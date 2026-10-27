@@ -14,3 +14,4 @@ Source observations and experiments behind the decisions. Each note keeps its da
 | [08](08-library-skills-and-mcp.md) | Library skills and the design system's docs MCP |
 | [09](09-site-feasibility.md) | TanStack Start, prerendering, offline and the design system under Bun |
 | [10](10-chat-knowledge-depth.md) | Deeper chat answers from a fuller knowledge base |
+| [11](11-knowledge-tooling.md) | TanStack AI and Vercel's AI tools for a much larger knowledge base |

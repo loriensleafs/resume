@@ -18,3 +18,4 @@ These records explain the choices behind this repository and their reasons. Numb
 | [0012](0012-vercel-pro-host.md) | Host the site and chat on Vercel Pro, with the Bun runtime |
 | [0013](0013-claude-sonnet-model.md) | The chat starts on Claude Sonnet 5.5 |
 | [0014](0014-library-skills-and-docs-mcp.md) | Agents load library skills through TanStack Intent and read the design system's docs MCP |
+| [0015](0015-sources-on-demand.md) | Deep dives become sources the chat opens on demand |
