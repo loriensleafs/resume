@@ -3,7 +3,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { loadResume } from "../../content";
 import { buildKnowledge } from "../build";
-import { parseId } from "../ids";
+import { isSourceId, parseId } from "../ids";
 import { KNOWLEDGE_BUDGET, renderKnowledge } from "../render";
 import { deepDive, FAKE_PHONE, fixture, removeFixtures, RESUME_YAML } from "./fixtures";
 
@@ -69,6 +69,7 @@ describe("buildKnowledge on fixtures", () => {
     const root = await fixture("topic-not-slug", {
       "knowledge/logistics.yaml": "topics:\n  - topic: -location\n    answer: Seattle area.\n    status: approved\n    approved: 2026-10-27\n",
     });
+    // zod's printed error sits between the file and the field.
     await expect(buildKnowledge({ root })).rejects.toThrow(/^knowledge\/logistics\.yaml: [\s\S]*not a slug[\s\S]*topics\[0\]\.topic/);
   });
 
@@ -88,8 +89,11 @@ describe("buildKnowledge on the real files", () => {
     const entries = await buildKnowledge({ root: REPO });
     const ids = entries.map((e) => e.id);
     expect(new Set(ids).size).toBe(ids.length);
-    // A "deep:" id names a deep dive by its source id until K3 replaces the form.
-    for (const id of ids) expect(parseId(id.replace(/^deep:/, ""))).toBeDefined();
+    for (const id of ids) {
+      // A "deep:" id names a deep dive by its source id until K3 replaces the form.
+      if (id.startsWith("deep:")) expect(isSourceId(id.slice("deep:".length))).toBe(true);
+      else expect(parseId(id)).toBeDefined();
+    }
   });
 
   test("covers every role, highlight, skills group and the lead", async () => {

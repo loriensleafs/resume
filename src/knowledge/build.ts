@@ -2,7 +2,7 @@
 // approved logistics answers. Every entry has a stable id the chat can cite.
 
 import { z } from "zod";
-import { displayUrl, formatLocation, formatRange, formatTitle, loadResume } from "../content";
+import { displayUrl, formatLocation, formatRange, formatTitle, loadResume, type Resume } from "../content";
 import { highlightId, isSlug, isSourceId, logisticsId, parseId, roleId, skillsId, SLUG_RULE, toSlug } from "./ids";
 import { KnowledgeError, parseDeepDive, SECTIONS, type DeepDive } from "./parse";
 
@@ -28,6 +28,18 @@ const logisticsSchema = z.strictObject({
   ),
 });
 
+/** Role ids and skills group names become ids, so each must give a slug. Logistics topics are checked in their schema. */
+function checkResumeSlugs(resume: Resume): void {
+  resume.work.forEach((job, i) => {
+    if (!isSlug(job.id)) throw new KnowledgeError("resume.yaml", `work[${i}].id "${job.id}" is not a slug: use ${SLUG_RULE}`);
+  });
+  resume.skills.forEach((group, i) => {
+    if (!isSlug(toSlug(group.name))) {
+      throw new KnowledgeError("resume.yaml", `skills[${i}].name "${group.name}" gives no slug: its slug needs ${SLUG_RULE}`);
+    }
+  });
+}
+
 export async function loadDeepDives(root: string): Promise<DeepDive[]> {
   const dir = `${root}/knowledge/deep-dives`;
   const files: string[] = [];
@@ -43,14 +55,7 @@ export async function loadDeepDives(root: string): Promise<DeepDive[]> {
 export async function buildKnowledge(options: { root?: string } = {}): Promise<Entry[]> {
   const root = options.root ?? REPO;
   const resume = await loadResume("public", root);
-  resume.work.forEach((job, i) => {
-    if (!isSlug(job.id)) throw new KnowledgeError("resume.yaml", `work[${i}].id "${job.id}" is not a slug: use ${SLUG_RULE}`);
-  });
-  resume.skills.forEach((group, i) => {
-    if (!isSlug(toSlug(group.name))) {
-      throw new KnowledgeError("resume.yaml", `skills[${i}].name "${group.name}" gives no slug: its slug needs ${SLUG_RULE}`);
-    }
-  });
+  checkResumeSlugs(resume);
   const b = resume.basics;
   const entries: Entry[] = [];
 

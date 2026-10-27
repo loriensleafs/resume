@@ -2,8 +2,9 @@
 // knowledge base looks like, for the build, the reads and the citation check.
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-const N = /^[1-9][0-9]*$/;
+const NUMBER_FROM_1 = /^[1-9][0-9]*$/;
 const SLUG_CHARACTERS = 60;
+/** A 60-character source id, a dot and a passage number up to 999. */
 const PASSAGE_ID_CHARACTERS = 64;
 
 /** How a slug is written, for error messages. */
@@ -40,8 +41,8 @@ export const logisticsId = (topic: string) => `logistics:${topic}`;
 /** Splits "<name>.<n>" at its last dot; undefined when the part after it is not a number from 1. */
 function splitNumber(s: string): [string, number] | undefined {
   const dot = s.lastIndexOf(".");
-  const n = s.slice(dot + 1);
-  return dot > 0 && N.test(n) ? [s.slice(0, dot), Number(n)] : undefined;
+  const digits = s.slice(dot + 1);
+  return dot > 0 && NUMBER_FROM_1.test(digits) ? [s.slice(0, dot), Number(digits)] : undefined;
 }
 
 /** The form of an id and its parts, or undefined when the id follows no form. */

@@ -195,7 +195,7 @@ export function logisticsId(topic: string): string;          // "logistics:<topi
 export const SLUG_RULE: string;
 ```
 
-`parseId()` gives the form only. Whether an id names an entry or a passage that exists is for the caller to check against the built knowledge.
+`parseId()` gives the form only. Whether an id names an entry or a passage that exists is for the caller to check against the built knowledge, with a `Map` or `Object.hasOwn()`: a slug such as `constructor` is also a property of every object.
 
 **Who gets which shape.**
 
