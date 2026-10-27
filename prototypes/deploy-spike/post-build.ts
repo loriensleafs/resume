@@ -79,8 +79,7 @@ const routes: Route[] = [
   // Step 3: the files, with the overrides above.
   { handle: "filesystem" },
   // Step 4: the API routes, case-sensitive.
-  // CONTROL RUN (D2): the API routes without caseSensitive. The restore commit puts it back.
-  ...apiRoutes.map((route) => ({ src: `^${escape(route.path)}$`, dest: route.fn })),
+  ...apiRoutes.map((route) => ({ src: `^${escape(route.path)}$`, dest: route.fn, caseSensitive: true })),
   // Step 5: every other path gets the not-found page with status 404.
   { src: "^/(.*)$", dest: "/404.html", status: 404 },
 ];

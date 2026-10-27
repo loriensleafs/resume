@@ -27,7 +27,8 @@ export default defineConfig({
       // https://vercel.com/docs/build-output-api/primitives#serverless-function-configuration
       vercel: {
         // SPEC-deploy's line: Nitro writes "bun1.x" when nothing sets the runtime. __server gets this config.
-        functions: { runtime: 'bun1.4.x', environment: { SPIKE_FUNCTION: '/__server' } },
+        // CONTROL RUN (D2): no runtime, so Nitro writes its default. The restore commit puts 'bun1.4.x' back.
+        functions: { environment: { SPIKE_FUNCTION: '/__server' } },
         functionRules: {
           // The chat's twin: its own function, as SPEC-deploy's functionRules gives /api/chat.
           '/api/spike': { maxDuration: 150, regions: ['iad1'], environment: { SPIKE_FUNCTION: '/api/spike' } },
