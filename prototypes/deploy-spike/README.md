@@ -89,8 +89,8 @@ Why this route. With the project's settings, Vercel posts only a commit status, 
 | 7 | Store writes finish after a stopped stream | D4 | Pending |
 | 8 | The WAF rules' case handling and content-type condition | D5 | Pending |
 | 9 | What the Upstash tokens can run | D4 | Pending |
-| 10 | Chrome's PDF viewer with the site's headers | D3 | Pending: Peter's check by hand, at https://resume-deploy-spike-26t9pe7rk-peterkloss.vercel.app/Peter-Kloss-Resume.pdf. The runs show the PDF served byte for byte with the six headers, no policy, `content-type: application/pdf` and `content-disposition: inline` (check 4) |
-| 11 | The Vercel Toolbar stays off | D3 | Pass, 2026-10-27 (run 40583006081, and 40581693149, 40582697904). In Chrome on the deployment URL, with the toolbar off for production and `x-vercel-skip-toolbar: 1`: no request to `vercel.live`, no toolbar element, no policy violation, and the built file byte for byte; without the header the page is the built file too. Planted controls prove the listener and both policies work. No run saw the toolbar on |
+| 10 | Chrome's PDF viewer with the site's headers | D3 | Pass, 2026-10-27, Peter's check by hand (decision record row 160): he opened https://resume-deploy-spike-26t9pe7rk-peterkloss.vercel.app/Peter-Kloss-Resume.pdf in Chrome, signed in to Vercel, and "Both pages show". That deployment is run 40583006081's; check 4 shows the PDF served byte for byte with the six headers, no policy, `content-type: application/pdf` and `content-disposition: inline` |
+| 11 | The Vercel Toolbar stays off | D3 | Pass for the production setting; the header's own effect is not proven. 2026-10-27, runs 40583006081, 40581693149 and 40582697904 on production deployments. They prove: with the toolbar off for production, Chrome on the deployment URL makes no request to `vercel.live`, has no toolbar element and no policy violation, and receives the built file byte for byte; a plain request without `x-vercel-skip-toolbar` also gets the built file; planted controls prove the listener and both policies work. They do not prove that `x-vercel-skip-toolbar` keeps an enabled toolbar off. Preview run 40584951645 (toolbar on by default) shows that check 11 goes red there: a plain request without the header got other bytes. But headless Chrome got the built file with and without the header, so the header's effect was not seen. Gap for D6; see "Check 11 on a preview" |
 | 12 | The status helper's name and Deployment Checks | D5 | Pending |
 
 ## Check 1: the build's Bun
@@ -256,7 +256,7 @@ check 3 (not-found paths): pass: /no-such-page, /API/chat, /API/spike, /sources/
    2. `^/(.*)$`: the six headers of SPEC-deploy's table.
    3. `^/(?!(?:Peter-Kloss-Resume\.pdf|Peter-Kloss-Resume\.docx|Peter-Kloss-Resume\.txt)$).*$`: the header policy.
    4. `^/(?:sw\.js|workbox-[0-9a-f]+\.js)$`: the worker policy. The worker files match routes 3 and 4, so they get the policy header from two routes: this is the merge that check 4 asks about.
-   Every route writes each header name in lower case, so no two routes set one header under two spellings.
+   The header routes write each header name in lower case, so no two routes set one header under two spellings. The redirect route writes `Location` as Vercel's docs do; no other route sets it.
 3. The policy tags (step 3): each HTML file, `404.html` included, starts its `<head>` with `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' <hashes>">`. The three prerendered pages have 4 inline scripts each; `404.html` has none and gets `script-src 'self'` alone. The tags come before `gen-sw.ts`, so the precache holds the tagged pages.
 4. The PDF: `public/Peter-Kloss-Resume.pdf`, `main`'s committed public PDF.
 
@@ -318,21 +318,72 @@ check 10 (PDF in Chrome's viewer): manual, Peter's: https://resume-deploy-spike-
 - **Encoded characters.** The path `/a%20b/%C3%A9` reached `Location` unchanged. The query `q=%2F&r=a+b` arrived as `q=%2F&r=a%20b`: Vercel parses the query and writes it again, so a `+` becomes `%20`. Both mean a space in a form-encoded query, which is how URLSearchParams reads it.
 - **`/api/` is not redirected** on the production address: `/api/build-info.json` answered 200 with the commit. The routes match without regard to case, so `(?!api/)` also leaves `/API/...` alone; no run asked that.
 - **The 308 carries the header routes' headers.** The redirect route comes first and has no `continue`, but the 308 had the six headers and the header policy (control run and final run), and Vercel's default `cache-control: public, max-age=0, must-revalidate`. The header routes come after it. So on Vercel, the headers of the `continue` routes after the redirect route still reach the 308. SPEC-deploy names no cache rule for the redirect.
-- **The toolbar stays off.** In every Chrome load: no request to `vercel.live`, no toolbar element, and the document byte for byte the built file. A plain request without `x-vercel-skip-toolbar` also got the built file. With the team's production setting Off, Vercel injects nothing into the deployment URL's pages, with or without the header. No run could show the toolbar on: the project has no preview deployments (its Ignored Build Step), and an agent does not change the setting.
+- **The toolbar stays off on production deployments.** In every Chrome load with the header: no request to `vercel.live`, no toolbar element, and the document byte for byte the built file. A plain request without `x-vercel-skip-toolbar` also got the built file. So with the team's production setting Off, Vercel changed nothing in the production deployment's pages. These runs say nothing about the header's own effect: the toolbar was off, so there was nothing for the header to keep out. "Check 11 on a preview" below is the one attempt to see the toolbar on.
 - **The split policy works on the real deployment.** Chrome reported no policy violation on `/`, a deep dive and the not-found page, with the header policy and each page's tag. The planted controls each gave their violation (`img-src` for the image, `script-src-elem` for the inline script), so both policies are enforced there. The service worker took control of `/` and the deep dive, so its own requests (the precache) got through, with the bypass cookie.
 - **Seen, not judged.** On `/`, Chrome logged `TypeError: Invalid action variant` from the design system's button in `routes-DcKKjtoG.js` (the spike's `DsButton`, older than D3), and one 404. The log does not name the 404's address; the local test shows Chrome asking for `/favicon.ico`, which the spike has not. The not-found page logs its own 404. None is a policy violation.
 - **The WAF.** Each run sent about 9 requests to `/api/` paths: 1 from the wait step, 3 from check 2, 3 from check 3, 1 from check 4 and 1 from check 5. No run met a 429.
 
-**Check 10, Peter's check.** He opens the PDF on the deployment URL in Chrome, signed in to Vercel. A pass: Chrome's own PDF viewer shows both pages of the resume, with its toolbar (page count, zoom, download), and the page is neither blank nor a download. A blank page, a "blocked" page or a file saved to Downloads is a fail; the "If it fails" change is that the documents' headers change.
+**Check 10, Peter's check: pass** (decision record row 160). Peter opened https://resume-deploy-spike-26t9pe7rk-peterkloss.vercel.app/Peter-Kloss-Resume.pdf, the PDF of run 40583006081's deployment, in Chrome while signed in to Vercel. His answer: "Both pages show". The pass rule was set before he looked: Chrome's own PDF viewer shows both pages, and the page is neither blank nor a download; a blank page, a "blocked" page or a file saved to Downloads would have failed. So the documents keep SPEC-deploy's headers: the six headers and no policy. Scope: one browser (Chrome, signed in to Vercel) and one deployment URL; the production domain was not tried, because it redirects.
+
+**Check 11 on a preview** (D3 review, one attempt). The production runs had the toolbar off, so they could not show the header working or check 11 going red. Vercel turns the toolbar on for previews by default (https://vercel.com/docs/vercel-toolbar), and the project's Ignored Build Step builds production only. So a throwaway branch, `prototype/d3-preview` (commit `9947f2d`, on top of `98316e1`), sets `"ignoreCommand": "exit 1"` in `vercel.json`. Vercel's docs: "This value overrides the Ignored Build Step in Project Settings" (https://vercel.com/docs/project-configuration/vercel-json#ignorecommand). So the branch built a protected preview with no dashboard change. Its own workflow runs `bun check.ts preview`, which waits for that preview on its Git branch URL and runs check 11 twice: with `x-vercel-skip-toolbar` on Chrome's requests, and without it. The plain request in check 11 never sends the header. The branch never merges, the spike branch included.
+
+Run 40584951645, preview `resume-deploy-spike-c94c3f395-peterkloss.vercel.app`, `VERCEL_ENV preview`:
+
+| Request | `/` | Requests to `vercel.live` |
+|---|---|---|
+| Chrome with `x-vercel-skip-toolbar` | the built file byte for byte | 0 |
+| Chrome without the header | the built file byte for byte | 0 |
+| A plain request (Bun's `fetch`) without the header | other bytes | not a browser |
+
+```text
+check 11 (Vercel Toolbar), preview, with x-vercel-skip-toolbar: FAIL: / without x-vercel-skip-toolbar answered HTTP 200 with other bytes than the built file; seen: /: HTTP 200, the built file byte for byte, 0 policy violations, 0 requests to vercel.live, other hosts: none, planted controls: script-src-elem inline, img-src https://example.invalid/spike-control.png, img-src https://example.invalid/spike-control.png, service worker controls the page, 2 console errors (console: TypeError: Invalid action variant at set variant (https://resume-deploy-spike-c94c3f395-peterkloss.vercel.app/assets/routes-DcKKjtoG.js:395:15588) at Reflect.se | network: Failed to load resource: the server responded with a status of 404 ()); /deep-dives/agent-workflows: HTTP 200, the built file byte for byte, 0 policy violations, 0 requests to vercel.live, other hosts: none, planted controls: script-src-elem inline, img-src https://example.invalid/spike-control.png, img-src https://example.invalid/spike-control.png, service worker controls the page, 0 console errors; /no-such-page: HTTP 404, the built file byte for byte, 0 policy violations, 0 requests to vercel.live, other hosts: none, planted controls: script-src-elem inline, img-src https://example.invalid/spike-control.png, img-src https://example.invalid/spike-control.png, service worker does not control the page, 1 console errors (network: Failed to load resource: the server responded with a status of 404 ()); / without x-vercel-skip-toolbar: HTTP 200, other bytes
+check 11 (Vercel Toolbar), preview, without x-vercel-skip-toolbar: FAIL: / without x-vercel-skip-toolbar answered HTTP 200 with other bytes than the built file; seen: /: HTTP 200, the built file byte for byte, 0 policy violations, 0 requests to vercel.live, other hosts: none, planted controls: script-src-elem inline, img-src https://example.invalid/spike-control.png, img-src https://example.invalid/spike-control.png, service worker controls the page, 2 console errors (console: TypeError: Invalid action variant at set variant (https://resume-deploy-spike-c94c3f395-peterkloss.vercel.app/assets/routes-DcKKjtoG.js:395:15588) at Reflect.se | network: Failed to load resource: the server responded with a status of 404 ()); /deep-dives/agent-workflows: HTTP 200, the built file byte for byte, 0 policy violations, 0 requests to vercel.live, other hosts: none, planted controls: script-src-elem inline, img-src https://example.invalid/spike-control.png, img-src https://example.invalid/spike-control.png, service worker controls the page, 0 console errors; /no-such-page: HTTP 404, the built file byte for byte, 0 policy violations, 0 requests to vercel.live, other hosts: none, planted controls: script-src-elem inline, img-src https://example.invalid/spike-control.png, img-src https://example.invalid/spike-control.png, service worker does not control the page, 1 console errors (network: Failed to load resource: the server responded with a status of 404 ()); / without x-vercel-skip-toolbar: HTTP 200, other bytes
+```
+
+What it shows:
+
+- **Check 11 can go red.** On the preview, the plain request without the header got other bytes than the built file, so Vercel changed the page there, and check 11 failed. On the production deployments the same request got the built file. The run prints no page content, so what Vercel added is not seen; the toolbar is the likely change, because it is on for previews.
+- **The header's effect is not proven.** Headless Chrome got the built file and made no request to `vercel.live` also without the header, so the Chrome loads cannot tell the header's effect apart. A hypothesis, not tested: Vercel adds nothing for headless Chrome, whose user agent says `HeadlessChrome`. The run also made no plain request with the header, which would have isolated it.
+- **The gap, for D6.** A second attempt would load the preview in Chrome with a user agent without `Headless`, make a plain request both with and without the header, and print booleans about the changed bytes (whether they hold `vercel.live`). The task allowed one attempt, so this one stops here.
+- `prototype/d3-preview` and its preview deployment stay on GitHub and on the project; any later push to that branch builds a preview again.
+
+**The scope of these verdicts** (for D6 and D18).
+
+- **The route list the runs used**, in this order (13 routes):
+  1. one host redirect, for `project-8ar0o.vercel.app` only;
+  2. the header routes: the cache rule (`/assets/` and Workbox in one route), the six headers, the header policy, the worker policy;
+  3. spike only: the two query routes from `/api/spike` to `/__server` and `/api/spike-bun1x`;
+  4. new to the spec (D2, route 3): each function folder that no API route names gets `/404.html` with status 404;
+  5. `{ "handle": "filesystem" }`, with the overrides;
+  6. the API routes `/api/spike` and `/api/cron/health`, case-sensitive;
+  7. every other path gets `/404.html` with status 404.
+- **How it differs from SPEC-deploy's order** (host redirects, headers, filesystem, three API routes, not-found page):
+  - one host route, not four;
+  - the spike's query routes and the function-folder route sit between the header routes and the filesystem;
+  - the API routes are the spike's, not `/api/chat`, `/api/status` and `/api/cron/health`;
+  - SPEC-deploy gives the headers as one step and fixes no order inside it; the spike's order is cache, six headers, header policy, worker policy;
+  - one cache route covers `/assets/` and Workbox.
+- **Check 4** read nine paths of one deployment at a time. Only the policy header was set by two routes; every other header came from one route.
+- **Check 5 and the 308 with its headers** were tested on one host only, the project's `.vercel.app` address, with three paths and one encoded path. pkloss.dev, pwk.dev and www.peterkloss.dev have no domain on this project. Their routes have the same form with another `eq` value, but no run asked them, so the kept query, the `+` to `%20` rewrite and the headers on the 308 are seen on one host only.
+- **Check 10** is one browser (Chrome, signed in to Vercel) on one deployment URL.
+- **Check 11** passed on production deployments only. The preview attempt below proves that the check goes red on a preview, but not that `x-vercel-skip-toolbar` keeps an enabled toolbar off.
+- **The header rule in D18.** Two ways keep exactly one policy on each worker file:
+
+  | Way | What decides the worker files' policy | What it costs |
+  |---|---|---|
+  | The worker route last (the spike's order, and SPEC-deploy's sentence "from the last matching route") | Vercel's merge: the last matching route wins. The runs and the control prove it on Vercel; Vercel's docs do not state it for Build Output routes, but Next.js documents the same rule for its `headers` ("If two headers match the same path and set the same header key, the last header key will override the first", https://nextjs.org/docs/app/api-reference/config/next-config-js/headers) | The order matters: `config.test.ts` must fail when the worker route moves before the header policy route, and `bun run preview` must apply the routes in order, a later value replacing an earlier one |
+  | Header routes whose paths never overlap | One route only: the header policy route's `src` leaves out the worker files, as it leaves out the documents | Two patterns must stay in step: each file with its own policy must also be in the header policy route's exclusion. The runs tested such an exclusion for the PDF, not for the worker files. A file left out of the exclusion falls back to the merge rule anyway |
+
+  Recommended: the worker route last. It needs no spec change, the spike proved it with a control, it is the rule Vercel documents for its own framework, and a test can pin the order. The other way trades one order rule for two lists that must agree.
 
 **For D6** (nothing in the spec changes here):
 
 - Check 4: the header routes as SPEC-deploy writes them work. Copy "the last matching route wins" as seen, with the control. D18's `writeVercelConfig()` keeps the worker policy route after the header policy route, and `config.test.ts` checks that order.
 - Check 5: pass; the redirect route needs no query of its own. Record the `+` to `%20` change, and that the 308 carries the headers.
-- Check 11: pass, with the limit above (no run with the toolbar on).
-- Check 10: Peter's verdict, once he gives it.
+- Check 11: pass for the production setting. Copy the gap with it: no run proves that `x-vercel-skip-toolbar` keeps an enabled toolbar off, because headless Chrome got the preview's built page with and without the header. D26's smoke check runs headless Chrome too, so a plain request compared byte for byte with the built file is what saw Vercel change a page.
+- Check 10: pass, by Peter's hand (row 160). The documents' headers stay as SPEC-deploy gives them.
 - Research 12 can add: Vercel sends `content-disposition: inline; filename="<name>"` with static files, and its default `cache-control` on a 308.
-- Not tested: whether one header name in two spellings (`Content-Security-Policy` in one route, `content-security-policy` in another) merges as one. The spike's routes spell every name in lower case, and D18 can do the same.
+- Not tested: whether one header name in two spellings (`Content-Security-Policy` in one route, `content-security-policy` in another) merges as one. The spike's header routes spell every name in lower case, and D18 can do the same.
 
 **For D4 and D5.**
 
