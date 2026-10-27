@@ -3,16 +3,18 @@
 // (SPEC-deploy, Documents).
 //
 // `docx` and Chrome stamp the build date into every file, so two builds of the same inputs
-// differ byte for byte. The inputs hash in documents/inputs.sha256 decides instead: an
-// unchanged hash writes nothing, and the committed files stay as they are.
+// differ byte for byte. The inputs hash in documents/inputs.sha256 decides instead: when no
+// input changed, nothing is written, and the committed files stay as they are.
 
 import { $ } from "bun";
 import { BASENAME, build } from "../src/build";
 
 const REPO = `${import.meta.dir}/..`;
+const DOCUMENTS_DIR = `${REPO}/documents`;
 
 // The documents' inputs (SPEC-content, Acceptance): the resume source, this module's source
-// files and the fonts. Test folders are not source files, so a test change needs no rebuild.
+// files and the fonts. Bun.Glob skips dotfiles, such as macOS's .DS_Store, and test folders
+// are not source files, so neither is an input.
 const INPUT_FILES = [
   "resume.yaml",
   "src/content.ts",
@@ -28,47 +30,68 @@ const LOCKED_PACKAGES = ["docx", "harfbuzzjs", "zod"];
 
 const sha256 = (data: string | Uint8Array) => new Bun.CryptoHasher("sha256").update(data).digest("hex");
 
-/** One hash over every input of the documents, in the form documents/inputs.sha256 holds. */
-export async function inputsHash(root = REPO): Promise<string> {
-  const paths = new Set<string>();
+/**
+ * The inputs hash, as documents/inputs.sha256 holds it: one `<sha256>  <name>` line per input
+ * in sha256sum form, sorted by name. A file's name is its path from the repo root; a locked
+ * package is `bun.lock#<package>`, hashed from its bun.lock entry.
+ */
+export async function inputsManifest(): Promise<string> {
+  const hashes = new Map<string, string>();
   for (const pattern of INPUT_FILES) {
-    // A dotfile, such as macOS's .DS_Store, is never an input.
-    for await (const path of new Bun.Glob(pattern).scan({ cwd: root, onlyFiles: true })) {
-      if (!path.split("/").includes("__tests__")) paths.add(path);
+    for await (const path of new Bun.Glob(pattern).scan({ cwd: REPO, onlyFiles: true })) {
+      if (!path.split("/").includes("__tests__")) hashes.set(path, sha256(await Bun.file(`${REPO}/${path}`).bytes()));
     }
   }
-
-  // Each line is "<sha256>  <name>", as sha256sum writes it; the lines are hashed together.
-  const lines: string[] = [];
-  for (const path of [...paths].sort()) lines.push(`${sha256(await Bun.file(`${root}/${path}`).bytes())}  ${path}`);
-
-  const lock = Bun.JSONC.parse(await Bun.file(`${root}/bun.lock`).text()) as { packages: Record<string, unknown> };
+  const lock = Bun.JSONC.parse(await Bun.file(`${REPO}/bun.lock`).text()) as { packages: Record<string, unknown> };
   for (const name of LOCKED_PACKAGES) {
     const entry = lock.packages[name];
     if (!entry) throw new Error(`bun.lock has no top-level entry for ${name}`);
-    lines.push(`${sha256(JSON.stringify(entry))}  bun.lock#${name}`);
+    hashes.set(`bun.lock#${name}`, sha256(JSON.stringify(entry)));
   }
-  return sha256(lines.map((line) => `${line}\n`).join(""));
+  return [...hashes.keys()]
+    .sort()
+    .map((name) => `${hashes.get(name)}  ${name}\n`)
+    .join("");
+}
+
+/** The inputs hash committed in a documents folder, or "" when the folder has none. */
+export async function committedManifest(dir = DOCUMENTS_DIR): Promise<string> {
+  const file = Bun.file(`${dir}/inputs.sha256`);
+  return (await file.exists()) ? file.text() : "";
+}
+
+/** The names of the inputs whose hash differs between two inputs hashes, or that only one lists. */
+export function changedInputs(before: string, after: string): string[] {
+  const a = hashesByName(before);
+  const b = hashesByName(after);
+  return [...new Set([...a.keys(), ...b.keys()])].filter((name) => a.get(name) !== b.get(name)).sort();
+}
+
+function hashesByName(manifest: string): Map<string, string> {
+  const hashes = new Map<string, string>();
+  for (const line of manifest.split("\n")) {
+    const match = line.match(/^([0-9a-f]{64}) {2}(.+)$/);
+    if (match) hashes.set(match[2]!, match[1]!);
+  }
+  return hashes;
 }
 
 const DOCUMENTS = ["pdf", "docx", "txt"] as const;
 
 if (import.meta.main) {
-  const dir = `${REPO}/documents`;
-  const hashFile = Bun.file(`${dir}/inputs.sha256`);
-  const hash = await inputsHash();
-  const committed = (await hashFile.exists()) ? (await hashFile.text()).trim() : "";
-  const present = await Promise.all(DOCUMENTS.map((ext) => Bun.file(`${dir}/${BASENAME}.${ext}`).exists()));
+  const manifest = await inputsManifest();
+  const changed = changedInputs(await committedManifest(), manifest);
+  const present = await Promise.all(DOCUMENTS.map((ext) => Bun.file(`${DOCUMENTS_DIR}/${BASENAME}.${ext}`).exists()));
 
-  if (committed === hash && present.every(Boolean)) {
-    console.log("documents/ is up to date: the inputs hash has not changed, so nothing was written.");
+  if (changed.length === 0 && present.every(Boolean)) {
+    console.log("documents/ is up to date: no input changed, so nothing was written.");
   } else {
     const tmp = `${Bun.env.TMPDIR ?? "/tmp"}/resume-documents-${crypto.randomUUID()}`;
     try {
       const [built] = await build({ outDir: tmp, variants: ["public"] });
-      for (const ext of DOCUMENTS) await Bun.write(`${dir}/${BASENAME}.${ext}`, Bun.file(built![ext]));
-      // The hash goes last, so an interrupted run never pairs a new hash with old documents.
-      await Bun.write(hashFile, `${hash}\n`);
+      for (const ext of DOCUMENTS) await Bun.write(`${DOCUMENTS_DIR}/${BASENAME}.${ext}`, Bun.file(built![ext]));
+      // The inputs hash goes last, so an interrupted run never pairs it with old documents.
+      await Bun.write(`${DOCUMENTS_DIR}/inputs.sha256`, manifest);
     } finally {
       await $`rm -rf ${tmp}`.quiet().nothrow();
     }
