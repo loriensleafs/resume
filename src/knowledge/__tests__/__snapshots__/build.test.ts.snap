@@ -47,3 +47,24 @@ exports[`buildKnowledge on the real files renders the core the chat sees (snapsh
 # Catalog
 "
 `;
+
+exports[`renderSource on buildKnowledge's output renders a fixture source as the chat reads it (snapshot; review the diff when the rendered text changes) 1`] = `
+"# [sample] Why platform work
+Interview: Peter's own words, in the first person.
+Roles: acme. Links: https://github.com/loriensleafs/brain.
+
+## [sample.1] Why front-end platform work?
+I like building what other engineers use.
+
+## [sample.2] Why front-end platform work? (continued)
+And I like seeing a whole team move faster.
+
+## [sample.3] How did you help with the migration?
+I helped plan it.
+
+## Not public: decline to describe these kinds of material
+Colleague names.
+"
+`;
+
+exports[`buildKnowledge on the real files lists every approved source's passage ids with their headings (snapshot, append-only: accept a diff only when it adds lines at the end of a source's list, or a new source's list) 1`] = `[]`;

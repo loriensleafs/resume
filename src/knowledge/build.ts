@@ -7,14 +7,11 @@ import { z } from "zod";
 import { displayUrl, formatLocation, formatRange, formatTitle, loadResume, type Resume } from "../content";
 import { highlightId, isSlug, isSourceId, logisticsId, PASSAGE_ID_RULE, parseId, roleId, skillsId, SLUG_RULE, SOURCE_ID_RULE, toSlug } from "./ids";
 import { KnowledgeError, LINE_BREAK, parseSource } from "./parse";
+import { PASSAGE_CHARACTERS, renderSource, SOURCE_CHARACTERS, SUMMARY_CHARACTERS } from "./render";
 import type { Entry, Knowledge, Source } from "./types";
 
 const REPO = `${import.meta.dir}/../..`;
 const SOURCES = "knowledge/sources";
-
-/** In an approved source (SPEC-knowledge, Objective; Sources, "Summary"). */
-const PASSAGE_CHARACTERS = 3000;
-const SUMMARY_CHARACTERS = 200;
 
 /**
  * A link as written: "https://", then no white space, control character, invisible format
@@ -122,7 +119,8 @@ const bySourceId = (a: Source, b: Source) => (a.id < b.id ? -1 : a.id > b.id ? 1
 
 /**
  * Every rule of an approved source that `source` breaks, each naming its field, in front-matter
- * order and then passage order; an empty list when it breaks none. `resumeIds` holds the ids of
+ * order, then passage order, then Not public, then the size of the source as the chat reads it
+ * (renderSource()); an empty list when it breaks none. `resumeIds` holds the ids of
  * the resume entries, where its roles and highlights must be. parseSource() has checked the shape
  * already. A draft meets these rules only once approved, and previewDraft() names the ones it
  * breaks (Drafts and approval).
@@ -159,6 +157,8 @@ function checkSource(source: Source, resumeIds: ReadonlySet<string>): string[] {
     problems.push('Not public holds a URL or an IP address; it names kinds of material only, such as "internal links"');
   }
   if (EMAIL_ADDRESS.test(source.notPublic)) problems.push('Not public holds an email address; it names kinds of material only, such as "colleague names"');
+  const rendered = renderSource(source).length;
+  if (rendered > SOURCE_CHARACTERS) problems.push(`the rendered source has ${rendered} characters; an approved source renders to at most ${SOURCE_CHARACTERS}`);
   return problems;
 }
 

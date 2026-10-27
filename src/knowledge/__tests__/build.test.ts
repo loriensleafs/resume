@@ -1,11 +1,12 @@
 // Seam 1 of SPEC-knowledge: buildKnowledge() on fixtures and on the real files, with renderCore()
-// on its output.
+// and renderSource() on its output.
 
 import { afterAll, describe, expect, test } from "bun:test";
 import { loadResume } from "../../content";
+import { holds } from "../../private-details";
 import { buildKnowledge } from "../build";
 import { parseId } from "../ids";
-import { renderCore } from "../render";
+import { renderCore, renderSource } from "../render";
 import type { Source } from "../types";
 import { DEEP_DIVE_BODY, deepDiveFile, FAKE_PHONE, fixture, interviewFile, removeFixtures, RESUME_YAML } from "./fixtures";
 
@@ -129,10 +130,13 @@ describe("buildKnowledge on fixtures", () => {
     expect(text).toEndWith("# Catalog\n");
   });
 
-  test("keeps private details out of the core and the sources", async () => {
+  test("keeps private details out of the core and the sources, and out of their rendered text", async () => {
     const root = await fixture("private", SOURCES);
     const knowledge = await buildKnowledge({ root });
-    expect(renderCore(knowledge)).not.toContain(FAKE_PHONE);
+    const rendered = [renderCore(knowledge), ...knowledge.sources.map((s) => renderSource(s))];
+    expect(rendered).toHaveLength(3);
+    // holds() finds the number in any format, not only as private.yaml writes it.
+    expect(rendered.some((text) => holds(text, FAKE_PHONE))).toBe(false);
     expect(JSON.stringify(knowledge)).not.toContain(FAKE_PHONE);
   });
 
@@ -174,6 +178,106 @@ describe("buildKnowledge on fixtures", () => {
   });
 });
 
+describe("renderSource on buildKnowledge's output", () => {
+  test("renders a deep dive whole: its header, kind line, roles and highlights, every passage in file order, then Not public", async () => {
+    const [alpha] = await builds("render-deep-dive", SOURCES);
+    expect(renderSource(alpha!)).toBe(
+      [
+        "# [alpha] The first thing",
+        "Deep dive: written from Peter's answers, in the third person.",
+        "Roles: acme. Highlights: highlight:acme.1.",
+        "",
+        "## [alpha.1] Problem",
+        "Text for Problem.",
+        "",
+        "## [alpha.2] What Peter did",
+        "Text for What Peter did.",
+        "",
+        "## [alpha.3] How it worked",
+        "Text for How it worked.",
+        "",
+        "## [alpha.4] Result",
+        "Text for Result.",
+        "",
+        "## [alpha.5] Tools",
+        "Text for Tools.",
+        "",
+        "## Not public: decline to describe these kinds of material",
+        "Internal code.",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  test("renders an interview with its kind line, and leaves out the line of roles, highlights and links when all three are empty", async () => {
+    const [, alphaBeta] = await builds("render-interview", SOURCES);
+    expect(renderSource(alphaBeta!)).toBe(
+      [
+        "# [alpha-beta] Why platform work",
+        "Interview: Peter's own words, in the first person.",
+        "",
+        "## [alpha-beta.1] Why front-end platform work?",
+        "I like building what other engineers use.",
+        "",
+        "## [alpha-beta.2] Why front-end platform work? (continued)",
+        "And I like seeing a whole team move faster.",
+        "",
+        "## [alpha-beta.3] How did you help with the migration?",
+        "I helped plan it.",
+        "",
+        "## Not public: decline to describe these kinds of material",
+        "Colleague names.",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  test.each([
+    ["roles only", interviewFile(), "Roles: acme."],
+    ["links only", interviewFile({ roles: "[]", links: '["https://github.com/loriensleafs/brain", "https://peterkloss.dev"]' }), "Links: https://github.com/loriensleafs/brain, https://peterkloss.dev."],
+    ["highlights only", deepDiveFile({ roles: "[]" }), "Highlights: highlight:acme.1."],
+    [
+      "roles, highlights and links",
+      deepDiveFile({ highlights: "[highlight:acme.1, highlight:acme.2]", links: '["https://peterkloss.dev"]' }),
+      "Roles: acme. Highlights: highlight:acme.1, highlight:acme.2. Links: https://peterkloss.dev.",
+    ],
+  ])("renders the line after the kind line with only its parts that are not empty: %s", async (_case, file, line) => {
+    const [source] = await builds(`render-line-${_case.replaceAll(/[ ,]+/g, "-")}`, { [SAMPLE]: file });
+    expect(renderSource(source!).split("\n").slice(2, 4)).toEqual([line, ""]);
+  });
+
+  test("renders only the passages asked for, in file order, with the header and Not public once", async () => {
+    const [alpha] = await builds("render-passages", SOURCES);
+    expect(renderSource(alpha!, ["alpha.4", "alpha.2"])).toBe(
+      [
+        "# [alpha] The first thing",
+        "Deep dive: written from Peter's answers, in the third person.",
+        "Roles: acme. Highlights: highlight:acme.1.",
+        "",
+        "## [alpha.2] What Peter did",
+        "Text for What Peter did.",
+        "",
+        "## [alpha.4] Result",
+        "Text for Result.",
+        "",
+        "## Not public: decline to describe these kinds of material",
+        "Internal code.",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  test('writes "Nothing listed." under Not public when the section is empty', async () => {
+    const [source] = await builds("render-nothing-listed", { [SAMPLE]: deepDiveFile({}, DEEP_DIVE_BODY.replace("Internal code.", "")) });
+    expect(renderSource(source!)).toEndWith("## [sample.5] Tools\nText for Tools.\n\n## Not public: decline to describe these kinds of material\nNothing listed.\n");
+  });
+
+  test("renders a fixture source as the chat reads it (snapshot; review the diff when the rendered text changes)", async () => {
+    const [source] = await builds("render-snapshot", { [SAMPLE]: interviewFile({ links: '["https://github.com/loriensleafs/brain"]' }) });
+    expect(renderSource(source!)).toMatchSnapshot();
+  });
+});
+
 describe("buildKnowledge on the rules of an approved source", () => {
   test.each([
     ["a capital letter", "Sample"],
@@ -197,8 +301,14 @@ describe("buildKnowledge on the rules of an approved source", () => {
   test("stops an approved source whose passage id would pass 64 characters, and names the passage", async () => {
     const id = "a".repeat(60);
     const body = [...Array.from({ length: 1000 }, (_, i) => `## Question ${i + 1}?\n\nAn answer.\n`), "## Not public\n\nColleague names.\n"].join("\n");
+    // 1,000 passages never render under 24,000 characters, so the source's size stops it too.
     expect(await stops("passage-id-65", { [`knowledge/sources/${id}.md`]: interviewFile({ id }, body) })).toBe(
-      `knowledge/sources/${id}.md: passage ${id}.1000 ("Question 1000?") breaks the passage id rule: use <source id>.<n>, at most 64 characters; this id has 65`,
+      [
+        `passage ${id}.1000 ("Question 1000?") breaks the passage id rule: use <source id>.<n>, at most 64 characters; this id has 65`,
+        "the rendered source has 96010 characters; an approved source renders to at most 24000",
+      ]
+        .map((problem) => `knowledge/sources/${id}.md: ${problem}`)
+        .join("\n"),
     );
   });
 
@@ -294,8 +404,13 @@ describe("buildKnowledge on the rules of an approved source", () => {
   test("checks a Not public section of 300,000 characters with no break in it well under a second", async () => {
     const root = await fixture("not-public-long", { [SAMPLE]: deepDiveFile({}, DEEP_DIVE_BODY.replace("Internal code.", "a".repeat(300_000))) });
     const start = performance.now();
-    await buildKnowledge({ root });
+    const message = await buildKnowledge({ root }).then(
+      () => "",
+      (e: Error) => e.message,
+    );
     expect(performance.now() - start).toBeLessThan(500);
+    // Only the size stops it: no URL, IP address or email address pattern matches the plain text.
+    expect(message).toMatch(/^knowledge\/sources\/sample\.md: the rendered source has \d+ characters; an approved source renders to at most 24000$/);
   });
 
   test.each([
@@ -345,6 +460,26 @@ describe("buildKnowledge on the rules of an approved source", () => {
     expect((await builds("passage-3000", { [SAMPLE]: deepDiveFile({}, body) }))[0]!.passages[1]!.text).toHaveLength(3000);
   });
 
+  /**
+   * The fixture interview with nine questions: eight answers of 2,600 characters, then `last`. The
+   * rendered text around the answers holds 422 characters: the header (92), each passage's heading
+   * line and the blank line before it (28 each), and Not public with its blank line and the final line
+   * break (78). So a last answer of 2,778 characters renders the source to exactly 24,000.
+   */
+  const nineAnswers = (last: number) =>
+    [...[...Array(8).fill(2600), last].map((n, i) => `## Question ${i + 1}?\n\n${"a".repeat(n)}\n`), "## Not public\n\nColleague names.\n"].join("\n");
+
+  test("stops an approved source whose rendered text has over 24,000 characters, and names its size", async () => {
+    expect(await stops("source-24001", { [SAMPLE]: interviewFile({}, nineAnswers(2779)) })).toBe(
+      `${SAMPLE}: the rendered source has 24001 characters; an approved source renders to at most 24000`,
+    );
+  });
+
+  test("lets an approved source render to exactly 24,000 characters", async () => {
+    const [source] = await builds("source-24000", { [SAMPLE]: interviewFile({}, nineAnswers(2778)) });
+    expect(renderSource(source!)).toHaveLength(24_000);
+  });
+
   test.each([
     ["201 characters", "a".repeat(201), "it has 201 characters on 1 line"],
     ["two lines", "|\n  First line.\n  Second line.", "it has 24 characters on 2 lines"],
@@ -367,7 +502,8 @@ describe("buildKnowledge on the rules of an approved source", () => {
       summary: "a".repeat(201),
       links: '["http://example.com/", "https://peter:hunter2@example.com/"]',
     };
-    const body = DEEP_DIVE_BODY.replace("Text for Problem.", "a".repeat(3001))
+    // The 24,001-character passage takes the rendered source past its budget too: 507 characters around it.
+    const body = DEEP_DIVE_BODY.replace("Text for Problem.", "a".repeat(24_001))
       .replace("Text for Result.", "")
       .replace("Internal code.", "See https://wiki.example.com/ or ask alice@example.com.");
     expect(await stops("every-rule", { [SAMPLE]: deepDiveFile(front, body) })).toBe(
@@ -377,10 +513,11 @@ describe("buildKnowledge on the rules of an approved source", () => {
         "summary must be one line of 1 to 200 characters; it has 201 characters on 1 line",
         "links[0] is not an absolute https:// URL: write it in full, with no space, line break, backslash or invisible character",
         "links[1] holds a user name or password: give the URL without them",
-        'passage sample.1 ("Problem") has 3001 characters; an approved passage holds at most 3000',
+        'passage sample.1 ("Problem") has 24001 characters; an approved passage holds at most 3000',
         'passage sample.4 ("Result") has no text; an approved passage holds text, and only Not public may be empty',
         'Not public holds a URL or an IP address; it names kinds of material only, such as "internal links"',
         'Not public holds an email address; it names kinds of material only, such as "colleague names"',
+        "the rendered source has 24508 characters; an approved source renders to at most 24000",
       ]
         .map((problem) => `${SAMPLE}: ${problem}`)
         .join("\n"),
@@ -399,7 +536,8 @@ describe("buildKnowledge on a draft source file", () => {
       summary: "a".repeat(201),
       links: '["http://example.com/", "https://peter:hunter2@example.com/"]',
     };
-    const body = DEEP_DIVE_BODY.replace("Text for Problem.", "a".repeat(3001))
+    // Over the passage budget, and with it over the rendered source's budget.
+    const body = DEEP_DIVE_BODY.replace("Text for Problem.", "a".repeat(24_001))
       .replace("Text for Result.", "")
       .replace("Internal code.", "See https://wiki.example.com/ or ask alice@example.com.");
     const sources = await builds("draft-every-rule", { ...SOURCES, "knowledge/sources/Draft_One.md": deepDiveFile(front, body) });
@@ -447,5 +585,12 @@ describe("buildKnowledge on the real files", () => {
 
   test("renders the core the chat sees (snapshot; review the diff when content changes)", async () => {
     expect(renderCore(await buildKnowledge({ root: REPO }))).toMatchSnapshot();
+  });
+
+  // Approved passages are append-only (SPEC-knowledge, Sources), so an approved passage id always
+  // names the same passage, also in a visitor's saved session. Empty until the first source is approved.
+  test("lists every approved source's passage ids with their headings (snapshot, append-only: accept a diff only when it adds lines at the end of a source's list, or a new source's list)", async () => {
+    const { sources } = await buildKnowledge({ root: REPO });
+    expect(sources.flatMap((s) => s.passages.map((p) => `[${p.id}] ${p.heading}`))).toMatchSnapshot();
   });
 });
