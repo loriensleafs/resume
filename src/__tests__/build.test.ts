@@ -131,6 +131,7 @@ describe("an invalid resume source", () => {
 work:
   - id: acme
     name: Acme
+    x-short: Acme
     position: Engineer
     startDate: 2020
     highlights: [Did a thing.]
@@ -153,6 +154,12 @@ education: []
   test("stops the build and names a bad date", async () => {
     await expect(attempt("date", base.replace("startDate: 2020", 'startDate: "Dec 2020"'))).rejects.toThrow(
       /YYYY[\s\S]*work\[0\]\.startDate/,
+    );
+  });
+
+  test("stops the build and names a role without its x-short", async () => {
+    await expect(attempt("no-short", base.replace("    x-short: Acme\n", ""))).rejects.toThrow(
+      /^resume\.yaml is not valid:[\s\S]*work\[0\]\["x-short"\]/,
     );
   });
 

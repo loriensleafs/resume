@@ -16,6 +16,8 @@ const profile = z.strictObject({ network: text, username: text, url: z.url() });
 const job = z.strictObject({
   id: z.string().regex(/^[a-z0-9-]+$/, "use lowercase letters, digits and hyphens"),
   name: text,
+  // The career timeline's label for the role (SPEC-site). Only the site reads it; no document prints it.
+  "x-short": text,
   position: text,
   team: text.optional(),
   promotedFrom: text.optional(),

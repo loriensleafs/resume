@@ -21,6 +21,8 @@ const fixture = (overrides: Partial<Resume> = {}): Resume => ({
     {
       id: "acme",
       name: "Acme & Co <Labs>",
+      // Each x-short appears nowhere else in the fixture, so a renderer that prints it fails the tests.
+      "x-short": "ACME-SHORT",
       position: "Engineer",
       team: "Platform team",
       promotedFrom: "Junior Engineer",
@@ -29,7 +31,16 @@ const fixture = (overrides: Partial<Resume> = {}): Resume => ({
       highlights: ["Built <things> & shipped them."],
       earlier: false,
     },
-    { id: "old", name: "Old Co", position: "Developer", startDate: "2010", endDate: "2012", highlights: [], earlier: true },
+    {
+      id: "old",
+      name: "Old Co",
+      "x-short": "OLD-SHORT",
+      position: "Developer",
+      startDate: "2010",
+      endDate: "2012",
+      highlights: [],
+      earlier: true,
+    },
   ],
   skills: [{ name: "Tools", keywords: ["Bun", "TypeScript"] }],
   education: [{ institution: "A University" }],
@@ -83,6 +94,11 @@ describe("renderPrintHtml", () => {
     withPhone.basics.phone = "(555) 555-0100";
     expect(renderPrintHtml(withPhone, "FONTS")).toContain("<span>(555) 555-0100</span>");
   });
+
+  test("prints no role's x-short, for a role or an earlier role", () => {
+    expect(html).not.toContain("ACME-SHORT");
+    expect(html).not.toContain("OLD-SHORT");
+  });
 });
 
 describe("renderText", () => {
@@ -103,6 +119,11 @@ describe("renderText", () => {
   test("omits the earlier-roles heading when there are none", () => {
     expect(renderText(fixture({ work: [fixture().work[0]!] }))).not.toContain("Earlier roles");
   });
+
+  test("prints no role's x-short, for a role or an earlier role", () => {
+    expect(text).not.toContain("ACME-SHORT");
+    expect(text).not.toContain("OLD-SHORT");
+  });
 });
 
 describe("renderDocx", () => {
@@ -114,5 +135,15 @@ describe("renderDocx", () => {
     expect(xml).toContain("Acme &amp; Co &lt;Labs&gt;");
     expect(xml).toContain('<w:tab w:val="right"');
     expect(xml).toContain("<w:numPr>");
+  });
+
+  test("prints no role's x-short in any part of the file, for a role or an earlier role", async () => {
+    const path = `${Bun.env.TMPDIR ?? "/tmp"}/resume-render-${crypto.randomUUID()}.docx`;
+    await Bun.write(path, await renderDocx(fixture()));
+    const parts = await $`unzip -p ${path}`.text();
+    await $`rm -f ${path}`.quiet();
+    expect(parts).toContain("Old Co"); // control: the parts were read
+    expect(parts).not.toContain("ACME-SHORT");
+    expect(parts).not.toContain("OLD-SHORT");
   });
 });
