@@ -88,7 +88,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [C14](modules/chat.md#c14-turn-telemetry-summed-usage-and-one-chat_turn-event-per-turn) Turn telemetry: summed usage and one `chat_turn` event per turn — blocked by C4, C12
 - [ ] [C15](modules/chat.md#c15-the-system-prompt-the-scope-and-audience-lines-and-the-refusal-wordings) The system prompt, the scope and audience lines, and the refusal wordings — blocked by C7 to C9; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [Checkpoint chat: the handler](modules/chat.md#checkpoint-chat-the-handler) — after C3 to C15
-- [ ] [S3](modules/site.md#s3-the-resume-view-from-build-time-data-with-knowledge-ids) The resume view from build-time data, with knowledge ids — blocked by S2, K1
+- [x] [S3](modules/site.md#s3-the-resume-view-from-build-time-data-with-knowledge-ids) The resume view from build-time data, with knowledge ids — blocked by S2, K1 (done 2026-10-27; each entry carries its id in `data-knowledge-id`; `root` reaches the data)
 - [ ] [S4](modules/site.md#s4-the-app-bar-and-design-system-parts-in-prerendered-pages) The app bar, and design-system parts in prerendered pages — blocked by S3
 - [ ] [S5](modules/site.md#s5-the-static-not-found-page) The static not-found page — blocked by S4
 - [ ] [S6](modules/site.md#s6-page-titles-descriptions-canonical-addresses-and-share-previews) Page titles, descriptions, canonical addresses and share previews — blocked by S3
