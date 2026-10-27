@@ -1,6 +1,6 @@
 # Spec: chat
 
-Approved by Peter on 2026-10-27. Amended after an audit with the missing brain skills and the design system's skills and MCP server, and approved again the same day ([decision record](../docs/design/interview-2026-10-26.md) rows 85 to 106). Amended again on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (row 127): the turn's budget, the limit state, the request caps, the Origin check, the usage fields, and the read tool staying listed. Amended on 2026-10-27 after the spec reviews (decision record rows 128 to 136). Approved by Peter with the updated mockups on 2026-10-27 (decision record row 139); the scope label and the texts follow rows 137 and 138.
+Approved by Peter on 2026-10-27. Amended after an audit with the missing brain skills and the design system's skills and MCP server, and approved again the same day ([decision record](../docs/design/interview-2026-10-26.md) rows 85 to 106). Amended again on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (row 127): the turn's budget, the limit state, the request caps, the Origin check, the usage fields, and the read tool staying listed. Amended on 2026-10-27 after the spec reviews (decision record rows 128 to 136). Approved by Peter with the updated mockups on 2026-10-27 (decision record row 139); the scope label and the texts follow rows 137 and 138. Amended on 2026-10-27 after C1, rows 155 and 156: thinking events stay off the wire and the thinking summary reaches the browser only as plain text in the chat's own event, a thrown run ends with `SERVER_ERROR`, and the read budget's wording ([research 07](../docs/research/07-tanstack-ai-hosting-model.md)).
 
 ## Objective
 
@@ -54,6 +54,7 @@ A turn is one question and its answer, with the reads made for it.
 | The deadline passes (120 s) | The handler ends the stream with its own `RUN_ERROR` event, code `DEADLINE`, before it closes. "The answer didn't arrive." with Try again and Edit question; partial text is not kept | `error` (`errorCode` `DEADLINE`) |
 | A model call reaches `max_tokens` | The same alert as an error; partial text is not kept | `error` (`errorCode` `MAX_TOKENS`) |
 | The model fails, or the stream breaks after it started | The same alert | `error` |
+| The server fails during the run (a throw out of the `chat()` stream) | The same alert | `error` (`errorCode` `SERVER_ERROR`) |
 | The request fails before any response (a network error) | The question goes back to the front of the queue as a queued question, and the input shows the offline state. The chat tries again every 30 s and on the `online` event | none (the function does not run) |
 | The host's rate limit answers 429 | The same alert, with "Too many questions in a short time. Try again in a few minutes." The queue pauses until the visitor sends again | none (the function does not run) |
 | The day's cost cap or Anthropic's monthly limit is reached | The "limit reached" state: Peter's email and a link that opens the resume, with no Try again. The question goes back into the input only when the input is empty. The queue pauses, and a saved pause marker keeps the state after a reload. The wording (Peter, row 138): for the day, "The chat has reached today's limit." and "It answers again at <00:00 UTC in the visitor's time, such as 5:00 PM> your time. Until then, you can read the resume or email Peter at <email>."; for the month, "The chat has reached this month's limit." and "It answers again on <the first day of next month, such as November 1>. Until then, you can read the resume or email Peter at <email>."; the button "Open the resume" | `limit`; a refusal before the model call writes no log entry |
@@ -81,10 +82,11 @@ export const turnLimits = {
 } as const;
 ```
 
-- **Reads.** The `readBudget` middleware counts `read_sources` calls in `onGuardToolCall`. A guard always runs: after every `onBeforeToolCall` hook and after the tool's input check, so no other middleware can skip it, and a call that fails the input check does not count. A call after the third is skipped with an error result. The tool stays in the list: the tools come first in the cached prompt, so removing one would rewrite the whole cache ([SPEC-deploy](SPEC-deploy.md)). Each read returns at most 24,000 characters (`readPassages()`, [SPEC-knowledge](SPEC-knowledge.md)).
+- **Reads.** The `readBudget` middleware counts `read_sources` calls in `onGuardToolCall`. The guard runs after every `onBeforeToolCall` hook and after the tool's input check, just before the tool runs. So every read that runs has passed the guard, and no read runs past the budget. Another middleware's `skip` ends a call before the guard, and that call reads nothing. A call that fails the input check does not count. A call after the third is skipped with an error result. The tool stays in the list: the tools come first in the cached prompt, so removing one would rewrite the whole cache ([SPEC-deploy](SPEC-deploy.md)). Each read returns at most 24,000 characters (`readPassages()`, [SPEC-knowledge](SPEC-knowledge.md)).
 - **The last call.** After the third read returns, and at the sixth model call, `readBudget`'s `onConfig` gives the next call `toolChoice: "none"`. The tools stay in the request, so the cache holds, but the call can only answer. A turn therefore never ends on a tool call with no answer.
 - **Model calls.** `agentLoopStrategy: maxIterations(6)` bounds the loop as a whole.
-- **Thinking.** Sonnet 5.5 always thinks, and its thinking counts toward each call's `max_tokens`. `handleChat()` calls `chat()` with `reasoning: { level: "medium", summary: false }` and `modelOptions: { max_tokens: turnLimits.answerTokens }`. The Anthropic adapter sends this as adaptive thinking with `output_config.effort: "medium"`. With `summary: false` the thinking text is omitted, so it never streams to the browser, where it could restate read text or `Not public` material. SPEC-deploy's reservation of $0.90 per turn covers the worst turn under these limits.
+- **Thinking.** Sonnet 5.5 always thinks, and its thinking counts toward each call's `max_tokens`. `handleChat()` calls `chat()` with `reasoning: { level: "medium", summary: true }` and `modelOptions: { max_tokens: turnLimits.answerTokens }`. The Anthropic adapter sends this as adaptive thinking with `output_config.effort: "medium"` and `display: "summarized"`. Anthropic never returns the raw thinking: the text of a thinking block is a summary of it, and the summary is the most there is ([research 07](../docs/research/07-tanstack-ai-hosting-model.md)). Peter allows the summary in the browser (row 156): every approved source is public, and a source's `Not public` section names kinds of material only, never the material. SPEC-deploy's reservation of $0.90 per turn covers the worst turn under these limits.
+- **Thinking on the wire** (Peter, rows 155 and 156). Anthropic also returns each thinking block's signature, the encrypted thinking, and the adapter streams the summary and the signature as `REASONING_*` events. The browser's TanStack AI client would build a thinking part from them and send it back with the next question as a `reasoning` message, which the request check rejects. So the wire middleware drops every event whose type starts with `REASONING_`, by prefix, because the client builds a thinking part from several of them. In their place it sends the handler's own `CUSTOM` event `chat.thinking`: `{ active: true }` at a thinking block's start, `{ delta: <text> }` for the summary text, and `{ active: false }` at the block's end. No signature reaches the browser, ever. The server's own messages keep the signatures, so the read loop inside a turn is unchanged. The request check stays as approved: a request with a `reasoning` message gets 400 `INVALID_REQUEST`.
 - **Deadline.** A timer on the run's `abortController` aborts it at 120 s. The handler then sends its own `RUN_ERROR` event with the code `DEADLINE` before the stream closes, because the browser takes a stream that closes with no error event as a finished answer. The log records `error`, not `stopped`. [SPEC-deploy](SPEC-deploy.md) sets the function's `maxDuration` to 150 s.
 - **Conversation sent.** The server sends the model the last 20 turns, and at most 40,000 characters of them, oldest dropped first. Earlier reads reach the model as ids only, because a citation needs a read in the same turn ([decision 0016](../docs/decisions/0016-two-layer-knowledge.md)). The browser holds only those ids (see Tools). The browser's connection applies the same window before it sends, so a long conversation never reaches the 256 KB cap.
 
@@ -95,7 +97,7 @@ The browser sends TanStack AI's request (the messages and `threadId`) and three 
 1. It reads the body as bytes and stops at `turnLimits.requestBytes`. A larger body gets 413 `REQUEST_TOO_LARGE`.
 2. It parses the bytes with `JSON.parse`. A failure gets 400 `INVALID_REQUEST`.
 3. It calls `chatParamsFromRequestBody()` inside `try`/`catch`. A throw gets 400 `INVALID_REQUEST`. The handler does not use `chatParamsFromRequest()`, because that reads the body itself and answers a plain-text 400.
-4. It checks the messages with zod. Only the roles `user`, `assistant` and `tool` pass, and a user message holds text parts only. Any other role (`system`, `developer`) or part (an image, a document) gets 400 `INVALID_REQUEST`. When the newest question is over 10,000 characters, it gets 413 `QUESTION_TOO_LONG`.
+4. It checks the messages with zod. Only the roles `user`, `assistant` and `tool` pass, and a user message holds text parts only. Any other role (`system`, `developer`, `reasoning`) or part (an image, a document) gets 400 `INVALID_REQUEST`. When the newest question is over 10,000 characters, it gets 413 `QUESTION_TOO_LONG`.
 5. It checks `forwardedProps` with `ChatProps`. A failure gets 400 `INVALID_REQUEST`.
 
 The body's `tools`, `context`, `state` and `resume` are ignored. `chat()` gets only the handler's own tools.
@@ -119,11 +121,13 @@ type ChatError = {
 // RUN_ERROR event.
 ```
 
-- **Stream errors.** A chunk middleware rewrites every `RUN_ERROR` event to `{ code, message }`, with a fixed message for each code. It drops `rawEvent`, `metadata` and `usage`, so no Anthropic error body reaches the browser. The code is the handler's own (`DAILY_LIMIT`, `SPEND_LIMIT`, `DEADLINE` or `MAX_TOKENS`) or the model API's.
+- **Stream errors.** `wire.ts` exports one table of fixed messages, one per code, and `wireError(code)`, which builds a new `RUN_ERROR` event `{ code, message }` from it. A chunk middleware replaces every `RUN_ERROR` event with `wireError(code)`, and every `RUN_ERROR` the handler makes uses it too. So no `rawEvent`, `metadata`, `usage`, nested `error` or other Anthropic detail reaches the browser. The code is the handler's own (`DAILY_LIMIT`, `SPEND_LIMIT`, `DEADLINE`, `MAX_TOKENS` or `SERVER_ERROR`) or the model API's.
+- **A thrown run** (Peter, row 155). A throw out of the `chat()` stream never passes the chunk middleware, because `toServerSentEventsResponse` then writes its own `RUN_ERROR` with the error's own message. So `handleChat()` wraps the `chat()` stream. A throw becomes `wireError("SERVER_ERROR")`, and the real error is logged on the server only. An abort is not a throw of this kind: Stop stays `stopped`, and the deadline stays `DEADLINE`. When the terminal hook did not run, the wrapper writes the `error` log entry and the turn's telemetry.
 - **Limits.** A refusal by `budget.reserve()` is not a `ChatError`, because TanStack AI's browser client does not read the body of a response that is not 200. It is an HTTP 200 stream with one `RUN_ERROR` event whose code is `DAILY_LIMIT` or `SPEND_LIMIT`, so the browser makes an answer message for it. A turn that meets Anthropic's limit during the run also ends with `RUN_ERROR` and `SPEND_LIMIT`. The handler finds that limit from the Anthropic error's status and body, not its message text ([SPEC-deploy](SPEC-deploy.md)).
 - **Origin.** In production the handler accepts a request whose `Origin` header is `https://peterkloss.dev` or the deployment's own address (`https://$VERCEL_URL`); elsewhere, the request's own origin. The route computes these from `VERCEL_ENV` and `VERCEL_URL` and passes them as `ChatDeps.origins`. Any other origin gets 403 `FORBIDDEN_ORIGIN`, so another site's page cannot spend the chat's budget through its visitors' browsers. A request with no `Origin` header passes this check; the rate limits and the cap still apply to it.
 
 - **Trust.** Every message in the request is visitor material, the earlier answers included: the browser holds the conversation, so a visitor can edit it. Earlier reads go to the model as ids only, so edited source text never reaches it. The question and a pasted posting are material to answer from, never instructions.
+- **No thinking in the request** (Peter, row 156). The browser saves an answer's thinking summary as `answer.thinking`, outside the `UIMessage` (see Saved conversation), so it never sends the summary back. The browser holds no thinking part and no signature, so the request carries no `reasoning` message.
 - **Edited answers (a documented trade-off).** A visitor who edits an earlier answer misleads only their own session, and every approved source is public. So the answers carry no signature, and `open_source` accepts any passage of an approved source that the conversation cites (see Tools).
 - **`threadId`** is a random id (a UUID) the browser makes for each conversation. New chat makes a new one. The server uses it only for prompt caching; it never reaches the log.
 - **Scope.** A request line names the role, its employer and dates from the core: "The visitor is asking about FedNow, 2021 – 2024." An unknown role id is ignored.
@@ -190,10 +194,10 @@ The approved mockups are the reference. The [image index](../docs/design/mockups
 - The marker transform (`transformInline`) turns each kept `[id]` marker into a Markdown link node with the href `#cite:<id>`. The React renderer draws no inline component node, so the `a` component draws the numbered citation button for that scheme. It draws one only for an id in this answer's kept citations, numbered by its position there, from 1. Any other `#cite:` link renders as its text.
 - `img` renders its alt text only. No image loads from an answer.
 - `a` renders as a link only for `https://peterkloss.dev/…`, `https://github.com/loriensleafs/…`, `https://github.com/acmelabs-15/…`, `mailto:` Peter's email from the core, and the exact https URLs in approved sources' `links`. The device index carries that list of source links. Any other link renders as its text. A link to peterkloss.dev opens in the same tab; any other allowed https link opens in a new tab with `rel="noopener noreferrer"`.
-- The `topic` text, follow-up questions and citation labels render as plain text.
+- The `topic` text, the thinking summary, follow-up questions and citation labels render as plain text, never as Markdown or HTML.
 - The prose uses the design system's tokens. The plan checks whether `acme-markdown`'s `[data-acme-markdown-prose]` styles can be reused.
 
-**Answer steps** (rows 62 and 65). While answering, each step appears in a bordered box as it happens; the current step has a spinner and a moving highlight. The steps are "Found 1 source about <topic>", "Reading <title>", and "Checking citations". "Checking citations" shows from the first answer text after the last read until the `chat.citations` event arrives. When done, the box folds into one line above the answer: "Read 1 source and checked 3 citations". Opened, each row opens on its own: the passages read, by number and heading; and "Each citation points to a passage the chat read, to the resume or to one of Peter's logistics answers." (row 138) When the check removed a marker, the row says so: "Checked 3 citations, removed 1." The steps line shows only when the turn read.
+**Answer steps** (rows 62 and 65). While answering, each step appears in a bordered box as it happens; the current step has a spinner and a moving highlight. The steps are "Found 1 source about <topic>", "Reading <title>", and "Checking citations". "Checking citations" shows from the first answer text after the last read until the `chat.citations` event arrives. While thinking is active (from a `chat.thinking` event with `active: true` until one with `active: false`), a live step is the current step, with the spinner. It shows the thinking summary as its `delta` text arrives, as plain text only, never Markdown or HTML, under a label that marks it as the chat's working notes (Peter, row 156; the label's wording is a draft, row 153). After the answer, the summary stays in the opened steps under that label. It is not counted in the folded steps line. When done, the box folds into one line above the answer: "Read 1 source and checked 3 citations". Opened, each row opens on its own: the passages read, by number and heading; and "Each citation points to a passage the chat read, to the resume or to one of Peter's logistics answers." (row 138) When the check removed a marker, the row says so: "Checked 3 citations, removed 1." The steps line shows only when the turn read.
 
 **Citations card.** One row per kept citation of this answer, numbered from 1 in order of first use; the card lists only its own answer's citations (row 133). Each row has the icon, "<source title>: <passage heading>" or "Resume: <label>" or "Logistics: <topic>", and its action: "Open beside the chat" for a passage, "Show in the resume" for a resume entry of any kind (basics, a role, a highlight, a skills group, education), none for a logistics answer. The row of the open citation is tinted, and its action reads "Shown in the resume" when it is the resume. Labels come from the device index, which holds one label per resume entry, for example "Resume: FedNow" for a role and "Resume: FedNow, highlight 2" for a highlight. An id that no longer exists shows as plain text.
 
@@ -249,7 +253,7 @@ Cancel closes the dialog and returns focus to New chat.
 **Accessibility.** The site's target is WCAG 2.2 AA ([SPEC-site](SPEC-site.md)). In the chat:
 
 - The conversation is not a live region, so streaming text is never read out as it arrives. A streaming answer has `aria-busy="true"`. When it ends, a separate polite live region says one of two things only: "Answer ready" or "Answer stopped."
-- The current answer step is announced politely. The error alert (`acme-alert`, error variant) has `role="alert"`, so it is announced at once.
+- The current answer step is announced politely. For the thinking step, only the step's name is announced; the summary text is never in a live region. The error alert (`acme-alert`, error variant) has `role="alert"`, so it is announced at once.
 - Each citation button's name says what it opens: "Citation 1: The FedNow bundle cut, What Peter did".
 - After sending, focus stays in the input. Edit and "Ask about this" move focus to the input. After New chat's confirm, focus goes to the input; after Cancel, to New chat.
 - Every action is reachable by keyboard: the message actions, Stop, Send now, the citations, the steps line and the follow-up questions.
@@ -285,6 +289,7 @@ type SavedMessage = {
     removed: number;
     refusal: "out-of-scope" | "not-covered" | null;
     followUps: string[];
+    thinking: string;             // the thinking summary, for display only; "" when none arrived (row 156)
     outcome: "answered" | "stopped" | "error" | "limit";
   } | null;
 };
@@ -312,6 +317,7 @@ type SavedConversationState = {
 ```
 
 - **One row per message.** The sending tab writes a message's row when the message is added and again when it ends. It never writes the whole conversation at once.
+- **The thinking summary** (Peter, row 156). The answer's row keeps the summary from the `chat.thinking` events as `answer.thinking`, for display only. It stays outside the `UIMessage`, which is what `useChat` sends, so the browser never sends the summary back (see The request).
 - **Version.** A `session` row with a `version` the chat does not know clears the chat's stores, and the visit works as a first visit. Blocked storage works as a first visit too; the chat then keeps the conversation in memory.
 - **Each question's request.** A question keeps its `about`, scope and audience in its message metadata, and a queued question in its row. Retry and a queued send reuse them, so the question is asked the same way again.
 - **The queue.** It sends in order, one question at a time, whenever the chat is idle, online and not paused. After Stop, the next queued question sends at once (Peter, row 88); after an error, too. Send now moves one question to the front and stops the current answer. The queue survives a reload. The chat's own queue replaces `useChat`'s, which is in memory and drops queued items on Stop or an error.
@@ -350,6 +356,7 @@ export type Telemetry = { record(event: ChatTurnEvent, reservation?: string): Pr
 ```
 
 - No IP address, `threadId`, scope, audience, cookie or other saved-session data (decision 0020).
+- No thinking text, the thinking summary included (row 156). The turn telemetry is unchanged.
 - A turn refused before the model call writes no entry. A turn that meets Anthropic's limit during the run writes one with `limit`.
 - SPEC-deploy's `Ops` implements `QuestionLog`, `Budget` and `Telemetry` with its store, and deletes entries after 90 days. Tests use the in-memory ones in `src/chat/server/question-log.ts`.
 - **The day window.** `list(days)` returns the entries whose `date` is one of the last `days` UTC days, today included, newest first. On 2026-10-27, `list(7)` returns the entries dated 2026-10-21 to 2026-10-27, and none dated 2026-10-20. The contract suite `src/chat/server/__tests__/question-log-contract.ts` checks this, and SPEC-deploy runs it against both stores.
@@ -378,7 +385,7 @@ export type ChatTurnEvent = {
   cacheWrite1hTokens: number | null;
   outputTokens: number | null;
   durationMs: number;
-  errorCode: string | null;  // the model API's code, "DEADLINE", "MAX_TOKENS", "DAILY_LIMIT" or "SPEND_LIMIT"; never a message or stack trace
+  errorCode: string | null;  // the model API's code, "DEADLINE", "MAX_TOKENS", "SERVER_ERROR", "DAILY_LIMIT" or "SPEND_LIMIT"; never a message or stack trace
 };
 ```
 
@@ -386,7 +393,7 @@ It holds no question text, `threadId`, IP address or other visitor data. The que
 
 ## Evals
 
-`evals/trick-questions.yaml` holds the trick questions and the fit-check postings. `bun run evals` asks each one through `handleChat()`, checks the result, and writes a review file to `.scratch/evals/<date>.md` (untracked) with every answer. Each run costs money, so it runs only on Peter's request or with his approval for that run. The evals pass these `ChatDeps`:
+`evals/trick-questions.yaml` holds the trick questions and the fit-check postings. `bun run evals` asks each one through `handleChat()`, checks the result, and writes a review file to `.scratch/evals/<date>.md` (untracked) with every answer and its thinking summary (row 156). Each run costs money, so it runs only on Peter's request or with his approval for that run. The evals pass these `ChatDeps`:
 
 - `adapter`: `createAnthropicChat("claude-sonnet-5-5", key)`, where `key` is `ANTHROPIC_API_KEY` from `.secrets/local.env` (the `resume-evals` key), loaded with `--env-file`. The evals do not use `anthropicText()`, because it reads `ANTHROPIC_AUTH_TOKEN` and `ANTHROPIC_OAUTH_TOKEN` first, and a shell can hold those.
 - `knowledge`: the real `buildKnowledge()` output.
@@ -400,7 +407,7 @@ A case is `{ id, question, expect }`, plus optional `history` (earlier turns, as
 export const EvalExpect = z.strictObject({
   outcome: z.enum(["answered", "refusal:out-of-scope", "refusal:not-covered"]),
   mustContain: z.array(z.string()).optional(),    // each text appears in the answer
-  mustNotContain: z.array(z.string()).optional(), // no text appears in the answer
+  mustNotContain: z.array(z.string()).optional(), // no text appears in the answer or its thinking summary
   minCitations: z.number().int().min(0).optional(), // at least this many kept citations
   maxRemoved: z.number().int().min(0).optional(),   // at most this many removed markers
   tools: z.array(z.enum(["read_sources", "open_resume", "open_source"])).optional(), // each tool is called in the turn
@@ -451,13 +458,16 @@ bun run evals                      # the trick questions against the real model;
 ## Project Structure
 
 ```text
-src/chat/server/handle-chat.ts     handleChat(request, deps): the module's server entry point, the request checks in order, and the About read
+src/chat/server/handle-chat.ts     handleChat(request, deps): the module's server entry point, the request checks in order, the About read,
+                                   and the stream wrapper that turns a throw into SERVER_ERROR
 src/chat/server/props.ts           ChatProps and the messages schema
 src/chat/server/prompt.ts          the system prompt, with the core from SPEC-knowledge's renderCore(knowledge), and the scope, audience and about lines
 src/chat/server/tools.ts           read_sources (its input checks readLimits), open_resume, open_source
 src/chat/server/limits.ts          turnLimits; the readBudget and deadline middleware
 src/chat/server/markers.ts         the marker middleware and the chat.citations event
-src/chat/server/wire.ts            the chunk middleware that rewrites read results to ids and RUN_ERROR events to { code, message }
+src/chat/server/wire.ts            the chunk middleware that rewrites read results to ids, RUN_ERROR events to wireError(code)
+                                   and REASONING_* events to chat.thinking with the summary text; the fixed messages per
+                                   code and wireError()
 src/chat/server/question-log.ts    QuestionLog, QuestionLogEntry, Budget and Telemetry, and their in-memory versions
 src/chat/server/telemetry.ts       ChatTurnEvent, and the middleware that sums onUsage and calls telemetry.record()
 src/chat/ui/                       ChatColumn, Messages, Question, QueuedQuestion, Answer, AnswerText, AnswerSteps,
@@ -512,7 +522,9 @@ export function readBudget(max = turnLimits.reads, readsBefore = 0): ChatMiddlew
   let reads = readsBefore;
   return {
     name: "read-budget",
-    // A guard always runs: after every onBeforeToolCall hook and after the input schema check.
+    // The guard runs after every onBeforeToolCall hook and after the input schema check, just before the
+    // tool runs, so every read that runs has passed it. Another middleware's skip ends a call before the
+    // guard, and that call reads nothing.
     onGuardToolCall: (_ctx, call) =>
       call.toolName === "read_sources" && ++reads > max
         ? { type: "skip", result: { error: "The read limit for this question is reached." } }
@@ -534,7 +546,7 @@ export function readBudget(max = turnLimits.reads, readsBefore = 0): ChatMiddlew
 1. **The handler.** `handleChat()` with `fakeText()`, the real knowledge built from fixtures (one fixture source has `Not public` text), and the in-memory log, budget and telemetry. A stub Anthropic client (`src/chat/server/__tests__/stub-anthropic.ts`, through `createAnthropicChatWithClient()`) scripts what `fakeText()` cannot: spend-limit errors, `max_tokens`, a stop during a call, and a call that never ends. The tests read the server-sent events, the log and the telemetry events:
    - **Citations.** An answer with no read keeps a resume citation and writes one `answered` entry with no `threadId`. A read then an answer keeps a citation to a read passage and removes one to an unread passage; `chat.citations` reports 1 removed.
    - **Read results on the wire.** No streamed event holds passage text or the fixture's `Not public` text, and each `read_sources` `TOOL_CALL_RESULT` holds `{ read, unknown, skipped }` only. The model's next call still gets the full read text.
-   - **The read budget.** Four scripted reads: the fourth is skipped, and every model call in the turn has the same tools. The call after the third read has `toolChoice: "none"`. A read whose input fails the schema does not count. Another middleware's `onBeforeToolCall` that transforms the arguments cannot skip the budget.
+   - **The read budget.** Four scripted reads: the fourth is skipped, and every model call in the turn has the same tools. The call after the third read has `toolChoice: "none"`. A read whose input fails the schema does not count. Another middleware's `onBeforeToolCall` that transforms the arguments cannot skip the budget. Another middleware's `skip` ends its call before the guard, and that call reads nothing.
    - **The last call.** Five scripted model calls that each call a tool: the sixth call has `toolChoice: "none"`, and the turn ends with an answer.
    - **Read limits.** A `read_sources` call with 21 ids, or with an id of 65 characters, gets a tool error, and the run goes on.
    - **About.** An `about` passage id is read before the first model call. The stream starts with that read's call and its id-only result, the passage can be cited, and only 2 more reads are allowed.
@@ -544,8 +556,8 @@ export function readBudget(max = turnLimits.reads, readsBefore = 0): ChatMiddlew
    - **History.** Earlier turns over 40,000 characters: the oldest are dropped first. Twenty-five turns of history: the model receives 20, and earlier reads as ids only, also when the request carries edited read text.
    - **Limits.** A `budget` that refuses gives a 200 stream with one `RUN_ERROR` event and its code, no model call and no log entry. The stub client's spend-limit errors, with both documented bodies, end the stream with `SPEND_LIMIT` and write a `limit` entry.
    - **Endings.** The stub client's `max_tokens` ends the stream with `RUN_ERROR` `MAX_TOKENS` and writes an `error` entry. A model error gives `RUN_ERROR` and an `error` entry; an aborted request gives a `stopped` entry. A call that never ends: at 120 s the stream ends with `RUN_ERROR` `DEADLINE` before it closes, and the entry is `error`.
-   - **Stream errors.** Every `RUN_ERROR` on the wire holds only its code and the fixed message for it: no `rawEvent`, `metadata`, `usage` or Anthropic error body.
-   - **Thinking.** The stub client sees adaptive thinking with effort `medium`, the thinking text omitted, and `max_tokens` 8,000 on every model call.
+   - **Stream errors.** Every `RUN_ERROR` on the wire holds only its code and the fixed message for it: no `rawEvent`, `metadata`, `usage` or Anthropic error body. A middleware that throws a marker string: the marker never reaches the wire, the stream ends with `RUN_ERROR` `SERVER_ERROR`, and the log entry is `error`.
+   - **Thinking.** The stub client sees adaptive thinking with effort `medium`, `display: "summarized"`, and `max_tokens` 8,000 on every model call. No `REASONING_*` event and no signature reaches the wire, and each `chat.thinking` event carries only `active` or `delta`. The wire output of a turn with thinking, run through the real `@tanstack/ai-client` stream processor, gives a next request that passes the request check and holds no thinking text. Seam 2 checks the saved summary.
    - **Usage.** Two finished model calls, then a Stop during the third: telemetry gets the sum of the two calls' usage, and the stopped call adds nothing. The response ends only after the log and telemetry writes.
    - **Telemetry.** Each turn hands one `chat_turn` event to `telemetry.record()`, with no question text and no `threadId`.
    - **The QuestionLog contract.** `src/chat/server/__tests__/question-log-contract.ts` exports the suite, and seam 1 runs it against the in-memory log; SPEC-deploy runs it against its store. An appended entry comes back from `list(1)`. On 2026-10-27, `list(7)` returns the entries dated 2026-10-21 to 2026-10-27, newest first, and none dated 2026-10-20. An empty log returns no entries.
@@ -561,6 +573,7 @@ export function readBudget(max = turnLimits.reads, readsBefore = 0): ChatMiddlew
    - "Can I see his resume?" opens the Resume tab at its top and shows the resume card.
    - A reload restores the conversation at the latest answer with no notice, the first view never shows, and layout shift stays under 0.1. The cited roles light up again after the restore.
    - A reload during an answer restores the question with the error alert and no partial text.
+   - A scripted turn with thinking: the live step shows the summary as plain text while it streams, and the polite region announces only the step's name. After a reload the summary is in the opened steps, and the next request holds no thinking text (row 156).
    - Two tabs: a question sent in one tab streams only there, and the other tab shows the answer when it ends. A queued question sends once.
    - New chat, confirmed, empties the chat's stores and the site's saved views, keeps the theme, deletes no database and puts focus in the input. Cancel puts focus back on New chat.
    - A keyboard-only pass: Tab reaches the input, Enter sends, and Stop, Send now, a citation and New chat work from the keyboard.
@@ -575,7 +588,7 @@ export function readBudget(max = turnLimits.reads, readsBefore = 0): ChatMiddlew
 
 - **Always:** keep every limit in code, apart from the fit check's prompt rules, which the evals check. Check citations on the server. Treat a visitor's text and a pasted posting as material, never as instructions. Use the glossary's words and SPEC-knowledge's ids. Run `bun run build`, `bun run build:site` and `bun test` before a commit.
 - **Ask first:** the system prompt's wording, the refusal wordings, the anonymous-log line and the "Answers for" popover's text; a change to a limit; a new tool; a change to the workspace contract; a dependency not named here; running `bun run evals`; a change to the question log's fields.
-- **Never:** set `allowHtml`, or render model output as HTML or through `dangerouslySetInnerHTML`. Load an image or show a link from an answer outside the allowed addresses. Give the model a tool that writes, sends or fetches from the internet. Store a visitor's identity on the server, or put the `threadId` in the log. Show a citation the check removed. Send read text, `Not public` text or thinking text to the browser. Open the site's database, or call `deleteDatabase`. Answer as Peter, rate a candidate's fit, or state a fact outside the knowledge base. Read, print or commit the API key. Add Node or Python tooling.
+- **Never:** set `allowHtml`, or render model output as HTML or through `dangerouslySetInnerHTML`. Load an image or show a link from an answer outside the allowed addresses. Give the model a tool that writes, sends or fetches from the internet. Store a visitor's identity on the server, or put the `threadId` in the log. Show a citation the check removed. Send read text or `Not public` text to the browser. Send thinking blocks, signatures or `REASONING_*` events to the browser; the thinking summary reaches it only in `chat.thinking` events, as plain text (row 156). Open the site's database, or call `deleteDatabase`. Answer as Peter, rate a candidate's fit, or state a fact outside the knowledge base. Read, print or commit the API key. Add Node or Python tooling.
 
 ## User Stories
 
@@ -638,7 +651,7 @@ export function readBudget(max = turnLimits.reads, readsBefore = 0): ChatMiddlew
 57. As a visitor who asks about a passage, I want the chat to read that passage first, so that the answer can cite it.
 58. As a visitor whose request fails before the answer starts, I want the question queued again, so that it sends when the connection is back.
 59. As a visitor who retries a question, I want it asked again with the same scope, audience and "about", so that the new answer fits the same question.
-60. As Peter, I want no read text, `Not public` text or thinking text to reach a browser, so that nothing confidential leaves the server.
+60. As Peter, I want no read text, `Not public` text, thinking block or signature to reach a browser, and the thinking summary only as plain text, so that nothing confidential leaves the server.
 61. As Peter, I want a turn that passes the deadline or the output cap to end with an error event, so that a cut answer never looks finished.
 62. As Peter, I want error events stripped of the provider's details, so that no internal error text reaches a visitor.
 63. As Peter, I want the chat to define the interfaces that the deploy module implements, so that the modules have no cycle.
