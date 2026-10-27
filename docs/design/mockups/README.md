@@ -11,7 +11,7 @@ Updated later on 2026-10-27 (canvas version 44; [decision record](../interview-2
 - The conversation board shows the resume card.
 - The "Welcome back" notice is gone.
 
-Updated again on 2026-10-27 after the spec reviews (canvas version 46; [decision record](../interview-2026-10-26.md) rows 133, 136 and 138). Peter approved the new texts in row 138; the rest waits for his approval with the amended specs:
+Updated again on 2026-10-27 after the spec reviews (canvas version 46; [decision record](../interview-2026-10-26.md) rows 133, 136, 138 and 139). Peter approved the new texts in row 138 and the boards with the amended specs in row 139:
 
 - Each answer numbers its own citations from 1, and its card lists only its own citations (row 133). Citation numbers in answers are drawn as the citation buttons on every board.
 - In the resume, every highlight the latest answer cites shows its number; only the opened one is tinted, with a blue number.

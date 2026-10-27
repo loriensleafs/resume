@@ -1,6 +1,6 @@
 # Spec: knowledge
 
-Approved by Peter on 2026-10-26, and its two-layer update on 2026-10-27 ([decision record](../docs/design/interview-2026-10-26.md) row 36). Amended on 2026-10-27 after the spec reviews (decision record rows 128 to 136).
+Approved by Peter on 2026-10-26, and its two-layer update on 2026-10-27 ([decision record](../docs/design/interview-2026-10-26.md) row 36). Amended on 2026-10-27 after the spec reviews (decision record rows 128 to 136). Approved by Peter with the updated mockups on 2026-10-27 (decision record row 139); the scope label and the texts follow rows 137 and 138.
 
 ## Objective
 

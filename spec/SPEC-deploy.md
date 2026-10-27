@@ -2,7 +2,7 @@
 
 Approved by Peter on 2026-10-27 (decision record row 127), with the amendments to other specs below. Peter's answers are rows 107 to 127 of the [decision record](../docs/design/interview-2026-10-26.md); the facts are in [research 12](../docs/research/12-deploy-platform.md); the static site with build-time data is [decision 0023](../docs/decisions/0023-static-site-build-time-data.md). Three adversarial reviews found 18, 16 and 39 issues. This version answers all of them, with the local checks that the third review asked for (row 126). What only a real Vercel deployment can settle is the plan's first task, the [deploy spike](#deploy-spike).
 
-Corrected on 2026-10-27 after the reviews of the other specs (decision record rows 128 to 136).
+Corrected on 2026-10-27 after the reviews of the other specs (decision record rows 128 to 136). Approved by Peter with the updated mockups on 2026-10-27 (decision record row 139); the scope label and the texts follow rows 137 and 138.
 
 ## Objective
 

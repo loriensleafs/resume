@@ -1,6 +1,6 @@
 # Spec: chat
 
-Approved by Peter on 2026-10-27. Amended after an audit with the missing brain skills and the design system's skills and MCP server, and approved again the same day ([decision record](../docs/design/interview-2026-10-26.md) rows 85 to 106). Amended again on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (row 127): the turn's budget, the limit state, the request caps, the Origin check, the usage fields, and the read tool staying listed. Amended on 2026-10-27 after the spec reviews (decision record rows 128 to 136).
+Approved by Peter on 2026-10-27. Amended after an audit with the missing brain skills and the design system's skills and MCP server, and approved again the same day ([decision record](../docs/design/interview-2026-10-26.md) rows 85 to 106). Amended again on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (row 127): the turn's budget, the limit state, the request caps, the Origin check, the usage fields, and the read tool staying listed. Amended on 2026-10-27 after the spec reviews (decision record rows 128 to 136). Approved by Peter with the updated mockups on 2026-10-27 (decision record row 139); the scope label and the texts follow rows 137 and 138.
 
 ## Objective
 

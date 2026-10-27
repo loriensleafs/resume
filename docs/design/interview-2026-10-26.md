@@ -148,6 +148,7 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 136 | (Peter, 2026-10-27) Mockups after spec changes | "If there are changes that mean we need to update the mockups, we should update them to match those changes." |
 | 137 | When a visitor picks a role, where do the scope chip's short name and years come from? (Peter first confirmed that a request for the whole resume sets no scope.) | The site passes them: `Scope` becomes `{ roleId, label, years }`, filled from `resume.yaml`, so the chip shows at once. An amendment to the contract approved in row 134. The recommendation was this option |
 | 138 | Approve five proposed texts on canvas version 45: the day and month "limit reached" messages, the rate-limit alert, the not-found page, and the steps' citation line that names logistics answers? | Approved all five as drawn. The recommendation was this option |
+| 139 | Approve the amended specs (all five, the spec map and the glossary) and the updated mockups (canvas version 46), with Claude's choices where the change sheet left a value open (replaceState addresses, the 30-day install offer, the mockups' short labels, the link allowlist, the C15 trade-off, no theme switch on phones, the read limits, the whole reservation for a turn that ends early, no thinking text in the browser)? | Approved. The recommendation was this option |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 

@@ -2,7 +2,7 @@
 
 Amended on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (decision record row 127): the committed public documents in `documents/`.
 
-Amended on 2026-10-27 after the spec reviews (decision record rows 128 to 136): the documents' files and test seam, the narrower documents hash, the one before-commit rule, and each role's `x-short` field.
+Amended on 2026-10-27 after the spec reviews (decision record rows 128 to 136): the documents' files and test seam, the narrower documents hash, the one before-commit rule, and each role's `x-short` field. Approved by Peter with the updated mockups on 2026-10-27 (decision record row 139); the scope label and the texts follow rows 137 and 138.
 
 ## Objective
 
