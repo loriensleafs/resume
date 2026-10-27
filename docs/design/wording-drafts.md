@@ -1,6 +1,6 @@
 # Wording drafts
 
-The texts that Peter has not approved yet ([decision record](interview-2026-10-26.md) row 153). Each task below drafts its text from the approved mockups and its spec, builds on the draft, and writes it into its own file in `wording-drafts/`. A task edits only its own file, so wording tasks can build at the same time. This index is fixed: a task leaves it as it is.
+The texts that Peter has not approved yet ([decision record](interview-2026-10-26.md) row 153). Each task below drafts its text from the approved mockups and its spec, builds on the draft, and writes it into its own file in `wording-drafts/`. A task edits only its own file, so wording tasks can build at the same time. A task that adds a new wording adds its own row to this index.
 
 Peter approves every wording draft in one sitting before D37, the first release. The decision record holds his approval. Each file then gives its status with that row, and its Draft section points to the code that holds the text: from then on, the code owns the text. A change he makes becomes a small follow-up task.
 

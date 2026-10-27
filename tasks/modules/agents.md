@@ -31,7 +31,7 @@ Notes: `scripts/docs-only.txt` and the `release` skill appear as code spans unti
 Delivers: an agent about to push follows one procedure: it checks the commits for private details, finds whether the push is a release, runs the checks, records the push, pushes, watches the checks and reports. Before the deploy module is built, step 1 says so, and the skill goes on to steps 2, 3, 4 and 6.
 Blocked by: A1
 Acceptance:
-- `.agents/skills/release/SKILL.md` has SPEC-agents' six steps, each ending on a "Done when" line. Step 1 checks every push for private details. Step 3 records the push; before row 151 it asked Peter through `brain:ask-user-question`. Step 6 never promotes or rolls back by hand and points to `docs/runbooks/rollback.md` (a code span until deploy writes it). While `scripts/site-changed.sh` does not exist, step 1 tells Peter that the deploy module is not built, and the skill goes on to steps 2, 3, 4 and 6.
+- `.agents/skills/release/SKILL.md` has SPEC-agents' six steps, each ending on a "Done when" line. Step 1 runs the private-detail check and the approval check on every push. Step 3 records the push; before row 151 it asked Peter through `brain:ask-user-question`. Step 6 never promotes or rolls back by hand and points to `docs/runbooks/rollback.md` (a code span until deploy writes it). While `scripts/site-changed.sh` does not exist, step 1 tells Peter that the deploy module is not built, and the skill goes on to steps 2, 3, 4 and 6.
 - `.claude/skills/release` links to `../../.agents/skills/release`. The `AGENTS.md` release rule links to the skill.
 - The test also checks every repo skill. Its front matter parses. Its `name` equals the folder's name, is kebab-case and has 64 characters or fewer. Its `description` has 1 to 1,024 characters. `.claude/skills/` holds exactly one link for each skill, and each link resolves to `.agents/skills/<name>`. Every relative link in each `SKILL.md` resolves.
 Verify: `bun test ./__tests__`; `ls -l .claude/skills`
@@ -111,7 +111,7 @@ Notes: the test would pass earlier, because SPEC-knowledge's Commands names `--d
 ### A8: The agents module lands
 
 Delivers: the Modules table shows agents as built, and a fresh session told only "continue" passes the check.
-Blocked by: A1, A2, A3, A4, A5, A6, A7, A9 (TC)
+Blocked by: A1, A2, A3, A4, A5, A6, A7, A9
 Acceptance:
 - The agents row in `AGENTS.md` and in `spec/README.md` says built. `bun test ./__tests__` and `bun test` pass (SPEC-agents, Success Criteria).
 - The fresh-session check passes: a sub-agent in a fresh clone is told only "continue", Peter reads the result, and `docs/STATUS.md` records it (SPEC-agents, Testing Strategy 2).
@@ -120,14 +120,15 @@ Files: `AGENTS.md`, `spec/README.md`, `docs/STATUS.md`
 Size: S
 Needs Peter: no
 
-### A9 (TC): The type check
+### A9: The type check
 
-Delivers: `bun run typecheck` (`"typecheck": "bun check"`) passes, and it runs before every commit and in CI (row 157).
-Blocked by: none. It starts after the row 151 branch and C1 are merged into `main`, because both change files that it changes (`AGENTS.md`, the specs, `package.json`, `bun.lock`).
+Delivers: `bun run typecheck` (`"typecheck": "bun check"`) passes, and it runs before every commit and in CI (row 157); and the `zod` override that keeps CI's `audit-all` green (row 158).
+Blocked by: C1 (both change `package.json` and `bun.lock`)
+Notes: it also starts only after the row 151 branch is on `main`, because both change `AGENTS.md` and the specs. `@types/react` and `@types/react-dom` 19.3.0 come with S1, not with A9 (row 159).
 Acceptance:
 - `tsconfig.json` is the one that [research 13](../../docs/research/13-type-check.md) gives: `strict`, `noUncheckedIndexedAccess`, no `verbatimModuleSyntax`, `isolatedModules`, the DOM libs, and an explicit `include`, so `.claude/worktrees/` is never checked.
 - `typescript` 7.0.2 and `@types/bun` 1.4.4 are exact development dependencies.
-- The 35 current errors are fixed (research 13, "Risks"), and `bun run typecheck` passes.
+- Every current error is fixed (research 13, "Risks", found 35), and `bun run typecheck` passes.
 - A test in `__tests__/` checks that `process.versions.typescript` equals the `typescript` version that `package.json` pins (decision 0025).
 - `AGENTS.md`'s Session start says Bun 1.4.4 or later, and its Verify lists `bun run typecheck` first; SPEC-agents' Verify line says the same.
 - CI's `oven-sh/setup-bun` uses 1.4.4 in every job, and the `test` job runs `bun run typecheck` right after `bun ci`.

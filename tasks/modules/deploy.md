@@ -26,7 +26,7 @@ Acceptance:
 Verify: `gh run list --branch prototype/deploy-spike --workflow spike-check.yml`; `gh run view <run id> --log` shows the check 1 line; the README holds the verdict.
 Files: `prototypes/deploy-spike/` (copied from `prototypes/csp-probe/`), `prototypes/deploy-spike/vercel.json`, `prototypes/deploy-spike/check.ts`, `.github/workflows/spike-check.yml` (spike branch only), `prototypes/deploy-spike/README.md`
 Size: M
-Needs Peter: the Pro team and the throwaway project (account, money); the Actions secret. Each push of `prototype/deploy-spike` follows AGENTS.md, "Releases and approvals", with the `release` skill's private-detail check (SPEC-deploy, "Approval").
+Needs Peter: the Pro team and the throwaway project (account, money); the Actions secret. Each push of `prototype/deploy-spike` follows AGENTS.md, "Releases and approvals", with the `release` skill's step 1 (SPEC-deploy, "Approval").
 
 ### D2: Deploy spike, part 2: the post-build routes and the function runtime
 

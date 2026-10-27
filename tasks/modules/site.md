@@ -21,13 +21,13 @@ The mockups that the tasks draw are in `docs/design/mockups/`: first view, after
 Delivers: Peter can run `bun run dev` and open `/`, and a Vite build writes Nitro's Vercel output in `.vercel/output/`.
 Blocked by: none
 Acceptance:
-- The spec's packages are installed at their exact versions: `@tanstack/react-start` 1.169.4, `@tanstack/react-router` 1.170.46, `react` and `react-dom` 19.3.1, `vite` 8.3.5, `@vitejs/plugin-react` 6.1.2 and `nitro` 3.0.260903-beta. Vite runs under `bun --bun`, with `srcDirectory: "src/site"` and Nitro's `vercel` preset (Tech Stack).
+- The spec's packages are installed at their exact versions: `@tanstack/react-start` 1.169.4, `@tanstack/react-router` 1.170.46, `react` and `react-dom` 19.3.1, `vite` 8.3.5, `@vitejs/plugin-react` 6.1.2 and `nitro` 3.0.260903-beta. `@types/react` and `@types/react-dom` 19.3.0 are exact development dependencies, so the type check (A9) reads the React code (row 159). Vite runs under `bun --bun`, with `srcDirectory: "src/site"` and Nitro's `vercel` preset (Tech Stack).
 - `bun --bun vite build` writes `.vercel/output/config.json` and `.vercel/output/static/`, and git ignores `.vercel/` (AC; Boundaries: never commit `.vercel/`).
 - The task confirms that each function's `index.mjs` in `.vercel/output/functions/` has a default export with `fetch(request)`, which `bun run preview` needs, and records what it found in its `tasks/todo.md` entry (Commands: "the plan confirms it when it installs Nitro").
 Verify: `bun install`; `bun run dev`, then `curl -s http://localhost:3000/ | grep -c '<html lang="en"'` prints 1; `bun --bun vite build && ls .vercel/output/static .vercel/output/functions`; `bun run build`; `bun test` (43 pass)
 Files: `package.json` and `bun.lock`, `.gitignore`, `vite.config.ts`, `src/site/router.tsx`, `src/site/routes/__root.tsx`
 Size: M
-Needs Peter: no. Peter approved `nitro` and `react-dom` (row 135); approving the spec approved the rest.
+Needs Peter: no. Peter approved `nitro` and `react-dom` (row 135), and `@types/react` and `@types/react-dom` (row 159); approving the spec approved the rest.
 
 ### S2: `buildSite()` prerenders `/` and `/resume`, and no other page
 

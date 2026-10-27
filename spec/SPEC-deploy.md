@@ -556,7 +556,7 @@ Peter does these steps once, in this order, so that the chat never runs in produ
 The plan's first task, before any production code. A local build cannot answer these questions; a throwaway deployment can.
 
 - **Setup.** Peter creates a second Vercel project in his Pro team from the branch `prototype/deploy-spike`, with no domains and no Anthropic key, and a pay-as-you-go Upstash database for it. The spike costs cents beyond the Pro plan.
-- **Approval.** Each push to that project deploys. Its pushes follow [AGENTS.md](../AGENTS.md), "Releases and approvals" (row 151), and each runs the `release` skill's private-detail check first.
+- **Approval.** Each push to that project deploys. Its pushes follow [AGENTS.md](../AGENTS.md), "Releases and approvals" (row 151), and each runs the `release` skill's step 1 first.
 - **Throwaway.** The spike code stays on its branch (brain's prototype rules); its verdicts go into research 12 and, where they change a rule, into this spec. Peter removes the project afterwards.
 
 | # | Check | If it fails |

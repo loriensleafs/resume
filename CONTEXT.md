@@ -142,7 +142,7 @@ _Avoid_: retrieval, lookup, search
 
 **Answer steps**:
 The record shown with an answer of what the chat did for it: the sources it found and read, and the citations it checked.
-_Avoid_: thinking, reasoning, trace
+_Avoid_: thinking (the thinking summary is one part of the answer steps, not their name), reasoning, trace
 
 **Thinking summary**:
 Anthropic's summary of the model's thinking for one model call, shown in the answer steps as the chat's working notes, and never sent back to the server (rows 155 and 156).
@@ -229,7 +229,7 @@ One task building in its own git worktree; up to 3 build at once (row 150).
 _Avoid_: slot, worker
 
 **Wording draft**:
-A text that Peter has not approved yet, written by a task from the mockups and the spec (row 153).
+A text that a task writes from the mockups and the spec for Peter's approval (row 153). Its file keeps it after he approves it, with the status "approved".
 _Avoid_: "draft" alone, which the glossary keeps out for a queued question
 
 **Agent files**:

@@ -1,6 +1,6 @@
 # A type check for before each commit and CI
 
-Researched 2026-10-27, when the repository had no type check. Peter's choice is [decision record](../design/interview-2026-10-26.md) row 157; task TC (`tasks/modules/agents.md`, A9) builds it.
+Researched 2026-10-27, when the repository had no type check. Peter's choice is [decision record](../design/interview-2026-10-26.md) row 157; task A9 (`tasks/modules/agents.md`) builds it.
 
 ## Peter's choice (row 157)
 
@@ -23,7 +23,7 @@ With the `tsconfig.json` below, both checkers printed identical results on the r
 |---|---|---|
 | `@types/bun` | 1.4.4 | Types for `Bun` and `bun:test`. It also brings the Node types [B1]. |
 | `typescript` | 7.0.2 | Equals `process.versions.typescript` of Bun 1.4.4, so the editor and the check agree [B1]. The planned `@tanstack/db` 0.15.2 requires it as a peer, and Bun installs peers [B5]. It is the reference `tsc`. |
-| `@types/react`, `@types/react-dom` | 19.3.0 each | Added with the site's first task, not with TC. React ships no types [R1]. `@tanstack/ai-react` 1.0.0 requires `@types/react` as a peer. |
+| `@types/react`, `@types/react-dom` | 19.3.0 each | Added with the site's first task, S1, not with A9 (row 159). React ships no types [R1]. `@tanstack/ai-react` 1.0.0 requires `@types/react` as a peer. |
 
 TanStack Start, Router, AI 1.0 and both design-system packages ship their own `.d.ts` files (npm manifests). No direct `@types/node`: `bun-types` references it.
 
@@ -88,7 +88,7 @@ CI, job `test` in `.github/workflows/ci.yml`, directly after `bun ci`:
 - **Young checker.** `bun check` was 17 days old when researched, and 1.4.4 changed its internals for speed [B3]. `typescript` 7.0.2 stays installed as the reference; a difference from `tsc` is a Bun bug [B1].
 - **Version drift.** A Bun upgrade can move the TypeScript version. A small test that compares `process.versions.typescript` with the pinned `typescript` keeps them equal.
 - **No compiler API in TypeScript 7.** A tool that imports `typescript`, such as typescript-eslint, fails [T1]. None of the 425 packages in the planned stack imports it; `@tanstack/db` names it only as a types peer. If a tool needs the API later, alias `typescript` to `@typescript/typescript6`, as TanStack's `start-basic` example does [S2].
-- **Existing errors.** This `tsconfig.json` finds 35 errors in 3 files: 34 from `noUncheckedIndexedAccess` (33 in `scripts/make-fonts.ts`, 1 in `src/print/chrome.ts`) and 1 in `src/__tests__/build.test.ts:116`. TC fixes them before the check goes on.
+- **Existing errors.** This `tsconfig.json` finds 35 errors in 3 files: 34 from `noUncheckedIndexedAccess` (33 in `scripts/make-fonts.ts`, 1 in `src/print/chrome.ts`) and 1 in `src/__tests__/build.test.ts:116`. A9 fixes them before the check goes on.
 - **Stale route tree.** A route added without the generator fails the check. That is the wanted signal.
 - React 19.3 with TypeScript 7: no known problem found.
 
