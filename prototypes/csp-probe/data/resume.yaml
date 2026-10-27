@@ -1,0 +1,9 @@
+name: Spike Person
+headline: Front-End and AI Platform Engineer
+deepDives:
+  - id: design-system-mcp
+    title: Design System MCP
+    body: An MCP server that answers component questions from the manifest.
+  - id: agent-workflows
+    title: Agent Workflows
+    body: Multi-agent orchestration for a design system team.

@@ -1,0 +1,24 @@
+{
+  "name": "site-spike",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@acmelabs/design-system": "0.3.2",
+    "@acmelabs/design-system-react": "0.3.2",
+    "@tanstack/react-router": "1.170.46",
+    "@tanstack/react-start": "1.169.4",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "nitro": "3.0.260903-beta",
+    "typescript": "^7.0.2",
+    "vite": "8.3.5",
+    "vite-plugin-pwa": "2.0.0",
+    "workbox-build": "7.4.1",
+    "workbox-window": "7.4.1"
+  }
+}
