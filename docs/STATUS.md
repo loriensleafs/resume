@@ -33,7 +33,6 @@ Updated 2026-10-27. This file is the one current handoff. A fresh session resume
 
 ## Waiting on Peter
 
-- **The push of K1's commits to `main`.** They change `src/knowledge/`, which the site build reads, so the push is a release: the agent follows the [release skill](../.agents/skills/release/SKILL.md) and asks first.
 - **Each push to `prototype/deploy-spike`** (D1 to D5), and the PDF check in Chrome (D3). The spike's setup is done. The full list of your steps, with the task each one blocks, is in [tasks/plan.md](../tasks/plan.md), "Waiting on Peter".
 - The rest of the setup list in [SPEC-deploy](../spec/SPEC-deploy.md#setup-list), when the deploy module reaches it: ntfy (step 2, then the budget's webhook), the Anthropic workspaces and keys (step 3), the real project's import (step 4), its Upstash database (step 6) and WAF rules (step 7), and steps 9 to 13. You sign up and pay; agents never do.
 - Delete the spike project and its Upstash database before D32.
@@ -44,4 +43,4 @@ Updated 2026-10-27. This file is the one current handoff. A fresh session resume
 - Peter's local clone: `git clone https://github.com/loriensleafs/resume ~/Dev/resume`, then create `private.yaml` there (see README).
 - Nothing red. CI does not exist yet; SPEC-deploy specifies it, and it is built with the deploy module.
 - Pushed to `main` on 2026-10-27, with Peter's approval: the test move (two commits) and A1 (one commit). By SPEC-deploy's docs-only list that push was a release: the move renames two snapshot files and a fixture, and only `*.test.ts` files are on the list. No deploy exists yet, so the push changes nothing live. A2's commit `d7a98a7` is on `origin/main` too. The uncommitted `package.json` change that an earlier STATUS named is gone: the tree was clean when K1 started, and `package.json` matches commit `151b359`.
-- Local on `main`, not pushed (2026-10-27): K1's four commits, `f810f57`, `a5298b0`, `98c03b2` and `18dc597`, and the Task end commit that follows them.
+- Pushed to `main` on 2026-10-27, with Peter's approval through the release skill: K1's five commits, up to `b3479c4`. They change `src/knowledge/`, so the push counted as a release; no deploy exists yet, so nothing live changed, and no release check ran. The commit that writes this line is docs-only and local; it goes with the next push that Peter approves.
