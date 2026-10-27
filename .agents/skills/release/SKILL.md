@@ -45,7 +45,7 @@ bun .agents/skills/release/scripts/private-detail-check.ts <push range>; echo "e
 - Exit 2: the script cannot check. Stop, and push nothing. Tell Peter the reason it printed, which holds no value. When the reason is a missing `private.yaml`, copy the file into this clone from Peter's main checkout, then start step 1 again.
 - Any other exit code: stop, push nothing, and tell Peter.
 
-**Approvals.** Some of the approvals that AGENTS.md lists show in the commits: a change to the docs-only list, a change to an approved knowledge source (approved as SPEC-knowledge's "Drafts and approval" defines it), and a new package. The script prints one line for each such change:
+**Approvals.** Some of the approvals that AGENTS.md lists show in the commits: a change to the docs-only list, a change to a knowledge source that is approved before or after it (as SPEC-knowledge's "Drafts and approval" defines it), and a new package, which includes a package spec that is not an exact version. The script prints one line for each such change; its header lists the rules:
 
 ```sh
 bun .agents/skills/release/scripts/approval-check.ts <push range>; echo "exit $?"

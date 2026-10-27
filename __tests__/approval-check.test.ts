@@ -72,12 +72,15 @@ describe("the approval check", () => {
     expect(check(root)).toMatchObject({ exitCode: 1, lines: ["approved knowledge: knowledge/sources/sample.md"] });
   });
 
-  test("lists the old path of an approved knowledge source that the range moves", async () => {
+  test("lists both paths of an approved knowledge source that the range moves", async () => {
     const root = await repo({ "package.json": PACKAGE, "knowledge/deep-dives/sample.md": APPROVED });
     Bun.spawnSync(["mkdir", "-p", `${root}/knowledge/sources`]);
     git(root, "mv", "knowledge/deep-dives/sample.md", "knowledge/sources/sample.md");
     git(root, "commit", "-q", "-m", "move");
-    expect(check(root)).toMatchObject({ exitCode: 1, lines: ["approved knowledge: knowledge/deep-dives/sample.md"] });
+    expect(check(root)).toMatchObject({
+      exitCode: 1,
+      lines: ["approved knowledge: knowledge/deep-dives/sample.md", "approved knowledge: knowledge/sources/sample.md"],
+    });
   });
 
   test("lists a change to approved logistics answers", async () => {
@@ -87,9 +90,36 @@ describe("the approval check", () => {
     expect(check(root)).toMatchObject({ exitCode: 1, lines: ["approved knowledge: knowledge/logistics.yaml"] });
   });
 
-  test("passes a change to a draft source and a new source", async () => {
+  test.each([
+    ["in double quotes", 'status: "approved"'],
+    ["in single quotes", "status: 'approved'"],
+    ["with a comment", "status: approved   # draft | approved"],
+  ])("reads an approved status written %s", async (_name, line) => {
+    const source = APPROVED.replace("status: approved", line);
+    const root = await repo({ "package.json": PACKAGE, "knowledge/sources/sample.md": source });
+    await change(root, { "knowledge/sources/sample.md": `${source}More text.\n` });
+    expect(check(root)).toMatchObject({ exitCode: 1, lines: ["approved knowledge: knowledge/sources/sample.md"] });
+  });
+
+  test("lists a new approved source and a draft that the range approves", async () => {
     const root = await repo({ "package.json": PACKAGE, "knowledge/sources/draft.md": DRAFT });
-    await change(root, { "knowledge/sources/draft.md": `${DRAFT}More text.\n`, "knowledge/sources/new.md": APPROVED });
+    await change(root, {
+      "knowledge/sources/draft.md": DRAFT.replace("status: draft", "status: approved"),
+      "knowledge/sources/new.md": APPROVED,
+    });
+    expect(check(root)).toMatchObject({
+      exitCode: 1,
+      lines: ["approved knowledge: knowledge/sources/draft.md", "approved knowledge: knowledge/sources/new.md"],
+    });
+  });
+
+  test("passes a change to a draft source and a new draft source", async () => {
+    const root = await repo({ "package.json": PACKAGE, "knowledge/sources/draft.md": DRAFT, "knowledge/README.md": "# Knowledge\n" });
+    await change(root, {
+      "knowledge/sources/draft.md": `${DRAFT}More text.\n`,
+      "knowledge/sources/new.md": DRAFT,
+      "knowledge/README.md": "# Knowledge base\n",
+    });
     expect(check(root)).toMatchObject({ exitCode: 0, lines: [] });
   });
 
@@ -100,10 +130,29 @@ describe("the approval check", () => {
     expect(check(root)).toMatchObject({ exitCode: 1, lines: ["new package: left-pad"] });
   });
 
-  test("passes a new version of a package", async () => {
+  test("passes a new exact version of a package", async () => {
     const root = await repo({ "package.json": PACKAGE });
     await change(root, { "package.json": PACKAGE.replace("4.6.7", "4.6.8") });
     expect(check(root)).toMatchObject({ exitCode: 0, lines: [] });
+  });
+
+  test.each([
+    ["a git URL", "git+https://github.com/someone/zod.git"],
+    ["a GitHub reference", "github:someone/zod"],
+    ["a range", "^4.6.7"],
+    ["a local folder", "file:../zod"],
+    ["another registry name", "npm:other-package@4.6.7"],
+  ])("lists a package whose spec changes to %s", async (_name, spec) => {
+    const root = await repo({ "package.json": PACKAGE });
+    await change(root, { "package.json": PACKAGE.replace('"4.6.7"', JSON.stringify(spec)) });
+    expect(check(root)).toMatchObject({ exitCode: 1, lines: ["package without an exact version: zod"] });
+  });
+
+  test("lists a package that the range trusts to run its install scripts", async () => {
+    const root = await repo({ "package.json": PACKAGE });
+    const trusted = { ...JSON.parse(PACKAGE), trustedDependencies: ["zod"] };
+    await change(root, { "package.json": JSON.stringify(trusted, null, 2) });
+    expect(check(root)).toMatchObject({ exitCode: 1, lines: ["newly trusted package: zod"] });
   });
 
   test("cannot check a package.json that does not parse", async () => {

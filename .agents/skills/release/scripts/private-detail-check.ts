@@ -10,6 +10,7 @@
 // A value matches in any letter case. A value with 7 or more digits, such as a phone number, also matches with
 // separators between its digits: up to 4 spaces, brackets, dots, plus signs, slashes, hyphens or dashes, or a
 // line break (two for a blank line) followed by indentation. Fewer digits would match too much other text.
+// It does not decode text that someone encoded on purpose, such as base64, gzip or UTF-16.
 //
 // It prints one number: how many values the range holds, plus one when private.yaml is tracked.
 // Exit 0: none. Exit 1: some. Exit 2: it cannot check, and stderr says why. It fails closed: a missing, empty
@@ -61,16 +62,20 @@ function bytesAsText(bytes: Uint8Array): string {
   return out;
 }
 
-/** The text to search in one file version. */
-async function contentText(bytes: Uint8Array, dir: string): Promise<string> {
+/** The text to search in one file version. A PDF or a zip file goes through a temporary file, deleted at once. */
+async function contentText(bytes: Uint8Array, tmp: string): Promise<string> {
   const startsWith = (signature: number[]) => signature.every((byte, i) => bytes[i] === byte);
   if (startsWith(PDF) || startsWith(ZIP)) {
-    const file = `${dir}/${crypto.randomUUID()}`;
+    const file = `${tmp}/private-detail-check-${crypto.randomUUID()}`;
     await Bun.write(file, bytes);
-    const extracted = startsWith(PDF)
-      ? decode(await run(["pdftotext", "-q", file, "-"], dir, "pdftotext failed or is missing"))
-      : decode(await run(["unzip", "-p", file], dir, "unzip failed or is missing")).replace(/<[^>]*>/g, "");
-    return bytesAsText(bytes) + SPLIT + extracted;
+    try {
+      const extracted = startsWith(PDF)
+        ? decode(await run(["pdftotext", "-q", file, "-"], tmp, "pdftotext failed or is missing"))
+        : decode(await run(["unzip", "-p", file], tmp, "unzip failed or is missing")).replace(/<[^>]*>/g, "");
+      return bytesAsText(bytes) + SPLIT + extracted;
+    } finally {
+      await Bun.file(file).delete().catch(() => {});
+    }
   }
   // Git's own rule: a NUL byte in the first 8,000 bytes makes a file binary.
   return bytes.subarray(0, 8000).includes(0) ? bytesAsText(bytes) : decode(bytes);
@@ -104,21 +109,17 @@ export async function countPrivateDetails(range: string, cwd: string): Promise<n
   const values = privateValues(parsed);
   if (values.length === 0) throw new CannotCheck("private.yaml holds no value");
 
-  const dir = `${Bun.env.TMPDIR ?? "/tmp"}/private-detail-check-${crypto.randomUUID()}`;
-  try {
-    // `-m` shows a merge's changes against each parent, so a value only in a conflict resolution shows too.
-    // `--format=fuller` adds the committer. `--end-of-options` keeps the range from acting as an option.
-    const pieces = [
-      await gitText(root, ["log", "-p", "-m", "--format=fuller", "--no-color", "--no-ext-diff", "--no-textconv", "--end-of-options", range, "--"]),
-    ];
-    for (const id of await changedFileVersions(root, range)) {
-      pieces.push(await contentText(await git(root, ["cat-file", "blob", id]), dir));
-    }
-    const tracked = (await gitText(root, ["ls-files", "--", "private.yaml"])).trim() !== "";
-    return countHeld(values, pieces.join(SPLIT)) + (tracked ? 1 : 0);
-  } finally {
-    Bun.spawnSync(["rm", "-rf", dir]);
+  const tmp = (Bun.env.TMPDIR ?? "/tmp").replace(/\/$/, "");
+  // `-m` shows a merge's changes against each parent, so a value only in a conflict resolution shows too.
+  // `--format=fuller` adds the committer. `--end-of-options` keeps the range from acting as an option.
+  const pieces = [
+    await gitText(root, ["log", "-p", "-m", "--format=fuller", "--no-color", "--no-ext-diff", "--no-textconv", "--end-of-options", range, "--"]),
+  ];
+  for (const id of await changedFileVersions(root, range)) {
+    pieces.push(await contentText(await git(root, ["cat-file", "blob", id]), tmp));
   }
+  const tracked = (await gitText(root, ["ls-files", "--", "private.yaml"])).trim() !== "";
+  return countHeld(values, pieces.join(SPLIT)) + (tracked ? 1 : 0);
 }
 
 if (import.meta.main) {
