@@ -978,7 +978,10 @@ async function whoAnswered(res: Response, info: BuildInfo) {
   // The first part of x-vercel-id is the edge region that took the request; the WAF counts per region.
   const region = /^([a-z]{3}\d)::/.exec(res.headers.get("x-vercel-id") ?? "")?.[1] ?? "unknown";
   const mark = mitigated === null ? "none" : /^[a-z_-]{1,32}$/i.test(mitigated) ? mitigated : "other";
-  const label = notFoundPage ? "the not-found page" : mitigated !== null ? `x-vercel-mitigated ${mark}` : `another body (${res.headers.get("content-type")})`;
+  // Only the media type of content-type, and only when it has the shape of one: the deployment sets the value.
+  const media = (res.headers.get("content-type") ?? "none").split(";")[0]!.trim();
+  const type = /^[a-z0-9.+-]{1,40}\/[a-z0-9.+-]{1,40}$|^none$/i.test(media) ? media : "other";
+  const label = notFoundPage ? "the not-found page" : mitigated !== null ? `x-vercel-mitigated ${mark}` : `another body (${type})`;
   return { status: res.status, waf: mitigated !== null && !notFoundPage, notFoundPage, region, body, text: `HTTP ${res.status}, ${label}` };
 }
 
@@ -989,9 +992,9 @@ const CHAT_POSTS = 41; // SPEC-deploy's smoke check: a 429 must come by the 41st
  * every chat POST gets static/404.html with status 404, and the WAF's own answer carries x-vercel-mitigated. Judged:
  * a chat POST with Content-Type text/plain gets the WAF's 403; chat POSTs with a malformed JSON body get the
  * not-found page (the first is the control: the content type, not the path, decides the 403) until one gets the
- * WAF's 429, which must come by the 41st. Recorded, not judged: whether the path condition matches /API/chat and
- * /api/%63hat, whether the routes send /api/sp%69ke to its function, and whether the address still gets a page
- * after its 429. The rules count per address for 10
+ * WAF's 429, which must come by the 41st. Recorded, not judged: whether the path condition matches /API/chat,
+ * /Api/Chat and /api/%63hat, whether the routes send /api/sp%69ke to its function, and whether the address still
+ * gets a page after its 429. The rules count per address for 10
  * minutes, so this check runs in a job of its own, after the other checks, and a rerun within 10 minutes from the
  * same address meets the old count.
  */
@@ -1011,12 +1014,11 @@ export const wafRules = {
     seen.push(`POST /api/chat text/plain: ${plain.text}`);
     if (plain.status !== 403 || !plain.waf) problems.push(`POST /api/chat text/plain answered ${plain.text}, not the WAF's 403`);
 
-    // Recorded: does the path condition match another case, and a percent-encoded letter?
-    const upper = await post("/API/chat", "text/plain", "spike check 8");
-    seen.push(
-      `POST /API/chat text/plain: ${upper.text}: the path condition ${upper.waf ? "matches" : "does not match"} /API/chat` +
-        (upper.waf ? " regardless of case" : ""),
-    );
+    // Recorded: does the path condition match two other spellings, and a percent-encoded letter?
+    for (const path of ["/API/chat", "/Api/Chat"]) {
+      const other = await post(path, "text/plain", "spike check 8");
+      seen.push(`POST ${path} text/plain: ${other.text}: the path condition ${other.waf ? "matches" : "does not match"} ${path}`);
+    }
     const encoded = await post("/api/%63hat", "text/plain", "spike check 8");
     seen.push(`POST /api/%63hat text/plain: ${encoded.text}: the path condition ${encoded.waf ? "decodes" : "does not decode"} %63`);
     // Recorded: do the routes decode it too? /api/spike answers with its function's name (check 2).
