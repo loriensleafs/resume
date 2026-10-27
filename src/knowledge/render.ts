@@ -1,7 +1,7 @@
 // Renders the knowledge base as the text the chat reads (SPEC-knowledge, Rendered text). Each
 // line of the core starts with the [id] the chat cites or reads.
 
-import type { Entry, Knowledge } from "./build";
+import type { Entry, Knowledge } from "./types";
 
 /** The rendered core stays under this many characters: about 20,000 tokens at roughly 4 characters per token. */
 export const CORE_CHARACTERS = 80_000;

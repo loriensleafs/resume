@@ -6,14 +6,8 @@
 import { z } from "zod";
 import { displayUrl, formatLocation, formatRange, formatTitle, loadResume, type Resume } from "../content";
 import { highlightId, isSlug, logisticsId, parseId, roleId, skillsId, SLUG_RULE, toSlug } from "./ids";
-import { KnowledgeError, parseSource, type Source } from "./parse";
-
-export type { Passage, Source, Subject } from "./parse";
-
-/** One entry of the core: the chat sees it as `[<id>] <title>: <text>`. */
-export type Entry = { id: string; kind: "resume" | "logistics" | "catalog"; title: string; text: string };
-/** Server only: it holds each source's Not public text. The chat's function gets it through virtual:knowledge. */
-export type Knowledge = { core: Entry[]; sources: Source[] };
+import { KnowledgeError, parseSource } from "./parse";
+import type { Entry, Knowledge, Source } from "./types";
 
 const REPO = `${import.meta.dir}/../..`;
 const SOURCES = "knowledge/sources";

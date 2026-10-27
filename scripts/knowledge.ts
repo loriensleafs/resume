@@ -2,8 +2,9 @@
 // size against its budget. The core goes to standard output and the size to standard error, so
 // `bun run knowledge > core.txt` writes the core alone. A core at or over its budget exits with 1.
 
-import { buildKnowledge, type Entry } from "../src/knowledge/build";
+import { buildKnowledge } from "../src/knowledge/build";
 import { CORE_CHARACTERS, renderCore } from "../src/knowledge/render";
+import type { Entry } from "../src/knowledge/types";
 
 const knowledge = await buildKnowledge();
 const core = renderCore(knowledge);
