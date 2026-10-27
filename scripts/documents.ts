@@ -35,7 +35,7 @@ const sha256 = (data: string | Uint8Array) => new Bun.CryptoHasher("sha256").upd
  * in sha256sum form, sorted by name. A file's name is its path from the repo root; a locked
  * package is `bun.lock#<package>`, hashed from its bun.lock entry.
  */
-export async function inputsManifest(): Promise<string> {
+export async function inputsHash(): Promise<string> {
   const hashes = new Map<string, string>();
   for (const pattern of INPUT_FILES) {
     for await (const path of new Bun.Glob(pattern).scan({ cwd: REPO, onlyFiles: true })) {
@@ -55,7 +55,7 @@ export async function inputsManifest(): Promise<string> {
 }
 
 /** The inputs hash committed in a documents folder, or "" when the folder has none. */
-export async function committedManifest(dir = DOCUMENTS_DIR): Promise<string> {
+export async function committedInputsHash(dir = DOCUMENTS_DIR): Promise<string> {
   const file = Bun.file(`${dir}/inputs.sha256`);
   return (await file.exists()) ? file.text() : "";
 }
@@ -67,9 +67,9 @@ export function changedInputs(before: string, after: string): string[] {
   return [...new Set([...a.keys(), ...b.keys()])].filter((name) => a.get(name) !== b.get(name)).sort();
 }
 
-function hashesByName(manifest: string): Map<string, string> {
+function hashesByName(text: string): Map<string, string> {
   const hashes = new Map<string, string>();
-  for (const line of manifest.split("\n")) {
+  for (const line of text.split("\n")) {
     const match = line.match(/^([0-9a-f]{64}) {2}(.+)$/);
     if (match) hashes.set(match[2]!, match[1]!);
   }
@@ -78,23 +78,40 @@ function hashesByName(manifest: string): Map<string, string> {
 
 const DOCUMENTS = ["pdf", "docx", "txt"] as const;
 
-if (import.meta.main) {
-  const manifest = await inputsManifest();
-  const changed = changedInputs(await committedManifest(), manifest);
-  const present = await Promise.all(DOCUMENTS.map((ext) => Bun.file(`${DOCUMENTS_DIR}/${BASENAME}.${ext}`).exists()));
+/**
+ * Rebuilds the documents in `dir` when an input changed or a document is missing, and says why.
+ * Otherwise it writes nothing and returns two empty lists.
+ */
+export async function updateDocuments(dir = DOCUMENTS_DIR): Promise<{ changed: string[]; missing: string[] }> {
+  const current = await inputsHash();
+  const changed = changedInputs(await committedInputsHash(dir), current);
+  const missing: string[] = [];
+  for (const ext of DOCUMENTS) {
+    if (!(await Bun.file(`${dir}/${BASENAME}.${ext}`).exists())) missing.push(`${BASENAME}.${ext}`);
+  }
+  if (changed.length > 0 || missing.length > 0) await writeDocuments(dir, current);
+  return { changed, missing };
+}
 
-  if (changed.length === 0 && present.every(Boolean)) {
+async function writeDocuments(dir: string, current: string): Promise<void> {
+  const tmp = `${Bun.env.TMPDIR ?? "/tmp"}/resume-documents-${crypto.randomUUID()}`;
+  try {
+    const [built] = await build({ outDir: tmp, variants: ["public"] });
+    for (const ext of DOCUMENTS) await Bun.write(`${dir}/${BASENAME}.${ext}`, Bun.file(built![ext]));
+    // The inputs hash goes last, so an interrupted run never pairs it with old documents.
+    await Bun.write(`${dir}/inputs.sha256`, current);
+  } finally {
+    await $`rm -rf ${tmp}`.quiet().nothrow();
+  }
+}
+
+if (import.meta.main) {
+  const { changed, missing } = await updateDocuments();
+  if (changed.length === 0 && missing.length === 0) {
     console.log("documents/ is up to date: no input changed, so nothing was written.");
   } else {
-    const tmp = `${Bun.env.TMPDIR ?? "/tmp"}/resume-documents-${crypto.randomUUID()}`;
-    try {
-      const [built] = await build({ outDir: tmp, variants: ["public"] });
-      for (const ext of DOCUMENTS) await Bun.write(`${DOCUMENTS_DIR}/${BASENAME}.${ext}`, Bun.file(built![ext]));
-      // The inputs hash goes last, so an interrupted run never pairs it with old documents.
-      await Bun.write(`${DOCUMENTS_DIR}/inputs.sha256`, manifest);
-    } finally {
-      await $`rm -rf ${tmp}`.quiet().nothrow();
-    }
+    if (changed.length > 0) console.log(`Changed inputs: ${changed.join(", ")}`);
+    if (missing.length > 0) console.log(`Missing documents: ${missing.join(", ")}`);
     console.log(`documents/: wrote ${DOCUMENTS.map((ext) => `${BASENAME}.${ext}`).join(", ")} and inputs.sha256.`);
   }
 }
