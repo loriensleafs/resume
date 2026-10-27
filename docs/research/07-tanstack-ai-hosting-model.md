@@ -108,13 +108,14 @@ The options.
 
 The decision. Peter chose A (row 155). The wire middleware drops every event whose type starts with `REASONING_`, by prefix, because the client builds a thinking part from several of them. So the browser holds no thinking part and no signature, and sends nothing back. The request check stays as approved.
 
-Row 155 first put a content-free `chat.thinking` event and a "Thinking" step in place of the dropped events. Peter then chose to show the thinking summary, with guards (row 156), because the mockups leave space to show that the model is working:
+Row 155 first put a content-free `chat.thinking` event and a live step in place of the dropped events. Peter then chose to show the thinking summary, with guards (row 156), because the mockups leave space to show that the model is working:
 
-- `handleChat()` asks for `reasoning: { level: "medium", summary: true }`, so the adapter sends `display: "summarized"`. Anthropic never returns the raw thinking: "what you see is never the raw chain of thought" (thinking docs, "How thinking works"). The summary is the most there is.
-- Peter allows the summary in the browser because every approved source is public, and a source's `Not public` section names kinds of material only.
-- The summary streams as `REASONING_MESSAGE_CONTENT` (`ai-anthropic/src/adapters/text.ts:1975–1988`). The wire middleware sends it in the handler's own `CUSTOM` event `chat.thinking`: `{ active: true }` at a block's start, `{ delta: <text> }` for the summary text, and `{ active: false }` at its end. It never sends a signature.
-- While thinking is active, a live answer step shows the summary as plain text, never Markdown or HTML, under a label that marks it as the chat's working notes (the wording is a draft, row 153). After the answer, it stays in the opened steps under that label. It is not counted in the folded steps line. Only the step's name is announced.
-- The browser saves the summary as `answer.thinking`, outside the `UIMessage`, so it is never in a request. The evals' `mustNotContain` covers it, and the review file shows it. The question log stores no thinking text.
+- `handleChat()` asks for `reasoning: { level: "medium", summary: true }`, so the adapter sends `display: "summarized"`. Anthropic never returns the raw thinking: "what you see is never the raw chain of thought" (thinking docs, "How thinking works"). The thinking summary is the most there is.
+- Peter allows the thinking summary in the browser because every approved source is public, and a source's `Not public` section names kinds of material only.
+- The thinking summary streams as `REASONING_MESSAGE_CONTENT` (`ai-anthropic/src/adapters/text.ts:1975–1988`). The wire middleware sends it in the handler's own `CUSTOM` event `chat.thinking`: `{ active: true }` at a block's start, `{ delta: <text> }` for the thinking summary's text, and `{ active: false }` at its end. It never sends a signature.
+- While thinking is active, a live answer step shows the thinking summary as plain text, never Markdown or HTML, under a label that marks it as the chat's working notes (the wording is a draft, row 153). After the answer, the thinking summary stays in the opened steps under that label. It is not counted in the folded steps line. Only the step's label is announced.
+- The folded steps line shows when the turn read or has a thinking summary, so a visitor can always open the thinking summary. When the turn read nothing, the line's text is a wording draft for C26, for example "Thought it through".
+- The browser saves the thinking summary as `answer.thinking`, outside the `UIMessage`, so it is never in a request. The evals' `mustNotContain` covers it, and the review file shows it. The question log stores no thinking text.
 
 #### 2. A thrown run skips the `RUN_ERROR` rewrite
 
@@ -148,7 +149,7 @@ One `fakeText()` adapter keeps one queue, and each model call takes the next ans
 
 Status: note. Finding 1's decision drops these events from the wire.
 
-For each thinking block the adapter sends `REASONING_START` and `REASONING_MESSAGE_START`, then the text as `REASONING_MESSAGE_CONTENT`, then the signature as `REASONING_ENCRYPTED_VALUE`, then the end events (`ai-anthropic/src/adapters/text.ts:1874–1893`, `1975–1988`, `2045–2070`). With `display: "omitted"` the text is empty; with `"summarized"` it is the summary. The signature is encrypted thinking, not text.
+For each thinking block the adapter sends `REASONING_START` and `REASONING_MESSAGE_START`, then the text as `REASONING_MESSAGE_CONTENT`, then the signature as `REASONING_ENCRYPTED_VALUE`, then the end events (`ai-anthropic/src/adapters/text.ts:1874–1893`, `1975–1988`, `2045–2070`). With `display: "omitted"` the text is empty; with `"summarized"` it is the thinking summary. The signature is encrypted thinking, not text.
 
 #### 7. The chat's browser code
 
