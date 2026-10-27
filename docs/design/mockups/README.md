@@ -11,16 +11,16 @@ Updated later on 2026-10-27 (canvas version 44; [decision record](../interview-2
 - The conversation board shows the resume card.
 - The "Welcome back" notice is gone.
 
-Updated again on 2026-10-27 after the spec reviews (canvas version 45; [decision record](../interview-2026-10-26.md) rows 133 and 136). These changes wait for Peter's approval with the amended specs:
+Updated again on 2026-10-27 after the spec reviews (canvas version 46; [decision record](../interview-2026-10-26.md) rows 133, 136 and 138). Peter approved the new texts in row 138; the rest waits for his approval with the amended specs:
 
 - Each answer numbers its own citations from 1, and its card lists only its own citations (row 133). Citation numbers in answers are drawn as the citation buttons on every board.
 - In the resume, every highlight the latest answer cites shows its number; only the opened one is tinted, with a blue number.
 - The audience lines read "Manager:" and "Recruiter:".
 - The phone boards show the "Answers for" select and the anonymous-log line under the input.
 - The phone sheets have no grab handle: the design system's drawer has no swipe to close.
-- New input states: limit reached for the day and for the month, and "Too many questions". Their texts are proposals for Peter to approve.
-- A new not-found page, desktop and phone. It has no script, so it follows the system's light or dark setting, not the visitor's own choice. Its text is a proposal for Peter to approve.
-- The steps' citation line also names Peter's logistics answers (a proposal).
+- New input states: limit reached for the day and for the month, and "Too many questions". Peter approved their texts (row 138).
+- A new not-found page, desktop and phone. It has no script, so it follows the system's light or dark setting, not the visitor's own choice. Peter approved its text (row 138).
+- The steps' citation line also names Peter's logistics answers (row 138).
 
 The mockups were made on a private Claude Design canvas, "Resume site mockups", with Peter's ACME design system 0.3.2. These images are rendered from the canvas boards. The board sources are on the branch [`prototype/site-mockups`](https://github.com/loriensleafs/resume/tree/prototype/site-mockups/prototypes/site-mockups), not on `main`, because they open only inside the canvas.
 

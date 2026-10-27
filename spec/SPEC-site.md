@@ -105,7 +105,7 @@ The address follows the view, with `history.replaceState`, so it adds no history
 - `/?role=<id>` while a role is selected and no source is open;
 - `/` otherwise.
 
-So a visitor shares a role or a source by copying the address. An unknown source or role id in a query (`?source=`, `?role=`) gives the first view, not an error. An unknown path, `/sources/<unknown id>` included, gets the not-found page with status 404: "Page not found" with links to the chat and to the resume, and no script. Peter approves its wording. A citation to an id that no longer exists shows as plain text (SPEC-knowledge).
+So a visitor shares a role or a source by copying the address. An unknown source or role id in a query (`?source=`, `?role=`) gives the first view, not an error. An unknown path, `/sources/<unknown id>` included, gets the not-found page with status 404: "Page not found" with links to the chat and to the resume, and no script. Its wording (Peter, row 138): "404", the heading "Page not found", "There is no page at this address. The link may be mistyped, or the page may have moved.", and the links "Ask the chat about Peter's work" (`/`) and "Read Peter's resume" (`/resume`). It follows the system's light or dark setting, because a page with no script cannot read the visitor's stored theme. A citation to an id that no longer exists shows as plain text (SPEC-knowledge).
 
 ## Saved views
 

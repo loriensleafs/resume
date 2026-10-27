@@ -44,5 +44,5 @@ Order (Peter, 2026-10-27): write and approve every remaining spec first (tasks 9
 - [ ] 14. Write SPEC-chat.md (with the Agent Design plugin), then SPEC-deploy.md and SPEC-agents.md, each for Peter's review
   - [x] SPEC-chat.md, approved 2026-10-27 (decision record row 84)
   - [x] SPEC-deploy.md, approved 2026-10-27 (decision record row 127); its first plan task is the deploy spike
-  - [ ] Adversarial reviews of SPEC-knowledge, SPEC-site and SPEC-chat, plus a cross-spec pass (row 123): 100 findings; Peter decided rows 128 to 136; fixes applied to all five specs and the mockups (canvas version 45); a consistency check's 15 findings fixed. Waits for Peter's approval of the amended specs and mockups.
+  - [ ] Adversarial reviews of SPEC-knowledge, SPEC-site and SPEC-chat, plus a cross-spec pass (row 123): 100 findings; Peter decided rows 128 to 136; fixes applied to all five specs and the mockups (canvas version 46); the scope chip's label (row 137) and five texts (row 138) decided; a consistency check's 15 findings fixed. Waits for Peter's approval of the amended specs and mockups.
   - [ ] SPEC-agents.md

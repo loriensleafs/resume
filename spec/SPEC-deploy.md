@@ -241,7 +241,7 @@ Three Vercel WAF rules, per IP address:
 
 - The content-type rule stops the cheapest cross-site attack before the function runs: a page on another site can post a form, but a form cannot send `application/json` without the browser first asking the server's permission, which the site never gives. The handler's Origin check (SPEC-chat amendment 9) is the second guard.
 - Denied requests cost nothing and do not run the function.
-- SPEC-chat already maps a 429 to its alert. Its text changes to "Try again in a few minutes", for Peter's approval with the other wordings.
+- SPEC-chat already maps a 429 to its alert. Its text changes to "Too many questions in a short time." and "Try again in a few minutes.", approved by Peter (row 138).
 - `/api/cron/health` answers 401 at once without the right `CRON_SECRET`, before it reads anything.
 - Whether a WAF path condition matches without regard to case, and whether the content-type condition works as written, are spike checks. The case-sensitive API routes already send `/API/chat` to the not-found page.
 
@@ -324,7 +324,7 @@ Either gives `errorCode: "SPEND_LIMIT"` and sets the marker `limit:spend` with t
 - A turn that meets Anthropic's limit during the run ends with `RUN_ERROR` and the code `SPEND_LIMIT`.
 - In both cases the telemetry outcome is `limit`, and the saved answer keeps the outcome `limit`, so a reload shows the same state.
 - The browser shows the "limit reached" state, with Peter's email, a link that opens the resume, and no Try again. The question goes back into the input only when the input is empty, and the question queue pauses until the visitor sends again (SPEC-chat).
-- The words come to Peter with the other wordings. These are amendments to SPEC-chat (below).
+- Peter approved the words (row 138); SPEC-chat holds them. These are amendments to SPEC-chat (below).
 
 ## The question log, daily totals, alerts and status
 
@@ -872,4 +872,4 @@ The real platform is checked by the deploy spike, by the release check, by the t
 
 ## Open Questions
 
-None for this spec. The platform questions are the deploy spike's checks. For Peter, with the other wordings: the "limit reached" texts (day and month), the new 429 text and the not-found page's text.
+None for this spec. The platform questions are the deploy spike's checks. The "limit reached" texts, the 429 text and the not-found page's text are approved (row 138).
