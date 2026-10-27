@@ -35,6 +35,7 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 23 | Site: test seams | The site build output, plus one real-browser test |
 | 24 | Site: speed and accessibility targets | No WCAG 2.2 AA violations; main content visible in under 2.5 s and layout shift under 0.1 on a throttled phone profile; first-load JavaScript under 200 KB compressed |
 | 25 | Site: are the deep dives still worth having if the chat answers in more depth (deep-dive tabs, sources on demand, or none)? | Sources on demand ([0015](../decisions/0015-sources-on-demand.md)). Peter added that his interview answers were "much more dense" than the deep dives, and asked to recover them, brief them up or add other sources, because "we're going to have to somehow be able to provide this AI with a lot more information" |
+| 26 | Knowledge layout: all in the prompt, or two layers (a core in every request, full sources read by a tool)? | Two layers ([0016](../decisions/0016-two-layer-knowledge.md)) |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 

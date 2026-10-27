@@ -42,4 +42,4 @@ A vector index (the Vercel RAG guide) is the third pattern. It is built for thou
 - **Prompt caching** is already automatic; the 1-hour cache costs more per write and helps only if visits are close together.
 - **Not needed now:** AI Gateway (one provider, and the Anthropic Console spend limit already caps cost), AI Elements (the site uses Peter's design system; AI Elements is being deprecated), vector stores, Workflows, Chat SDK and memory middleware.
 
-Outcome: open. Peter chooses the layout. The content plan (what new sources to gather) is separate and does not depend on the layout: each source is a Markdown file in his words either way.
+Outcome: Peter chose two layers on 2026-10-26 ([decision 0016](../decisions/0016-two-layer-knowledge.md)). The content plan (what new sources to gather) is separate and does not depend on the layout: each source is a Markdown file in his words either way.

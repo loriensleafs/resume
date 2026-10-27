@@ -19,3 +19,4 @@ These records explain the choices behind this repository and their reasons. Numb
 | [0013](0013-claude-sonnet-model.md) | The chat starts on Claude Sonnet 5.5 |
 | [0014](0014-library-skills-and-docs-mcp.md) | Agents load library skills through TanStack Intent and read the design system's docs MCP |
 | [0015](0015-sources-on-demand.md) | Deep dives become sources the chat opens on demand |
+| [0016](0016-two-layer-knowledge.md) | The knowledge base has two layers: a core in every request, sources read by a tool |

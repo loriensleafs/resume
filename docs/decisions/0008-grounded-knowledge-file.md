@@ -6,6 +6,6 @@ Decided 2026-10-26 by Peter.
 
 Consequences:
 
-- The whole knowledge file goes into each request; it is small enough to fit, so nothing is missed and no search index is needed. Prompt caching keeps the cost per question low. If the file outgrows the context, the chat gets a lookup tool instead.
+- The whole knowledge file goes into each request; it is small enough to fit, so nothing is missed and no search index is needed. Prompt caching keeps the cost per question low. If the file outgrows the context, the chat gets a lookup tool instead. Replaced on 2026-10-26 by [decision 0016](0016-two-layer-knowledge.md): a core goes into each request, and the chat reads full sources through a tool.
 - Peter writes or approves every entry. Deep dives come from interviews with Peter, one item at a time.
 - Deep dives describe Peter's own work at interview level. They leave out internal code, customer names, security details and figures employers have not made public, which matters most for FedNow.
