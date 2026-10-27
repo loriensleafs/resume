@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bun build-info.ts && bun --bun vite build && bun gen-sw.ts"
+    "build": "bun --bun vite build && bun gen-sw.ts && bun build-info.ts"
   },
   "dependencies": {
     "@acmelabs/design-system": "0.3.2",

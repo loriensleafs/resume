@@ -2,6 +2,8 @@
 # Each push to the spike branch builds a protected production deployment on the throwaway Vercel project
 # (root folder prototypes/deploy-spike). This workflow waits for that commit's deployment and runs check.ts
 # against it. It prints verdicts, states and hosts only; the bypass secret stays in the environment.
+# The wait and the checks share one 15-minute bound (check.ts RUN_MS); the job timeout adds room for setup.
+# A newer push cancels this run. Rerun only the newest run.
 name: spike-check
 
 on:
@@ -19,10 +21,16 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 17
     defaults:
       run:
         working-directory: prototypes/deploy-spike
+    env:
+      # The project's Git branch URL: <project>-git-<branch>-<team>.vercel.app (protected)
+      # https://vercel.com/docs/deployments/generated-urls#generated-from-git
+      SPIKE_BRANCH_HOST: resume-deploy-spike-git-prototype-deploy-spike-peterkloss.vercel.app
+      # The project's production address (public under Standard Protection); it never gets the bypass.
+      SPIKE_PRODUCTION_HOST: project-8ar0o.vercel.app
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -34,17 +42,15 @@ jobs:
 
       - name: Wait for this commit's deployment
         id: deployment
-        timeout-minutes: 16
         run: bun check.ts wait
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          # The project's Git branch URL: <project>-git-<branch>-<team>.vercel.app
-          # https://vercel.com/docs/deployments/generated-urls#generated-from-git
-          SPIKE_BRANCH_HOST: resume-deploy-spike-git-prototype-deploy-spike-peterkloss.vercel.app
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
       - name: Run the spike checks
-        run: bun check.ts run "$ORIGIN"
+        run: bun check.ts run
         env:
-          ORIGIN: ${{ steps.deployment.outputs.origin }}
+          DEPLOYMENT_HOST: ${{ steps.deployment.outputs.deployment }}
+          PRODUCTION_HOST: ${{ steps.deployment.outputs.production }}
+          RUN_DEADLINE: ${{ steps.deployment.outputs.deadline }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}

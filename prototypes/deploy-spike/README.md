@@ -16,8 +16,13 @@ What does a real Vercel deployment do with the site's build output? A local buil
 
 - The site spike from `prototypes/csp-probe/` (its own verdict is in that folder's README), built with Nitro's Vercel preset as in `prototypes/nitro-vercel-output/`. Nitro writes `.vercel/output/`; the pages land in `.vercel/output/static/`.
 - `vercel.json`: `bunVersion`, `framework: null`, the install command `bun ci` and the build command `bun run build`. The Ignored Build Step stays the project's own setting.
-- `bun run build` runs three steps: `build-info.ts`, `bun --bun vite build`, then `gen-sw.ts` (the Workbox service worker over `.vercel/output/static/`).
-- `build-info.ts` writes `public/build-info.json`, which Vite copies to `/build-info.json`. It holds the commit, the deployment's own address (`VERCEL_URL`), the Git branch address, `vercel.json`'s `bunVersion`, `bun.lock`'s `lockfileVersion`, and the output of `bun --version` with the binary's path and revision. It writes named fields only, because the build environment also holds the bypass secret.
+- `bun run build` runs three steps: `bun --bun vite build`, `gen-sw.ts` (the Workbox service worker over `.vercel/output/static/`), then `build-info.ts`.
+- `build-info.ts` writes `build-info.json` into the static output, at `/build-info.json` and again at `/api/build-info.json`. It holds:
+  - the commit, `VERCEL_ENV`, and three addresses: the deployment's own (`VERCEL_URL`), the Git branch URL and the production address (`VERCEL_PROJECT_PRODUCTION_URL`);
+  - `vercel.json`'s `bunVersion` and `bun.lock`'s `lockfileVersion`;
+  - the output of `bun --version`, with the binary's path and revision;
+  - each function's `runtime` and `maxDuration`, read from the built `.vc-config.json` files.
+- It writes named fields only, because the build environment also holds the bypass secret. Checks take their expected values from this file, not from constants in `check.ts`.
 - The prerender crawler skips the links to `.pdf`, `.docx` and `.txt`: they are files, not pages, and this branch commits none. Without the filter the build fails with "Failed to fetch /resume.pdf: Not Found".
 - `check.ts` and `.github/workflows/spike-check.yml` (below).
 
@@ -27,9 +32,28 @@ Each push to the branch starts `spike-check`, which runs on `ubuntu-24.04` with 
 
 1. `bun check.ts wait` reads the commit's statuses through GitHub's API and waits for Vercel's status for this project. A `failure` or `error` ends the run with Vercel's description and its dashboard link.
 2. After `success`, it reads `/build-info.json` from the project's Git branch URL, `resume-deploy-spike-git-prototype-deploy-spike-peterkloss.vercel.app`, until the file names this commit. The file's `VERCEL_URL` is the deployment's own address.
-3. `bun check.ts run <origin>` runs the checks against that address and prints one line per check: `check <n> (<name>): pass|FAIL: <what it saw>`, and for a failure the change from the spec's "If it fails" column.
+3. It then reads `/api/build-info.json` from the production address, `project-8ar0o.vercel.app`, until that address serves the same commit, because the production address can lag the commit status. The `/api/` copy stays reachable after D3 adds the host redirect there, because SPEC-deploy's redirect leaves `/api/` alone. The polling on the protected hosts uses `/build-info.json`, so it does not count against the WAF's `/api/` rule.
+4. `bun check.ts run` runs every check in `CHECKS`, in order, and prints one line per check: `check <n> (<name>): pass|FAIL: <what it saw>`, and for a failure the change from the spec's "If it fails" column. A check that throws gets a FAIL line, and the next check still runs.
 
-The wait is at most 15 minutes. Every request carries `x-vercel-protection-bypass` and `x-vercel-skip-toolbar: 1`. The secret goes only to hosts that match this project's `*.vercel.app` names.
+The wait and the checks share one bound: 15 minutes from the start of the wait. The job's own timeout is 17 minutes, which adds room for setup. A newer push cancels the run, and only the newest run is worth a rerun: an older one waits for a commit that the branch URL no longer serves.
+
+**Adding a check (D2 to D5).** Append a `Check` to `CHECKS` in `check.ts`. Its `run(ctx)` gets:
+
+| Field | What it is |
+|---|---|
+| `deployment`, `production` | The deployment's own host (protected) and the production address (public) |
+| `info` | This deployment's `build-info.json`, the source of expected values (check 2 compares the functions' `runtime` with the Bun they report) |
+| `deadline` | The end of the run's 15 minutes |
+| `deploymentFetch(path, init)` | A request to the deployment, with the bypass and `x-vercel-skip-toolbar: 1`; redirects are not followed |
+| `productionFetch(path, init)` | A request to the production address, with `x-vercel-skip-toolbar: 1` and never the bypass; redirects are not followed (check 5 reads the 308's `Location`) |
+| `report(path)` | A flat JSON object that a spike function on the deployment reports: booleans, hosts and times. The store checks (7 and 9) run inside the function, which holds the `KV_*` variables, so the runner needs no new secret |
+| `poll(label, maxMs, attempt)` | Calls `attempt` every 10 s until it returns a value, or until `maxMs` or the run's deadline passes. Check 6 polls a function's record of the cron's calls this way |
+
+The bypass secret is read in one place, and it goes only to hosts that match this project's protected `*.vercel.app` names. The production address must equal the workflow's `SPIKE_PRODUCTION_HOST`.
+
+Notes for later checks:
+- Check 6: Vercel Cron calls on its own schedule, so the check waits inside the run's bound. A newer push cancels the run (`concurrency`), and with it the wait.
+- Check 8: the WAF rules count per IP address over 10 minutes. A rerun within 10 minutes meets the old count, so check 8 runs last.
 
 Why this route. With the project's settings, Vercel posts only a commit status, whose link is the dashboard, not the deployment's address; `deployment_status` and `repository_dispatch` are off, and `repository_dispatch` reaches only workflows on `main` anyway.
 
