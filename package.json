@@ -5,6 +5,7 @@
   "description": "Peter Kloss's resume: one YAML source, printed to PDF, Word and text, served as a website with an AI chat",
   "scripts": {
     "build": "bun run scripts/build.ts",
+    "build:site": "bun run scripts/build-site.ts",
     "dev": "bun --bun vite dev",
     "documents": "bun run scripts/documents.ts",
     "fonts": "bun run scripts/make-fonts.ts",
