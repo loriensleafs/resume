@@ -25,3 +25,4 @@ These records explain the choices behind this repository and their reasons. Numb
 | [0019](0019-wider-chat-scope.md) | The chat also answers about Peter's career story, working style, opinions, side projects and skill depth |
 | [0020](0020-anonymous-question-log.md) | The chat keeps an anonymous log of the questions it gets |
 | [0021](0021-chat-turn-workflow.md) | Each chat turn is a fixed workflow with one bounded read loop |
+| [0022](0022-question-log-store.md) | The question log lives in Upstash Redis, pay as you go, with one list per day that expires |

@@ -1,0 +1,71 @@
+# Deploy: Vercel, the question log's store, spend limits, CI and the Content Security Policy
+
+Researched 2026-10-27 for SPEC-deploy, from official docs, changelogs and pricing pages only. The main claims were checked a second time against the pages linked below. One probe ran in Chromium.
+
+## Vercel runtime and functions
+
+- **Bun runtime: Beta on all plans.** `bunVersion` in `vercel.json` takes `"1.4.x"` or `"1.x"`. `"1.x"` selects "the previous latest Bun version (currently `1.3.14`)", so this repository (Bun 1.4.2) needs `"1.4.x"`. https://vercel.com/docs/functions/runtimes/bun#configuring-the-runtime
+- The Bun runtime has no automatic source maps, no bytecode caching and no request metrics on `node:http`. Streaming, Fluid compute and logs work. https://vercel.com/docs/functions/runtimes/bun#feature-support
+- **Nitro on Vercel** picks the runtime from, in order: `vercel.functions.runtime` in the Nitro config, `engines` in `package.json`, `bunVersion` in `vercel.json`, then the build's runtime. `1.4.x` maps to `bun1.4.x`. Bun's guide says not to use Nitro's `bun` preset on Vercel. https://nitro.build/deploy/providers/vercel#runtime, https://bun.com/docs/guides/ecosystem/tanstack-start#hosting
+- **Maximum duration on Pro:** 300 s by default, 800 s at most, with Fluid compute on by default for new projects. A streamed response counts toward the limit; a timeout returns 504 `FUNCTION_INVOCATION_TIMEOUT`. One route sets its own value through Nitro's `vercel.functionRules`. https://vercel.com/docs/functions/limitations#max-duration, https://nitro.build/deploy/providers/vercel#per-route-function-configuration
+- **Region:** `iad1` by default; set in the dashboard, `vercel.json` `regions` or per function. https://vercel.com/docs/functions/configuring-functions/region#setting-your-default-region
+
+## Deploys
+
+- By default a push to the production branch deploys and assigns the custom domains at once. https://vercel.com/docs/deployments/promoting-a-deployment
+- **Staged production:** with "Auto-assign Custom Production Domains" off (Settings, Environments, Production, Branch Tracking), a push to `main` makes a **Staged** deployment. A person promotes it from the dashboard ("Promote") or with `vercel promote`, and "it doesn't require a rebuild". Same page, section "Staging and promoting a production deployment".
+- **Instant Rollback** on Pro returns to any deployment that served production before, by moving the domains. A rollback turns domain auto-assignment off. https://vercel.com/docs/instant-rollback
+- Previews are made per branch and per pull request. Standard Deployment Protection (Vercel Authentication) is on all plans. Previews get `x-robots-tag: noindex`. https://vercel.com/docs/deployment-protection#standard-protection, https://vercel.com/docs/headers/response-headers
+- **The Vercel CLI needs Node.js:** the Bun install "still requires Node.js to run its launcher, even when you use native execution". Git deploys and the dashboard need no CLI. https://vercel.com/docs/cli#experimental-native-cli-binaries
+
+## Edge: rate limit, redirects, headers, caching
+
+- **WAF rate limiting on Pro:** 40 rules a project; fixed window from 10 s to 10 min; keyed by IP or JA4 digest; conditions on path and method; actions 429 (default), log, deny (403) or challenge. Counters are per region. Rules change without a redeploy. https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting#limits
+- Price on Pro: $0.50 per million allowed requests (iad1); denied and rate-limited traffic costs nothing. https://vercel.com/docs/vercel-firewall/vercel-waf/usage-and-pricing
+- Rate-limit rules cannot be written in `vercel.json` (its `mitigate` takes only `challenge` and `deny`). They live in the dashboard, the REST API, Terraform or `vercel firewall`. https://vercel.com/docs/vercel-firewall/vercel-waf/custom-rules#configuration-in-vercel.json
+- **Domain redirects in `vercel.json`:** a `redirects` entry with a `has` host condition and `"permanent": true` returns 308, and the path and query pass through. The dashboard's "Redirect to" does not document its status code or path handling. https://vercel.com/docs/project-configuration/vercel-json#redirects, https://vercel.com/docs/routing/redirects
+- **Headers:** `vercel.json` `headers` applies to static files and functions. A function's own `Cache-Control` wins over `vercel.json`. Vercel adds `strict-transport-security: max-age=63072000` (no `includeSubDomains`, no `preload`) and no CSP, Referrer-Policy, Permissions-Policy or X-Content-Type-Options. https://vercel.com/docs/project-configuration/vercel-json#headers, https://vercel.com/docs/headers/response-headers#strict-transport-security
+- **Caching:** the default is `public, max-age=0, must-revalidate`. Static files stay on the CDN for the life of a deployment. Hashed files should get `max-age=31536000, immutable`; the docs' example keeps the service worker at `max-age=0, must-revalidate`. https://vercel.com/docs/caching/cache-control-headers#default-cache-control-value
+
+## Cron, logs, alerts, spend, settings
+
+- **Cron on Pro:** `vercel.json` `crons`, up to 100 a project, as often as once a minute, production only. Vercel sends a GET with `Authorization: Bearer $CRON_SECRET`, with no retry. https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs
+- **Runtime logs** stay 1 day on Pro, 30 days with Observability Plus. Search covers only `message` and `requestPath`. Log Drains: $0.50 per GB. https://vercel.com/docs/logs/runtime#limits, https://vercel.com/docs/drains#usage-and-pricing
+- **Alerts** "are available on Enterprise and Pro plans with Observability Plus": error anomaly (a route's five-minute 5xx count against its 24-hour baseline) and usage anomaly, by email, Slack or webhook. Observability Plus costs $1.20 per million events and is on by default for teams that became Pro on or after 2026-04-03. https://vercel.com/docs/alerts, https://vercel.com/docs/observability/observability-plus#pricing
+- **Spend management:** an on-demand budget per billing cycle, notices at 50, 75 and 100 percent, a webhook, and an optional pause of every project's production deployments (503 `DEPLOYMENT_PAUSED`), checked every few minutes. Pro includes $20 of monthly credit. https://vercel.com/docs/spend-management, https://vercel.com/docs/plans/pro-plan#monthly-credit
+- **Environment variables:** a Secret value is write-only after saving. Each variable applies to the environments chosen (Production, Preview, Development); a promoted preview cannot keep its preview values. https://vercel.com/docs/environment-variables/sensitive-environment-variables
+
+## The question log's store
+
+| Store | Free allowance | Expiry | From Bun | Notes |
+|---|---|---|---|---|
+| Upstash Redis (Marketplace) | 500,000 commands and 250 MB a month | Per-key `EXPIRE` deletes the key on time | REST with `fetch` and `Authorization: Bearer` | Billing through Vercel. A free database is archived after at least 30 days with no use (warning emails first; data backed up); a paid plan avoids it. A read-only token cannot run `SCAN` or `KEYS`. |
+| Neon Postgres (Marketplace) | 100 CU-hours and 1 GB a project | None; needs a scheduled `DELETE` | `Bun.sql` over TCP (pooled URL unverified); HTTP needs the `@neondatabase/serverless` driver | `pg_cron` runs only while the compute is awake |
+| Vercel Blob | Usage-based from the $20 credit | None; needs a scheduled delete | `@vercel/blob` SDK (a public REST API is unverified) | Lists by prefix |
+
+Vercel KV and Vercel Postgres are retired (moved to Upstash and Neon), and Global Config (the old Edge Config) is not for frequent writes. https://upstash.com/docs/redis/overall/billing#free-tier, https://upstash.com/docs/redis/commands/generic/expire, https://upstash.com/docs/redis/features/restapi, https://upstash.com/docs/redis/help/faq, https://neon.com/docs/introduction/plans, https://vercel.com/docs/vercel-blob/usage-and-pricing, https://vercel.com/docs/redis
+
+Upstash recommends its REST API over TCP clients on Vercel. Bun's own Redis client speaks TLS (`rediss://`) but reads `REDIS_URL`. https://upstash.com/docs/redis/howto/redis-cli#tcp-or-http, https://bun.com/docs/runtime/redis
+
+At a few thousand entries a month the store costs nothing on any of the three. Whether the read-only token allows `LRANGE` is not documented.
+
+## Anthropic spend limits
+
+- A workspace spend limit is set in the Console (Workspaces, the workspace, Spend limits), below the organization limit, and not on the Default Workspace. It can email at chosen amounts. https://platform.claude.com/docs/en/manage-claude/workspaces#set-workspace-limits
+- At a limit Peter sets, the API returns **HTTP 400 `invalid_request_error`**, "You have reached your specified workspace API usage limits", with the date access resumes. https://platform.claude.com/docs/en/api/rate-limits#setting-your-own-spend-limit
+- At the usage tier's cap it returns **HTTP 429 `rate_limit_error`** with `error_code` `enforced_spend_limit_reached` and no `retry-after`. New organizations may start in an Evaluation tier with lower limits. https://platform.claude.com/docs/en/api/rate-limits#spend-limits
+- An API key can belong to one workspace; per-workspace rate limits are set in the Console. https://platform.claude.com/docs/en/manage-claude/authentication#key-types
+
+## CI on GitHub Actions
+
+- Actions minutes are free for public repositories on standard runners. https://docs.github.com/en/billing/concepts/product-billing/github-actions
+- `oven-sh/setup-bun@v2` (v2.2.0) pins `bun-version: 1.4.2` or reads `packageManager`. https://github.com/oven-sh/setup-bun#inputs
+- `ubuntu-24.04` has Google Chrome at `/usr/bin/google-chrome`; poppler is not installed (`apt-get install poppler-utils`). `ubuntu-latest` moves to 26.04 between 2026-10-19 and 2026-11-19, so a pinned image avoids a silent change. https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md, https://github.com/actions/runner-images/issues/14748
+- `bun ci` equals `bun install --frozen-lockfile`. Bun runs no dependency lifecycle scripts outside its allow list; `trustedDependencies: []` blocks all. `bun audit` checks `bun.lock` against npm advisories and exits 1 on findings or when the registry is unreachable. https://bun.com/docs/pm/cli/install, https://bun.com/docs/pm/lifecycle#trusteddependencies, https://bun.com/docs/pm/cli/audit
+
+## Probe: a strict Content Security Policy
+
+The earlier site spike ([research 09](09-site-feasibility.md)) was served with `default-src 'self'`, `script-src 'self'` plus each page's inline-script hashes, `style-src 'self'`, `object-src 'none'`, `base-uri 'none'` and `frame-ancestors 'none'`. Chromium reported no violation on a first visit, a second visit, a deep-dive page and an offline visit through the service worker. The probe, its verdict and what it did not test are on the branch `prototype/csp-probe`.
+
+- A prerendered page has four inline scripts, one of them TanStack Router's hydration bootstrap with per-page data, so each page has its own hashes. TanStack Start's per-request `ssr.nonce` does not fit pages served as static files.
+- The design system adds its styles as constructable stylesheets; it uses `<style>` elements with `window.litNonce` only where a browser lacks them. So `style-src 'self'` is enough.

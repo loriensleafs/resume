@@ -163,3 +163,25 @@ _Avoid_: analytics, chat history, transcript
 **Trick question**:
 An eval case that tries to make the chat state something false, leave its scope or ignore its rules.
 _Avoid_: jailbreak test, red-team prompt
+
+## Running the site
+
+**Release**:
+A push of site changes to `main`, which goes live at peterkloss.dev once its checks pass. Peter approves each one.
+_Avoid_: ship, go-live, promotion
+
+**Smoke check**:
+A short set of requests that checks a running copy of the site, its pages, headers, redirects and the chat's request checks, without asking the model anything.
+_Avoid_: end-to-end test, ping, e2e
+
+**Health check**:
+The daily smoke check of peterkloss.dev, which also reads the day before's daily totals.
+_Avoid_: uptime monitor, heartbeat
+
+**Daily totals**:
+The server's per-day record of how chat turns ended, the tokens they used and how long they took, with no question text.
+_Avoid_: metrics, analytics, stats
+
+**Limit alert**:
+An urgent push to Peter's phone when the chat's spend nears or reaches its monthly limit, or when the health check fails.
+_Avoid_: notification, page, alarm
