@@ -5,7 +5,7 @@ import { loadResume } from "../../content";
 import { buildKnowledge } from "../build";
 import { parseId } from "../ids";
 import { KNOWLEDGE_BUDGET, renderKnowledge } from "../render";
-import { deepDive, FAKE_PHONE, fixture, removeFixtures } from "./fixtures";
+import { deepDive, FAKE_PHONE, fixture, removeFixtures, RESUME_YAML } from "./fixtures";
 
 const REPO = `${import.meta.dir}/../../..`;
 afterAll(removeFixtures);
@@ -58,6 +58,23 @@ describe("buildKnowledge on fixtures", () => {
       "knowledge/logistics.yaml": "topics:\n  - topic: location\n    answer:\n    status: approved\n    approved: 2026-10-27\n",
     });
     await expect(buildKnowledge({ root })).rejects.toThrow(/logistics\.yaml/);
+  });
+
+  test("stops on a role id that is not a slug, naming the file and the field", async () => {
+    const root = await fixture("role-not-slug", { "resume.yaml": RESUME_YAML.replace("id: acme", "id: acme--two") });
+    await expect(buildKnowledge({ root })).rejects.toThrow(/^resume\.yaml: work\[0\]\.id "acme--two" is not a slug/);
+  });
+
+  test("stops on a logistics topic that is not a slug, naming the file and the field", async () => {
+    const root = await fixture("topic-not-slug", {
+      "knowledge/logistics.yaml": "topics:\n  - topic: -location\n    answer: Seattle area.\n    status: approved\n    approved: 2026-10-27\n",
+    });
+    await expect(buildKnowledge({ root })).rejects.toThrow(/^knowledge\/logistics\.yaml: [\s\S]*not a slug[\s\S]*topics\[0\]\.topic/);
+  });
+
+  test("stops on a skills group whose name gives no slug, naming the file and the field", async () => {
+    const root = await fixture("skills-no-slug", { "resume.yaml": RESUME_YAML.replace("name: Platform and tooling", 'name: "+++"') });
+    await expect(buildKnowledge({ root })).rejects.toThrow(/^resume\.yaml: skills\[0\]\.name "\+\+\+" gives no slug/);
   });
 
   test("keeps private details out", async () => {

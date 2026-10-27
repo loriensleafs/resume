@@ -173,6 +173,30 @@ export function renderSource(source: Source, passageIds?: string[]): string;
 export function previewDraft(options: { root?: string; id: string }): Promise<{ text: string; problems: string[] }>;
 ```
 
+**The id rules** live in `src/knowledge/ids.ts` (task K1). The build, the reads, the site and the chat's citation check use these exports, and none of them writes an id form by hand:
+
+```ts
+/** Every id form, with its parts. */
+export type IdForm =
+  | { form: "basics" } | { form: "education" }
+  | { form: "role"; role: string } | { form: "highlight"; role: string; n: number }
+  | { form: "skills"; slug: string } | { form: "logistics"; topic: string }
+  | { form: "source"; source: string } | { form: "passage"; source: string; n: number };
+/** The form of an id and its parts, or undefined when the id follows no form. */
+export function parseId(id: string): IdForm | undefined;
+export function isSlug(s: string): boolean;     // at most 60 characters
+export function isSourceId(s: string): boolean; // a slug, never "basics" or "education"
+export function toSlug(name: string): string;   // a skills group's name as its slug
+export function roleId(role: string): string;                // "role:<role id>"
+export function highlightId(role: string, n: number): string; // "highlight:<role id>.<n>"
+export function skillsId(groupName: string): string;         // "skills:<slug>"
+export function logisticsId(topic: string): string;          // "logistics:<topic>"
+/** How a slug is written, for error messages. */
+export const SLUG_RULE: string;
+```
+
+`parseId()` gives the form only. Whether an id names an entry or a passage that exists is for the caller to check against the built knowledge.
+
 **Who gets which shape.**
 
 | Consumer | Shape | How |

@@ -3,7 +3,7 @@
 
 import { z } from "zod";
 import { displayUrl, formatLocation, formatRange, formatTitle, loadResume } from "../content";
-import { highlightId, isSourceId, logisticsId, parseId, roleId, skillsId } from "./ids";
+import { highlightId, isSlug, isSourceId, logisticsId, parseId, roleId, skillsId, SLUG_RULE, toSlug } from "./ids";
 import { KnowledgeError, parseDeepDive, SECTIONS, type DeepDive } from "./parse";
 
 export type Entry = { id: string; kind: "resume" | "deep-dive" | "logistics"; title: string; text: string };
@@ -14,7 +14,7 @@ const logisticsSchema = z.strictObject({
   topics: z.array(
     z
       .strictObject({
-        topic: z.string().regex(/^[a-z0-9-]+$/),
+        topic: z.string().refine(isSlug, `not a slug: use ${SLUG_RULE}`),
         answer: z.string().nullish(),
         status: z.enum(["draft", "approved"]),
         approved: z
@@ -43,6 +43,14 @@ export async function loadDeepDives(root: string): Promise<DeepDive[]> {
 export async function buildKnowledge(options: { root?: string } = {}): Promise<Entry[]> {
   const root = options.root ?? REPO;
   const resume = await loadResume("public", root);
+  resume.work.forEach((job, i) => {
+    if (!isSlug(job.id)) throw new KnowledgeError("resume.yaml", `work[${i}].id "${job.id}" is not a slug: use ${SLUG_RULE}`);
+  });
+  resume.skills.forEach((group, i) => {
+    if (!isSlug(toSlug(group.name))) {
+      throw new KnowledgeError("resume.yaml", `skills[${i}].name "${group.name}" gives no slug: its slug needs ${SLUG_RULE}`);
+    }
+  });
   const b = resume.basics;
   const entries: Entry[] = [];
 
