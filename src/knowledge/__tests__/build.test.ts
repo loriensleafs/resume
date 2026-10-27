@@ -1,49 +1,17 @@
 // Seam 1 of SPEC-knowledge: buildKnowledge() on fixtures and on the real files.
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { $ } from "bun";
 import { loadResume } from "../../content";
-import { buildKnowledge, ID_PATTERN } from "../build";
+import { buildKnowledge } from "../build";
+import { parseId } from "../ids";
 import { KNOWLEDGE_BUDGET, renderKnowledge } from "../render";
-import { deepDive } from "./fixtures";
+import { deepDive, FAKE_PHONE, fixture, removeFixtures } from "./fixtures";
 
 const REPO = `${import.meta.dir}/../../..`;
-const FAKE_PHONE = "(555) 555-0100";
-const tmp = `${Bun.env.TMPDIR ?? "/tmp"}/knowledge-test-${crypto.randomUUID()}`;
-afterAll(async () => {
-  await $`rm -rf ${tmp}`.quiet().nothrow();
-});
-
-const resumeYaml = `basics:
-  name: Test Person
-  label: Engineer
-  email: test@example.com
-  summary: A summary.
-  location: { city: Boston, region: MA, countryCode: US }
-  profiles: []
-work:
-  - id: acme
-    name: Acme
-    position: Engineer
-    startDate: 2020
-    highlights: [Built the first thing., Built the second thing.]
-skills:
-  - name: Platform and tooling
-    keywords: [Bun]
-education:
-  - institution: A University
-`;
+afterAll(removeFixtures);
 
 const approvedFront = (id: string, extra = "") =>
   `id: ${id}\ntitle: Deep dive ${id}\nrole: acme\nhighlights: [1]\nstatus: approved\napproved: 2026-10-27\nsource: Interview${extra}`;
-
-async function fixture(name: string, files: Record<string, string>) {
-  const root = `${tmp}/${name}`;
-  await Bun.write(`${root}/resume.yaml`, resumeYaml);
-  await Bun.write(`${root}/private.yaml`, `basics:\n  phone: ${FAKE_PHONE}\n`);
-  for (const [path, text] of Object.entries(files)) await Bun.write(`${root}/${path}`, text);
-  return root;
-}
 
 describe("buildKnowledge on fixtures", () => {
   test("orders resume entries, approved deep dives, then approved logistics", async () => {
@@ -103,7 +71,8 @@ describe("buildKnowledge on the real files", () => {
     const entries = await buildKnowledge({ root: REPO });
     const ids = entries.map((e) => e.id);
     expect(new Set(ids).size).toBe(ids.length);
-    for (const id of ids) expect(id).toMatch(ID_PATTERN);
+    // A "deep:" id names a deep dive by its source id until K3 replaces the form.
+    for (const id of ids) expect(parseId(id.replace(/^deep:/, ""))).toBeDefined();
   });
 
   test("covers every role, highlight, skills group and the lead", async () => {

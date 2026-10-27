@@ -3,12 +3,10 @@
 
 import { z } from "zod";
 import { displayUrl, formatLocation, formatRange, formatTitle, loadResume } from "../content";
+import { highlightId, isSourceId, logisticsId, parseId, roleId, skillsId } from "./ids";
 import { KnowledgeError, parseDeepDive, SECTIONS, type DeepDive } from "./parse";
 
 export type Entry = { id: string; kind: "resume" | "deep-dive" | "logistics"; title: string; text: string };
-
-export const ID_PATTERN =
-  /^(basics|education|role:[a-z0-9-]+|highlight:[a-z0-9-]+\.[1-9]\d*|skills:[a-z0-9-]+|deep:[a-z0-9-]+|logistics:[a-z0-9-]+)$/;
 
 const REPO = `${import.meta.dir}/../..`;
 
@@ -29,12 +27,6 @@ const logisticsSchema = z.strictObject({
       }),
   ),
 });
-
-export const toSlug = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
 
 export async function loadDeepDives(root: string): Promise<DeepDive[]> {
   const dir = `${root}/knowledge/deep-dives`;
@@ -62,15 +54,15 @@ export async function buildKnowledge(options: { root?: string } = {}): Promise<E
   });
   for (const job of resume.work) {
     entries.push({
-      id: `role:${job.id}`,
+      id: roleId(job.id),
       kind: "resume",
       title: job.name,
       text: `${formatTitle(job)}, ${formatRange(job)}${job.location ? `, ${job.location}` : ""}.${job.earlier ? " Listed under earlier roles." : ""}`,
     });
-    job.highlights.forEach((h, i) => entries.push({ id: `highlight:${job.id}.${i + 1}`, kind: "resume", title: `${job.name}, highlight ${i + 1}`, text: h }));
+    job.highlights.forEach((h, i) => entries.push({ id: highlightId(job.id, i + 1), kind: "resume", title: `${job.name}, highlight ${i + 1}`, text: h }));
   }
   for (const group of resume.skills) {
-    entries.push({ id: `skills:${toSlug(group.name)}`, kind: "resume", title: `Skills: ${group.name}`, text: group.keywords.join(", ") });
+    entries.push({ id: skillsId(group.name), kind: "resume", title: `Skills: ${group.name}`, text: group.keywords.join(", ") });
   }
   entries.push({ id: "education", kind: "resume", title: "Education", text: resume.education.map((e) => e.institution).join("; ") });
 
@@ -96,13 +88,15 @@ export async function buildKnowledge(options: { root?: string } = {}): Promise<E
     const parsed = logisticsSchema.safeParse(Bun.YAML.parse(await logisticsFile.text()));
     if (!parsed.success) throw new KnowledgeError("knowledge/logistics.yaml", `not valid:\n${z.prettifyError(parsed.error)}`);
     for (const t of parsed.data.topics) {
-      if (t.status === "approved") entries.push({ id: `logistics:${t.topic}`, kind: "logistics", title: t.topic, text: t.answer!.trim() });
+      if (t.status === "approved") entries.push({ id: logisticsId(t.topic), kind: "logistics", title: t.topic, text: t.answer!.trim() });
     }
   }
 
   const seen = new Set<string>();
   for (const e of entries) {
-    if (!ID_PATTERN.test(e.id)) throw new KnowledgeError("knowledge", `id "${e.id}" does not follow the id rules`);
+    // "deep:" is the old contract's form until K3 makes each deep dive a catalog entry.
+    const follows = e.id.startsWith("deep:") ? isSourceId(e.id.slice("deep:".length)) : parseId(e.id) !== undefined;
+    if (!follows) throw new KnowledgeError("knowledge", `id "${e.id}" does not follow the id rules`);
     if (seen.has(e.id)) throw new KnowledgeError("knowledge", `id "${e.id}" is used twice`);
     seen.add(e.id);
   }

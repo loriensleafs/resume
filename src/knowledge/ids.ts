@@ -1,0 +1,73 @@
+// The id grammar (SPEC-knowledge, Ids): one place that says what an id in the
+// knowledge base looks like, for the build, the reads and the citation check.
+
+const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const N = /^[1-9][0-9]*$/;
+const SLUG_CHARACTERS = 60;
+const PASSAGE_ID_CHARACTERS = 64;
+
+/** How a slug is written, for error messages. */
+export const SLUG_RULE = `lowercase letters and digits, with single hyphens between them, at most ${SLUG_CHARACTERS} characters`;
+
+/** Every form an id can take, with its parts. */
+export type IdForm =
+  | { form: "basics" }
+  | { form: "education" }
+  | { form: "role"; role: string }
+  | { form: "highlight"; role: string; n: number }
+  | { form: "skills"; slug: string }
+  | { form: "logistics"; topic: string }
+  | { form: "source"; source: string }
+  | { form: "passage"; source: string; n: number };
+
+export const isSlug = (s: string) => s.length <= SLUG_CHARACTERS && SLUG.test(s);
+
+/** A slug that is not one of the bare resume entry ids. */
+export const isSourceId = (s: string) => isSlug(s) && s !== "basics" && s !== "education";
+
+/** A name in lowercase, each run of other characters made one hyphen, no hyphen at either end. */
+export const toSlug = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+export const roleId = (role: string) => `role:${role}`;
+export const highlightId = (role: string, n: number) => `highlight:${role}.${n}`;
+export const skillsId = (groupName: string) => `skills:${toSlug(groupName)}`;
+export const logisticsId = (topic: string) => `logistics:${topic}`;
+
+/** Splits "<name>.<n>" at its last dot; undefined when the part after it is not a number from 1. */
+function splitNumber(s: string): [string, number] | undefined {
+  const dot = s.lastIndexOf(".");
+  const n = s.slice(dot + 1);
+  return dot > 0 && N.test(n) ? [s.slice(0, dot), Number(n)] : undefined;
+}
+
+/** The form of an id and its parts, or undefined when the id follows no form. */
+export function parseId(id: string): IdForm | undefined {
+  if (id === "basics" || id === "education") return { form: id };
+  const colon = id.indexOf(":");
+  if (colon === -1) {
+    if (isSourceId(id)) return { form: "source", source: id };
+    const passage = splitNumber(id);
+    if (passage && id.length <= PASSAGE_ID_CHARACTERS && isSourceId(passage[0])) {
+      return { form: "passage", source: passage[0], n: passage[1] };
+    }
+    return undefined;
+  }
+  const rest = id.slice(colon + 1);
+  switch (id.slice(0, colon)) {
+    case "role":
+      return isSlug(rest) ? { form: "role", role: rest } : undefined;
+    case "highlight": {
+      const highlight = splitNumber(rest);
+      return highlight && isSlug(highlight[0]) ? { form: "highlight", role: highlight[0], n: highlight[1] } : undefined;
+    }
+    case "skills":
+      return isSlug(rest) ? { form: "skills", slug: rest } : undefined;
+    case "logistics":
+      return isSlug(rest) ? { form: "logistics", topic: rest } : undefined;
+  }
+  return undefined;
+}
