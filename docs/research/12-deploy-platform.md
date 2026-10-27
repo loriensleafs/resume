@@ -82,6 +82,40 @@ At a few thousand entries a month the store costs nothing on any of the three. W
 - **Vercel Cron** calls the production deployment URL and does not follow redirects. https://vercel.com/docs/cron-jobs
 - **Protection bypass in a browser:** also send `x-vercel-set-bypass-cookie: true`, so follow-up requests carry the bypass. https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation
 
+## The committed documents: fixed dates (2026-10-27)
+
+The build image has no Chrome (above). So the site serves the public documents that are committed in `documents/` ([SPEC-deploy](../../spec/SPEC-deploy.md), Documents). SPEC-deploy asked the plan to check whether the Word library or Chrome accepts a fixed date.
+
+**Verdict.** Neither accepts a fixed date. Two builds of the same inputs never match byte for byte. The inputs hash alone keeps the committed documents stable. `bun run documents` writes nothing while `documents/inputs.sha256` matches the inputs.
+
+SPEC-content needs no change. SPEC-deploy's Documents section states this verdict and links here.
+
+**The Word file** (`docx` 9.14.0). Three parts change on each build. The line numbers are in `node_modules/docx/dist/index.mjs`.
+
+| Part | What changes | Why | Lines |
+|---|---|---|---|
+| `docProps/core.xml`, the document properties | `dcterms:created` and `dcterms:modified`, the created and modified dates. `dcterms` is the Dublin Core vocabulary that Office files use for them. | `docx` writes `new Date()`. No option sets a date. | 19304 to 19326 |
+| `word/document.xml` and `word/_rels/document.xml.rels` | The relationship id of each link. The id joins the link in the text to its address. | `docx` makes each id with `uniqueId()`. `uniqueId()` calls nanoid, a small random-id library that `docx` bundles. nanoid uses `Math.random()`. | 13528 to 13537, 4846, 4663 |
+| The zip itself | The date of each zip entry | `docx` adds each part with `zip.file(path, data)` and no date. So JSZip, the zip library that `docx` bundles, stamps the build time. | 35224 to 35234 |
+
+T1's builder found the random link ids.
+
+**The PDF.** Chrome writes the print time into the PDF's `/CreationDate` and `/ModDate`. `Page.printToPDF` is the DevTools call that prints the PDF. It has 17 parameters, and none of them sets a date or metadata. Two sources list the same 17 parameters:
+
+- The official protocol page, https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-printToPDF, read 2026-10-27. Its `tot` (tip of tree) is the newest protocol.
+- The protocol of the installed Chrome, 156.0.8078.48 on macOS. These commands print the version, then the count:
+
+```sh
+CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+"$CHROME" --version   # Google Chrome 156.0.8078.48
+"$CHROME" --headless=new --remote-debugging-port=9333 --user-data-dir="$(mktemp -d)" about:blank 2>/dev/null &
+sleep 2
+curl -s http://127.0.0.1:9333/json/protocol | bun -e 'const p = await Bun.stdin.json(); console.log(p.domains.find((d) => d.domain === "Page").commands.find((c) => c.name === "printToPDF").parameters.length)'   # 17
+kill %1
+```
+
+**Two public builds, one after the other** (`bun run build --public`, 2026-10-27). The text file and the print preview were identical. The two PDFs had the same size. They differed only in `/CreationDate` and `/ModDate`. The two Word files differed only in the two `dcterms` dates, the 3 link ids and the zip entry dates.
+
 ## Alert channels
 
 - **Twilio SMS:** about $0.0083 a text plus carrier fees (about $0.012 to $0.013 in total), $1.15 a month for a local number; "Anyone sending SMS/MMS messages over a 10DLC number from an application to the US must register for A2P 10DLC", hobbyists included. https://www.twilio.com/en-us/sms/pricing/us, https://www.twilio.com/docs/messaging/compliance/a2p-10dlc

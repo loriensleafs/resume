@@ -15,5 +15,5 @@ Source observations and experiments behind the decisions. Each note keeps its da
 | [09](09-site-feasibility.md) | TanStack Start, prerendering, offline and the design system under Bun |
 | [10](10-chat-knowledge-depth.md) | Deeper chat answers from a fuller knowledge base |
 | [11](11-knowledge-tooling.md) | TanStack AI and Vercel's AI tools for a much larger knowledge base |
-| [12](12-deploy-platform.md) | Deploy: Vercel, the question log's store, spend limits, CI and the Content Security Policy |
+| [12](12-deploy-platform.md) | Deploy: Vercel, the question log's store, spend limits, CI and the Content Security Policy; the verdict on fixed dates in the committed documents |
 | [13](13-type-check.md) | A type check for before each commit and CI: `bun check` or TypeScript 7 |
