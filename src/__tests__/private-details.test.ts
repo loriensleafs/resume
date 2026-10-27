@@ -32,6 +32,7 @@ describe("holds", () => {
     ["with a zero-width space", "Call 555​555​0142."],
     ["with four separators", "Call (555) - 555 - 0142."],
     ["with a space between each digit", "Call 5 5 5 5 5 5 0 1 4 2."],
+    ["wrapped across two lines", "Call 555-555-\n0142."],
     ["across a blank line", "Call 555\n\n555-0142."],
     ["across indentation", "Call 555\n        555-0142."],
     ["after a leading 1", "Call 15555550142."],
@@ -75,11 +76,13 @@ describe("findPhoneNumbers", () => {
     ["in brackets", "Call (555) 555-0200."],
     ["with hyphens", "Call 555-555-0200."],
     ["with dots", "Call 555.555.0200."],
-    ["as digits only", "Call 5555550200."],
     ["with slashes", "Call 555 / 555 / 0200."],
     ["with en dashes", "Call 555–555–0200."],
     ["after +1", "Call +1 555 555 0200."],
+    ["after +1 with no separator", "Call +15555550200."],
+    ["with brackets and no space", "Call (555)5550200."],
     ["with an extension", "Call 555-555-0200x12."],
+    ["with a written extension", "Call 555-555-0200 ext. 12."],
     ["in fullwidth digits", "Call （５５５）５５５－０２００."],
     ["just below the made-up range", "Call 555-555-0099."],
     ["beside a made-up one", "Call 555-555-0100 or 555-555-0200."],
@@ -90,7 +93,12 @@ describe("findPhoneNumbers", () => {
     expect(findPhoneNumbers(text)).toEqual([1]);
   });
 
+  // A bare run of digits is an id or a timestamp as often as a phone number. The private number is still found in
+  // that form, because holds() compares against private.yaml.
   test.each([
+    ["a bare run of 10 digits", "Id 5555550200."],
+    ["a bare run of digits after a 1", "Id 15555550200."],
+    ["a bare run of digits after 00", "Id 00442079460958."],
     ["a made-up number", "Call (555) 555-0100 or 555-555-0199."],
     ["a timestamp", "Posted at 1700000000."],
     ["a number whose exchange starts with 0", "Order 7700900123."],

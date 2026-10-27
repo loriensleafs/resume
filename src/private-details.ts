@@ -27,7 +27,7 @@ const NORTH_AMERICAN = new RegExp(
 );
 // Any other country's number, not inside a longer number or word: + or 00, a country code that starts with 2 to 9,
 // then 8 to 15 digits in all.
-const INTERNATIONAL = new RegExp(String.raw`(?<![\p{L}\p{N}+])(?:\+|00)[2-9](?:${LINE_GAP}\d){7,14}(?!\d)`, "u");
+const INTERNATIONAL = new RegExp(String.raw`(?<![\p{L}\p{N}+])(?:\+|00)[2-9](?:${LINE_GAP}\d){7,14}(?!\d)`, "gu");
 
 /** The text in NFKC form, with each decimal digit of any script written as its ASCII digit. */
 function plain(text: string): string {
@@ -71,13 +71,21 @@ export function holds(text: string, value: string): boolean {
   return new RegExp(String.raw`(?<!\d)(?:(?:00${GAP})?1${GAP})?${[...digits].join(GAP)}(?!\d)`, "u").test(haystack);
 }
 
+// A match made of digits alone, with no separator, "+" or bracket, is an id or a timestamp as often as a phone
+// number, so findPhoneNumbers lets it pass. The private number is still found in that form: holds() compares
+// every file against private.yaml.
+const isBareDigits = (match: string) => /^\d+$/.test(match);
+
 /** The lines, from 1, that hold a phone number other than a made-up one. It never gives the number itself. */
 export function findPhoneNumbers(text: string): number[] {
   const lines: number[] = [];
   text.split("\n").forEach((line, i) => {
     const plainLine = plain(line);
-    const northAmerican = [...plainLine.matchAll(NORTH_AMERICAN)].some(([, exchange, subscriber]) => !isFictional(exchange!, subscriber!));
-    if (northAmerican || INTERNATIONAL.test(plainLine)) lines.push(i + 1);
+    const northAmerican = [...plainLine.matchAll(NORTH_AMERICAN)].some(
+      ([match, exchange, subscriber]) => !isBareDigits(match) && !isFictional(exchange!, subscriber!),
+    );
+    const international = [...plainLine.matchAll(INTERNATIONAL)].some(([match]) => !isBareDigits(match));
+    if (northAmerican || international) lines.push(i + 1);
   });
   return lines;
 }
