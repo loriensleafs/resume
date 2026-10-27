@@ -50,6 +50,7 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 38 | Which app icon? | B, the career timeline mark: four role spans on the site's blue |
 | 39 | The career timeline on one line: which layout? | Peter rejected equal widths ("loses the timeline feel") and chose E: a full-width band under the app bar, at true length, every name on one line; on narrow screens and phones it scrolls sideways and opens at the latest roles |
 | 40 | (Peter, 2026-10-27) Mobile and dark mode | Asked to see the band on a phone and every Merged view in dark mode |
+| 41 | The reset button: "Start over" in the app bar, or "New chat"? Keep old conversations? | "New chat" at the top of the chat column; it replaces the conversation after a confirmation, with no history list ([0017](../decisions/0017-saved-visitor-session.md)). Peter also asked what the "About: FedNow" chip means: it is the chat's scope from the selected role, renamed "Asking about FedNow" |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
