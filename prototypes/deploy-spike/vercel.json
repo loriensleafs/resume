@@ -3,5 +3,6 @@
   "bunVersion": "1.4.x",
   "framework": null,
   "installCommand": "bun ci",
-  "buildCommand": "bun run build"
+  "buildCommand": "bun run build",
+  "ignoreCommand": "exit 1"
 }

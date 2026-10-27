@@ -865,13 +865,83 @@ async function run(): Promise<void> {
   if (failed) process.exit(1);
 }
 
+// ---- THROWAWAY BRANCH prototype/d5-waf only (D5): the wait for this branch's preview, and the first probe -----
+
+/**
+ * Waits for this commit's preview deployment on the branch URL, as D3's preview branch did, and writes
+ * deployment= and deadline= to $GITHUB_OUTPUT. The production address serves the spike branch's commits, so the
+ * production wait of `wait` does not apply here.
+ */
+async function previewWait(): Promise<void> {
+  const repo = env("GITHUB_REPOSITORY");
+  const sha = env("GITHUB_SHA");
+  const token = env("GITHUB_TOKEN");
+  const branch = protectedHost(env("SPIKE_BRANCH_HOST"), "SPIKE_BRANCH_HOST");
+  const deadline = Date.now() + RUN_MS;
+  const log = quietLog();
+  console.log(`waiting up to ${RUN_MS / 60_000} minutes for the preview of ${short(sha)}`);
+  const info = await pollUntil("github", deadline, async () => {
+    const status = await vercelStatus(repo, sha, token);
+    if (!status) return void log.say("vercel: no commit status yet");
+    if (status.state === "pending") return void log.say(`vercel: pending (${status.description})`);
+    if (status.state !== "success") {
+      console.log(`vercel: ${status.state} (${status.description}); see ${status.target_url}`);
+      process.exit(1);
+    }
+    log.say(`vercel: success (${status.description})`);
+    const { status: http, info } = await readBuildInfo(`https://${branch}/build-info.json`, withBypass(branch));
+    if (http !== 200) return void log.say(`branch URL ${branch}: ${httpNote(http)}`);
+    if (info?.commit !== sha) return void log.say(`branch URL ${branch}: serves ${short(info?.commit ?? null)}, waiting for ${short(sha)}`);
+    return info;
+  });
+  if (!info) {
+    console.log(`error: no preview of ${short(sha)} within ${RUN_MS / 60_000} minutes; last state: ${log.last}`);
+    process.exit(1);
+  }
+  const deployment = protectedHost(info.deploymentHost ?? "", "build-info deploymentHost");
+  console.log(`preview of ${short(sha)}: https://${deployment}, VERCEL_ENV ${info.vercelEnv}`);
+  const output = Bun.file(env("GITHUB_OUTPUT"));
+  const lines = `deployment=${deployment}\ndeadline=${deadline}\n`;
+  await Bun.write(output, ((await output.exists()) ? await output.text() : "") + lines);
+}
+
+/**
+ * The first probe (D5, section 2 of the brief): one chat POST with Content-Type: text/plain on this preview, with the
+ * bypass, because Deployment Protection comes before the WAF's rules. The spike has no /api/chat route, so without
+ * the WAF the answer is static/404.html with status 404; the "chat content type" rule answers 403.
+ */
+async function wafProbe(): Promise<void> {
+  const deployment = protectedHost(env("DEPLOYMENT_HOST"), "DEPLOYMENT_HOST");
+  const { status, info } = await readBuildInfo(`https://${deployment}/build-info.json`, withBypass(deployment));
+  if (status !== 200 || !info) {
+    console.log(`error: build-info.json answered ${httpNote(status)}`);
+    process.exit(1);
+  }
+  const res = await fetch(
+    `https://${deployment}/api/chat`,
+    withBypass(deployment, { method: "POST", headers: { "content-type": "text/plain" }, body: "spike check 8 probe" }),
+  );
+  const body = await res.arrayBuffer();
+  const mitigated = res.headers.get("x-vercel-mitigated");
+  const notFoundPage = info.notFoundSha256 !== null && sha256(body) === info.notFoundSha256;
+  const applies = res.status === 403 && mitigated !== null;
+  console.log(
+    `probe (WAF on a preview, VERCEL_ENV ${info.vercelEnv}): POST /api/chat Content-Type text/plain: HTTP ${res.status}, ` +
+      `x-vercel-mitigated ${mitigated === null ? "none" : /^[a-z_-]{1,32}$/i.test(mitigated) ? mitigated : "other"}, ` +
+      `the not-found page ${notFoundPage}, content-type ${res.headers.get("content-type")}, ${body.byteLength} bytes; ` +
+      `the rules apply to this preview: ${applies}`,
+  );
+}
+
 // Only as the entry point, so a local test can import chromeVisits.
 if (import.meta.main) {
   const command = process.argv[2];
   if (command === "wait") await wait();
   else if (command === "run") await run();
+  else if (command === "preview-wait") await previewWait();
+  else if (command === "waf-probe") await wafProbe();
   else {
-    console.log("usage: bun check.ts wait | bun check.ts run");
+    console.log("usage: bun check.ts wait | bun check.ts run | bun check.ts preview-wait | bun check.ts waf-probe");
     process.exit(2);
   }
 }
