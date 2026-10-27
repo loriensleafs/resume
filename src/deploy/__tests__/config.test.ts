@@ -115,7 +115,49 @@ describe("addPolicyTags()", () => {
       "fragment.html": "<p>No head here.</p><script>var inline = 1;</script>",
     });
 
-    await expect(addPolicyTags(dir)).rejects.toThrow(`${dir}/fragment.html has 0 <head> elements`);
+    await expect(addPolicyTags(dir)).rejects.toThrow(`${dir}/fragment.html must have only`);
+  });
+
+  // A script before the policy tag runs with no policy, so its hash in the tag would protect nothing.
+  test("refuses a page with a script before its <head>, and names it", async () => {
+    const dir = await staticFolder("script-first", {
+      "index.html": "<!doctype html><script>var inline = 1;</script><html><head></head><body></body></html>",
+    });
+
+    await expect(addPolicyTags(dir)).rejects.toThrow(`${dir}/index.html must have only`);
+  });
+
+  // The browser ignores a <head> start tag inside <body>, and a policy tag outside <head>
+  // (https://html.spec.whatwg.org/multipage/semantics.html#attr-meta-http-equiv-content-security-policy).
+  test("refuses a page whose <head> sits inside <body>, and names it", async () => {
+    const dir = await staticFolder("head-in-body", {
+      "index.html": "<html><body><head></head><script>var inline = 1;</script></body></html>",
+    });
+
+    await expect(addPolicyTags(dir)).rejects.toThrow(`${dir}/index.html must have only`);
+  });
+
+  // The browser's tokenizer ends "<!-->" at once, so the script after it runs; a comment rule that read on to the
+  // next "-->" would take that script for comment text.
+  test("refuses a script after <!-->, which the browser does not read as a comment", async () => {
+    const dir = await staticFolder("short-comment", {
+      "index.html": "<!--><script>var inline = 1;</script><!-- --><html><head></head><body></body></html>",
+    });
+
+    await expect(addPolicyTags(dir)).rejects.toThrow(`${dir}/index.html must have only`);
+  });
+
+  test("accepts a doctype, whitespace, comments and <html> before <head>, and puts the tag right after <head>", async () => {
+    const start = "<!-- built -->\n<!DOCTYPE html>\n<!-- page -->\n<HTML lang=\"en\" class='a b'>\n  <head data-x=y>";
+    const page = `${start}<title>Home</title></head><body><script>var inline = 1;</script></body></HTML>`;
+    const dir = await staticFolder("preamble", { "index.html": page });
+
+    await addPolicyTags(dir);
+
+    expect(await Bun.file(`${dir}/index.html`).text()).toBe(
+      `${start}<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' ` +
+        `'sha256-B2yPHKaXnvFWtRChIbabYmUBFZdVfKKXHbWtWidDVF8='">${page.slice(start.length)}`,
+    );
   });
 
   test("refuses a page that already has a policy tag, and names it", async () => {

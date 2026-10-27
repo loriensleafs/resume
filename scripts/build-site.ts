@@ -8,10 +8,9 @@
 //
 // A relative folder starts at the working folder, which `bun run` sets to the repository.
 //
-// Run one build per checkout at a time. Nitro keeps the output folder of the last build in
-// node_modules/.nitro/last-build.json, at a path its options cannot move, and the prerender finds the output through
-// that file (src/site/build.ts). So two builds at once, such as this script and the site's build test, can prerender
-// from each other's output. This script runs its one buildSite() and waits for it before the next step.
+// Run one build per checkout at a time: two builds at once, such as this script and the site's build test, can
+// prerender from each other's output (src/site/build.ts says why). This script runs its one buildSite() and waits for
+// it before the next step.
 
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";

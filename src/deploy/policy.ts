@@ -20,37 +20,53 @@ function hashSource(text: string): string {
   return `'sha256-${new Bun.CryptoHasher("sha256").update(parsed).digest("base64")}'`;
 }
 
+// A policy tag protects only what comes after it, and the browser enforces it only as a child of <head>
+// (https://html.spec.whatwg.org/multipage/semantics.html#attr-meta-http-equiv-content-security-policy). So a page
+// may start with nothing but a doctype, whitespace, comments and an <html> start tag before its <head> start tag.
+// The tree builder then makes that <head> the first child of <html>
+// (https://html.spec.whatwg.org/multipage/parsing.html#the-before-head-insertion-mode), and the tag goes right after
+// it. Each part below is stricter than the browser's tokenizer, so the browser reads a matching start the same way;
+// a page that does not match is refused, never guessed at.
+/** HTML's whitespace. `\s` also matches characters, such as a no-break space, that the tree builder does not skip. */
+const SPACE = "[\\t\\n\\f\\r ]";
+/** A comment ends at the first --> or --!>. "<!-->" and "<!--->" end at once, so a start with them is refused. */
+const COMMENT = "<!--(?!-?>)[\\s\\S]*?--!?>";
+const SKIPPED = `(?:${SPACE}|${COMMENT})*`;
+/** An attribute with a plain name and a quoted or plain value. A quote or "<" in a name or plain value fails. */
+const ATTRIBUTE = `${SPACE}+[a-z_:][-a-z0-9_:.]*(?:${SPACE}*=${SPACE}*(?:"[^"]*"|'[^']*'|[^\\t\\n\\f\\r "'=<>\`]+))?`;
+const startTag = (name: string) => `<${name}(?:${ATTRIBUTE})*${SPACE}*>`;
+/** A doctype ends at its first ">", whatever comes before it. */
+const UP_TO_HEAD = new RegExp(
+  `^${SKIPPED}(?:<!doctype[^>]*>${SKIPPED})?(?:${startTag("html")}${SKIPPED})?${startTag("head")}`,
+  "i",
+);
+
 /**
  * What the policy tag depends on in one page: the text of each inline script (a script element with no src
- * attribute) in page order, the number of <head> elements, and the number of policy tags already there.
- * HTMLRewriter reads elements as the browser does, so a script inside a comment is not one, and a data-src
- * attribute is not src. It gives a script's text raw, with no entity decoding, as the browser runs it.
+ * attribute) in page order, and the number of policy tags already there. HTMLRewriter reads elements as the browser
+ * does, so a script inside a comment is not one, and a data-src attribute is not src. It gives a script's text raw,
+ * with no entity decoding, as the browser runs it.
  */
-function readPage(html: string): { scripts: string[]; heads: number; policyTags: number } {
-  const scripts: { text: string }[] = [];
-  let script = { text: "" };
-  let heads = 0;
+function readPage(html: string): { scripts: string[]; policyTags: number } {
+  const scripts: string[] = [];
   let policyTags = 0;
   new HTMLRewriter()
     .on("script:not([src])", {
-      element: () => {
-        script = { text: "" };
-        scripts.push(script);
-      },
+      element: () => void scripts.push(""),
+      // A script's text arrives in chunks after its start tag, so each chunk belongs to the last script.
       text: (chunk) => {
-        script.text += chunk.text;
+        scripts[scripts.length - 1] += chunk.text;
       },
     })
-    .on("head", { element: () => void heads++ })
     .on('meta[http-equiv="Content-Security-Policy" i]', { element: () => void policyTags++ })
     .transform(html);
-  return { scripts: scripts.map(({ text }) => text), heads, policyTags };
+  return { scripts, policyTags };
 }
 
 /**
  * Starts each HTML file's <head> under staticDir with its policy tag: `default-src 'self'; script-src 'self'` and
  * the hash of each of the page's own inline scripts. Returns the files, as paths in staticDir.
- * It fails, naming the file, on a page it cannot give exactly one policy tag first in its head.
+ * It fails, naming the file, on a page whose policy tag would not come before every script, or would not be its only one.
  */
 export async function addPolicyTags(staticDir: string): Promise<string[]> {
   const pages = (await Array.fromAsync(new Glob("**/*.html").scan({ cwd: staticDir }))).sort();
@@ -59,16 +75,19 @@ export async function addPolicyTags(staticDir: string): Promise<string[]> {
   for (const page of pages) {
     const file = `${staticDir}/${page}`;
     const html = await Bun.file(file).text();
-    const { scripts, heads, policyTags } = readPage(html);
-    if (heads !== 1) throw new Error(`addPolicyTags: ${file} has ${heads} <head> elements; its policy tag needs one`);
+    const head = UP_TO_HEAD.exec(html)?.[0];
+    if (head === undefined) {
+      throw new Error(
+        `addPolicyTags: ${file} must have only a doctype, whitespace, comments and <html> before its <head>, ` +
+          "so that its policy tag comes before every script",
+      );
+    }
+    const { scripts, policyTags } = readPage(html);
     // A second policy is enforced beside this one, and one written without this page's hashes blocks its scripts.
     if (policyTags > 0) throw new Error(`addPolicyTags: ${file} already has a policy tag; this step writes the only one`);
     // A Set keeps each hash once, in page order: two scripts with the same text need one hash.
     const tag = policyTag([...new Set(scripts.map(hashSource))]);
-    const tagged = new HTMLRewriter()
-      .on("head", { element: (head) => void head.prepend(tag, { html: true }) })
-      .transform(html);
-    await Bun.write(file, tagged);
+    await Bun.write(file, head + tag + html.slice(head.length));
   }
   return pages;
 }
