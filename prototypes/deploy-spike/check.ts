@@ -8,11 +8,29 @@
 // deadline and the helpers below. A check never touches the bypass secret; deploymentFetch adds it and
 // productionFetch never sends it. Expected values come from build-info.json, which the build reads from its output.
 // Checks 2 and 3 (D2) test the config.json that post-build.ts writes: the routes, overrides, cron and functions.
+// Checks 4, 5 and 11 (D3) test its headers, its host redirect and the Vercel Toolbar; check 11 drives the runner's
+// Chrome through the DevTools protocol (chromeVisits below), so the spike adds no package. Check 10 is Peter's, by
+// hand; the run prints the PDF's address for it.
 // It prints states, hosts and verdicts only. Rerun only the newest run: an older one waits for a commit that the
 // branch URL no longer serves.
 
-// The routes and the cron that post-build.ts writes. Importing it writes nothing (its build runs only as entry point).
-import { API_ROUTES, CRON, QUERY_ROUTES, SPIKE_PATH } from "./post-build.ts";
+import { existsSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+// The values that post-build.ts writes. Importing it writes nothing (its build runs only as entry point).
+import {
+  API_ROUTES,
+  CRON,
+  DOCUMENTS,
+  HEADER_POLICY,
+  IMMUTABLE,
+  PRODUCTION_HOST,
+  QUERY_ROUTES,
+  REDIRECT_ORIGIN,
+  SECURITY_HEADERS,
+  SPIKE_PATH,
+  WORKER_POLICY,
+} from "./post-build.ts";
 
 const PROJECT_STATUS_URL = "https://vercel.com/peterkloss/resume-deploy-spike/"; // Vercel's commit status links here
 const PROTECTED_HOST = /^resume-deploy-spike-[a-z0-9-]+-peterkloss\.vercel\.app$/; // the deployment and branch URLs
@@ -35,6 +53,9 @@ type BuildInfo = {
   routeCount: number;
   pages: { file: string; path: string; sha256: string | null; override: string | null }[]; // prerendered, except /
   notFoundSha256: string | null; // static/404.html
+  files: Record<string, string | null>; // SHA-256 of index.html, the PDF and sw.js
+  workbox: string[]; // the workbox-<hash>.js files
+  asset: string | null; // one file in assets/
   crons: { path: string; schedule: string }[];
 };
 
@@ -45,14 +66,23 @@ export type Ctx = {
   production: string; // the project's production .vercel.app address (public)
   info: BuildInfo; // this deployment's build-info.json
   deadline: number; // epoch ms: the end of this run's 15 minutes
-  /** GET or other request on the deployment's own host, with the bypass and x-vercel-skip-toolbar; no redirects. */
-  deploymentFetch(path: string, init?: RequestInit): Promise<Response>;
+  /**
+   * GET or other request on the deployment's own host, with the bypass and, unless `skipToolbar` is false,
+   * x-vercel-skip-toolbar; no redirects.
+   */
+  deploymentFetch(path: string, init?: RequestInit, options?: { skipToolbar?: boolean }): Promise<Response>;
   /** Request on the public production address, with x-vercel-skip-toolbar only, never the bypass; no redirects. */
   productionFetch(path: string, init?: RequestInit): Promise<Response>;
   /** A flat JSON object that a spike function on the deployment reports: booleans, hosts, times, no tokens. */
   report(path: string): Promise<Report>;
   /** Calls attempt every 10 s until it returns a value, or until maxMs or the run's deadline passes. */
   poll<T>(label: string, maxMs: number, attempt: () => Promise<T | undefined>): Promise<T | undefined>;
+  /**
+   * Loads each path on the deployment in Chrome, each in a fresh browser context. Only requests to the deployment
+   * get the bypass and x-vercel-skip-toolbar; the first also asks for the bypass cookie, so the service worker's own
+   * requests pass. See chromeVisits.
+   */
+  chrome(paths: string[]): Promise<ChromeVisit[]>;
 };
 
 type Check = {
@@ -176,7 +206,444 @@ const notFound: Check = {
   },
 };
 
-const CHECKS: Check[] = [buildBun, postBuildRoutes, notFound];
+/** Vercel's default cache rule, which SPEC-deploy keeps for pages, /sw.js and the documents ("Caching"). */
+const REVALIDATE = "public, max-age=0, must-revalidate";
+
+/** How many policies a content-security-policy value holds: each has one base-uri. Two headers arrive joined by ", ". */
+const policyCount = (value: string | null) => (value === null ? 0 : value.split("base-uri").length - 1);
+const policyName = (value: string | null) =>
+  value === null
+    ? "no policy"
+    : value === HEADER_POLICY
+      ? "the header policy"
+      : value === WORKER_POLICY
+        ? "the worker policy"
+        : `${policyCount(value)} other ${policyCount(value) === 1 ? "policy" : "policies"} ${JSON.stringify(value)}`;
+
+/** The six headers that every response gets, by name, as SPEC-deploy's table gives them. */
+function securityHeaderProblems(res: Response): string[] {
+  return Object.entries(SECURITY_HEADERS)
+    .filter(([name, value]) => res.headers.get(name) !== value)
+    .map(([name]) => `${name} ${res.headers.get(name) === null ? "missing" : JSON.stringify(res.headers.get(name))}`);
+}
+
+/**
+ * Check 4: how route headers merge. The worker files match both policy routes and must get one policy, the worker
+ * policy; the PDF must get none; a function response and the not-found page (from a route before the filesystem and
+ * from the last route) must get the six headers and the header policy. A wrong value names what arrived, so two
+ * policies or two HSTS values show joined by ", ".
+ */
+const headerMerge: Check = {
+  check: 4,
+  name: "route headers",
+  ifFails: "the header routes change, so each path gets exactly one policy",
+  async run({ info, deploymentFetch }) {
+    const page = info.pages[0];
+    if (!page || !info.asset || info.workbox.length === 0) {
+      return { pass: false, detail: "build-info.json names no deep dive, no asset or no workbox-<hash>.js file" };
+    }
+    type Case = { path: string; what: string; status: number; policy: string | null; cache: string | null; sha256?: string | null; type?: string };
+    const cases: Case[] = [
+      { path: "/", what: "a page", status: 200, policy: HEADER_POLICY, cache: REVALIDATE, sha256: info.files["index.html"] },
+      { path: `/${page.path}`, what: "a deep dive", status: 200, policy: HEADER_POLICY, cache: REVALIDATE, sha256: page.sha256 },
+      { path: "/sw.js", what: "the service worker", status: 200, policy: WORKER_POLICY, cache: REVALIDATE, sha256: info.files["sw.js"] },
+      ...info.workbox.map((file) => ({ path: `/${file}`, what: "Workbox", status: 200, policy: WORKER_POLICY, cache: IMMUTABLE })),
+      { path: `/assets/${info.asset}`, what: "a hashed asset", status: 200, policy: HEADER_POLICY, cache: IMMUTABLE },
+      {
+        path: `/${DOCUMENTS[0]}`,
+        what: "the PDF",
+        status: 200,
+        policy: null,
+        cache: REVALIDATE,
+        sha256: info.files[DOCUMENTS[0]],
+        type: "application/pdf",
+      },
+      { path: SPIKE_PATH, what: "a function", status: 200, policy: HEADER_POLICY, cache: "no-store" },
+      { path: "/no-such-page", what: "the not-found page, last route", status: 404, policy: HEADER_POLICY, cache: null, sha256: info.notFoundSha256 },
+      { path: "/__server", what: "the not-found page, route before the filesystem", status: 404, policy: HEADER_POLICY, cache: null, sha256: info.notFoundSha256 },
+    ];
+
+    const problems: string[] = [];
+    const seen: string[] = [];
+    for (const c of cases) {
+      const res = await deploymentFetch(c.path);
+      const body = await res.arrayBuffer();
+      const policy = res.headers.get("content-security-policy");
+      const cache = res.headers.get("cache-control");
+      const wrong = [
+        ...(res.status === c.status ? [] : [`HTTP ${res.status}, not ${c.status}`]),
+        ...securityHeaderProblems(res),
+        ...(policy === c.policy ? [] : [`${policyName(policy)}, not ${policyName(c.policy)}`]),
+        ...(c.cache === null || cache === c.cache ? [] : [`cache-control ${JSON.stringify(cache)}, not "${c.cache}"`]),
+        ...(c.sha256 === undefined || (c.sha256 !== null && sha256(body) === c.sha256) ? [] : ["not the built file byte for byte"]),
+        ...(c.type === undefined || res.headers.get("content-type")?.startsWith(c.type) ? [] : [`content-type ${res.headers.get("content-type")}`]),
+      ];
+      if (wrong.length) problems.push(`${c.path} (${c.what}): ${wrong.join(", ")}`);
+      const disposition = res.headers.get("content-disposition");
+      seen.push(
+        `${c.path} (${c.what}): HTTP ${res.status}, ${securityHeaderProblems(res).length === 0 ? "the six headers" : "not the six headers"}, ` +
+          `${policyName(policy)}, cache-control ${JSON.stringify(cache)}${disposition === null ? "" : `, content-disposition ${JSON.stringify(disposition)}`}`,
+      );
+    }
+    return { pass: problems.length === 0, detail: problems.length ? `${problems.join("; ")}; seen: ${seen.join("; ")}` : seen.join("; ") };
+  },
+};
+
+/**
+ * Check 5: the host redirect on the production .vercel.app address answers 308 to the same path and query on
+ * peterkloss.dev, and leaves /api/ alone. The route's Location names only the path ($1), so a kept query is Vercel's
+ * doing. A path with encoded characters and the headers on the 308 are recorded, not judged.
+ */
+const hostRedirect: Check = {
+  check: 5,
+  name: "host redirect",
+  ifFails: "the route adds the query itself",
+  async run({ info, productionFetch }) {
+    const page = info.pages[0];
+    if (info.productionHost !== null && info.productionHost !== PRODUCTION_HOST) {
+      return { pass: false, detail: `the redirect route names ${PRODUCTION_HOST}, but the project's production address is ${info.productionHost}` };
+    }
+    const cases = [
+      { path: "/resume?x=1", location: `${REDIRECT_ORIGIN}/resume?x=1` }, // SPEC-deploy's smoke check
+      { path: "/?a=1&b=two", location: `${REDIRECT_ORIGIN}/?a=1&b=two` },
+      ...(page ? [{ path: `/${page.path}`, location: `${REDIRECT_ORIGIN}/${page.path}` }] : []), // no query, no "?"
+    ];
+    const problems: string[] = [];
+    const seen: string[] = [];
+    let first: Response | null = null;
+    for (const c of cases) {
+      const res = await productionFetch(c.path);
+      first ??= res;
+      const location = res.headers.get("location");
+      seen.push(`${c.path}: HTTP ${res.status} to ${location ?? "no Location"}`);
+      if (res.status !== 308 || location !== c.location) problems.push(`${c.path} answered HTTP ${res.status} to ${location ?? "no Location"}, not 308 to ${c.location}`);
+    }
+
+    // Recorded: a path and query with encoded characters.
+    const encoded = await productionFetch("/a%20b/%C3%A9?q=%2F&r=a+b");
+    seen.push(`/a%20b/%C3%A9?q=%2F&r=a+b: HTTP ${encoded.status} to ${encoded.headers.get("location") ?? "no Location"}`);
+    // Recorded: which of the six headers the 308 carries; the redirect route ends routing before the header routes.
+    if (first) {
+      const carried = Object.keys(SECURITY_HEADERS).filter((name) => first!.headers.get(name) !== null);
+      seen.push(`the 308 carries ${carried.length ? carried.join(", ") : "none of the six headers"}, cache-control ${JSON.stringify(first.headers.get("cache-control"))}`);
+    }
+
+    // /api/ is not redirected: the wait step and Vercel Cron rely on it.
+    const api = await productionFetch("/api/build-info.json");
+    const apiCommit = api.status === 200 ? ((await api.json()) as BuildInfo).commit : null;
+    seen.push(`/api/build-info.json: HTTP ${api.status}${apiCommit ? `, commit ${short(apiCommit)}` : ""}`);
+    if (api.status !== 200 || apiCommit !== info.commit) problems.push(`/api/build-info.json answered HTTP ${api.status}, not 200 with this commit`);
+
+    return { pass: problems.length === 0, detail: problems.length ? `${problems.join("; ")}; seen: ${seen.join("; ")}` : seen.join("; ") };
+  },
+};
+
+/**
+ * Check 11: with the toolbar off for production and x-vercel-skip-toolbar on every request to the deployment, Chrome
+ * loads three pages on the deployment URL with no request to vercel.live, no toolbar element and no policy violation,
+ * and receives the built file byte for byte, so Vercel injected nothing. Two planted controls prove that the
+ * violation listener works and that both policies are enforced there: an image from another host (the header's
+ * img-src) and an inline script (the tag's script-src). A plain request without x-vercel-skip-toolbar must also get
+ * the built page, which shows the production setting alone keeps the toolbar out.
+ */
+const toolbarOff: Check = {
+  check: 11,
+  name: "Vercel Toolbar",
+  ifFails: "the policy allows nothing more; the checks fail instead",
+  async run({ info, chrome, deploymentFetch }) {
+    const page = info.pages[0];
+    if (!page) return { pass: false, detail: "build-info.json names no deep dive" };
+    const expected = [
+      { path: "/", status: 200, sha256: info.files["index.html"] },
+      { path: `/${page.path}`, status: 200, sha256: page.sha256 },
+      { path: "/no-such-page", status: 404, sha256: info.notFoundSha256 },
+    ];
+    const visits = await chrome(expected.map((e) => e.path));
+
+    const problems: string[] = [];
+    const seen: string[] = [];
+    for (const [i, visit] of visits.entries()) {
+      const want = expected[i]!;
+      const same = want.sha256 !== null && visit.documentSha256 === want.sha256;
+      const plantedImg = visit.planted.some((v) => v.startsWith("img-src "));
+      const plantedScript = visit.planted.some((v) => v.startsWith("script-src"));
+      if (visit.vercelLive > 0) problems.push(`${visit.path}: ${visit.vercelLive} requests to vercel.live`);
+      if (visit.toolbar) problems.push(`${visit.path}: the page holds a toolbar element or a vercel.live script or frame`);
+      if (visit.violations.length) problems.push(`${visit.path}: policy violations ${visit.violations.join(", ")}`);
+      if (visit.status !== want.status) problems.push(`${visit.path}: HTTP ${visit.status}, not ${want.status}`);
+      if (!same) problems.push(`${visit.path}: Chrome did not receive the built file byte for byte`);
+      if (!plantedImg || !plantedScript) problems.push(`${visit.path}: the planted controls gave ${visit.planted.join(", ") || "no violation"}, so the listener or a policy did not work`);
+      seen.push(
+        `${visit.path}: HTTP ${visit.status}, ${same ? "the built file byte for byte" : "other bytes"}, ${visit.violations.length} policy violations, ` +
+          `${visit.vercelLive} requests to vercel.live, other hosts: ${visit.otherHosts.join(", ") || "none"}, ` +
+          `planted controls: ${visit.planted.join(", ") || "none"}, service worker ${visit.controlled ? "controls the page" : "does not control the page"}, ` +
+          `${visit.errors.length} console errors${visit.errors.length ? ` (${visit.errors.join(" | ")})` : ""}`,
+      );
+    }
+
+    // Without x-vercel-skip-toolbar, the production setting alone must keep the toolbar out.
+    const plain = await deploymentFetch("/", undefined, { skipToolbar: false });
+    const plainSame = info.files["index.html"] !== null && sha256(await plain.arrayBuffer()) === info.files["index.html"];
+    seen.push(`/ without x-vercel-skip-toolbar: HTTP ${plain.status}, ${plainSame ? "the built file byte for byte" : "other bytes"}`);
+    if (plain.status !== 200 || !plainSame) problems.push(`/ without x-vercel-skip-toolbar answered HTTP ${plain.status} with other bytes than the built file`);
+
+    return { pass: problems.length === 0, detail: problems.length ? `${problems.join("; ")}; seen: ${seen.join("; ")}` : seen.join("; ") };
+  },
+};
+
+export const CHECKS: Check[] = [buildBun, postBuildRoutes, notFound, headerMerge, hostRedirect, toolbarOff];
+
+// ---- Chrome through the DevTools protocol ----------------------------------------------------------------------
+
+/** What one page load in Chrome showed. */
+export type ChromeVisit = {
+  path: string;
+  status: number | null; // the document's HTTP status
+  documentSha256: string | null; // of the document's body as Chrome received it
+  violations: string[]; // the page's own policy violations: "<directive> <blocked URI>"
+  planted: string[]; // the violations that the planted controls caused
+  vercelLive: number; // requests to vercel.live from the page or its service worker
+  otherHosts: string[]; // hosts other than the origin's that the page or its service worker requested
+  toolbar: boolean; // a vercel-live-feedback element, or a script or frame from vercel.live, in the page
+  controlled: boolean; // a service worker controls the page
+  errors: string[]; // page errors and console errors, from the page and its service worker, before the controls
+};
+
+type CdpMessage = { id?: number; method?: string; params?: any; result?: any; error?: { message: string }; sessionId?: string };
+
+/** A minimal DevTools protocol client over Bun's WebSocket. https://chromedevtools.github.io/devtools-protocol/ */
+class Cdp {
+  private next = 0;
+  private readonly waiting = new Map<number, { resolve(result: any): void; reject(error: Error): void; method: string }>();
+  private readonly handlers = new Set<(message: CdpMessage) => void>();
+
+  private constructor(private readonly ws: WebSocket) {
+    ws.onmessage = (event) => {
+      const message = JSON.parse(String(event.data)) as CdpMessage;
+      if (message.id === undefined) return this.handlers.forEach((handler) => handler(message));
+      const waiter = this.waiting.get(message.id);
+      this.waiting.delete(message.id);
+      if (message.error) waiter?.reject(new Error(`${waiter.method}: ${message.error.message}`));
+      else waiter?.resolve(message.result);
+    };
+    ws.onclose = () => {
+      for (const waiter of this.waiting.values()) waiter.reject(new Error(`${waiter.method}: Chrome closed the connection`));
+      this.waiting.clear();
+    };
+  }
+
+  static connect(url: string): Promise<Cdp> {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(url);
+      ws.onopen = () => resolve(new Cdp(ws));
+      ws.onerror = () => reject(new Error("cannot connect to Chrome's DevTools endpoint"));
+    });
+  }
+
+  send(method: string, params: object = {}, sessionId?: string): Promise<any> {
+    const id = ++this.next;
+    this.ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.waiting.delete(id);
+        reject(new Error(`${method}: no answer in 30 s`));
+      }, 30_000);
+      this.waiting.set(id, {
+        method,
+        resolve: (result) => (clearTimeout(timer), resolve(result)),
+        reject: (error) => (clearTimeout(timer), reject(error)),
+      });
+    });
+  }
+
+  on(handler: (message: CdpMessage) => void): void {
+    this.handlers.add(handler);
+  }
+
+  close(): void {
+    this.ws.close();
+  }
+}
+
+// Records the page's policy violations; injected before any page script, so it sees them all.
+const VIOLATION_LISTENER = `window.__spikeViolations = [];
+document.addEventListener("securitypolicyviolation", (e) => window.__spikeViolations.push(e.effectiveDirective + " " + (e.blockedURI || "inline")));`;
+// The planted controls: an image from another host breaks the header's img-src, an inline script the tag's script-src.
+const PLANT_CONTROLS = `(() => {
+  const img = document.createElement("img"); img.src = "https://example.invalid/spike-control.png"; document.body.append(img);
+  const script = document.createElement("script"); script.textContent = "window.__spikeInline = true"; document.body.append(script);
+})()`;
+const PAGE_STATE = `JSON.stringify({
+  violations: window.__spikeViolations ?? null,
+  toolbar: document.querySelector('vercel-live-feedback, script[src*="vercel.live"], iframe[src*="vercel.live"]') !== null,
+  controlled: Boolean(navigator.serviceWorker && navigator.serviceWorker.controller),
+})`;
+
+const CHROME = [process.env.CHROME_PATH, "/usr/bin/google-chrome", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"];
+
+const withTimeout = <T>(promise: Promise<T>, ms: number, what: string) =>
+  Promise.race([promise, sleep(ms).then(() => Promise.reject(new Error(`${what} within ${ms / 1000} s`)))]);
+
+/**
+ * Loads each path of `origin` in headless Chrome, each in a fresh browser context, and reports what it saw.
+ * Every request the page makes to the origin's host gets `headersFor(first)`, where `first` is true for the first
+ * request of the visit; a request to any other host goes out unchanged, so those headers never leave the origin.
+ * The service workers are attached too, so their requests and console errors count.
+ */
+export async function chromeVisits(origin: string, paths: string[], headersFor: (first: boolean) => Record<string, string>): Promise<ChromeVisit[]> {
+  const chromePath = CHROME.find((path) => path !== undefined && existsSync(path));
+  if (!chromePath) throw new Error("no Chrome: set CHROME_PATH");
+  const profile = await mkdtemp(`${process.env.RUNNER_TEMP ?? tmpdir()}/spike-chrome-`);
+  // --no-sandbox as Playwright launches Chromium by default; the pages are the spike's own.
+  const chrome = Bun.spawn(
+    [chromePath, "--headless=new", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check",
+      "--no-sandbox", "--disable-background-networking", "--disable-component-update", "--disable-sync", "about:blank"],
+    { stdin: "ignore", stdout: "ignore", stderr: "ignore" },
+  );
+  try {
+    // Chrome writes its port and browser path to DevToolsActivePort in the profile.
+    const active = await pollUntil("chrome", Date.now() + 30_000, async () => {
+      const file = Bun.file(`${profile}/DevToolsActivePort`);
+      const [port, path] = (await file.exists()) ? (await file.text()).split("\n") : [];
+      return port && path ? `ws://127.0.0.1:${port}${path}` : undefined;
+    });
+    if (!active) throw new Error("Chrome did not start within 30 s");
+    const cdp = await Cdp.connect(active);
+    try {
+      return await visitAll(cdp, origin, paths, headersFor);
+    } finally {
+      cdp.close();
+    }
+  } finally {
+    chrome.kill();
+    await chrome.exited;
+    await rm(profile, { recursive: true, force: true });
+  }
+}
+
+async function visitAll(cdp: Cdp, origin: string, paths: string[], headersFor: (first: boolean) => Record<string, string>): Promise<ChromeVisit[]> {
+  const host = new URL(origin).host;
+  // The visit in progress: its browser context, its sessions (the page and its service workers) and what they showed.
+  // One verdict line each: an error's text keeps its first 160 characters on one line.
+  const oneLine = (text: unknown) => String(text).replace(/\s+/g, " ").slice(0, 160);
+  let current: {
+    context: string;
+    page: string;
+    sessions: Set<string>;
+    visit: ChromeVisit;
+    hosts: Set<string>;
+    document: string | null;
+    first: boolean;
+    planted: boolean;
+    loaded(): void;
+  } | null = null;
+
+  cdp.on((message) => {
+    const p = message.params;
+    // A service worker, from the auto-attach below: count its requests and errors, then let it start.
+    if (message.method === "Target.attachedToTarget" && !message.sessionId) {
+      const session: string = p.sessionId;
+      if (current && p.targetInfo.browserContextId === current.context) current.sessions.add(session);
+      void Promise.all(["Network.enable", "Runtime.enable", "Log.enable"].map((m) => cdp.send(m, {}, session)))
+        .catch(() => {})
+        .finally(() => cdp.send("Runtime.runIfWaitingForDebugger", {}, session).catch(() => {}));
+      return;
+    }
+    if (!current || !message.sessionId || !current.sessions.has(message.sessionId)) return;
+    const c = current;
+    switch (message.method) {
+      case "Fetch.requestPaused": {
+        // Only the origin's requests get the extra headers; a request elsewhere goes out unchanged.
+        const url = new URL(p.request.url);
+        if (url.host !== host) {
+          void cdp.send("Fetch.continueRequest", { requestId: p.requestId }, message.sessionId).catch(() => {});
+          break;
+        }
+        const headers = Object.entries({ ...p.request.headers, ...headersFor(c.first) }).map(([name, value]) => ({ name, value: String(value) }));
+        c.first = false;
+        void cdp.send("Fetch.continueRequest", { requestId: p.requestId, headers }, message.sessionId).catch(() => {});
+        break;
+      }
+      case "Network.requestWillBeSent": {
+        const url = URL.parse(p.request.url);
+        if (!url || !url.protocol.startsWith("http") || c.planted) break;
+        if (url.hostname === "vercel.live" || url.hostname.endsWith(".vercel.live")) c.visit.vercelLive++;
+        if (url.host !== host) c.hosts.add(url.host);
+        break;
+      }
+      case "Network.responseReceived":
+        // The visited page's own document, not a frame's: same host and path.
+        if (message.sessionId === c.page && p.type === "Document" && URL.parse(p.response.url)?.host === host && URL.parse(p.response.url)?.pathname === c.visit.path) {
+          c.document = p.requestId;
+          c.visit.status = p.response.status;
+        }
+        break;
+      case "Page.loadEventFired":
+        c.loaded();
+        break;
+      case "Runtime.exceptionThrown":
+        if (!c.planted) c.visit.errors.push(`exception: ${oneLine(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text)}`);
+        break;
+      case "Runtime.consoleAPICalled":
+        if (!c.planted && p.type === "error") c.visit.errors.push(`console: ${oneLine(p.args?.[0]?.value ?? p.args?.[0]?.description)}`);
+        break;
+      case "Log.entryAdded":
+        if (!c.planted && p.entry.level === "error") c.visit.errors.push(`${p.entry.source}: ${oneLine(p.entry.text)}`);
+        break;
+    }
+  });
+
+  // Attach to every service worker as it starts; each waits until the handler above has enabled its domains.
+  await cdp.send("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: true, flatten: true, filter: [{ type: "service_worker", exclude: false }] });
+
+  const visits: ChromeVisit[] = [];
+  for (const path of paths) {
+    const { browserContextId } = await cdp.send("Target.createBrowserContext", { disposeOnDetach: true });
+    const { targetId } = await cdp.send("Target.createTarget", { url: "about:blank", browserContextId });
+    const { sessionId } = await cdp.send("Target.attachToTarget", { targetId, flatten: true });
+    let loaded = () => {};
+    const load = new Promise<void>((resolve) => (loaded = resolve));
+    const visit: ChromeVisit = {
+      path, status: null, documentSha256: null, violations: [], planted: [], vercelLive: 0, otherHosts: [], toolbar: false, controlled: false, errors: [],
+    };
+    current = { context: browserContextId, page: sessionId, sessions: new Set([sessionId]), visit, hosts: new Set(), document: null, first: true, planted: false, loaded };
+    try {
+      await Promise.all(["Page.enable", "Network.enable", "Runtime.enable", "Log.enable"].map((m) => cdp.send(m, {}, sessionId)));
+      await cdp.send("Fetch.enable", { patterns: [{ urlPattern: "*", requestStage: "Request" }] }, sessionId);
+      await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: VIOLATION_LISTENER }, sessionId);
+      const navigation = await cdp.send("Page.navigate", { url: `${origin}${path}` }, sessionId);
+      if (navigation.errorText) throw new Error(`${path}: ${navigation.errorText}`);
+      await withTimeout(load, 30_000, `${path} did not load`);
+      await sleep(4_000); // the service worker installs and claims the page; a late toolbar script would load now
+
+      const evaluate = async () =>
+        JSON.parse((await cdp.send("Runtime.evaluate", { expression: PAGE_STATE, returnByValue: true }, sessionId)).result.value) as {
+          violations: string[] | null;
+          toolbar: boolean;
+          controlled: boolean;
+        };
+      const before = await evaluate();
+      visit.violations = before.violations ?? ["the violation listener did not run"];
+      visit.toolbar = before.toolbar;
+      visit.controlled = before.controlled;
+      visit.otherHosts = [...current.hosts].sort();
+      if (current.document) {
+        const body = await cdp.send("Network.getResponseBody", { requestId: current.document }, sessionId);
+        visit.documentSha256 = new Bun.CryptoHasher("sha256").update(body.base64Encoded ? Buffer.from(body.body, "base64") : body.body).digest("hex");
+      }
+
+      current.planted = true;
+      await cdp.send("Runtime.evaluate", { expression: PLANT_CONTROLS }, sessionId);
+      await sleep(1_000);
+      visit.planted = ((await evaluate()).violations ?? []).slice(visit.violations.length);
+    } finally {
+      current = null;
+      await cdp.send("Target.disposeBrowserContext", { browserContextId }).catch(() => {});
+    }
+    visits.push(visit);
+  }
+  return visits;
+}
 
 // ---- the harness ------------------------------------------------------------------------------------------------
 
@@ -205,12 +672,22 @@ function productionHost(host: string, what: string): string {
   return host;
 }
 
-/** The only place the bypass secret is read. It goes out only to a host that matches PROTECTED_HOST. */
-function withBypass(host: string, init: RequestInit = {}): RequestInit {
-  const headers = new Headers(init.headers);
-  headers.set("x-vercel-protection-bypass", env("VERCEL_AUTOMATION_BYPASS_SECRET"));
-  headers.set("x-vercel-skip-toolbar", "1");
+/**
+ * The only place the bypass secret is read. Its headers go out only to a host that matches PROTECTED_HOST, with
+ * x-vercel-skip-toolbar unless `skipToolbar` is false, and with x-vercel-set-bypass-cookie when `setCookie` is true.
+ */
+function bypassHeaders(host: string, options: { skipToolbar?: boolean; setCookie?: boolean } = {}): Record<string, string> {
   protectedHost(host, "host");
+  return {
+    "x-vercel-protection-bypass": env("VERCEL_AUTOMATION_BYPASS_SECRET"),
+    ...(options.skipToolbar === false ? {} : { "x-vercel-skip-toolbar": "1" }),
+    ...(options.setCookie ? { "x-vercel-set-bypass-cookie": "true" } : {}),
+  };
+}
+
+function withBypass(host: string, init: RequestInit = {}, options: { skipToolbar?: boolean } = {}): RequestInit {
+  const headers = new Headers(init.headers);
+  for (const [name, value] of Object.entries(bypassHeaders(host, options))) headers.set(name, value);
   return { ...init, headers, redirect: "manual" };
 }
 
@@ -350,7 +827,7 @@ async function run(): Promise<void> {
     production,
     info,
     deadline,
-    deploymentFetch: (path, init) => fetch(`https://${deployment}${path}`, withBypass(deployment, init)),
+    deploymentFetch: (path, init, options) => fetch(`https://${deployment}${path}`, withBypass(deployment, init, options)),
     productionFetch: (path, init) => fetch(`https://${production}${path}`, withoutBypass(init)),
     async report(path) {
       const res = await fetch(`https://${deployment}${path}`, withBypass(deployment));
@@ -363,6 +840,7 @@ async function run(): Promise<void> {
       return body as Report;
     },
     poll: (label, maxMs, attempt) => pollUntil(label, Math.min(Date.now() + maxMs, deadline), attempt),
+    chrome: (paths) => chromeVisits(`https://${deployment}`, paths, (first) => bypassHeaders(deployment, { setCookie: first })),
   };
 
   let failed = 0;
@@ -372,14 +850,19 @@ async function run(): Promise<void> {
     const tail = result.pass ? "" : `; if it fails: ${check.ifFails}`;
     console.log(`check ${check.check} (${check.name}): ${result.pass ? "pass" : "FAIL"}: ${result.detail}${tail}`);
   }
+  // Check 10 is Peter's, in his own Chrome: the deployment URL is protected, and he is signed in to Vercel.
+  console.log(`check 10 (PDF in Chrome's viewer): manual, Peter's: https://${deployment}/${DOCUMENTS[0]}`);
   console.log(`checks: ${CHECKS.length - failed} pass, ${failed} fail`);
   if (failed) process.exit(1);
 }
 
-const command = process.argv[2];
-if (command === "wait") await wait();
-else if (command === "run") await run();
-else {
-  console.log("usage: bun check.ts wait | bun check.ts run");
-  process.exit(2);
+// Only as the entry point, so a local test can import chromeVisits.
+if (import.meta.main) {
+  const command = process.argv[2];
+  if (command === "wait") await wait();
+  else if (command === "run") await run();
+  else {
+    console.log("usage: bun check.ts wait | bun check.ts run");
+    process.exit(2);
+  }
 }
