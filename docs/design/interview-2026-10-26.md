@@ -52,6 +52,9 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 40 | (Peter, 2026-10-27) Mobile and dark mode | Asked to see the band on a phone and every Merged view in dark mode |
 | 41 | The reset button: "Start over" in the app bar, or "New chat"? Keep old conversations? | "New chat" at the top of the chat column; it replaces the conversation after a confirmation, with no history list ([0017](../decisions/0017-saved-visitor-session.md)). Peter also asked what the "About: FedNow" chip means: it is the chat's scope from the selected role, renamed "Asking about FedNow" |
 | 42 | (Peter, 2026-10-27) Chat input | The send button sits to the right of the input, as in most chat interfaces; "Answers for" stays underneath. The button has states: empty (off), ready, answering (it becomes Stop), stopped, offline (it queues the question) and error (Try again). Drawn on the board "Chat input: send button states" |
+| 43 | (Peter, 2026-10-27) Answering and Stop | While an answer streams, a Material-style progress ring turns around the button, and Stop is a plain square, not a circled icon |
+| 44 | (Peter, 2026-10-27) Error pattern: does the failed question go back into the input? | Checked: in ChatGPT and chat kits such as Stream, the failed question stays in the conversation and the retry appears where the answer should be; no source found that moves it back into the input. Drawn: the question stays, the error takes the answer's place with "Try again" and "Edit question" (which puts it back in the input) |
+| 45 | (Peter, 2026-10-27) Selected role on the timeline | Only blue, no extra height; the name turns bold. Cited roles are blue with names in normal weight |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
