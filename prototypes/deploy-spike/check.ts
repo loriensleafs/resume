@@ -30,7 +30,7 @@ type BuildInfo = {
   bunPath: string;
   functions: Record<string, { runtime: string | null; maxDuration: number | null }>;
   routeCount: number;
-  overrides: Record<string, { path: string | null; sha256: string | null }>; // file -> its clean address
+  pages: { file: string; path: string; sha256: string | null; override: string | null }[]; // prerendered, except /
   notFoundSha256: string | null; // static/404.html
   crons: { path: string; schedule: string }[];
 };
@@ -95,7 +95,8 @@ const CRON = { path: "/api/cron/health", schedule: "17 15 * * *" }; // SPEC-depl
 /**
  * Check 2: Vercel serves the routes, overrides and cron that post-build.ts wrote, and which Bun runs each function.
  * Each route must reach the function it names (the function reports its name from its .vc-config.json), and the
- * function must see the path that was asked for. Each override's clean address must serve its file byte for byte.
+ * function must see the path that was asked for. Each prerendered page must have an override, and its clean address
+ * must serve its file byte for byte; the page list comes from the files, so a control without overrides still asks.
  */
 const postBuildRoutes: Check = {
   check: 2,
@@ -117,13 +118,14 @@ const postBuildRoutes: Check = {
       }
     }
 
-    const overrides = Object.entries(info.overrides);
-    if (overrides.length === 0) problems.push("config.json has no overrides");
-    for (const [file, { path, sha256: expected }] of overrides) {
-      const res = await deploymentFetch(`/${path}`);
-      const same = expected !== null && sha256(await res.arrayBuffer()) === expected;
-      seen.push(`/${path}: HTTP ${res.status}, ${same ? "" : "not "}the file ${file}`);
-      if (res.status !== 200 || !same) problems.push(`/${path} answered HTTP ${res.status} ${same ? "with" : "without"} the file ${file}`);
+    if (info.pages.length === 0) problems.push("the build prerendered no page besides /");
+    for (const page of info.pages) {
+      const res = await deploymentFetch(`/${page.path}`);
+      const same = page.sha256 !== null && sha256(await res.arrayBuffer()) === page.sha256;
+      const override = page.override === page.path ? "override" : "no override";
+      seen.push(`/${page.path} (${override}): HTTP ${res.status}, ${same ? "" : "not "}the file ${page.file}`);
+      if (page.override !== page.path) problems.push(`config.json has no override for ${page.file}`);
+      if (res.status !== 200 || !same) problems.push(`/${page.path} answered HTTP ${res.status} ${same ? "with" : "without"} the file ${page.file}`);
     }
 
     const cron = info.crons.some((c) => c.path === CRON.path && c.schedule === CRON.schedule);

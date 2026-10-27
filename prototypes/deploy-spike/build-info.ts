@@ -3,7 +3,7 @@
 // - /api/build-info.json, which stays reachable on the production .vercel.app address after D3 adds the host
 //   redirect there (SPEC-deploy's redirect leaves /api/ alone), so `wait` can confirm that address too.
 // Checks take their expected values from this file, read from the built output, not from constants in check.ts:
-// each function's runtime, and the overrides, the not-found page and the crons that post-build.ts wrote.
+// each function's runtime, the prerendered pages with their overrides, the not-found page and the crons.
 // It writes named fields only: the build environment also holds VERCEL_AUTOMATION_BYPASS_SECRET.
 import { $, Glob } from "bun";
 
@@ -33,10 +33,14 @@ const config = (await Bun.file(`${output}/config.json`).json()) as {
   overrides?: Record<string, { path?: string }>;
   crons?: { path: string; schedule: string }[];
 };
-const overrides: Record<string, { path: string | null; sha256: string | null }> = {};
-for (const [file, override] of Object.entries(config.overrides ?? {})) {
-  overrides[file] = { path: override.path ?? null, sha256: await sha256(`${output}/static/${file}`) };
+// The prerendered pages, read from the files, so check 2 asks each clean address whether or not an override names it.
+const pages: { file: string; path: string; sha256: string | null; override: string | null }[] = [];
+for await (const file of new Glob("**/index.html").scan({ cwd: `${output}/static` })) {
+  if (file === "index.html") continue;
+  const override = config.overrides?.[file]?.path ?? null;
+  pages.push({ file, path: file.slice(0, -"/index.html".length), sha256: await sha256(`${output}/static/${file}`), override });
 }
+pages.sort((a, b) => a.path.localeCompare(b.path));
 
 const info = {
   commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
@@ -51,7 +55,7 @@ const info = {
   bunPath: process.execPath,
   functions,
   routeCount: config.routes?.length ?? 0,
-  overrides,
+  pages, // each prerendered page except /, with the clean address its config.json override names (or null)
   notFoundSha256: await sha256(`${output}/static/404.html`),
   crons: config.crons ?? [],
   builtAt: new Date().toISOString(),
@@ -63,5 +67,6 @@ await Bun.write(`${output}/static/api/build-info.json`, json);
 console.log(
   `build-info: bun ${info.bunVersion} at ${info.bunPath}; vercel.json bunVersion ${info.vercelJsonBunVersion}; ` +
     `lockfileVersion ${info.lockfileVersion}; functions ${Object.entries(functions).map(([f, c]) => `${f} ${c.runtime}`).join(", ") || "none"}; ` +
-    `${info.routeCount} routes, ${Object.keys(overrides).length} overrides, ${info.crons.length} crons`,
+    `${info.routeCount} routes, ${pages.filter((p) => p.override !== null).length} of ${pages.length} pages with an override, ` +
+    `${info.crons.length} crons`,
 );
