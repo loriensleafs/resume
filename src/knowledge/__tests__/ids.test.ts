@@ -1,7 +1,7 @@
 // Seam 3 of SPEC-knowledge: the id grammar, including the forms the build never makes.
 
 import { describe, expect, test } from "bun:test";
-import { highlightId, logisticsId, parseId, roleId, skillsId, toSlug, type IdForm } from "../ids";
+import { highlightId, logisticsId, parseId, passageId, roleId, skillsId, toSlug, type IdForm } from "../ids";
 
 const slug60 = "a".repeat(60);
 
@@ -62,6 +62,8 @@ describe("the id builders", () => {
     expect(skillsId("Platform and tooling")).toBe("skills:platform-and-tooling");
     expect(logisticsId("work-arrangement")).toBe("logistics:work-arrangement");
     expect(parseId(highlightId("highspot", 3))).toEqual({ form: "highlight", role: "highspot", n: 3 });
+    expect(passageId("fednow-architecture", 3)).toBe("fednow-architecture.3");
+    expect(parseId(passageId("fednow-architecture", 3))).toEqual({ form: "passage", source: "fednow-architecture", n: 3 });
   });
 
   test("toSlug makes each run of other characters one hyphen, with none at either end", () => {

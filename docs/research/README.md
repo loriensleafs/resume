@@ -16,3 +16,4 @@ Source observations and experiments behind the decisions. Each note keeps its da
 | [10](10-chat-knowledge-depth.md) | Deeper chat answers from a fuller knowledge base |
 | [11](11-knowledge-tooling.md) | TanStack AI and Vercel's AI tools for a much larger knowledge base |
 | [12](12-deploy-platform.md) | Deploy: Vercel, the question log's store, spend limits, CI and the Content Security Policy |
+| [13](13-type-check.md) | A type check for before each commit and CI: `bun check` or TypeScript 7 |

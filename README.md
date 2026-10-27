@@ -24,7 +24,9 @@ basics:
 
 ## Edit the content
 
-Edit `resume.yaml`, then run `bun run build` and `bun test`. Every fact comes from Peter or his records; see [decision 0001](docs/decisions/0001-facts-from-records.md). AI agents use the [edit-resume skill](.agents/skills/edit-resume/SKILL.md).
+Edit `resume.yaml`, then run `bun run build`, `bun run documents` and `bun test`. Every fact comes from Peter or his records; see [decision 0001](docs/decisions/0001-facts-from-records.md). AI agents use the [edit-resume skill](.agents/skills/edit-resume/SKILL.md).
+
+`bun run documents` rebuilds the public documents in `documents/`, which the site serves, because the site's host has no Chrome to build them. Run it after every change to `resume.yaml`, to the build code (`src/content.ts`, `src/build.ts`, `src/print/`, `src/export/`) or to `fonts/`, and commit `documents/` in the same commit. When no input changed, it writes nothing. When you forget it, `bun test` fails and names the inputs that changed.
 
 ## Test
 
@@ -43,7 +45,8 @@ Only needed to change a weight or add characters. `bun run fonts` downloads Goog
 ```text
 resume.yaml      the resume content (JSON Resume shape)
 src/             schema, print template, Chrome printing, Word and text renderers, build()
-scripts/         bun run build, bun run fonts
+scripts/         bun run build, bun run documents, bun run fonts
+documents/       the committed public documents and their inputs hash
 fonts/           fixed-weight Google Sans Flex
 spec/            capability map and module specs
 tasks/           current plan and task list

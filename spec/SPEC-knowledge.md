@@ -135,6 +135,7 @@ bun run knowledge --draft <source id>   # prints a draft source file as the chat
 knowledge/sources/         one Markdown file per source (deep dives and interviews), approved or draft
 knowledge/logistics.yaml   logistics answers
 src/knowledge/ids.ts       the id grammar, shared by the build and readPassages()
+src/knowledge/types.ts     the types in Code Style, and no code: the renderers, the reads, the site and the chat import them without the build
 src/knowledge/parse.ts     parseSource(): front matter and passages of one source file
 src/knowledge/build.ts     buildKnowledge({ root }), publicKnowledge() and previewDraft(); every rule checked
 src/knowledge/render.ts    renderCore() and renderSource(): text with [id] markers
@@ -191,6 +192,7 @@ export function roleId(role: string): string;                // "role:<role id>"
 export function highlightId(role: string, n: number): string; // "highlight:<role id>.<n>"
 export function skillsId(groupName: string): string;         // "skills:<slug>"
 export function logisticsId(topic: string): string;          // "logistics:<topic>"
+export function passageId(sourceId: string, n: number): string; // "<source id>.<n>"
 /** How a slug is written, for error messages. */
 export const SLUG_RULE: string;
 ```

@@ -46,6 +46,10 @@ _Avoid_: export, artifact (artifact means a published claude.ai page)
 The generated `resume.html` that Chrome prints to the PDF; open it to see the PDF layout.
 _Avoid_: template (the template is the code that renders it)
 
+**Inputs hash**:
+The file `documents/inputs.sha256`: one hash for each input of the committed public documents, which are the resume source, the content module's code, the fonts and its locked packages. It decides when the documents are rebuilt, and the tests fail while it does not match the inputs.
+_Avoid_: checksum file, manifest
+
 ## Site and chat
 
 **Site**:
@@ -142,7 +146,11 @@ _Avoid_: retrieval, lookup, search
 
 **Answer steps**:
 The record shown with an answer of what the chat did for it: the sources it found and read, and the citations it checked.
-_Avoid_: thinking, reasoning, trace
+_Avoid_: thinking (the thinking summary is one part of the answer steps, not their name), reasoning, trace
+
+**Thinking summary**:
+Anthropic's summary of the model's thinking for one model call, shown in the answer steps as the chat's working notes, and never sent back to the server (rows 155 and 156).
+_Avoid_: thoughts, reasoning, chain of thought
 
 **Fit check**:
 The chat's answer to a pasted job description: each requirement with what Peter's record shows and its citations, or "not in Peter's record", and no verdict on fit.
@@ -179,7 +187,7 @@ _Avoid_: jailbreak test, red-team prompt
 ## Running the site
 
 **Release**:
-A push of site changes to `main`, which goes live at peterkloss.dev once its checks pass. Peter approves each one.
+A push of site changes to `main`, which goes live at peterkloss.dev once its checks pass.
 _Avoid_: ship, go-live, promotion
 
 **Site file**:
@@ -211,6 +219,22 @@ _Avoid_: notification, page, alarm
 **Decision record**:
 The dated record of the product questions put to Peter and his answers, one numbered row per decision, in `docs/design/interview-<date>.md`. A row number names one decision, as in "row 131".
 _Avoid_: "interview" alone (an interview is a source), interview notes, transcript
+
+**Standing approval**:
+Peter's approval, given once, that covers every push, releases included (row 151). It does not cover a force-push or the other approvals `AGENTS.md` lists.
+_Avoid_: blanket approval, auto-approve
+
+**Conductor**:
+The session that runs `/brain:build auto`: it starts each task's sub-agent, runs the reviews, merges, and asks Peter.
+_Avoid_: orchestrator
+
+**Lane**:
+One task building in its own git worktree; up to 3 build at once (row 150).
+_Avoid_: slot, worker
+
+**Wording draft**:
+A text that a task writes from the mockups and the spec for Peter's approval (row 153). Its file keeps it after he approves it, with the status "approved".
+_Avoid_: "draft" alone, which the glossary keeps out for a queued question
 
 **Agent files**:
 What a coding agent reads to work on this project: the shared instructions, each agent's own entry file and settings, and the repo skills. They are not site files.
