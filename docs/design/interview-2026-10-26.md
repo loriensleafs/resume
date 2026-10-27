@@ -36,10 +36,15 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 24 | Site: speed and accessibility targets | No WCAG 2.2 AA violations; main content visible in under 2.5 s and layout shift under 0.1 on a throttled phone profile; first-load JavaScript under 200 KB compressed |
 | 25 | Site: are the deep dives still worth having if the chat answers in more depth (deep-dive tabs, sources on demand, or none)? | Sources on demand ([0015](../decisions/0015-sources-on-demand.md)). Peter added that his interview answers were "much more dense" than the deep dives, and asked to recover them, brief them up or add other sources, because "we're going to have to somehow be able to provide this AI with a lot more information" |
 | 26 | Knowledge layout: all in the prompt, or two layers (a core in every request, full sources read by a tool)? | Two layers ([0016](../decisions/0016-two-layer-knowledge.md)) |
+| 27 | (Peter, 2026-10-27) Saved sessions | "Everything should stay saved to local storage or saved locally somehow. So that if they close the app but then come back to it, it'll pick up exactly where they left off." Also a way to "clear and start over" ([0017](../decisions/0017-saved-visitor-session.md)) |
+| 28 | (Peter, 2026-10-27) Domains | Peter asked to get www.peterkloss.com and www.pk.com, both opening the same site. Both are registered by others: peterkloss.com since 2005 (Cronon GmbH, expires 2027-10-08), with another person's unfinished site; pk.com since 1997 (GoDaddy, every transfer and update locked, expires 2031-09-03). Peter then named peterwkloss.com, peterwatsonkloss.com and peterklossal.com. These three, and peterkloss.dev and peterkloss.net, return "not found" from their registries on 2026-10-27, so they appear to be free. Peter buys any domain; agents never buy |
+| 29 | (Peter, 2026-10-27) Install | The site offers to install itself as an app, on phones and on computers. "When it installs, it should open a standalone app." |
+| 30 | (Peter, 2026-10-27) App icon | Design "a little logo for the app" for the installed app |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
 ## Still open
 
 - The site's visual design: Peter's review of the mockups.
-- A domain name, if Peter wants one (Peter buys it; agents never buy).
+- The domain: Peter's first choices are taken (question 28).
+- The app icon (question 30).
