@@ -26,7 +26,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [A1](modules/agents.md#a1-agentsmd-routes-by-module-and-carries-the-approval-rules) `AGENTS.md` routes by module and carries the approval rules — blocked by the test move
 - [x] [A2](modules/agents.md#a2-the-release-repo-skill) The `release` repo skill — blocked by A1
 - [ ] [Checkpoint agents: before the first release](modules/agents.md#checkpoint-agents-before-the-first-release) — after A1, A2; Peter: read the new Modules and Releases and approvals sections before T1's push
-- [ ] [K1](modules/knowledge.md#k1-the-id-grammar-in-one-module) The id grammar in one module — blocked by none
+- [x] [K1](modules/knowledge.md#k1-the-id-grammar-in-one-module) The id grammar in one module — blocked by none (done 2026-10-27; Peter added the id grammar's own test seam, row 146)
 - [ ] [C1](modules/chat.md#c1-install-the-chats-packages-and-check-spec-chats-tanstack-ai-names) Install the chat's packages and check SPEC-chat's TanStack AI names — blocked by none; Peter: approve a SPEC-chat amendment, only if a TanStack AI name differs
 - [ ] [C2](modules/chat.md#c2-the-question-log-budget-and-telemetry-contracts-with-the-contract-suite) The question log, budget and telemetry contracts, with the contract suite — blocked by none
 - [ ] [Checkpoint chat: contracts](modules/chat.md#checkpoint-chat-contracts) — after C2
@@ -202,7 +202,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [D34](modules/deploy.md#d34-the-setup-list-and-the-rollback-runbook) The setup list and the rollback runbook — blocked by D6, D32; Peter: review and approve the setup list and the rollback runbook
 - [ ] [D36](modules/deploy.md#d36-runbooks-for-the-store-health-and-release-alerts) Runbooks for the store, health and release alerts — blocked by D32, D33; Peter: review and approve the runbooks
 - [ ] [Checkpoint deploy: setup list and runbooks](modules/deploy.md#checkpoint-deploy-setup-list-and-runbooks) — after D34 to D36; Peter: approve them
-- [ ] Peter: setup steps 1 to 11 of `docs/runbooks/setup.md`, in order: the domains bought, ntfy, the Anthropic workspaces, Vercel Pro and the import, the toolbar and protection, Upstash, the WAF rules, the spend budget, the Actions secrets, Deployment Checks (spike check 12), the domains added — after D34; blocks D37
+- [ ] Peter: setup steps 1 to 11 of `docs/runbooks/setup.md`, in order: the domains bought, ntfy, the Anthropic workspaces, Vercel Pro and the import, the toolbar and protection, Upstash, the WAF rules, the spend budget, the Actions secrets, Deployment Checks (spike check 12), the domains added — after D34; blocks D37 (done 2026-10-27: step 1, the three domains bought; step 4's Pro sign-up; step 5's toolbar setting; step 8's budget)
 - [ ] [D37](modules/deploy.md#d37-setup-step-11-the-vercelapp-address-the-first-release) Setup step 11: the `.vercel.app` address, the first release — blocked by D17, D32 to D34, A2 and Peter's setup steps 1 to 11; Peter: approve the release and confirm its push reaches his phone
 - [ ] [Checkpoint agents: the first release follows the release skill](modules/agents.md#checkpoint-agents-the-first-release-follows-the-release-skill) — after D37
 - [ ] Peter: setup step 12: `ANTHROPIC_API_KEY`, then Redeploy with "Use project's Ignore Build Step" unchecked — after D37; blocks D38

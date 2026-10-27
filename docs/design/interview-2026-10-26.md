@@ -161,4 +161,4 @@ After question 24, Peter asked for mockups of the site with his design system be
 
 ## Still open
 
-- Buying the domains (question 31): Peter buys them.
+None. Buying the domains (row 31) is done: Peter bought peterkloss.dev, pkloss.dev and pwk.dev on 2026-10-27, in the Vercel team Peter Kloss (SPEC-deploy setup step 1; [STATUS](../STATUS.md)).
