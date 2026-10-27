@@ -1,9 +1,10 @@
 // Runs after `vite build` (and its prerender) so the precache list includes the prerendered HTML.
+// Deploy spike: Nitro's Vercel preset puts the pages in .vercel/output/static/ instead of dist/client/.
 import { generateSW } from "workbox-build";
 const result = await generateSW({
-  globDirectory: "dist/client",
+  globDirectory: ".vercel/output/static",
   globPatterns: ["**/*.{html,js,css,pdf,docx,txt,woff2,webmanifest}"],
-  swDest: "dist/client/sw.js",
+  swDest: ".vercel/output/static/sw.js",
   navigateFallback: undefined,
   cleanupOutdatedCaches: true,
   clientsClaim: true,

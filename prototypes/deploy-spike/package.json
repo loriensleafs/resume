@@ -2,6 +2,9 @@
   "name": "site-spike",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build": "bun build-info.ts && bun --bun vite build && bun gen-sw.ts"
+  },
   "dependencies": {
     "@acmelabs/design-system": "0.3.2",
     "@acmelabs/design-system-react": "0.3.2",
