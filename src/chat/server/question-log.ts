@@ -42,6 +42,7 @@ export function inMemoryQuestionLog(now: () => Date): QuestionLog {
       const newestFirst: QuestionLogEntry[] = [];
       for (let back = 0; back < days; back++) {
         const day = utcDay(today - back * DAY_MS);
+        // The spec fixes no order between two entries of the same day; this log puts the later one first.
         newestFirst.push(...entries.filter((entry) => entry.date === day).reverse());
       }
       return newestFirst;

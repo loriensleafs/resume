@@ -7,9 +7,9 @@ import { describe, expect, test } from "bun:test";
 import type { QuestionLog, QuestionLogEntry } from "../question-log";
 
 /** A clock that always reads `iso`. */
-const on = (iso: string) => () => new Date(iso);
+const clockAt = (iso: string) => () => new Date(iso);
 /** 2026-10-27, the day the spec writes the window for. */
-const noon = on("2026-10-27T12:00:00.000Z");
+const noon = clockAt("2026-10-27T12:00:00.000Z");
 
 const entryOn = (date: string): QuestionLogEntry => ({
   id: `entry-${date}`,
@@ -42,17 +42,28 @@ export function questionLogContract(
       expect(await log.list(1)).toEqual([entry]);
     });
 
+    test("on 2026-10-27, list(1) returns the entry dated 2026-10-27 and none dated 2026-10-26", async () => {
+      const log = await makeLog(noon);
+      const today = entryOn("2026-10-27");
+
+      await log.append(entryOn("2026-10-26"));
+      await log.append(today);
+
+      expect(await log.list(1)).toEqual([today]);
+    });
+
     test.each([
       ["at its first moment", "2026-10-27T00:00:00.000Z"],
       ["at noon", "2026-10-27T12:00:00.000Z"],
       ["at its last moment", "2026-10-27T23:59:59.999Z"],
     ])(
-      "on 2026-10-27 %s, list(7) returns the entries dated 2026-10-21 to 2026-10-27, newest first, and none dated 2026-10-20",
+      "on 2026-10-27 %s, list(7) returns the entries dated 2026-10-21 to 2026-10-27, newest first, and none dated 2026-10-20 or 2026-10-28",
       async (_, iso) => {
-        const log = await makeLog(on(iso));
+        const log = await makeLog(clockAt(iso));
         for (const date of [
           "2026-10-24",
           "2026-10-20",
+          "2026-10-28",
           "2026-10-27",
           "2026-10-21",
           "2026-10-26",
