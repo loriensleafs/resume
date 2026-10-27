@@ -7,7 +7,7 @@ The resume project has six modules. Each module has one spec in this folder, nam
 | content | `resume.yaml`, and the PDF, Word and text files built from it | none | [SPEC-content.md](SPEC-content.md) |
 | knowledge | The chat's approved knowledge base: the core (resume, logistics answers, catalog) and the sources (deep dives, interviews), with an id for every entry and passage | content | [SPEC-knowledge.md](SPEC-knowledge.md) |
 | site | The TanStack Start PWA: the chat beside the resume, sources opened on demand, saved sessions, install, offline cache, downloads | content, knowledge | [SPEC-site.md](SPEC-site.md) |
-| chat | The `/api/chat` route, chat UI, history in TanStack DB, offline queue, guardrails, evals | knowledge, site | SPEC-chat.md |
+| chat | The `/api/chat` route, chat UI, history in TanStack DB, offline queue, guardrails, evals | knowledge, site | [SPEC-chat.md](SPEC-chat.md) |
 | deploy | Hosting, rate limit, spend cap, domain, CI | site, chat | SPEC-deploy.md |
 | agents | `AGENTS.md`, `CLAUDE.md` and the repo skills | all; updated as each module lands | SPEC-agents.md |
 

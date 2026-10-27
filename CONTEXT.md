@@ -85,7 +85,7 @@ An entry in the core that Peter approves about his job search: remote or on-site
 _Avoid_: FAQ, preferences
 
 **Citation**:
-The id of the passage or resume entry an answer used, shown with the answer.
+The id of the passage, resume entry or logistics answer an answer used, shown with the answer. The server keeps it only when the id is a resume entry, a logistics answer or a passage read in the same turn.
 _Avoid_: source link, reference
 
 **Saved session**:
@@ -113,12 +113,48 @@ The standalone prerendered page of one approved source at `/sources/<id>`, reada
 _Avoid_: deep-dive page, article page
 
 **Refusal**:
-The chat's answer to a topic outside its scope (salary, immigration, health, age, personal life): it declines and points to Peter's email.
+The chat's answer to a topic outside its scope (salary, immigration, health, age, personal life), or to a question the knowledge base does not cover: it declines and points to Peter's email.
 _Avoid_: guardrail message, block
 
 **Queued question**:
-A question asked while offline, stored on the visitor's device and sent when the connection returns.
+A question asked while offline or while an answer streams, stored on the visitor's device and sent when the chat is free and online.
 _Avoid_: pending message, draft
+
+**Turn**:
+One question and its answer, with the reads made for it.
+_Avoid_: exchange, round, request
+
+**Read**:
+One call of the chat's read tool, which returns the text of the sources or passages asked for. At most 3 per turn.
+_Avoid_: retrieval, lookup, search
+
+**Answer steps**:
+The lines that show what the chat did for an answer: the sources found, the source read, the citations checked. Shown one by one while it works, then folded into one line above the answer.
+_Avoid_: thinking, reasoning, trace
+
+**Fit check**:
+The chat's answer to a pasted job description: each requirement with what Peter's record shows and its citations, or "not in Peter's record", and no verdict on fit.
+_Avoid_: job match, fit score
+
+**Audience**:
+The visitor's "Answers for" choice (recruiter, hiring manager or engineer), which sets what an answer leads with.
+_Avoid_: persona, mode, role (a role is a job in the resume)
+
+**Follow-up question**:
+One of at most two questions the chat suggests under an answer.
+_Avoid_: suggestion chip, related question
+
+**Resume card**:
+The card in an answer that opens the whole resume beside the chat, after a visitor asks for the resume.
+_Avoid_: artifact card, attachment
+
+**Device matches**:
+The resume entries and passages that match what the visitor types, found on the device with no model and no network.
+_Avoid_: autocomplete, search results
+
+**Question log**:
+The anonymous record the server keeps of each turn: the question, what was read and cited, and the outcome. No visitor identity.
+_Avoid_: analytics, chat history, transcript
 
 **Trick question**:
 An eval case that tries to make the chat state something false, leave its scope or ignore its rules.

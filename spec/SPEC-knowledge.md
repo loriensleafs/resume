@@ -27,7 +27,7 @@ Acceptance criteria:
 | A source, and its catalog entry | `<source id>` | `fednow-architecture` |
 | A passage, numbered from 1 in file order | `<source id>.<n>` | `fednow-architecture.3` |
 
-A citation is a passage id or a resume entry id. Highlight and passage numbers follow the file order, so reordering changes their ids. A saved session can hold a citation to an id that no longer exists; the site shows it as plain text ([decision 0017](../docs/decisions/0017-saved-visitor-session.md)).
+A citation is a passage id, a resume entry id or a logistics answer id (the approved mockups cite logistics answers; [SPEC-chat](SPEC-chat.md)). Highlight and passage numbers follow the file order, so reordering changes their ids. A saved session can hold a citation to an id that no longer exists; the site shows it as plain text ([decision 0017](../docs/decisions/0017-saved-visitor-session.md)).
 
 ## Sources
 

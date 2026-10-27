@@ -24,7 +24,7 @@ Acceptance criteria:
 
 The approved mockups are the reference for every view. The image index names each one.
 
-**App bar.** A blue box with "Peter Kloss", then the headline (`basics.label`). At the end: "Install app" (secondary button, Chrome's install icon), "Resume" (a menu of the PDF, Word and text documents), and a three-way theme switch: system, light, dark. On phones: the name box and a download button for the documents.
+**App bar.** A blue box with "Peter Kloss", then the headline (`basics.label`). At the end: "Install app" (secondary button, Chrome's install icon), "Resume" (a menu of the PDF, Word and text documents), and a three-way theme switch: system, light, dark. On phones: the name box and a download button for the documents. The app bar has an end slot that the workspace route fills with the chat's New chat on phones ([SPEC-chat](SPEC-chat.md)).
 
 **Career timeline band.** Full width under the app bar, headed "Career timeline". Every role and earlier role in `resume.yaml` is a span at its true length on a year axis, with its employer name on one line. The selected role is blue with its name in bold; roles the latest answer cites are blue with their names in normal weight. On phones the band scrolls sideways, opens at the latest roles and says "Swipe for earlier roles". Each span is a real button with the employer and dates as its name.
 
@@ -139,8 +139,9 @@ export type Scope = { roleId: string } | null;
 export type Workspace = {
   scope: Scope;
   setScope(scope: Scope): void;
-  /** A passage id opens its source beside the chat with the passage marked; a resume entry id shows it in the resume. */
-  openCitation(id: string, citationNumber: number): void;
+  /** A passage id opens its source beside the chat with the passage marked; a resume entry id shows it in the resume.
+   *  Without a number (a device match), the panel shows no "Opened from citation" note. */
+  openCitation(id: string, citationNumber?: number): void;
   /** The whole resume at its top: the Resume tab on wide screens, the full-height sheet on phones (row 81). */
   openResume(): void;
   /** The latest answer's citations: their roles light up on the timeline and their highlights in the resume. */
@@ -232,7 +233,7 @@ export function useWorkspace(): Workspace;
 - Accounts, server-side storage of visitors and analytics.
 - An update prompt for a new site version.
 - Languages other than English.
-- Cards for artifacts inside answers (interview row 63, still open; the chat module owns answers).
+- Cards inside answers: the chat module owns answers, and its only card is the resume card (interview rows 63 and 81).
 
 ## Prior-art tests
 
