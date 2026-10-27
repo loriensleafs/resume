@@ -63,6 +63,26 @@ At a few thousand entries a month the store costs nothing on any of the three. W
 - `ubuntu-24.04` has Google Chrome at `/usr/bin/google-chrome`; poppler is not installed (`apt-get install poppler-utils`). `ubuntu-latest` moves to 26.04 between 2026-10-19 and 2026-11-19, so a pinned image avoids a silent change. https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md, https://github.com/actions/runner-images/issues/14748
 - `bun ci` equals `bun install --frozen-lockfile`. Bun runs no dependency lifecycle scripts outside its allow list; `trustedDependencies: []` blocks all. `bun audit` checks `bun.lock` against npm advisories and exits 1 on findings or when the registry is unreachable. https://bun.com/docs/pm/cli/install, https://bun.com/docs/pm/lifecycle#trusteddependencies, https://bun.com/docs/pm/cli/audit
 
+## Facts behind the review fixes (2026-10-27)
+
+- **Build image:** Amazon Linux 2023, with Node.js 24 and 22, Python and Ruby; packages install with `dnf install -y` in the install command. The docs list no Chrome. https://vercel.com/docs/builds/build-image
+- **Standard Protection** "protects all domains except production domains"; the production generated deployment URL becomes restricted. https://vercel.com/docs/deployment-protection#standard-protection
+- **`VERCEL_GIT_PREVIOUS_SHA`** (build time): "The git SHA of the last successful deployment for the project and branch", empty on a branch's first deployment, "only exposed when an Ignored Build Step is provided". `VERCEL_ENV` and `VERCEL_GIT_COMMIT_SHA` are available at build and run time. https://vercel.com/docs/environment-variables/system-environment-variables
+- **Ignored Build Step:** exit 1 builds, exit 0 cancels; the command can read the system variables. https://vercel.com/docs/project-configuration/project-settings#ignored-build-step
+- **Deployment Checks** hold each production deployment until the required checks pass, then assign the domains; GitHub checks are matched by job name; they need production auto-aliasing on; Force Promote bypasses them. https://vercel.com/docs/deployment-checks
+- **Repository dispatch:** Vercel sends `vercel.deployment.ready` (and other events) to GitHub Actions with the deployment's `url` and `environment` in `client_payload`; the workflow file must be on the default branch. https://vercel.com/docs/git/vercel-for-github#repository-dispatch-events
+- **Protection Bypass for Automation** (all plans): send `x-vercel-protection-bypass: <secret>`; Vercel also sets `VERCEL_AUTOMATION_BYPASS_SECRET`. https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation
+- **Ignore command example:** `"ignoreCommand": "git diff --quiet HEAD^ HEAD ./"`. https://vercel.com/docs/project-configuration/vercel-json#ignorecommand
+- **Rolling Releases** are on Pro for one project; a fraction of visitors gets the new deployment first. https://vercel.com/docs/rolling-releases
+- **GitHub schedules:** "In a public repository, scheduled workflows are automatically disabled when no repository activity has occurred in 60 days"; they run only on the default branch; notices go "to the user who last modified the cron syntax". https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule
+- **TanStack AI usage (installed 1.0.0):** the Anthropic adapter sets `promptTokens` to uncached input plus cache reads plus cache writes, with `cachedTokens`, `cacheWriteTokens` and `cacheWrite1hTokens` in `promptTokensDetails` (`@tanstack/ai-anthropic/dist/esm/usage.js`). Middleware `ctx.defer()` promises "do not block streaming and are awaited after the terminal hook" (`@tanstack/ai` middleware types). Nitro's Vercel page says nothing about `waitUntil`. https://nitro.build/deploy/providers/vercel
+
+## Alert channels
+
+- **Twilio SMS:** about $0.0083 a text plus carrier fees (about $0.012 to $0.013 in total), $1.15 a month for a local number; "Anyone sending SMS/MMS messages over a 10DLC number from an application to the US must register for A2P 10DLC", hobbyists included. https://www.twilio.com/en-us/sms/pricing/us, https://www.twilio.com/docs/messaging/compliance/a2p-10dlc
+- **Carrier email-to-text gateways** are no longer reliable; AT&T has shut its gateway down (third-party reports, not an official source).
+- **ntfy.sh:** free with no sign-up; publish with an HTTP POST to `ntfy.sh/<topic>`, with `Title` and `Priority` headers (1 to 5); "the topic is essentially a password"; apps on Android and iOS; paid plans add reserved topics. https://docs.ntfy.sh/publish/, https://ntfy.sh/
+
 ## Probe: a strict Content Security Policy
 
 The earlier site spike ([research 09](09-site-feasibility.md)) was served with `default-src 'self'`, `script-src 'self'` plus each page's inline-script hashes, `style-src 'self'`, `object-src 'none'`, `base-uri 'none'` and `frame-ancestors 'none'`. Chromium reported no violation on a first visit, a second visit, a deep-dive page and an offline visit through the service worker. The probe, its verdict and what it did not test are on the branch `prototype/csp-probe`.
