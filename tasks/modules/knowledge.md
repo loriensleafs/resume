@@ -25,7 +25,7 @@ Acceptance:
 - A fixture role id or logistics topic that is not a slug, or a skills group whose name gives no slug, stops `buildKnowledge()` with a message that names the file and the field (Ids: "the build stops on one that is not").
 - K1 picks the export names of `src/knowledge/ids.ts` and records them in SPEC-knowledge, so the site and chat tasks can cite them (main's decision, 2026-10-27). The fixture's `resume.yaml` keeps each role's `x-short` if T1 has landed first; otherwise T1 adds it.
 Verify: `bun test src/knowledge`; the existing core snapshot passes unchanged and `bun run knowledge` prints the same text as before.
-Files: `src/knowledge/ids.ts`, `src/knowledge/build.ts`, `src/knowledge/__tests__/build.test.ts`, `src/knowledge/__tests__/fixtures.ts` (the fixture folder helper moves here, so later tests and content's `x-short` change edit one place), `spec/SPEC-knowledge.md` (the export names)
+Files: `src/knowledge/ids.ts`, `src/knowledge/build.ts`, `src/knowledge/__tests__/build.test.ts`, `src/knowledge/__tests__/fixtures.ts` (the fixture folder helper moves here, so later tests and content's `x-short` change edit one place), `spec/SPEC-knowledge.md` (the export names), `src/knowledge/__tests__/ids.test.ts` (seam 3, added by Peter during the review, decision record row 146)
 Size: S
 Needs Peter: no
 

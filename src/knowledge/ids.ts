@@ -38,11 +38,12 @@ export const highlightId = (role: string, n: number) => `highlight:${role}.${n}`
 export const skillsId = (groupName: string) => `skills:${toSlug(groupName)}`;
 export const logisticsId = (topic: string) => `logistics:${topic}`;
 
-/** Splits "<name>.<n>" at its last dot; undefined when the part after it is not a number from 1. */
+/** Splits "<name>.<n>" at its last dot; undefined when the part after it is not a safe integer from 1. */
 function splitNumber(s: string): [string, number] | undefined {
   const dot = s.lastIndexOf(".");
   const digits = s.slice(dot + 1);
-  return dot > 0 && NUMBER_FROM_1.test(digits) ? [s.slice(0, dot), Number(digits)] : undefined;
+  const n = Number(digits);
+  return dot > 0 && NUMBER_FROM_1.test(digits) && Number.isSafeInteger(n) ? [s.slice(0, dot), n] : undefined;
 }
 
 /** The form of an id and its parts, or undefined when the id follows no form. */
@@ -51,11 +52,9 @@ export function parseId(id: string): IdForm | undefined {
   const colon = id.indexOf(":");
   if (colon === -1) {
     if (isSourceId(id)) return { form: "source", source: id };
+    if (id.length > PASSAGE_ID_CHARACTERS) return undefined;
     const passage = splitNumber(id);
-    if (passage && id.length <= PASSAGE_ID_CHARACTERS && isSourceId(passage[0])) {
-      return { form: "passage", source: passage[0], n: passage[1] };
-    }
-    return undefined;
+    return passage && isSourceId(passage[0]) ? { form: "passage", source: passage[0], n: passage[1] } : undefined;
   }
   const rest = id.slice(colon + 1);
   switch (id.slice(0, colon)) {

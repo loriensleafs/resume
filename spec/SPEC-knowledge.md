@@ -36,7 +36,7 @@ The id grammar:
 
 ```text
 slug        [a-z0-9]+(-[a-z0-9]+)*   at most 60 characters
-n           [1-9][0-9]*              numbered from 1
+n           [1-9][0-9]*              numbered from 1, at most Number.MAX_SAFE_INTEGER
 source id   a slug, never "basics" or "education"
 passage id  <source id>.<n>          at most 64 characters
 ```
@@ -252,7 +252,7 @@ Roles: <role ids>. Highlights: <highlight ids>. Links: <links>.
 
 ## Testing Strategy
 
-`bun test`, at the same two seams Peter confirmed on 2026-10-26, extended on 2026-10-27:
+`bun test`, at the two seams Peter confirmed on 2026-10-26, extended on 2026-10-27, and a third seam for the id grammar that he added on 2026-10-27 ([decision record](../docs/design/interview-2026-10-26.md) row 146):
 
 1. **`buildKnowledge()`**, on fixtures and on the real files, with **`readPassages()`**, **`publicKnowledge()`**, **`renderCore()`**, **`renderSource()`** and **`previewDraft()`** on its output. The tests check:
    - the core's order, and the catalog in source-id order with one entry per approved source;
@@ -269,6 +269,7 @@ Roles: <role ids>. Highlights: <highlight ids>. Links: <links>.
 
    The rendered core and one rendered source have snapshots. A third snapshot lists every approved source's passage ids with their headings. A new passage adds lines at the end of its source's list; a reviewer accepts no other change to that snapshot (append-only).
 2. **Unit tests on the source parser:** front matter for both kinds, highlight ids, deep-dive section order, interview passages, a "(continued)" heading only directly after the heading it continues, `Not public` last, passage size, and missing or unknown sections.
+3. **Unit tests on the id grammar** (`src/knowledge/__tests__/ids.test.ts`): `parseId()` on a table of ids, each with the form it gives or with none. The table holds every form at its length limits, numbers from 1 with no leading zero and none past `Number.MAX_SAFE_INTEGER`, and forms the build never makes, such as `basics.1`, `highlight:acme.0`, `role:acme:two` and an empty id. The id builders give ids that `parseId()` reads back. The site and the chat call `parseId()` with ids from the model and from browsers, and seam 1 never reaches the paths that reject an id.
 
 No test can check three rules: that `Not public` names kinds only, that headings follow Peter's wording rule, and the edit rule. Peter checks them at approval, with the redaction list and the passage-id snapshot in front of him.
 
