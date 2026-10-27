@@ -322,10 +322,19 @@ const hostRedirect: Check = {
     // Recorded: a path and query with encoded characters.
     const encoded = await productionFetch("/a%20b/%C3%A9?q=%2F&r=a+b");
     seen.push(`/a%20b/%C3%A9?q=%2F&r=a+b: HTTP ${encoded.status} to ${encoded.headers.get("location") ?? "no Location"}`);
-    // Recorded: which of the six headers the 308 carries; the redirect route ends routing before the header routes.
+    // Recorded: the headers on the 308. The redirect route has no `continue`, and the header routes come after it.
     if (first) {
-      const carried = Object.keys(SECURITY_HEADERS).filter((name) => first!.headers.get(name) !== null);
-      seen.push(`the 308 carries ${carried.length ? carried.join(", ") : "none of the six headers"}, cache-control ${JSON.stringify(first.headers.get("cache-control"))}`);
+      const wrong = securityHeaderProblems(first);
+      const six =
+        wrong.length === 0
+          ? "the six headers"
+          : wrong.every((w) => w.endsWith(" missing")) && wrong.length === Object.keys(SECURITY_HEADERS).length
+            ? "none of the six headers"
+            : `not the six headers: ${wrong.join(", ")}`;
+      seen.push(
+        `the 308 carries ${six}, ` +
+          `${policyName(first.headers.get("content-security-policy"))}, cache-control ${JSON.stringify(first.headers.get("cache-control"))}`,
+      );
     }
 
     // /api/ is not redirected: the wait step and Vercel Cron rely on it.
