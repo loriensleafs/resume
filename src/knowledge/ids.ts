@@ -12,7 +12,7 @@ export const SLUG_RULE = `lowercase letters and digits, with single hyphens betw
 /** How a source id is written, for error messages: the rule isSourceId() checks. */
 export const SOURCE_ID_RULE = `a slug (${SLUG_RULE}), never "basics" or "education"`;
 /** How a passage id is written, for error messages. */
-export const PASSAGE_ID_RULE = `a passage id is <source id>.<n>, at most ${PASSAGE_ID_CHARACTERS} characters`;
+export const PASSAGE_ID_RULE = `<source id>.<n>, at most ${PASSAGE_ID_CHARACTERS} characters`;
 
 /** Every form an id can take, with its parts. */
 export type IdForm =

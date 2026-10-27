@@ -17,17 +17,24 @@ const PASSAGE_CHARACTERS = 3000;
 const SUMMARY_CHARACTERS = 200;
 
 /**
- * A link as written: "https://", then no white space, control character or backslash. The URL
- * class drops tabs and line breaks and reads a backslash as a slash, so without this a link could
- * parse as one URL, print as another, and add a line to the rendered source.
+ * A link as written: "https://", then no white space, control character, invisible format
+ * character (a bidi control, a zero-width character) or backslash. The URL class drops tabs, line
+ * breaks and some zero-width characters, and reads a backslash as a slash, so without this a link
+ * could parse as one URL, look like another, and add a line to the rendered source.
  */
-const WRITTEN_HTTPS_LINK = /^https:\/\/[^\s\p{Cc}\\]+$/u;
+const WRITTEN_HTTPS_LINK = /^https:\/\/[^\s\p{Cc}\p{Cf}\\]+$/u;
 
-// Not public names kinds of material only (Sources), so it holds neither of these. Both match
-// widely: a URL with any scheme (https://, ftp://, slack://), and anything of the form name@host,
-// which an email address with no dot in its host is too.
-const ANY_URL = /[a-z][a-z0-9+.-]*:\/\//i;
-const EMAIL_ADDRESS = /[^\s@]+@[^\s@]+/;
+// Not public names kinds of material only (Sources), so it holds no link and no email address.
+// Each pattern starts at a fixed character or a word start and checks a bounded run after it, so a
+// long section costs one pass. A bare host and path, such as wiki.corp.example.com/x, is left to
+// Peter's review at approval: a pattern for it would also stop the build on prose like "Node.js/Bun".
+const NOT_PUBLIC_LINKS = [
+  /\/\/[^\s/]/, // a URL with any scheme (https://, ftp://, slack://), and a protocol-relative link (//corp.com/x)
+  /\b(?:javascript|data):\S/i, // the two schemes with no "//"; "data: accounts", with a space, is prose
+  /\b\d{1,3}(?:\.\d{1,3}){3}\b/, // an IPv4 address, also with a port or a path after it
+];
+/** Anything of the form name@host, so an email address with no dot in its host is one too. */
+const EMAIL_ADDRESS = /[^\s@]@[^\s@]/;
 
 const logisticsSchema = z.strictObject({
   topics: z.array(
@@ -96,13 +103,16 @@ async function logisticsEntries(root: string): Promise<Entry[]> {
     .map((t) => ({ id: logisticsId(t.topic), kind: "logistics" as const, title: t.topic, text: t.answer!.trim() }));
 }
 
-/** Why `link` is not an absolute https:// URL with no user name or password; undefined when it is one. */
+/**
+ * The rule `link` breaks, or undefined when it is an absolute https:// URL with no user name or
+ * password. No message shows the link, so a user name or password in it never reaches a terminal
+ * or a CI log.
+ */
 function linkProblem(link: string): string | undefined {
   const url = URL.canParse(link) ? new URL(link) : undefined;
   if (url?.protocol !== "https:" || !WRITTEN_HTTPS_LINK.test(link)) {
-    return `${JSON.stringify(link)} is not an absolute https:// URL: write it in full, with no space, line break or backslash`;
+    return "is not an absolute https:// URL: write it in full, with no space, line break, backslash or invisible character";
   }
-  // The link is not shown, so a password never reaches a terminal or a CI log.
   if (url.username || url.password) return "holds a user name or password: give the URL without them";
   return undefined;
 }
@@ -140,12 +150,14 @@ function checkSource(source: Source, resumeIds: ReadonlySet<string>): string[] {
   for (const p of source.passages) {
     const passage = `passage ${p.id} (${JSON.stringify(p.heading)})`;
     // A bad source id makes every passage id bad too; its own problem says so once.
-    if (goodId && parseId(p.id)?.form !== "passage") problems.push(`${passage} has an id of ${p.id.length} characters; ${PASSAGE_ID_RULE}`);
+    if (goodId && parseId(p.id)?.form !== "passage") problems.push(`${passage} breaks the passage id rule: use ${PASSAGE_ID_RULE}; this id has ${p.id.length}`);
     if (!p.text) problems.push(`${passage} has no text; an approved passage holds text, and only Not public may be empty`);
     if (p.text.length > PASSAGE_CHARACTERS) problems.push(`${passage} has ${p.text.length} characters; an approved passage holds at most ${PASSAGE_CHARACTERS}`);
   }
-  // What it found is not shown: it is the very material Not public keeps out.
-  if (ANY_URL.test(source.notPublic)) problems.push('Not public holds a URL; it names kinds of material only, such as "internal links"');
+  // No message shows what it found: that is the material Not public keeps out.
+  if (NOT_PUBLIC_LINKS.some((link) => link.test(source.notPublic))) {
+    problems.push('Not public holds a URL or an IP address; it names kinds of material only, such as "internal links"');
+  }
   if (EMAIL_ADDRESS.test(source.notPublic)) problems.push('Not public holds an email address; it names kinds of material only, such as "colleague names"');
   return problems;
 }
@@ -187,9 +199,10 @@ function catalogEntry(source: Source): Entry {
 /** Every id in the knowledge base, each core entry's and each passage's, follows the id rules and is used once. */
 function checkIds(core: Entry[], sources: Source[]): void {
   const seen = new Set<string>();
+  // For passage ids this is a backstop no file can reach today: checkSource() stops a bad one first, and file names keep source ids apart.
   for (const id of [...core.map((e) => e.id), ...sources.flatMap((s) => s.passages.map((p) => p.id))]) {
-    if (!parseId(id)) throw new KnowledgeError("knowledge", `id "${id}" does not follow the id rules`);
-    if (seen.has(id)) throw new KnowledgeError("knowledge", `id "${id}" is used twice`);
+    if (!parseId(id)) throw new KnowledgeError("knowledge", `id ${JSON.stringify(id)} does not follow the id rules`);
+    if (seen.has(id)) throw new KnowledgeError("knowledge", `id ${JSON.stringify(id)} is used twice`);
     seen.add(id);
   }
 }
