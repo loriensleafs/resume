@@ -1,6 +1,6 @@
 # Spec: site
 
-Approved by Peter on 2026-10-27. Amended (the resume view's ⋯ menu, `openResume()`, the optional citation number, the app bar's end slot, the route files as the only place site and chat meet, design-system parts for sheets and the menu) and approved again the same day ([interview record](../docs/design/interview-2026-10-26.md) rows 81 and 85 to 106).
+Approved by Peter on 2026-10-27. Amended (the resume view's ⋯ menu, `openResume()`, the optional citation number, the app bar's end slot, the route files as the only place site and chat meet, design-system parts for sheets and the menu) and approved again the same day ([interview record](../docs/design/interview-2026-10-26.md) rows 81 and 85 to 106). Amended again on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (row 127): Nitro's Vercel output, build-time data for the pages, the policy tags, the static not-found page, the service worker's network-first navigations and the committed documents ([decision 0023](../docs/decisions/0023-static-site-build-time-data.md)).
 
 ## Objective
 
@@ -10,7 +10,9 @@ The site is the shell. The chat column's contents belong to the chat module ([SP
 
 Acceptance criteria:
 
-- `bun run build:site` writes the site to `dist/client/`. It prerenders `/`, `/resume` and `/sources/<id>` for every approved source. Each page reads without JavaScript.
+- `bun run build:site` writes Nitro's Vercel output, `.vercel/output/`, in every environment; the pages are in `.vercel/output/static/`. It prerenders `/`, `/resume` and `/sources/<id>` for every approved source. Each page reads without JavaScript.
+- No page and no server function runs at request time ([decision 0023](../docs/decisions/0023-static-site-build-time-data.md)). Loaders get their data from a module made at build time, so a click between pages needs no server, online or offline. Every other path gets the static not-found page with status 404.
+- Every HTML file meets SPEC-deploy's Content Security Policy: it starts with its own policy tag, which lists the hashes of its inline scripts, and holds no `style` attribute.
 - Every resume fact on the site comes from `resume.yaml` through the content module's loader, `public` variant. Every source text comes from `buildKnowledge()`. No page copies a fact by hand, and no file holds a private detail.
 - A source page shows every passage of the source and never its `Not public` section. No page lists the sources for browsing (decision 0015); source pages are reached from citations, the "Open beside the chat" link, the sitemap and shared links.
 - On a wide screen the workspace shows the app bar, the career timeline band, the chat column and the document panel, as in the mockups. Below 1024 px it shows one column, and the resume and sources open as sheets.
@@ -54,9 +56,10 @@ The approved mockups are the reference for every view. The image index names eac
 | `/?role=<role id>` | The workspace with that role selected and the resume at it |
 | `/resume` | The standalone resume page |
 | `/sources/<source id>` | The standalone source page; each passage has the anchor `#<source id>.<n>` |
-| `/Peter-Kloss-Resume.pdf`, `.docx`, `.txt` | The public documents from the content module |
+| `/Peter-Kloss-Resume.pdf`, `.docx`, `.txt` | The public documents, committed in `documents/` ([SPEC-deploy](SPEC-deploy.md)) |
+| Any other path, `/sources/<unknown id>` included | The not-found page, status 404 |
 
-An unknown source or role id gives the first view, not an error. A citation to an id that no longer exists shows as plain text (SPEC-knowledge).
+An unknown source or role id in a query (`?source=`, `?role=`) gives the first view, not an error. An unknown path, `/sources/<unknown id>` included, gets the not-found page with status 404: "Page not found" with links to the chat and to the resume, and no script. Peter approves its wording. A citation to an id that no longer exists shows as plain text (SPEC-knowledge).
 
 ## Saved views
 
@@ -79,7 +82,7 @@ type SavedViews = {
 
 ## Offline
 
-A Bun script runs `generateSW` from `workbox-build` on `dist/client/` after the Vite build ([research 09](../docs/research/09-site-feasibility.md)). The precache holds every prerendered page under its clean address, the JavaScript and CSS, the fonts, the icons and the three documents. A new version installs in the background and takes over on the next visit; the site shows no update prompt. The chat's behavior offline is the chat module's ([decision 0010](../docs/decisions/0010-offline-chat.md)).
+A Bun script runs `generateSW` from `workbox-build` on `.vercel/output/static/` after the Vite build ([research 09](../docs/research/09-site-feasibility.md)). The precache holds every prerendered page under its clean address, the not-found page, the JavaScript and CSS, the fonts, the icons and the three documents. A navigation to a page that is not precached goes to the network first, and gets the not-found page only when the network fails. Workbox's `navigateFallback` alone would show the not-found page for such a navigation also online, for example for a source page that a release has just added. `/api/` is never a navigation fallback. The worker's registration is a script file, not an inline script. A new version installs in the background and takes over on the next visit; the site shows no update prompt. The chat's behavior offline is the chat module's ([decision 0010](../docs/decisions/0010-offline-chat.md)).
 
 ## Tech Stack
 
@@ -90,7 +93,8 @@ Versions checked on 2026-10-26 ([research 05](../docs/research/05-framework-supp
 - `@acmelabs/design-system-react` 0.3.2 and its tokens. Its parts render in the browser only ([decision 0007](../docs/decisions/0007-tanstack-start-pwa.md)): prerendered pages hold plain semantic HTML styled with the design system's tokens, and the parts upgrade after load. Each part is imported on its own, not from one bundle.
 - `@tanstack/react-db` 0.5.12 (`@tanstack/db` 0.15.2) for the saved views.
 - `workbox-build` 7.4.1 for the service worker.
-- Google Sans Flex served from the site itself, a Latin subset of the variable font (weights 400 to 700) cut with `harfbuzzjs`. No request to Google Fonts or any other third party.
+- Google Sans Flex served from the site itself, a Latin subset of the variable font (weights 400 to 700) cut with `harfbuzzjs`. No request to Google Fonts or any other third party. The cut font files are committed, so the Vercel build downloads nothing.
+- Prerendered Markdown renders with `@tanstack/markdown/react`. Its `components` option for `th` and `td` turns a column's alignment into a class, because a `style` attribute breaks the policy.
 - Dev: `playwright` (driving Chromium under Bun) and `axe-core` for the browser test.
 
 Approving this spec approves adding these dependencies.
@@ -100,8 +104,8 @@ Approving this spec approves adding these dependencies.
 ```sh
 bun install               # first time
 bun run dev               # Vite dev server for the site at http://localhost:3000
-bun run build:site        # public documents, Vite build with prerendering, icons, fonts, service worker → dist/client/
-bun run preview           # serves dist/client/ at http://localhost:4173, as the host would
+bun run build:site        # copies documents/; Vite build with prerendering, icons, fonts, service worker, policy tags, the not-found page and the routes → .vercel/output/
+bun run preview           # serves .vercel/output/ at http://localhost:4173 with its routes, headers and status codes, as Vercel does
 bun test tests/site       # this module's tests: the build output and the browser test
 bun test                  # every test
 bun run build             # the documents only, unchanged (content module)
@@ -116,15 +120,15 @@ src/site/shell/              AppBar, CareerTimeline, DocumentPanel, ResumeView, 
 src/site/workspace.ts        the workspace contract the chat module reads
 src/site/saved-views.ts      the saved views in IndexedDB
 src/site/suggested-questions.ts  the first view's suggested questions, overall and per role
-src/site/data.ts             server functions that read resume.yaml and buildKnowledge() at build time
+src/site/data.ts             the pages' data: a Vite module made at build time from resume.yaml and buildKnowledge(), public text only
 src/site/styles/             tokens import, fonts, layout
 src/site/build.ts            buildSite({ root, outDir }): the module's one entry point
 scripts/build-site.ts        `bun run build:site`: a thin wrapper around buildSite()
-scripts/preview-site.ts      `bun run preview`: Bun.serve over dist/client/ with clean addresses
+scripts/preview-site.ts      `bun run preview`: Bun.serve over .vercel/output/ with the routes of its config.json
 vite.config.ts               TanStack Start, React and prerender settings
 tests/site/build.test.ts     seam 1: the build output
 tests/site/browser.test.ts   seam 2: the real-browser test
-dist/client/                 site output; ignored by git
+.vercel/output/              site output; ignored by git
 ```
 
 ## Code Style
@@ -169,7 +173,9 @@ export function useWorkspace(): Workspace;
    - Every highlight in `resume.yaml` appears as text in `/` and `/resume`, with its knowledge id on its element. Every passage of a source appears on its page with its anchor; its `Not public` text appears in no file.
    - No file under the output holds the fake phone number.
    - The web manifest has the name, `start_url` `/`, `scope` `/`, `display` `standalone`, and PNG icons of 192, 512 and maskable 512 px.
-   - The service worker's precache lists every page under its clean address, the fonts, the icons and the three documents.
+   - The service worker's precache lists every page under its clean address, the not-found page, the fonts, the icons and the three documents.
+   - Each HTML file starts with a policy tag that lists exactly the hashes of its own inline scripts, and no file holds a `style=` attribute.
+   - The not-found page `404.html` exists and has no script.
    - The JavaScript that `/` loads before interaction, gzip-compressed, is under 200 KB.
    - Each page has a title, a description, a canonical address on `https://peterkloss.dev`, and Open Graph tags; the sitemap lists every page.
 2. **One real-browser test.** Playwright drives Chromium under Bun against `bun run preview`:
@@ -178,14 +184,15 @@ export function useWorkspace(): Workspace;
    - Selecting a role on the timeline shows it in the resume and sets the scope. `/?source=<id>&passage=<n>` opens the source with the passage marked. A reload restores the tab, the source, the passage and the scope.
    - The dark theme survives a reload, set on the page before its first paint.
    - The resume view's ⋯ menu lists PDF, Word and Text, and each item fetches its document with a success status.
-   - After one visit, with the network off, `/`, `/resume`, a source page and the PDF load with no page errors, and a design-system part is upgraded.
+   - After one visit, with the network off, `/`, `/resume`, a source page and the PDF load with no page errors, and a design-system part is upgraded. A click from a source page to `/` shows the first view, and an unknown path shows the not-found page.
+   - On every page it visits, the test fails on any request to `/_serverFn/`, and on any Content Security Policy violation.
    - The service worker controls the page and the manifest is linked, so Chromium can install the site.
 
 ## Boundaries
 
 - **Always:** take every fact from `resume.yaml` and `buildKnowledge()`. Build to the approved mockups. Keep every page readable without JavaScript. Use the glossary's words and SPEC-knowledge's ids. Run `bun run build`, `bun run build:site` and `bun test` before a commit.
 - **Ask first:** a dependency not named in this spec; a change from the approved mockups; the wording of the suggested questions; a change to the workspace contract, because the chat module depends on it; any request to a third party (fonts, analytics, scripts).
-- **Never:** put private details or a source's `Not public` text in any output. Add a list of sources to browse. Store anything that identifies a visitor on a server (the chat's anonymous question log is [decision 0020](../docs/decisions/0020-anonymous-question-log.md)). Server-render design-system parts. Add Node or Python tooling. Commit `dist/`.
+- **Never:** put private details or a source's `Not public` text in any output. Add a list of sources to browse. Store anything that identifies a visitor on a server (the chat's anonymous question log is [decision 0020](../docs/decisions/0020-anonymous-question-log.md)). Server-render design-system parts. Run a page or a server function at request time. Add Node or Python tooling. Commit `dist/` or `.vercel/`.
 
 ## User Stories
 
@@ -228,7 +235,7 @@ export function useWorkspace(): Workspace;
 ## Out of scope
 
 - Everything inside the chat column apart from the first view's static text, and `/api/chat`: [SPEC-chat](README.md). That includes New chat, which calls the workspace's `reset()`.
-- The domains, redirects, hosting settings, security headers (which enforce "no third-party requests"), rate limits and CI: [SPEC-deploy](README.md).
+- The domains, redirects, hosting settings, security headers (which enforce "no third-party requests"), rate limits and CI: [SPEC-deploy](SPEC-deploy.md).
 - A page or menu that lists the sources ([decision 0015](../docs/decisions/0015-sources-on-demand.md)).
 - Accounts, server-side storage of visitors and analytics.
 - An update prompt for a new site version.

@@ -26,3 +26,4 @@ These records explain the choices behind this repository and their reasons. Numb
 | [0020](0020-anonymous-question-log.md) | The chat keeps an anonymous log of the questions it gets |
 | [0021](0021-chat-turn-workflow.md) | Each chat turn is a fixed workflow with one bounded read loop |
 | [0022](0022-question-log-store.md) | The question log lives in Upstash Redis, pay as you go, with one list per day that expires |
+| [0023](0023-static-site-build-time-data.md) | The site is static files with build-time data; only the three API routes run as functions |

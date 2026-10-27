@@ -1,6 +1,6 @@
 # Spec: chat
 
-Approved by Peter on 2026-10-27. Amended after an audit with the missing brain skills and the design system's skills and MCP server, and approved again the same day ([interview record](../docs/design/interview-2026-10-26.md) rows 85 to 106).
+Approved by Peter on 2026-10-27. Amended after an audit with the missing brain skills and the design system's skills and MCP server, and approved again the same day ([interview record](../docs/design/interview-2026-10-26.md) rows 85 to 106). Amended again on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (row 127): the turn's budget, the limit state, the request caps, the Origin check, the usage fields, and the read tool staying listed.
 
 ## Objective
 
@@ -11,13 +11,14 @@ This module owns the `/api/chat` route and everything inside the chat column apa
 Acceptance criteria:
 
 - Each turn follows one fixed workflow in code with one bounded read loop (Peter, [interview record](../docs/design/interview-2026-10-26.md) row 82; [decision 0021](../docs/decisions/0021-chat-turn-workflow.md)). The model chooses only whether to read, which sources, and the answer text.
-- Code stops the fourth read in a turn, and removes the read tool after the third.
+- Code stops the fourth read in a turn. The read tool stays listed, so the cached tool list never changes within a turn.
 - An answer keeps a citation only when its id is a resume entry, a logistics answer or a passage read in the same turn. Every other marker is removed before the text reaches the browser.
 - A question outside the chat's scope, or one the knowledge base does not cover, gets a refusal that points to Peter's email ([decisions 0009](../docs/decisions/0009-chat-scope.md), [0019](../docs/decisions/0019-wider-chat-scope.md)).
 - A pasted job description gets the fit check: each requirement with the matching record and its citations, or "not in Peter's record"; no verdict on fit (row 80).
 - A request for the resume opens the whole resume beside the chat, with a card in the answer that opens it again (row 81).
 - The conversation, the queued questions and the "Answers for" choice are saved on the visitor's device and restored on return ([decision 0017](../docs/decisions/0017-saved-visitor-session.md)). Offline, questions queue and send when the connection returns ([decision 0010](../docs/decisions/0010-offline-chat.md)).
 - The server keeps one anonymous question-log entry per turn, with no visitor identity ([decision 0020](../docs/decisions/0020-anonymous-question-log.md)).
+- At the day's cost cap or Anthropic's monthly limit, a turn shows a "limit reached" state, not a retry, also after a reload ([SPEC-deploy](SPEC-deploy.md)).
 - Every chat state in the approved mockups works as drawn ([mockups](../docs/design/mockups/README.md)).
 - `bun test tests/chat` and the chat part of `bun test tests/site` pass with the fake model. `bun run evals` passes every deterministic check, and Peter reviews its answers.
 
@@ -28,13 +29,14 @@ A turn is one question and its answer, with the reads made for it.
 | # | Step | Chosen by | Result |
 |---|---|---|---|
 | 1 | The visitor sends a question, or the next queued question goes out | Code (browser) | `POST /api/chat` with the conversation and the request properties |
-| 2 | Check the request | Code (server) | A malformed request gets 400; a question over the limit gets 413. Neither calls the model or writes the log |
-| 3 | Build the model request | Code | The system prompt, the core with its catalog, the scope, audience and "about" lines, and the last turns |
-| 4 | Read, answer or refuse | Model | `read_sources` calls `readPassages()`; at most 3 reads |
-| 5 | Stream the answer | Model, streamed by code | Text with `[id]` markers, tool-call parts for the answer steps and cards |
-| 6 | Check the markers as they stream | Code | Citations kept or removed; refusal and follow-up markers taken out of the text |
-| 7 | Log | Code | One question-log entry, written after the run ends |
-| 8 | Save | Code (browser) | The turn in the saved conversation |
+| 2 | Check the request | Code (server) | A malformed request gets 400; a question or a request over its limit gets 413; a request from another site's page gets 403. None of them calls the model or writes the log |
+| 3 | Reserve the turn's budget | Code (server) | `budget.reserve()` ([SPEC-deploy](SPEC-deploy.md)); at the day's cap or the month's limit, the answer is the limit stream, and the model is not called |
+| 4 | Build the model request | Code | The system prompt, the core with its catalog, the scope, audience and "about" lines, and the last turns |
+| 5 | Read, answer or refuse | Model | `read_sources` calls `readPassages()`; at most 3 reads |
+| 6 | Stream the answer | Model, streamed by code | Text with `[id]` markers, tool-call parts for the answer steps and cards |
+| 7 | Check the markers as they stream | Code | Citations kept or removed; refusal and follow-up markers taken out of the text |
+| 8 | Log | Code | One question-log entry and the turn's telemetry, written after the run ends |
+| 9 | Save | Code (browser) | The turn in the saved conversation |
 
 **The read loop.** The catalog's one-line summaries choose the first read. Example: "How did FedNow's bundle get under 1 MB?" The summary of `fednow-bundle-size` selects it. If the passages it returns name work that another catalog entry covers, the next read takes that id, for example `fednow-design-system`. If they answer the question, the model writes the answer.
 
@@ -46,7 +48,8 @@ A turn is one question and its answer, with the reads made for it.
 | The third read returns | The model answers from what it read, says what it could not check, and points to Peter's email | `answered` |
 | The visitor selects Stop | What arrived stays, marked "Answer stopped." | `stopped` |
 | The deadline passes, the model fails, or the stream breaks | "The answer didn't arrive." with Try again and Edit question; partial text is not kept | `error` |
-| The host's rate limit answers 429 | The same alert, with "Too many questions in a short time. Try again in a minute." | none (the function does not run) |
+| The host's rate limit answers 429 | The same alert, with "Too many questions in a short time. Try again in a few minutes." | none (the function does not run) |
+| The day's cost cap or Anthropic's monthly limit is reached | The "limit reached" state: Peter's email and a link that opens the resume, with no Try again. The question stays in the input, and the queue pauses. Peter approves the wording for the day and the month | `limit`; a refusal before the model call writes no log entry |
 
 A reload during an answer cannot rejoin the stream, because the server keeps no conversation. The restored conversation shows that question with the error alert.
 
@@ -57,6 +60,8 @@ Code enforces every limit; the system prompt only explains them to the model. Th
 ```ts
 export const turnLimits = {
   questionCharacters: 10_000, // fits a pasted job description
+  historyCharacters: 40_000,  // earlier turns sent, oldest dropped first (row 125)
+  requestBytes: 262_144,      // a larger request gets 413 REQUEST_TOO_LARGE (row 125)
   reads: 3,                   // read_sources calls per turn (Peter, 2026-10-27)
   modelCalls: 6,              // agentLoopStrategy: maxIterations(6), a ceiling above 3 reads + tools + answer
   answerTokens: 2_000,        // Anthropic max_tokens for each model call
@@ -69,10 +74,10 @@ export const turnLimits = {
 } as const;
 ```
 
-- **Reads.** A middleware counts `read_sources` calls. At 3, `onConfig` removes the tool for the next model call; a fourth call that still arrives is skipped with an error result. Each read returns at most 24,000 characters (`readPassages()`, [SPEC-knowledge](SPEC-knowledge.md)).
+- **Reads.** A middleware counts `read_sources` calls. A call after the third is skipped with an error result. The tool stays in the list: the tools come first in the cached prompt, so removing one would rewrite the whole cache ([SPEC-deploy](SPEC-deploy.md)). Each read returns at most 24,000 characters (`readPassages()`, [SPEC-knowledge](SPEC-knowledge.md)).
 - **Model calls.** `agentLoopStrategy: maxIterations(6)` bounds the loop as a whole.
-- **Deadline.** A timer on the run's `abortController` aborts it at 60 s, and the log records `error`, not `stopped`. [SPEC-deploy](README.md) sets the function's maximum duration above that.
-- **Conversation sent.** The server sends the model the last 20 turns. Read results of earlier turns go as their ids only, because a citation needs a read in the same turn ([decision 0016](../docs/decisions/0016-two-layer-knowledge.md)).
+- **Deadline.** A timer on the run's `abortController` aborts it at 60 s, and the log records `error`, not `stopped`. [SPEC-deploy](SPEC-deploy.md) sets the function's maximum duration above that.
+- **Conversation sent.** The server sends the model the last 20 turns, and at most 40,000 characters of them, oldest dropped first. Read results of earlier turns go as their ids only, because a citation needs a read in the same turn ([decision 0016](../docs/decisions/0016-two-layer-knowledge.md)).
 
 ## The request
 
@@ -89,10 +94,16 @@ export const ChatProps = z.strictObject({
 A rejected request gets one error shape, with no detail of the server's insides:
 
 ```ts
-type ChatError = { error: { code: "INVALID_REQUEST" | "QUESTION_TOO_LONG"; message: string } };
-// 400 INVALID_REQUEST, 413 QUESTION_TOO_LONG. The browser maps 400, 413, 429, 5xx and a network
-// failure to its alert text; a stream error arrives as TanStack AI's RUN_ERROR event.
+type ChatError = {
+  error: { code: "INVALID_REQUEST" | "QUESTION_TOO_LONG" | "REQUEST_TOO_LARGE" | "FORBIDDEN_ORIGIN"; message: string };
+};
+// 400 INVALID_REQUEST, 413 QUESTION_TOO_LONG or REQUEST_TOO_LARGE, 403 FORBIDDEN_ORIGIN. The browser maps
+// 400, 403, 413, 429, 5xx and a network failure to its alert text; a stream error arrives as TanStack AI's
+// RUN_ERROR event.
 ```
+
+- **Limits.** A refusal by `budget.reserve()` is not a `ChatError`, because TanStack AI's browser client does not read the body of a response that is not 200. It is an HTTP 200 stream with one `RUN_ERROR` event whose code is `DAILY_LIMIT` or `SPEND_LIMIT`, so the browser makes an answer message for it. A turn that meets Anthropic's limit during the run also ends with `RUN_ERROR` and `SPEND_LIMIT`. The handler finds that limit from the Anthropic error's status and body, not its message text ([SPEC-deploy](SPEC-deploy.md)).
+- **Origin.** In production the handler accepts a request whose `Origin` header is `https://peterkloss.dev` or the deployment's own address (`https://$VERCEL_URL`); elsewhere, the request's own origin. Any other origin gets 403 `FORBIDDEN_ORIGIN`, so another site's page cannot spend the chat's budget through its visitors' browsers. A request with no `Origin` header passes this check; the rate limits and the cap still apply to it.
 
 - **Trust.** Every message in the request is visitor material, the earlier answers included: the browser holds the conversation, so a visitor can edit it. Earlier reads go to the model as ids only, so edited source text never reaches it. The question and a pasted posting are material to answer from, never instructions.
 - **`threadId`** is a random id (a UUID) the browser makes for each conversation. New chat makes a new one. The server uses it only for prompt caching; it never reaches the log.
@@ -183,6 +194,7 @@ When the chat column is narrower than 520 px (phones), the control is the design
 | Stopped | On | "Answer stopped." under what arrived |
 | Offline | Queue (cloud-off icon) | Enter queues the question |
 | Error | On | The alert takes the answer's place: Try again resends; Edit question puts it back in the input |
+| Limit reached | On | The "limit reached" state takes the answer's place, with no Try again. The question stays in the input, and the queue pauses until the visitor sends again |
 
 **Queued questions** (Peter, rows 88 to 90). Each queued question shows as an ordinary question message with a clock icon before its text, at the end of the conversation, after the answer that is still streaming, in the order it will send. Its action row is always visible: in place of how long ago, when it sends ("Sends when this answer finishes" or "Sends when you're back online"), then Send now (only while an answer streams), Edit and Remove. Send now stops the current answer, which stays, marked stopped, and sends that question at once; the other queued questions keep their order. Edit puts the question back in the input and takes it off the queue, as the Up arrow does in an empty input for the latest queued question (row 59). When a queued question sends, its clock goes away and its answer appears under it.
 
@@ -220,7 +232,7 @@ type SavedConversation = {
     removed: number;
     refusal: "out-of-scope" | "not-covered" | null;
     followUps: string[];
-    outcome: "answered" | "stopped" | "error";
+    outcome: "answered" | "stopped" | "error" | "limit";
   }>;
   audience: "recruiter" | "manager" | "engineer" | "designer" | "product" | null;
   updatedAt: string;
@@ -245,38 +257,41 @@ type QuestionLogEntry = {
   read: string[];       // source and passage ids read this turn
   citations: string[];  // kept citations
   removed: number;      // markers the check removed
-  outcome: "answered" | "refusal:out-of-scope" | "refusal:not-covered" | "stopped" | "error";
+  outcome: "answered" | "refusal:out-of-scope" | "refusal:not-covered" | "stopped" | "error" | "limit";
 };
 
 export type QuestionLog = { append(entry: QuestionLogEntry): Promise<void>; list(days: number): Promise<QuestionLogEntry[]> };
 ```
 
 - No IP address, `threadId`, scope, audience, cookie or other saved-session data (decision 0020).
-- [SPEC-deploy](README.md) supplies the store and deletes entries after 90 days. Tests use an in-memory `QuestionLog`.
-- `bun run questions` prints the last 7 days, newest first, with a count per outcome and the most read sources. It needs the store's credentials from SPEC-deploy.
+- A turn refused before the model call writes no entry. A turn that meets Anthropic's limit during the run writes one with `limit`.
+- [SPEC-deploy](SPEC-deploy.md) supplies the store and deletes entries after 90 days. Tests use an in-memory `QuestionLog`.
+- `bun run questions` prints the last 7 days, newest first, with a count per outcome and the most read sources, then the daily totals and the day's and the month's cost against the cap and the limit. It reads the store with the read-only token from Peter's `.secrets/local.env` ([SPEC-deploy](SPEC-deploy.md)).
 - A failed write never breaks the answer.
 
 ## Turn telemetry
 
-So that Peter can tell whether the chat works and what it costs, the server writes one structured log line per turn, from the terminal middleware hook, with `onUsage` for the tokens:
+So that Peter can tell whether the chat works and what it costs, the server writes one structured log line per turn, from the terminal middleware hook. The tokens come from `onUsage` when the run finishes, or from the `RUN_ERROR` event when it ends in a stop, `max_tokens` or an error; the counts are `null` when neither has them:
 
 ```ts
 type ChatTurnEvent = {
   event: "chat_turn";
-  outcome: QuestionLogEntry["outcome"] | "rejected";
+  outcome: QuestionLogEntry["outcome"] | "rejected";   // "limit" also for a refusal before the model call
   reads: number;
   citations: number;
   removed: number;
   modelCalls: number;
-  inputTokens: number;
-  cachedInputTokens: number;
-  outputTokens: number;
+  inputTokens: number | null;        // uncached input only
+  cachedInputTokens: number | null;  // cache reads
+  cacheWriteTokens: number | null;   // all cache writes, the 1-hour ones included
+  cacheWrite1hTokens: number | null;
+  outputTokens: number | null;
   durationMs: number;
-  errorCode: string | null;  // the model API's error code or "DEADLINE"; never a message or stack trace
+  errorCode: string | null;  // the model API's code, "DEADLINE", "MAX_TOKENS", "DAILY_LIMIT" or "SPEND_LIMIT"; never a message or stack trace
 };
 ```
 
-It holds no question text, `threadId`, IP address or other visitor data. The question log and this line answer different questions: what visitors ask, and whether the chat is healthy. [SPEC-deploy](README.md) decides where the line goes, how long it stays, and what alerts on it.
+It holds no question text, `threadId`, IP address or other visitor data. The question log and this line answer different questions: what visitors ask, and whether the chat is healthy. The handler hands each event, with its reservation, to `telemetry.record()` from [SPEC-deploy](SPEC-deploy.md), which prints the line, adds it to the daily totals and decides what alerts on it.
 
 ## Evals
 
@@ -301,25 +316,25 @@ The cases cover: each out-of-scope topic; an employer, project or skill not in t
 
 Versions checked on 2026-10-27 from the published packages.
 
-- `@tanstack/ai` 1.0.0, `@tanstack/ai-react` 1.0.0 and `@tanstack/ai-anthropic` 1.0.0, all on 1.0 together ([research 07](../docs/research/07-tanstack-ai-hosting-model.md)). The adapter is `anthropicText("claude-sonnet-5-5")` ([decision 0013](../docs/decisions/0013-claude-sonnet-model.md)); answers stream as server-sent events (`toServerSentEventsResponse`).
-- `fakeText()` from `@tanstack/ai/testing` scripts the model in tests and in the preview with `CHAT_FAKE=1`.
+- `@tanstack/ai` 1.0.0, `@tanstack/ai-react` 1.0.0 and `@tanstack/ai-anthropic` 1.0.0, all on 1.0 together ([research 07](../docs/research/07-tanstack-ai-hosting-model.md)). The adapter is `anthropicText("claude-sonnet-5-5")` ([decision 0013](../docs/decisions/0013-claude-sonnet-model.md)); answers stream as server-sent events (`toServerSentEventsResponse`). The route sets `promptCache: "short"` explicitly, a 5-minute cache.
+- `fakeText()` from `@tanstack/ai/testing` scripts the model in tests and in the preview with `CHAT_FAKE=1`. Outside production, the route always uses it, whatever variables are set; production ignores `CHAT_FAKE`.
 - `@tanstack/markdown` 0.0.13, the version the design system already depends on, as a direct dependency, to render answers with the rules in "Rendering answers".
 - The site's stack from [SPEC-site](SPEC-site.md): TanStack Start, React, `@tanstack/react-db`, `@acmelabs/design-system-react`, zod.
-- The API key is `ANTHROPIC_API_KEY`: in the host's settings ([SPEC-deploy](README.md)) and in Peter's untracked `.env` for evals. Agents never read, print or store it.
+- The API key is `ANTHROPIC_API_KEY`: in the host's settings ([SPEC-deploy](SPEC-deploy.md)) and, for evals, the `resume-evals` key in Peter's untracked `.secrets/local.env`, which `bun run evals` loads with `--env-file`. No `.env` file is ever created ([SPEC-deploy](SPEC-deploy.md)). Agents never read, print or store it.
 
 Approving this spec approves adding these dependencies.
 
 ## Commands
 
 ```sh
-bun run dev                        # the site with the chat; needs ANTHROPIC_API_KEY, or CHAT_FAKE=1
+bun run dev                        # the site with the chat and the fake model
 bun run build:site                 # also bundles the knowledge base with the route and writes the device index
 CHAT_FAKE=1 bun run preview        # the built site with the fake model, as the browser test uses it
 bun test tests/chat                # seam 1: the handler
 bun test tests/site                # seam 2: the build output and the browser test, chat included
 bun test                           # every test
 bun run evals                      # the trick questions against the real model; costs money; Peter approves each run
-bun run questions                  # the question log, last 7 days
+bun run questions                  # the question log, daily totals and costs, last 7 days; loads .secrets/local.env
 ```
 
 ## Project Structure
@@ -347,7 +362,7 @@ tests/chat/fixtures.ts             scripted model turns, shared with the preview
 tests/site/browser.test.ts         seam 2, extended with the chat
 ```
 
-A Vite plugin in `vite.config.ts` gives the server route the module `virtual:knowledge`: the `buildKnowledge()` output at build time, bundled with the function, so it reads no source files at run time. `buildSite()` also writes `dist/client/device-index.json`: the labels and text of resume entries, logistics answers and passages, never `Not public` text. The browser fetches it when the input first gets focus, so it stays out of the first-load JavaScript, and the service worker precaches it.
+A Vite plugin in `vite.config.ts` gives the server route the module `virtual:knowledge`: the `buildKnowledge()` output at build time, bundled with the function, so it reads no source files at run time. `buildSite()` also writes `.vercel/output/static/device-index.json`: the labels and text of resume entries, logistics answers and passages, never `Not public` text. The browser fetches it when the input first gets focus, so it stays out of the first-load JavaScript, and the service worker precaches it.
 
 ## Code Style
 
@@ -358,20 +373,18 @@ export type ChatDeps = {
   adapter: AnyTextAdapter;     // anthropicText("claude-sonnet-5-5"), or fakeText()
   knowledge: Knowledge;        // virtual:knowledge in the route; fixtures in tests
   log: QuestionLog;
+  budget: Ops["budget"];       // SPEC-deploy; tests pass an in-memory one
+  telemetry: Ops["telemetry"]; // SPEC-deploy; prints the chat_turn line and adds it to the daily totals
   now(): Date;
 };
 
 export function handleChat(request: Request, deps: ChatDeps): Promise<Response>;
 
-/** The read budget: code, not the prompt, stops the fourth read. */
+/** The read budget: code, not the prompt, stops the fourth read. The tool stays listed, so the cached tools never change. */
 export function readBudget(max = turnLimits.reads): ChatMiddleware {
   let reads = 0;
   return {
     name: "read-budget",
-    onConfig: (ctx, config) =>
-      ctx.phase === "beforeModel" && reads >= max
-        ? { tools: config.tools.filter((tool) => tool.name !== "read_sources") }
-        : undefined,
     onBeforeToolCall: (_ctx, call) =>
       call.toolName === "read_sources" && ++reads > max
         ? { type: "skip", result: { error: "The read limit for this question is reached." } }
@@ -390,11 +403,15 @@ export function readBudget(max = turnLimits.reads): ChatMiddleware {
 1. **The handler.** `handleChat()` with `fakeText()`, the real knowledge built from fixtures, and the in-memory log. The tests read the server-sent events and the log:
    - An answer with no read keeps a resume citation and writes one `answered` entry with no `threadId`.
    - A read then an answer keeps a citation to a read passage and removes one to an unread passage; `chat.citations` reports 1 removed.
-   - Four scripted reads: the fourth is skipped, and the next model call has no `read_sources` tool.
+   - Four scripted reads: the fourth is skipped, and every model call in the turn has the same tools.
    - An `about` passage id makes the first call a read that includes it.
    - Refusal and follow-up markers leave the text; the log has the refusal outcome; a third follow-up is dropped.
    - `open_source` with an id that was never cited returns an error; with a cited id it returns `opened`.
-   - A question of 10,001 characters gets 413, no model call and no log entry; a malformed body gets 400.
+   - A question of 10,001 characters gets 413, no model call and no log entry; a malformed body gets 400; a request over 256 KB gets 413 `REQUEST_TOO_LARGE`; `Origin: https://example.com` gets 403 `FORBIDDEN_ORIGIN`.
+   - Earlier turns over 40,000 characters: the oldest are dropped first.
+   - A `budget` that refuses gives a 200 stream with one `RUN_ERROR` event and its code, no model call and no log entry.
+   - An Anthropic spend-limit error, built with the SDK's error class and the documented bodies, ends the stream with `SPEND_LIMIT` and writes a `limit` entry.
+   - A stopped turn hands its `RUN_ERROR` usage to telemetry; the response ends only after the log and telemetry writes.
    - A model error gives `RUN_ERROR` and an `error` entry; an aborted request gives a `stopped` entry; the deadline aborts the run.
    - Twenty-five turns of history: the model receives 20, and earlier reads as ids only, also when the request carries edited read text.
    - A rejected request's body has the `ChatError` shape. Each turn writes one `chat_turn` line with no question text and no `threadId`.
@@ -404,6 +421,7 @@ export function readBudget(max = turnLimits.reads): ChatMiddleware {
    - A scripted answer with an outside image and an outside link shows the image's alt text and the link's text only; a link to peterkloss.dev stays a link; raw HTML shows as text.
    - Offline: the button reads Queue, the question queues, survives a reload, and sends when the network returns.
    - Stop keeps the partial answer as stopped. A scripted error shows the alert; Try again resends; Edit question fills the input.
+   - A scripted limit refusal shows the "limit reached" state with no Try again, also after a reload, and the queue pauses.
    - "Can I see his resume?" opens the Resume tab at its top and shows the resume card.
    - A reload restores the conversation at the latest answer with no notice, the first view never shows first, and layout shift stays under 0.1. New chat, confirmed, empties the database and keeps the theme.
    - A keyboard-only pass: Tab reaches the input, Enter sends, Stop, Send now, a citation and New chat work from the keyboard, and focus returns to New chat when its dialog closes.
@@ -470,10 +488,12 @@ export function readBudget(max = turnLimits.reads): ChatMiddleware {
 48. As a visitor, I want "Send now" on a queued question, so that I can skip the rest of a long answer.
 49. As a visitor, I want answers to show no outside images or links, so that a pasted posting cannot send me to a page Peter did not choose.
 50. As Peter, I want one log line per turn with its outcome, tokens and duration, so that I see failures and cost without reading visitors' questions.
+51. As a visitor when the chat's budget is spent, I want a "limit reached" message with Peter's email and the resume, also after a reload, so that I can still reach him.
+52. As Peter, I want a stopped or cut-off answer to count its real tokens, so that the daily cap and the estimates are not too low.
 
 ## Out of scope
 
-- Hosting, the rate limit, the spend limit, the log's store and its 90-day deletion, the function's duration and CI: [SPEC-deploy](README.md).
+- Hosting, the rate limit, the spend limit, the log's store and its 90-day deletion, the function's duration and CI: [SPEC-deploy](SPEC-deploy.md).
 - The first view's static text, the document panel, the resume and source views, and the download menu: [SPEC-site](SPEC-site.md).
 - Writing or approving sources: [SPEC-knowledge](SPEC-knowledge.md).
 - Search over the knowledge base (embeddings, a vector index); a keyword search comes only if the catalog outgrows the core budget.
@@ -481,7 +501,7 @@ export function readBudget(max = turnLimits.reads): ChatMiddleware {
 - An on-device model, accounts, a list of past conversations, voice input, file uploads, and cards other than the resume card.
 - Rejoining an answer that was streaming during a reload.
 - A notice for a returning visitor (the earlier "Welcome back" notice is dropped, row 92).
-- Security headers, where the turn telemetry goes, and alerts: [SPEC-deploy](README.md).
+- Security headers, where the turn telemetry goes, and alerts: [SPEC-deploy](SPEC-deploy.md).
 
 ## Prior-art tests
 

@@ -1,6 +1,6 @@
 # Spec: deploy
 
-Draft four for Peter's review, 2026-10-27. Peter's answers are rows 107 to 126 of the [interview record](../docs/design/interview-2026-10-26.md); the facts are in [research 12](../docs/research/12-deploy-platform.md). Three adversarial reviews found 18, 16 and 39 issues. This draft answers all of them, with the local checks that the third review asked for (row 126). What only a real Vercel deployment can settle is the plan's first task, the [deploy spike](#deploy-spike).
+Approved by Peter on 2026-10-27 (interview row 127), with the amendments to other specs below. Peter's answers are rows 107 to 127 of the [interview record](../docs/design/interview-2026-10-26.md); the facts are in [research 12](../docs/research/12-deploy-platform.md); the static site with build-time data is [decision 0023](../docs/decisions/0023-static-site-build-time-data.md). Three adversarial reviews found 18, 16 and 39 issues. This version answers all of them, with the local checks that the third review asked for (row 126). What only a real Vercel deployment can settle is the plan's first task, the [deploy spike](#deploy-spike).
 
 ## Objective
 

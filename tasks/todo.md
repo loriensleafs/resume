@@ -43,5 +43,5 @@ Order (Peter, 2026-10-27): write and approve every remaining spec first (tasks 9
   - Verify: `bun run knowledge` lists the sources; `bun test`
 - [ ] 14. Write SPEC-chat.md (with the Agent Design plugin), then SPEC-deploy.md and SPEC-agents.md, each for Peter's review
   - [x] SPEC-chat.md, approved 2026-10-27 (interview row 84)
-  - [ ] SPEC-deploy.md
+  - [x] SPEC-deploy.md, approved 2026-10-27 (interview row 127); its first plan task is the deploy spike
   - [ ] SPEC-agents.md

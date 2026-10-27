@@ -4,7 +4,7 @@ Updated 2026-10-27. This file is the one current handoff. A fresh session resume
 
 ## Where we are
 
-- **Phase:** the mockups are approved (task 12). The knowledge module is being reworked for a much larger knowledge base. SPEC-site.md (task 9 in [tasks/todo.md](../tasks/todo.md)) can now be written from the mockups.
+- **Phase:** specs. SPEC-content, SPEC-knowledge, SPEC-site, SPEC-chat and SPEC-deploy are approved. Next come the adversarial reviews of the other specs, then SPEC-agents (task 14 in [tasks/todo.md](../tasks/todo.md)).
 - **Done:** `resume.yaml` and `private.yaml` build the public and private PDF, Word and text files; `bun test` passes 43 tests. The first knowledge module is built: nine approved deep dives and four approved logistics answers, 46 entries, 31,275 characters.
 - **Decided 2026-10-26 and 2026-10-27:** deep dives become sources the chat opens on demand ([0015](decisions/0015-sources-on-demand.md)); two layers, a cached core in every request and full sources read through a server tool ([0016](decisions/0016-two-layer-knowledge.md)); the visitor's session is saved on their device with a "New chat" control ([0017](decisions/0017-saved-visitor-session.md)); the site lives at peterkloss.dev, with pkloss.dev and pwk.dev redirecting to it ([0018](decisions/0018-domains.md)). Also recorded (interview rows 29 and 30): the site offers to install itself and opens as a standalone app, and it needs an app icon. Research: [11](research/11-knowledge-tooling.md) (TanStack AI and Vercel's AI tools).
 - **Interview answers:** the chat history keeps no question-dialog answers. Peter supplied his own copy of the 2026-10-26 interview on 2026-10-27; it is kept word for word on this chat's private workspace branch (claude-sessions, `.scratch/resume/`), never in this repository, because it holds an internal Highspot link. His answers there come to about 2,560 words; the nine deep dives (3,924 words) keep nearly every fact from them, so more depth needs new material.
@@ -21,18 +21,21 @@ Updated 2026-10-27. This file is the one current handoff. A fresh session resume
   - the import cycle between site and chat is removed.
 
   The canvas is at version 44, and the images and branch sources follow it.
-- **Next:** all remaining specs before any more building (Peter, 2026-10-27). [SPEC-site](../spec/SPEC-site.md) and [SPEC-chat](../spec/SPEC-chat.md) are approved, with their amendments (row 106). Next is SPEC-deploy (hosting on Vercel Pro, the rate limit, the spend limit, the question log's store with 90-day deletion, the function's duration, CI and the domains), then SPEC-agents (task 14). Then the plan is rewritten for every module, and building resumes with task 11. The interviews (task 13) can run at any time. SPEC-chat, SPEC-deploy and SPEC-agents follow ([plan](../tasks/plan.md)).
+- **SPEC-deploy approved (task 14, 2026-10-27, interview row 127):** [SPEC-deploy](../spec/SPEC-deploy.md). Gated releases on Vercel Pro (CI, the audit and a release check in Chrome), static pages with build-time data and routes written after the build ([0023](decisions/0023-static-site-build-time-data.md)), the strict Content Security Policy, the WAF rules, an $8 daily cap with a $0.50 reservation per turn, Upstash for the question log and the daily totals ([0022](decisions/0022-question-log-store.md)), ntfy pushes for limit alerts, and two health checks that watch each other. Three adversarial reviews (18, 16 and 39 issues) were folded in. The amendments to SPEC-chat, SPEC-site and SPEC-content are applied. The probes are on the branch `prototype/csp-probe`; facts in [research 12](research/12-deploy-platform.md).
+- **Next:** adversarial reviews of SPEC-knowledge, SPEC-site and SPEC-chat in parallel, plus a cross-spec pass (row 123); Peter decides each finding. Then SPEC-agents (task 14), then the plan is rewritten for every module, with the deploy spike as its first task, and building resumes with task 11. The interviews (task 13) can run at any time.
 - **Open issues:** [01](../.scratch/knowledge/issues/01-markdown-parsers.md) names the streaming Markdown parsers once Peter hears from his former boss; [02](../.scratch/knowledge/issues/02-testing-harness-details.md) confirms the FedNow testing harness with a former colleague.
 
 ## Waiting on Peter
 
+- Wordings to approve later, with the system prompt: the "limit reached" texts (day and month), the 429 text "Try again in a few minutes", and the not-found page's text.
+- For the deploy spike, when the plan reaches it: a second, throwaway Vercel project from the branch `prototype/deploy-spike` and a pay-as-you-go Upstash database for it (cents). Each push to it needs your approval.
 - Buy peterkloss.dev, pkloss.dev and pwk.dev when ready, at a registrar or through Vercel ([0018](decisions/0018-domains.md)). Agents never buy.
 - Add `.mcp.json` and `.claude/settings.json` for Claude Code, from the README section "Working with AI agents" ([decision 0014](decisions/0014-library-skills-and-docs-mcp.md)). An agent's safety check blocks agents from writing their own configuration.
 - Run `bun install` in `~/Dev/resume`, so Intent and the docs MCP server work there.
-- Vercel Pro sign-up and an Anthropic API key with a workspace spend limit, when the deploy module starts ([0012](decisions/0012-vercel-pro-host.md), [0013](decisions/0013-claude-sonnet-model.md)). Peter signs up and pays; agents never do.
+- Vercel Pro, the Anthropic workspaces and keys, Upstash and ntfy: follow the setup list in [SPEC-deploy](../spec/SPEC-deploy.md#setup-list), in its order, when the deploy module starts. You sign up and pay; agents never do.
 
 ## Working state
 
 - Repository: github.com/loriensleafs/resume, public since 2026-10-26, branch `main`.
 - Peter's local clone: `git clone https://github.com/loriensleafs/resume ~/Dev/resume`, then create `private.yaml` there (see README).
-- Nothing red. CI does not exist yet; it arrives with the deploy module.
+- Nothing red. CI does not exist yet; SPEC-deploy specifies it, and it is built with the deploy module.

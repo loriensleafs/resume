@@ -1,5 +1,7 @@
 # Spec: content
 
+Amended on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (interview row 127): the committed public documents in `documents/`.
+
 ## Objective
 
 Keep Peter's resume in one file, `resume.yaml`, and build every document from it. A recruiter gets a designed PDF, an editable Word file and a plain-text file. Hiring software (ATS) reads all three in order. The public files never contain the phone number.
@@ -13,6 +15,7 @@ Acceptance criteria:
 - The text file has no hard line wraps and uses `-` bullets.
 - No file in `dist/public/` contains the phone number. `resume.yaml` cannot hold a phone number; the build rejects it.
 - An invalid `resume.yaml` stops the build with a message that names the file and the field.
+- `bun run documents` writes the public documents to `documents/`, with `documents/inputs.sha256`, a hash of the inputs. It writes nothing when the hash is unchanged. The website serves these committed files, because Vercel's build has no Chrome ([SPEC-deploy](SPEC-deploy.md)). `tests/content/documents.test.ts` checks the hash, the page count, the fonts and the text of a fresh build, and, where `private.yaml` exists, that no committed document's extracted text holds the phone number.
 
 ## Tech Stack
 
@@ -26,7 +29,8 @@ Acceptance criteria:
 ```sh
 bun install                 # first time
 bun run build               # public files, plus private files when private.yaml exists
-bun run build --public      # public files only (the website and CI use this)
+bun run build --public      # public files only; CI runs `bun run build` to check that the documents still build
+bun run documents           # rebuilds the committed public documents in documents/ when their inputs changed
 bun test                    # all tests
 bun test tests/content      # this module's tests
 bun test --update-snapshots # after a deliberate content change; review the snapshot diff
