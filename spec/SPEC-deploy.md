@@ -346,10 +346,11 @@ export type OpsEnv = {
   KV_REST_API_TOKEN?: string;
   NTFY_TOPIC_URL?: string;      // https://ntfy.sh/<secret topic>
   ANTHROPIC_API_KEY?: string;   // only whether it is set is read, for status()
-  PREVIEW_LIMIT?: string;       // "day" or "month", outside production only: the in-memory budget refuses every
-                                // turn with DAILY_LIMIT or SPEND_LIMIT, so a preview and the browser tests can
-                                // show the "limit reached" state; empty counts as unset, any other value throws;
-                                // ignored in production, whatever its value
+  PREVIEW_LIMIT?: string;       // Outside production only. With "day", the in-memory budget refuses every turn
+                                // with DAILY_LIMIT. With "month", it refuses with SPEND_LIMIT. So a preview and
+                                // the browser tests can show the "limit reached" state. An empty value counts
+                                // as unset. Any other value throws, and the error shows at most 32 characters
+                                // of it. Production ignores this variable, whatever its value.
 };
 
 export type Ops = {
@@ -376,6 +377,7 @@ export function createOpsReader(env: { KV_REST_API_URL: string; KV_REST_API_READ
 ```
 
 - This module describes two route files, `src/site/routes/api.status.ts` and `src/site/routes/api.cron.health.ts`. SPEC-chat describes `api.chat.ts`, which builds `createOps(process.env)` and passes its `log`, `budget` and `telemetry` to `handleChat()` as `ChatDeps`. The route files are composition roots: they import both modules. This module imports the chat module's types and its in-memory versions, and the chat module never imports this one.
+- `createOps()` gives new, empty parts on each call. So each route file builds it once per function instance, at module scope, and every request of that instance uses the same `Ops`. The instance holds the in-memory log outside production; in production it holds the capped day and the once-a-day `storefail` push.
 
 **Store calls.**
 
