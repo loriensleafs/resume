@@ -135,6 +135,7 @@ bun run knowledge --draft <source id>   # prints a draft source file as the chat
 knowledge/sources/         one Markdown file per source (deep dives and interviews), approved or draft
 knowledge/logistics.yaml   logistics answers
 src/knowledge/ids.ts       the id grammar, shared by the build and readPassages()
+src/knowledge/types.ts     the types in Code Style, and no code: the renderers, the reads, the site and the chat import them without the build
 src/knowledge/parse.ts     parseSource(): front matter and passages of one source file
 src/knowledge/build.ts     buildKnowledge({ root }), publicKnowledge() and previewDraft(); every rule checked
 src/knowledge/render.ts    renderCore() and renderSource(): text with [id] markers
