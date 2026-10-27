@@ -9,6 +9,10 @@ const PASSAGE_ID_CHARACTERS = 64;
 
 /** How a slug is written, for error messages. */
 export const SLUG_RULE = `lowercase letters and digits, with single hyphens between them, at most ${SLUG_CHARACTERS} characters`;
+/** How a source id is written, for error messages: the rule isSourceId() checks. */
+export const SOURCE_ID_RULE = `a slug (${SLUG_RULE}), never "basics" or "education"`;
+/** How a passage id is written, for error messages. */
+export const PASSAGE_ID_RULE = `a passage id is <source id>.<n>, at most ${PASSAGE_ID_CHARACTERS} characters`;
 
 /** Every form an id can take, with its parts. */
 export type IdForm =
