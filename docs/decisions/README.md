@@ -1,0 +1,17 @@
+# Decision records
+
+These records explain the choices behind this repository and their reasons. Numbers are stable ids, not dates. Read a record when your task touches its subject; current requirements live in the [specs](../../spec/README.md).
+
+| Record | Subject |
+| --- | --- |
+| [0001](0001-facts-from-records.md) | Every fact comes from Peter or his records |
+| [0002](0002-html-css-print.md) | Design in HTML and CSS, printed to PDF by Chrome |
+| [0003](0003-print-rules-for-hiring-software.md) | Print rules that keep the PDF readable by hiring software |
+| [0004](0004-bun-only.md) | All tooling is Bun and TypeScript: no Node, no Python |
+| [0005](0005-yaml-source.md) | One YAML resume source in the JSON Resume shape |
+| [0006](0006-public-repo-private-details.md) | Public repository; private details stay out of git |
+| [0007](0007-tanstack-start-pwa.md) | The site is a TanStack Start progressive web app |
+| [0008](0008-grounded-knowledge-file.md) | The chat answers from an approved knowledge file, not a trained model |
+| [0009](0009-chat-scope.md) | Chat scope: resume facts plus approved logistics |
+| [0010](0010-offline-chat.md) | Offline, the chat keeps its history and queues new questions |
+| [0011](0011-word-and-text-documents.md) | The build also makes Word and text documents |

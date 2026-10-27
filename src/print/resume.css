@@ -1,0 +1,150 @@
+/* Google Sans Flex, cut into fixed weights so the PDF embeds real TrueType fonts. */
+@font-face { font-family: "GSF"; src: url("fonts/gsf-400.ttf") format("truetype"); font-weight: 400; font-style: normal; }
+@font-face { font-family: "GSF"; src: url("fonts/gsf-450.ttf") format("truetype"); font-weight: 450; font-style: normal; }
+@font-face { font-family: "GSF"; src: url("fonts/gsf-520.ttf") format("truetype"); font-weight: 520; font-style: normal; }
+@font-face { font-family: "GSF"; src: url("fonts/gsf-640.ttf") format("truetype"); font-weight: 640; font-style: normal; }
+@font-face { font-family: "GSF"; src: url("fonts/gsf-680.ttf") format("truetype"); font-weight: 680; font-style: normal; }
+
+:root {
+  /* Color */
+  --ink: #1f2328;        /* body text */
+  --ink-2: #3c4043;      /* titles */
+  --graphite: #5f6368;   /* dates, places, secondary */
+  --accent: #2f6fdb;     /* one blue: headline, section names, lead rule */
+  --hair: #dadce0;       /* not used for rules; reserved */
+
+  /* Type scale (pt) */
+  --t-name: 30pt;
+  --t-headline: 12.5pt;
+  --t-section: 11pt;
+  --t-company: 10.5pt;
+  --t-body: 9.5pt;
+  --t-meta: 9pt;
+
+  /* Spacing scale (pt) */
+  --s1: 2.5pt;   /* between bullets */
+  --s2: 4.5pt;   /* title row to bullets */
+  --s3: 8pt;   /* section name to first item */
+  --s4: 13pt;  /* between jobs */
+  --s5: 21pt;  /* before a section */
+}
+
+@page { size: Letter; margin: 0.55in 0.6in 0.5in; }
+/* The 0.12in body padding keeps hanging bullet dots inside the printable area. */
+@media print { body { padding: 0 0.12in; } }
+
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body {
+  margin: 0;
+  background: #fff;
+  color: var(--ink);
+  font-family: "GSF", "Google Sans Flex", system-ui, sans-serif;
+  font-size: var(--t-body);
+  line-height: 1.42;
+  font-weight: 400;
+  font-variant-ligatures: no-common-ligatures; /* keeps "fi", "fl" as real letters for hiring software */
+  font-variant-numeric: tabular-nums;
+  font-kerning: normal;
+}
+a { color: inherit; text-decoration: none; }
+
+/* Screen preview only: show the sheet like paper. */
+@media screen {
+  html { background: #eef0f2; }
+  body { width: 8.5in; margin: 24px auto; padding: 0.55in 0.72in 0.5in; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+}
+
+/* Header */
+header { margin-bottom: 14pt; }
+.name {
+  font-size: var(--t-name);
+  font-weight: 680;
+  letter-spacing: -0.015em;
+  line-height: 1.05;
+  margin: 0;
+}
+.headline {
+  font-size: var(--t-headline);
+  font-weight: 450;
+  color: var(--accent);
+  margin: 4pt 0 7pt;
+  letter-spacing: -0.005em;
+}
+.contact {
+  color: var(--graphite);
+  font-size: var(--t-meta);
+  line-height: 1.5;
+  margin: 0;
+}
+.contact span + span { margin-left: 1.1em; }
+
+/* Lead paragraph: the one signature element */
+.lead {
+  margin: 0;
+  padding: 1pt 0 1pt 11pt;
+  border-left: 2.25pt solid var(--accent);
+  font-size: 10pt;
+  line-height: 1.48;
+  color: var(--ink);
+  max-width: 6.7in;
+}
+
+/* Sections */
+section { margin-top: var(--s5); }
+h2 {
+  font-size: var(--t-section);
+  font-weight: 640;
+  color: var(--accent);
+  letter-spacing: -0.005em;
+  margin: 0 0 var(--s3);
+  break-after: avoid;
+}
+
+/* Jobs */
+.job .row { break-after: avoid; }
+li { break-inside: avoid; }
+.job + .job { margin-top: var(--s4); }
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12pt;
+}
+.company { font-size: var(--t-company); font-weight: 640; }
+.title { font-weight: 520; color: var(--ink-2); }
+.meta { color: var(--graphite); font-size: var(--t-meta); white-space: nowrap; }
+.title-row { margin-top: 1pt; }
+
+ul {
+  margin: var(--s2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+li {
+  position: relative;
+  margin: 0;
+}
+li + li { margin-top: var(--s1); }
+/* Hanging bullet: the dot sits in the margin, text keeps one left edge. */
+li::before {
+  content: "\2022";
+  position: absolute;
+  left: -9pt;
+  top: 0;
+  color: var(--graphite);
+}
+
+/* Earlier roles: compact rows */
+.earlier { margin-top: var(--s4); break-inside: avoid; }
+.earlier .label { font-weight: 640; margin-bottom: 3pt; }
+.earlier .row + .row { margin-top: 1.5pt; }
+.earlier .company { font-size: var(--t-body); }
+.earlier .title { font-weight: 400; color: var(--graphite); margin-left: 0.9em; }
+
+/* Skills: label column + wrapped list */
+.skills { display: grid; grid-template-columns: 1.5in 1fr; column-gap: 8pt; row-gap: 5pt; margin: 0; }
+.skills dt { font-weight: 640; }
+.skills dd { margin: 0; }
+
+.edu { margin: 0; }

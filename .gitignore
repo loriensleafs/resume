@@ -1,0 +1,7 @@
+node_modules/
+dist/
+# Private details (phone number). Never commit this file.
+private.yaml
+# Downloaded by `bun run fonts`.
+GoogleSansFlex-VF.ttf
+.DS_Store

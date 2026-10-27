@@ -1,0 +1,17 @@
+{
+  "name": "resume",
+  "private": true,
+  "type": "module",
+  "description": "Peter Kloss's resume: one YAML source, printed to PDF, Word and text, served as a website with an AI chat",
+  "scripts": {
+    "build": "bun run scripts/build.ts",
+    "fonts": "bun run scripts/make-fonts.ts"
+  },
+  "dependencies": {
+    "docx": "9.14.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "harfbuzzjs": "1.6.4"
+  }
+}
