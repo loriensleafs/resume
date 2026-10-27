@@ -68,11 +68,13 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [Checkpoint knowledge: contract complete](modules/knowledge.md#checkpoint-knowledge-contract-complete) — after K5 to K10; Peter: review before the moves
 - [ ] [A7](modules/agents.md#a7-the-write-source-repo-skill) The `write-source` repo skill — blocked by A2, K10
 - [ ] [13](modules/knowledge.md#task-13-long-form-interviews-one-subject-at-a-time-career-working-style-stories-opinions-side-projects-skills) Long-form interviews, one subject at a time: career, working style, stories, opinions, side projects, skills — blocked by A7, K10 (ongoing); Peter: the interviews; the kind line for interview sources, before the first interview source is approved; each source's approval
-- [ ] [A8](modules/agents.md#a8-the-agents-module-lands) The agents module lands — blocked by A1 to A7; Peter: read the fresh-session result
+- [ ] [A8](modules/agents.md#a8-the-agents-module-lands) The agents module lands — blocked by A1 to A7 and TC; Peter: read the fresh-session result
 - [ ] [Checkpoint agents: lands](modules/agents.md#checkpoint-agents-lands) — after A7, A8
 - [ ] [D9](modules/deploy.md#d9-createops-gives-in-memory-parts-outside-production) `createOps()` gives in-memory parts outside production — blocked by C2
 - [ ] [Checkpoint deploy: createOps ready](modules/deploy.md#checkpoint-deploy-createops-ready) — after D9
-- [ ] [C3](modules/chat.md#c3-one-turn-through-handlechat-a-resume-citation-kept-and-one-log-entry) One turn through `handleChat()`: a resume citation kept and one log entry — blocked by C1, C2, K3
+- [ ] [TC](modules/agents.md#a9-tc-the-type-check) The type check (A9) — blocked by none; it starts after the row 151 branch and C1 are on `main`
+- [ ] Peter: release a `@acmelabs/design-system-mcp` with `zod` 4.6.6 or later (acmelabs-15/design-system#9); then a follow-up task removes the `zod` override (row 158) — after TC; blocks nothing
+- [ ] [C3](modules/chat.md#c3-one-turn-through-handlechat-a-resume-citation-kept-and-one-log-entry) One turn through `handleChat()`: a resume citation kept and one log entry — blocked by TC, C1, C2, K3
 - [ ] [C4](modules/chat.md#c4-request-checks-with-the-chaterror-shape-and-turnlimits) Request checks with the `ChatError` shape and `turnLimits` — blocked by C3
 - [ ] [C5](modules/chat.md#c5-the-read-tool-passages-read-on-the-server-ids-only-on-the-wire) The read tool: passages read on the server, ids only on the wire — blocked by C3, K7, K8
 - [ ] [C6](modules/chat.md#c6-the-read-budget-and-the-last-call) The read budget and the last call — blocked by C5

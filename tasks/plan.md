@@ -1,6 +1,6 @@
 # Plan
 
-All six module specs are approved ([capability map](../spec/README.md)). This plan builds them: 140 tasks from the five planners' proposals, merged on 2026-10-27 into one order with 26 checkpoints. Content gains the roles' short labels and the committed documents (T1 to T4). Knowledge moves to two layers, the core with its catalog and the sources read on demand (K1 to K13, which replace task 11). The site (S1 to S36), the chat (C1 to C41) and the deploy module (D1 to D38) are built from nothing. The agent files gain the Modules table, the approval rules, three repo skills and their tests (A1 to A8). The deploy spike runs first, beside the rest, once Peter has set up its throwaway project. Peter approved this breakdown on 2026-10-27 (decision record row 143): the task size, the order and the task boundaries.
+All six module specs are approved ([capability map](../spec/README.md)). This plan builds them: 140 tasks from the five planners' proposals, merged on 2026-10-27 into one order with 26 checkpoints. Content gains the roles' short labels and the committed documents (T1 to T4). Knowledge moves to two layers, the core with its catalog and the sources read on demand (K1 to K13, which replace task 11). The site (S1 to S36), the chat (C1 to C41) and the deploy module (D1 to D38) are built from nothing. The agent files gain the Modules table, the approval rules, three repo skills and their tests (A1 to A8), and the type check (A9, called TC; row 157). The deploy spike runs first, beside the rest, once Peter has set up its throwaway project. Peter approved this breakdown on 2026-10-27 (decision record row 143): the task size, the order and the task boundaries.
 
 ## How to read the task files
 
@@ -58,6 +58,7 @@ Wording is drafted, not asked (row 153). Each wording task writes its wording dr
 12. A7 waits on K10, and task 13 waits on A7 and K10. A2's first full run waits on deploy's release scripts and checks (D7, D16, D30, D32); it is D37's release.
 13. Until D16 exists, tasks verify with `bun run build` and `bun test`; after it, with `bun run build:site` too.
 14. Each module's landing sets its rows in `AGENTS.md`'s Modules table and in `spec/README.md` to built, and runs the fresh-session check.
+15. TC (A9, the type check, row 157) starts after the row 151 branch and C1 are on `main`, and C3 waits on it, so every later task runs `bun run typecheck` before its commit.
 
 ## Waiting on Peter
 
@@ -92,6 +93,7 @@ Each item names the task it blocks; todo.md shows them as "Peter:".
 27. Reading each fresh-session check's result, at each module's landing.
 28. His one review before D37: the wording drafts that [wording-drafts.md](../docs/design/wording-drafts.md) lists (row 153), and any checkpoint review still open (Running the plan): D37.
 29. Going over [build-decisions.md](../docs/design/build-decisions.md) with the conductor, at the end of the run (row 154).
+30. Releasing a `@acmelabs/design-system-mcp` with `zod` 4.6.6 or later, tracked in acmelabs-15/design-system#9; then a follow-up task removes TC's `zod` override (row 158). It blocks nothing.
 
 ## Risks
 

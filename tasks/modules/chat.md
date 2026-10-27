@@ -45,7 +45,7 @@ Needs Peter: no
 ### C3: One turn through `handleChat()`: a resume citation kept and one log entry
 
 Delivers: the walking skeleton of a turn: `handleChat(request, deps)` streams a fake-model answer as server-sent events, keeps a resume citation, and writes one question-log entry.
-Blocked by: C1, C2, K3 (`buildKnowledge()` with the core, the catalog and the sources, `renderCore()`, and the id rules in `src/knowledge/ids.ts`)
+Blocked by: TC (the type check, A9 in `tasks/modules/agents.md`), C1, C2, K3 (`buildKnowledge()` with the core, the catalog and the sources, `renderCore()`, and the id rules in `src/knowledge/ids.ts`)
 Acceptance:
 - An answer with no read keeps a resume citation in the streamed text, and the `chat.citations` `CUSTOM` event lists it with 0 removed (Testing Strategy, "Citations"; Markers).
 - The turn writes one `answered` entry with the UTC day, the question and the kept citations, and no `threadId`, after the run ends, from the terminal hook with `ctx.defer()` (Question log).

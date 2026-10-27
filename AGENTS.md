@@ -35,7 +35,7 @@ A missing skill: load it, then continue. A skill that may apply: load it. A docs
 | site | [SPEC-site](spec/SPEC-site.md) | `src/site/`, `public/` | `bun test src/site` | spec approved |
 | chat | [SPEC-chat](spec/SPEC-chat.md) | `src/chat/`, `evals/` | `bun test src/chat` | spec approved |
 | deploy | [SPEC-deploy](spec/SPEC-deploy.md) | `src/deploy/`, `src/ops/`, `scripts/build-site.ts`, `.github/` | `bun test src/ops src/deploy scripts/__tests__/docs-only scripts/__tests__/smoke` | spec approved |
-| agents | [SPEC-agents](spec/SPEC-agents.md) | the agent files, `scripts/private-detail-check.ts` | `bun test ./__tests__ scripts/__tests__/private-detail-check.test.ts` | being built (A1 to A8) |
+| agents | [SPEC-agents](spec/SPEC-agents.md) | the agent files, `scripts/private-detail-check.ts` | `bun test ./__tests__ scripts/__tests__/private-detail-check.test.ts` | being built (A1 to A9) |
 
 Before you change a module, read its spec to the last line and the decisions it links ([index](docs/decisions/README.md)). Use the glossary's words.
 

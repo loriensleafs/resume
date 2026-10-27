@@ -111,7 +111,7 @@ Notes: the test would pass earlier, because SPEC-knowledge's Commands names `--d
 ### A8: The agents module lands
 
 Delivers: the Modules table shows agents as built, and a fresh session told only "continue" passes the check.
-Blocked by: A1, A2, A3, A4, A5, A6, A7
+Blocked by: A1, A2, A3, A4, A5, A6, A7, A9 (TC)
 Acceptance:
 - The agents row in `AGENTS.md` and in `spec/README.md` says built. `bun test ./__tests__` and `bun test` pass (SPEC-agents, Success Criteria).
 - The fresh-session check passes: a sub-agent in a fresh clone is told only "continue", Peter reads the result, and `docs/STATUS.md` records it (SPEC-agents, Testing Strategy 2).
@@ -119,6 +119,24 @@ Verify: `bun test`; the fresh-session check (a sub-agent in a fresh clone)
 Files: `AGENTS.md`, `spec/README.md`, `docs/STATUS.md`
 Size: S
 Needs Peter: no
+
+### A9 (TC): The type check
+
+Delivers: `bun run typecheck` (`"typecheck": "bun check"`) passes, and it runs before every commit and in CI (row 157).
+Blocked by: none. It starts after the row 151 branch and C1 are merged into `main`, because both change files that it changes (`AGENTS.md`, the specs, `package.json`, `bun.lock`).
+Acceptance:
+- `tsconfig.json` is the one that [research 13](../../docs/research/13-type-check.md) gives: `strict`, `noUncheckedIndexedAccess`, no `verbatimModuleSyntax`, `isolatedModules`, the DOM libs, and an explicit `include`, so `.claude/worktrees/` is never checked.
+- `typescript` 7.0.2 and `@types/bun` 1.4.4 are exact development dependencies.
+- The 35 current errors are fixed (research 13, "Risks"), and `bun run typecheck` passes.
+- A test in `__tests__/` checks that `process.versions.typescript` equals the `typescript` version that `package.json` pins (decision 0025).
+- `AGENTS.md`'s Session start says Bun 1.4.4 or later, and its Verify lists `bun run typecheck` first; SPEC-agents' Verify line says the same.
+- CI's `oven-sh/setup-bun` uses 1.4.4 in every job, and the `test` job runs `bun run typecheck` right after `bun ci`.
+- The specs' Bun 1.4.2 becomes 1.4.4 where it names the local or CI Bun, and stays where it names Vercel's function runtime.
+- A second commit adds the `zod` override (row 158): a Bun `overrides` entry that installs `zod` 4.6.7 for `@acmelabs/design-system-mcp`. The docs server still answers one `resolve_version` call, and `bun audit --audit-level=high` passes.
+Verify: `bun run typecheck`; `bun run build`; `bun test`; `bun audit --audit-level=high`; one `resolve_version` call to the docs server; CI's `test`, `audit` and `audit-all` on the pushed commit.
+Files: `tsconfig.json`, `package.json`, `bun.lock`, `scripts/make-fonts.ts`, `src/print/chrome.ts`, `src/__tests__/build.test.ts`, the version test in `__tests__/`, `AGENTS.md`, `.github/workflows/ci.yml`, `spec/SPEC-agents.md` and the other specs that name the local or CI Bun
+Size: M
+Needs Peter: no (approved, row 157). Research 13 already holds the facts and his choice.
 
 ## Checkpoints
 
