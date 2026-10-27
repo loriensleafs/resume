@@ -1,0 +1,20 @@
+# Job-search logistics the chat may answer. Peter decides every answer's wording.
+# An entry reaches the chat only with status: approved and the date he approved it.
+# See spec/SPEC-knowledge.md.
+topics:
+  - topic: work-arrangement
+    answer:
+    status: draft
+    approved:
+  - topic: location
+    answer:
+    status: draft
+    approved:
+  - topic: availability
+    answer:
+    status: draft
+    approved:
+  - topic: target-roles
+    answer:
+    status: draft
+    approved:

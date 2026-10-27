@@ -4,9 +4,9 @@ Updated 2026-10-26. This file is the one current handoff. A fresh session resume
 
 ## Where we are
 
-- **Phase:** content module complete (Checkpoint A). Next phase: the knowledge and site specs.
+- **Phase:** knowledge module. [SPEC-knowledge.md](../spec/SPEC-knowledge.md) is approved, and its format and tests are built (43 tests pass). The deep dives and logistics answers wait on interviews with Peter.
 - **Done:** `resume.yaml` and `private.yaml` replace the hand-written `resume.html`. `bun run build` makes the public and private PDF, Word and text files. The private PDF is pixel-identical to the PDF built from the hand-written `resume.html`, and the public PDF differs only on the contact line. `bun test` passes 26 tests at the two approved seams. Brain's setup ran (local issue tracker). Agent files, decision records, research notes, the glossary and the interview record are written. History was rewritten on 2026-10-26 so that no commit holds a private detail.
-- **Next:** write [SPEC-knowledge.md](../spec/README.md) and SPEC-site.md for Peter's review (task 5 in [tasks/todo.md](../tasks/todo.md)).
+- **Next:** the deep-dive interviews, one at a time, starting with `highspot-mcp-server` (task 7 in [tasks/todo.md](../tasks/todo.md)). Then the logistics answers, then SPEC-site.md.
 
 ## Waiting on Peter
 

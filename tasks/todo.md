@@ -1,6 +1,6 @@
 # Tasks
 
-Current phase: 1 (content). Each task ends with its verification.
+Current phase: 3 (knowledge and site). Each task ends with its verification.
 
 - [x] 1. Move content to `resume.yaml`; build public and private PDF, Word and text
   - Acceptance: the private PDF is pixel-identical to the PDF built from the hand-written `resume.html`; the public files have no phone number.
@@ -17,4 +17,14 @@ Current phase: 1 (content). Each task ends with its verification.
 - [x] 4. Checkpoint A: rewrite the first commit without the phone number and push (needs Peter's approval)
   - Acceptance: no commit on `main` contains the phone number.
   - Verify: `git log -p --all | grep -c -F "$(bun -e 'console.log(Bun.YAML.parse(await Bun.file("private.yaml").text()).basics.phone)')"` prints 0
-- [ ] 5. Write SPEC-knowledge.md and SPEC-site.md for Peter's review
+- [x] 5. Write SPEC-knowledge.md for Peter's review (approved 2026-10-26)
+- [x] 6. Knowledge format: parser, `buildKnowledge()`, renderer with `[id]` markers, `bun run knowledge`
+  - Acceptance: every check in SPEC-knowledge.md "Testing Strategy" is a passing test.
+  - Verify: `bun test tests/knowledge`
+  - Files: `src/knowledge/*`, `scripts/knowledge.ts`, `knowledge/*`, `tests/knowledge/*`
+- [ ] 7. Interview Peter and approve the nine deep dives, one at a time
+  - Acceptance: each file in `knowledge/deep-dives/` has `status: approved` with Peter's date, and every statement traces to his answers.
+  - Verify: `bun run knowledge` lists `deep:<id>` for all nine; `bun test`
+- [ ] 8. Interview Peter and approve the four logistics answers
+  - Verify: `bun run knowledge` lists the four `logistics:` entries
+- [ ] 9. Write SPEC-site.md for Peter's review
