@@ -28,8 +28,8 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [Checkpoint agents: before the first release](modules/agents.md#checkpoint-agents-before-the-first-release) — after A1, A2; Peter: read the new Modules and Releases and approvals sections before T1's push
 - [x] [K1](modules/knowledge.md#k1-the-id-grammar-in-one-module) The id grammar in one module — blocked by none (done 2026-10-27; Peter added the id grammar's own test seam, row 146)
 - [ ] [C1](modules/chat.md#c1-install-the-chats-packages-and-check-spec-chats-tanstack-ai-names) Install the chat's packages and check SPEC-chat's TanStack AI names — blocked by none; Peter: approve a SPEC-chat amendment, only if a TanStack AI name differs
-- [ ] [C2](modules/chat.md#c2-the-question-log-budget-and-telemetry-contracts-with-the-contract-suite) The question log, budget and telemetry contracts, with the contract suite — blocked by none
-- [ ] [Checkpoint chat: contracts](modules/chat.md#checkpoint-chat-contracts) — after C2
+- [x] [C2](modules/chat.md#c2-the-question-log-budget-and-telemetry-contracts-with-the-contract-suite) The question log, budget and telemetry contracts, with the contract suite — blocked by none (done 2026-10-27)
+- [x] [Checkpoint chat: contracts](modules/chat.md#checkpoint-chat-contracts) — after C2 (passed 2026-10-27: `bun test src/chat` passes; D9 can start)
 - [ ] [S1](modules/site.md#s1-the-tanstack-start-app-on-bun-with-nitros-vercel-output) The TanStack Start app on Bun, with Nitro's Vercel output — blocked by none
 - [ ] [D7](modules/deploy.md#d7-ci-runs-the-build-the-tests-and-the-audits) CI runs the build, the tests and the audits — blocked by none
 - [x] Peter: the spike's setup: a Vercel Pro team ($20 a month from here on), the throwaway project from `prototype/deploy-spike` (root `prototypes/deploy-spike/`, Standard Protection, no domains, no Anthropic key) and its automation bypass secret as an Actions secret — blocks D1 (done 2026-10-27: team Peter Kloss, project `resume-deploy-spike`, secret `VERCEL_AUTOMATION_BYPASS_SECRET`; details in D1's body)
