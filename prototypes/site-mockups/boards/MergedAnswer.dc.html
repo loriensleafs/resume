@@ -47,6 +47,10 @@ a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
 .m-pass p{margin:4px 0 0}
 .m-on{background:var(--ds-blue-100)}
 .m-on .m-num{background:var(--ds-blue-700);color:#fff}
+/* Design-system gap: Toggle Tip has no width setting, and five audiences need about 412 px. */
+acme-toggle-tip.m-aud::part(content){max-inline-size:none}
+/* Design-system gap: Toggle Tip always shows a Close button; a click outside or Escape is enough here. */
+acme-toggle-tip.m-aud::part(close){display:none}
 </style>
 </helmet>
 <div style="width: 1440px; height: 900px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
@@ -110,7 +114,7 @@ a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
 
 <section aria-label="Conversation" style="flex: 0 0 560px; box-sizing: border-box; display: flex; flex-direction: column; border-right: 1px solid var(--ds-gray-400);">
 <div style="display: flex; justify-content: flex-end; padding: 10px 24px 0;"><acme-button variant="secondary" size="small"><acme-add-icon slot="start"></acme-add-icon>New chat</acme-button></div>
-<div style="flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 8px 40px 12px; display: flex; flex-direction: column; gap: 20px;">
+<div style="flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 8px 40px 12px; display: flex; flex-direction: column; justify-content: flex-end; gap: 20px;">
 <div class="m-msg m-msg-q"><p class="m-q text-copy-16">How did FedNow’s bundle get under 1 MB?</p><div class="m-acts" aria-hidden="true"></div></div>
 <article aria-label="Answer" class="m-msg">
 <div class="m-body">
@@ -137,11 +141,13 @@ a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
 <acme-textarea aria-label="Your question" placeholder="Ask a follow-up about FedNow" rows="1" auto-resize="" resize="none"></acme-textarea>
 <span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question" disabled=""><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span>
 </div>
-<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;">
-<span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span>
-<acme-button variant="secondary" size="small" shape="pill">Recruiter</acme-button>
-<acme-button size="small" shape="pill" aria-pressed="true">Hiring manager</acme-button>
-<acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button>
+<div style="display: flex; align-items: center; gap: 12px;">
+<acme-toggle-tip class="m-aud" side="top" align="start"><span slot="trigger" class="text-label-13" style="display: inline-flex; align-items: center; gap: 4px;"><span class="m-dim">Answers for:</span> Manager<acme-expand-more-icon></acme-expand-more-icon></span><div style="width: 412px; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 0;">
+<div><span class="text-copy-13 m-dim">Choose who you are, and answers lead with what matters to you. The facts are the same for everyone.</span></div>
+<acme-group attached="" size="small" variant="secondary" role="group" aria-label="Answers for"><acme-toggle-button>Recruiter</acme-toggle-button><acme-toggle-button pressed="">Manager</acme-toggle-button><acme-toggle-button>Engineer</acme-toggle-button><acme-toggle-button>Designer</acme-toggle-button><acme-toggle-button aria-label="Product manager">Product</acme-toggle-button></acme-group>
+<span class="text-copy-12 m-dim">Managers: what Peter owned, with whom, and what came of it.</span>
+</div></acme-toggle-tip>
+<span class="text-label-12 m-dim">Questions are kept anonymously to improve answers.</span>
 </div>
 </form>
 </section>

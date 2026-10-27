@@ -44,13 +44,13 @@
     "DarkInstallPhone.dc.html": { "x": 3770, "y": 2440, "w": 390, "h": 844, "title": "Phone: install offer, dark", "page": "merged" },
     "MergedStartOverPhone.dc.html": { "x": 4400, "y": 2440, "w": 390, "h": 844, "title": "Phone: New chat, light", "page": "merged" },
     "DarkStartOverPhone.dc.html": { "x": 4870, "y": 2440, "w": 390, "h": 844, "title": "Phone: New chat, dark", "page": "merged" },
-    "ComposerStates.dc.html": { "x": 0, "y": 3804, "w": 1440, "h": 1240, "title": "Chat input states, light", "page": "merged" },
-    "DarkComposerStates.dc.html": { "x": 1520, "y": 3804, "w": 1440, "h": 1240, "title": "Chat input states, dark", "page": "merged" },
-    "ConversationStates.dc.html": { "x": 3200, "y": 3804, "w": 1440, "h": 1800, "title": "Conversation states, light", "page": "merged" },
-    "DarkConversationStates.dc.html": { "x": 4720, "y": 3804, "w": 1440, "h": 1800, "title": "Conversation states, dark", "page": "merged" },
-    "TimelineStates.dc.html": { "x": 0, "y": 5724, "w": 1440, "h": 560, "title": "Career timeline: states", "page": "merged" },
-    "TimelineOneLine.dc.html": { "x": 1520, "y": 5724, "w": 1440, "h": 860, "title": "Career timeline on one line: options", "page": "merged" },
-    "AppIcons.dc.html": { "x": 3200, "y": 5724, "w": 1440, "h": 440, "title": "App icon", "page": "merged" }
+    "ComposerStates.dc.html": { "x": 0, "y": 3804, "w": 1440, "h": 1600, "title": "Chat input states, light", "page": "merged" },
+    "DarkComposerStates.dc.html": { "x": 1520, "y": 3804, "w": 1440, "h": 1600, "title": "Chat input states, dark", "page": "merged" },
+    "ConversationStates.dc.html": { "x": 3200, "y": 3804, "w": 1440, "h": 2140, "title": "Conversation states, light", "page": "merged" },
+    "DarkConversationStates.dc.html": { "x": 4720, "y": 3804, "w": 1440, "h": 2140, "title": "Conversation states, dark", "page": "merged" },
+    "TimelineStates.dc.html": { "x": 0, "y": 6064, "w": 1440, "h": 560, "title": "Career timeline: states", "page": "merged" },
+    "TimelineOneLine.dc.html": { "x": 1520, "y": 6064, "w": 1440, "h": 860, "title": "Career timeline on one line: options", "page": "merged" },
+    "AppIcons.dc.html": { "x": 3200, "y": 6064, "w": 1440, "h": 440, "title": "App icon", "page": "merged" }
   },
   "order": ["Main.dc.html", "Answer.dc.html", "Streaming.dc.html", "DeepDive.dc.html", "Mobile.dc.html", "Offline.dc.html", "ConceptAPlus.dc.html", "ConceptA.dc.html", "ConceptB.dc.html", "ConceptC.dc.html", "ConceptD.dc.html", "ConceptE.dc.html", "PhoneA.dc.html", "PhoneB.dc.html", "PhoneC.dc.html", "PhoneD.dc.html", "PhoneE.dc.html", "MergedStart.dc.html", "MergedAnswer.dc.html", "MergedPhone.dc.html", "TimelineStates.dc.html", "MergedSourcePhone.dc.html", "MergedPhoneRole.dc.html", "MergedInstallPhone.dc.html", "MergedStartOverPhone.dc.html", "MergedReturn.dc.html", "MergedInstalled.dc.html", "AppIcons.dc.html", "TimelineOneLine.dc.html", "DarkStart.dc.html", "DarkAnswer.dc.html", "DarkPhone.dc.html", "DarkSourcePhone.dc.html", "DarkPhoneRole.dc.html", "DarkReturn.dc.html", "DarkInstalled.dc.html", "DarkInstallPhone.dc.html", "DarkStartOverPhone.dc.html", "ComposerStates.dc.html", "DarkComposerStates.dc.html", "ConversationStates.dc.html", "DarkConversationStates.dc.html"],
   "notes": {

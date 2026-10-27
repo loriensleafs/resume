@@ -50,6 +50,8 @@ for (const b of boards) {
     await page.goto(`file://${tmp}`);
     await page.evaluate((m) => document.documentElement.setAttribute("data-acme-appearance", m), mode);
     await page.evaluate(() => document.fonts.ready);
+    // The boards set the toggle tip trigger to tiny tertiary in their lifecycle, which this script does not run.
+    await page.evaluate(() => document.querySelectorAll("acme-toggle-tip.m-info").forEach((t) => { const b = t.shadowRoot?.querySelector("[part~=trigger]"); if (b) { b.setAttribute("variant", "tertiary"); b.setAttribute("size", "tiny"); } }));
     await page.waitForTimeout(1500);
     await page.evaluate((m) => document.documentElement.setAttribute("data-acme-appearance", m), mode);
     await page.waitForTimeout(300);

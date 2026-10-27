@@ -6,7 +6,7 @@ This branch keeps the sources of the site mockups. It is a prototype record, not
 
 | Path | What it is |
 | --- | --- |
-| `boards/*.dc.html` | One file per board of the private Claude Design canvas "Resume site mockups", version 42 (2026-10-27) |
+| `boards/*.dc.html` | One file per board of the private Claude Design canvas "Resume site mockups", version 44 (2026-10-27) |
 | `boards/canvas.json` | The canvas index: pages, board positions, titles and notes |
 | `design-system-bundle.ts` | The entry for the one-file design-system bundle the boards load as `acme/design-system.js` |
 | `export.ts` | Renders the "Merged, light and dark" boards to PNG without the canvas |

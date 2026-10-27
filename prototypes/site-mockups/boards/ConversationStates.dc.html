@@ -54,7 +54,7 @@ a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
 .m-send{position:absolute;right:5px;bottom:5px;display:flex}
 </style>
 </helmet>
-<div style="width: 1440px; height: 1800px; box-sizing: border-box; padding: 40px 64px; display: flex; flex-direction: column; gap: 24px; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+<div style="width: 1440px; height: 2140px; box-sizing: border-box; padding: 40px 64px; display: flex; flex-direction: column; gap: 24px; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
 <div style="display: flex; flex-direction: column; gap: 6px;">
 <h1 class="text-heading-24" style="margin: 0;">Conversation: messages and answer steps</h1>
 <p class="text-copy-14 m-dim" style="margin: 0;">Each column is drawn at the chat column’s width. Every message keeps a 28 px row under it for its actions, shown or not, and messages are 20 px apart, so the space between a question and its answer matches the space between an answer and the next question. Questions and answers use the same text size.</p>
@@ -156,6 +156,26 @@ a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
 </div>
 </section>
 
+<section class="m-state" aria-labelledby="c8">
+<div class="m-cap"><h2 id="c8" class="text-label-14" style="margin: 0; font-weight: 600;">8. Asking for the resume</h2><span class="text-copy-13 m-dim">The whole resume opens beside the chat, at its top; on phones, as the full-height sheet. The answer is one line and the resume card, which opens it again. The resume view’s ⋯ menu holds the PDF, Word and Text downloads.</span></div>
+<div class="m-thread">
+<div class="m-msg m-msg-q"><p class="m-q text-copy-16">Can I see his resume?</p><div class="m-acts" aria-hidden="true"></div></div>
+<article class="m-msg" aria-label="Answer">
+<div class="m-body">
+<p class="m-ans text-copy-16">Here is Peter’s resume, open beside the chat.</p>
+</div>
+<div class="m-acts" role="toolbar" aria-label="Answer actions">
+<acme-group size="tiny" variant="tertiary" gap="4px">
+<acme-copy-button value="Here is Peter’s resume, open beside the chat." aria-label="Copy this answer"></acme-copy-button>
+<acme-icon-button aria-label="Retry this answer"><acme-refresh-icon></acme-refresh-icon></acme-icon-button>
+</acme-group>
+</div>
+<acme-card variant="outline" size="small" aria-label="Resume" style="margin-top: 4px;"><acme-card-body>
+<a href="#" class="m-src"><acme-article-icon></acme-article-icon><span class="text-label-13">Peter’s resume</span><span class="text-label-12" style="margin-left: auto; color: var(--ds-blue-900);">Open beside the chat</span></a>
+</acme-card-body></acme-card>
+</article>
+</div>
+</section>
 </div>
 
 <div class="m-col">
@@ -247,7 +267,7 @@ a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
 </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"appearance":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":1440,"height":1800}}'>
+<script type="text/x-dc" data-dc-script data-props='{"appearance":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":1440,"height":2140}}'>
 class Component extends DCLogic {
 componentDidMount() {
 document.documentElement.setAttribute('data-acme-appearance', this.props.appearance === 'dark' ? 'dark' : 'light');

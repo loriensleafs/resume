@@ -20,6 +20,10 @@ body{margin:0;background:var(--ds-background-100)}
 .m-field acme-textarea::part(textarea){padding-inline-end:48px}
 .m-status{display:flex;align-items:center;gap:8px;min-height:24px}
 .m-q{margin:0;align-self:flex-end;max-width:85%;padding:10px 14px;border-radius:16px 16px 4px 16px;background:var(--ds-gray-100)}
+.m-msg{display:flex;flex-direction:column;gap:4px;margin:0}
+.m-msg-q{align-items:flex-end}
+.m-acts{display:flex;align-items:center;gap:8px;min-height:28px}
+.m-clock{vertical-align:-3px;margin-right:6px;color:var(--ds-gray-900)}
 .m-busy{position:relative;display:inline-flex;flex:0 0 auto}
 .m-send{position:absolute;right:5px;bottom:5px;display:flex}
 .m-ring{position:absolute;left:0;top:0;width:100%;height:100%;animation:m-spin 1.4s linear infinite;pointer-events:none}
@@ -29,12 +33,16 @@ acme-alert::part(close),acme-alert::part(actions){margin-block:-6px}
 @keyframes m-spin{to{transform:rotate(360deg)}}
 @keyframes m-dash{0%{stroke-dasharray:1 200;stroke-dashoffset:0}50%{stroke-dasharray:100 200;stroke-dashoffset:-40}100%{stroke-dasharray:100 200;stroke-dashoffset:-143}}
 @media (prefers-reduced-motion: reduce){.m-ring,.m-ring circle{animation-duration:4s}}
+/* Design-system gap: Toggle Tip has no width setting, and five audiences need about 412 px. */
+acme-toggle-tip.m-aud::part(content){max-inline-size:none}
+/* Design-system gap: Toggle Tip always shows a Close button; a click outside or Escape is enough here. */
+acme-toggle-tip.m-aud::part(close){display:none}
 </style>
 </helmet>
-<div style="width: 1440px; height: 1240px; box-sizing: border-box; padding: 40px 64px; display: flex; flex-direction: column; gap: 24px; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+<div style="width: 1440px; height: 1600px; box-sizing: border-box; padding: 40px 64px; display: flex; flex-direction: column; gap: 24px; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
 <div style="display: flex; flex-direction: column; gap: 6px;">
 <h1 class="text-heading-24" style="margin: 0;">Chat input: send button states</h1>
-<p class="text-copy-14 m-dim" style="margin: 0;">The send button sits inside the input, at its right end, with no box around the two; “Answers for” stays underneath. Each input is drawn at the chat column’s width.</p>
+<p class="text-copy-14 m-dim" style="margin: 0;">The send button sits inside the input, at its right end, with no box around the two; the “Answers for” trigger and the line about the anonymous question log share the row underneath. Each input is drawn at the chat column’s width.</p>
 </div>
 
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 64px; row-gap: 32px; max-width: 1180px;">
@@ -43,7 +51,14 @@ acme-alert::part(close),acme-alert::part(actions){margin-block:-6px}
 <div class="m-cap"><h2 id="s1" class="text-label-14" style="margin: 0; font-weight: 600;">1. Empty</h2><span class="text-copy-13 m-dim">Send is off until there is a question.</span></div>
 <form class="m-form">
 <div class="m-field"><acme-textarea aria-label="Your question" placeholder="Ask about a project, a role or a skill" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question" disabled=""><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span></div>
-<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;"><span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span><acme-button variant="secondary" size="small" shape="pill">Recruiter</acme-button><acme-button variant="secondary" size="small" shape="pill">Hiring manager</acme-button><acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button></div>
+<div style="display: flex; align-items: center; gap: 12px;">
+<acme-toggle-tip class="m-aud" side="top" align="start"><span slot="trigger" class="text-label-13" style="display: inline-flex; align-items: center; gap: 4px;"><span class="m-dim">Answers for:</span> Anyone<acme-expand-more-icon></acme-expand-more-icon></span><div style="width: 412px; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 0;">
+<div><span class="text-copy-13 m-dim">Choose who you are, and answers lead with what matters to you. The facts are the same for everyone.</span></div>
+<acme-group attached="" size="small" variant="secondary" role="group" aria-label="Answers for"><acme-toggle-button>Recruiter</acme-toggle-button><acme-toggle-button>Manager</acme-toggle-button><acme-toggle-button>Engineer</acme-toggle-button><acme-toggle-button>Designer</acme-toggle-button><acme-toggle-button aria-label="Product manager">Product</acme-toggle-button></acme-group>
+<span class="text-copy-12 m-dim">Pick one, or leave it for balanced answers.</span>
+</div></acme-toggle-tip>
+<span class="text-label-12 m-dim">Questions are kept anonymously to improve answers.</span>
+</div>
 </form>
 </section>
 
@@ -51,7 +66,14 @@ acme-alert::part(close),acme-alert::part(actions){margin-block:-6px}
 <div class="m-cap"><h2 id="s2" class="text-label-14" style="margin: 0; font-weight: 600;">2. Ready</h2><span class="text-copy-13 m-dim">A question is typed; Send is on. Enter sends, Shift+Enter adds a line.</span></div>
 <form class="m-form">
 <div class="m-field"><acme-textarea aria-label="Your question" value="How did FedNow’s bundle get under 1 MB?" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question"><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span></div>
-<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;"><span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span><acme-button variant="secondary" size="small" shape="pill">Recruiter</acme-button><acme-button size="small" shape="pill" aria-pressed="true">Hiring manager</acme-button><acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button></div>
+<div style="display: flex; align-items: center; gap: 12px;">
+<acme-toggle-tip class="m-aud" side="top" align="start"><span slot="trigger" class="text-label-13" style="display: inline-flex; align-items: center; gap: 4px;"><span class="m-dim">Answers for:</span> Manager<acme-expand-more-icon></acme-expand-more-icon></span><div style="width: 412px; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 0;">
+<div><span class="text-copy-13 m-dim">Choose who you are, and answers lead with what matters to you. The facts are the same for everyone.</span></div>
+<acme-group attached="" size="small" variant="secondary" role="group" aria-label="Answers for"><acme-toggle-button>Recruiter</acme-toggle-button><acme-toggle-button pressed="">Manager</acme-toggle-button><acme-toggle-button>Engineer</acme-toggle-button><acme-toggle-button>Designer</acme-toggle-button><acme-toggle-button aria-label="Product manager">Product</acme-toggle-button></acme-group>
+<span class="text-copy-12 m-dim">Managers: what Peter owned, with whom, and what came of it.</span>
+</div></acme-toggle-tip>
+<span class="text-label-12 m-dim">Questions are kept anonymously to improve answers.</span>
+</div>
 </form>
 </section>
 
@@ -60,17 +82,41 @@ acme-alert::part(close),acme-alert::part(actions){margin-block:-6px}
 <div class="m-status" role="status"><span class="text-label-13 m-dim">Answering, reading the FedNow bundle cut</span></div>
 <form class="m-form">
 <div class="m-field"><acme-textarea aria-label="Your question" placeholder="Ask a follow-up" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-busy m-send"><acme-button type="button" variant="secondary" size="small" shape="circle" aria-label="Stop the answer"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect width="12" height="12" rx="2" style="fill: currentColor;"></rect></svg></acme-button><svg class="m-ring" viewBox="0 0 50 50" aria-hidden="true"><circle cx="25" cy="25" r="23.5"></circle></svg></span></div>
-<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;"><span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span><acme-button variant="secondary" size="small" shape="pill">Recruiter</acme-button><acme-button size="small" shape="pill" aria-pressed="true">Hiring manager</acme-button><acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button></div>
+<div style="display: flex; align-items: center; gap: 12px;">
+<acme-toggle-tip class="m-aud" side="top" align="start"><span slot="trigger" class="text-label-13" style="display: inline-flex; align-items: center; gap: 4px;"><span class="m-dim">Answers for:</span> Manager<acme-expand-more-icon></acme-expand-more-icon></span><div style="width: 412px; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 0;">
+<div><span class="text-copy-13 m-dim">Choose who you are, and answers lead with what matters to you. The facts are the same for everyone.</span></div>
+<acme-group attached="" size="small" variant="secondary" role="group" aria-label="Answers for"><acme-toggle-button>Recruiter</acme-toggle-button><acme-toggle-button pressed="">Manager</acme-toggle-button><acme-toggle-button>Engineer</acme-toggle-button><acme-toggle-button>Designer</acme-toggle-button><acme-toggle-button aria-label="Product manager">Product</acme-toggle-button></acme-group>
+<span class="text-copy-12 m-dim">Managers: what Peter owned, with whom, and what came of it.</span>
+</div></acme-toggle-tip>
+<span class="text-label-12 m-dim">Questions are kept anonymously to improve answers.</span>
+</div>
 </form>
 </section>
 
 <section class="m-state" aria-labelledby="s4">
-<div class="m-cap"><h2 id="s4" class="text-label-14" style="margin: 0; font-weight: 600;">4. Answering, a question waiting</h2><span class="text-copy-13 m-dim">Enter during an answer queues the new question. It waits above the input with a clock and sends when the answer finishes. × removes it. In an empty input, the Up arrow key brings it back into the input and off the queue.</span></div>
+<div class="m-cap"><h2 id="s4" class="text-label-14" style="margin: 0; font-weight: 600;">4. Answering, a question waiting</h2><span class="text-copy-13 m-dim">Enter during an answer queues the new question. It shows at the end of the conversation like any question, with a clock, and sends when the answer finishes. Send now stops the answer and sends it at once. Edit, or the Up arrow in an empty input, brings it back into the input; × removes it.</span></div>
 <div class="m-status" role="status"><span class="text-label-13 m-dim">Answering, reading the FedNow bundle cut</span></div>
-<acme-alert dismissible="" role="status"><acme-schedule-icon slot="start"></acme-schedule-icon>“Did Peter use micro-frontends there?” It sends when this answer finishes.</acme-alert>
+<div class="m-msg m-msg-q">
+<p class="m-q text-copy-14"><acme-schedule-icon class="m-clock" aria-label="Queued"></acme-schedule-icon>Did Peter use micro-frontends there?</p>
+<div class="m-acts" role="toolbar" aria-label="Queued question actions">
+<span class="text-label-12 m-dim">Sends when this answer finishes</span>
+<acme-button variant="tertiary" size="small">Send now</acme-button>
+<acme-group size="tiny" variant="tertiary" gap="4px">
+<acme-icon-button aria-label="Edit this question"><acme-edit-icon></acme-edit-icon></acme-icon-button>
+<acme-icon-button aria-label="Remove this question"><acme-close-icon></acme-close-icon></acme-icon-button>
+</acme-group>
+</div>
+</div>
 <form class="m-form">
 <div class="m-field"><acme-textarea aria-label="Your question" placeholder="Ask a follow-up" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-busy m-send"><acme-button type="button" variant="secondary" size="small" shape="circle" aria-label="Stop the answer"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect width="12" height="12" rx="2" style="fill: currentColor;"></rect></svg></acme-button><svg class="m-ring" viewBox="0 0 50 50" aria-hidden="true"><circle cx="25" cy="25" r="23.5"></circle></svg></span></div>
-<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;"><span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span><acme-button variant="secondary" size="small" shape="pill">Recruiter</acme-button><acme-button size="small" shape="pill" aria-pressed="true">Hiring manager</acme-button><acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button></div>
+<div style="display: flex; align-items: center; gap: 12px;">
+<acme-toggle-tip class="m-aud" side="top" align="start"><span slot="trigger" class="text-label-13" style="display: inline-flex; align-items: center; gap: 4px;"><span class="m-dim">Answers for:</span> Manager<acme-expand-more-icon></acme-expand-more-icon></span><div style="width: 412px; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 0;">
+<div><span class="text-copy-13 m-dim">Choose who you are, and answers lead with what matters to you. The facts are the same for everyone.</span></div>
+<acme-group attached="" size="small" variant="secondary" role="group" aria-label="Answers for"><acme-toggle-button>Recruiter</acme-toggle-button><acme-toggle-button pressed="">Manager</acme-toggle-button><acme-toggle-button>Engineer</acme-toggle-button><acme-toggle-button>Designer</acme-toggle-button><acme-toggle-button aria-label="Product manager">Product</acme-toggle-button></acme-group>
+<span class="text-copy-12 m-dim">Managers: what Peter owned, with whom, and what came of it.</span>
+</div></acme-toggle-tip>
+<span class="text-label-12 m-dim">Questions are kept anonymously to improve answers.</span>
+</div>
 </form>
 </section>
 
@@ -79,16 +125,39 @@ acme-alert::part(close),acme-alert::part(actions){margin-block:-6px}
 <div class="m-status"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect width="12" height="12" rx="2" style="fill: var(--ds-gray-900);"></rect></svg><span class="text-label-13 m-dim">Answer stopped.</span></div>
 <form class="m-form">
 <div class="m-field"><acme-textarea aria-label="Your question" placeholder="Ask a follow-up" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question" disabled=""><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span></div>
-<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;"><span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span><acme-button variant="secondary" size="small" shape="pill">Recruiter</acme-button><acme-button size="small" shape="pill" aria-pressed="true">Hiring manager</acme-button><acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button></div>
+<div style="display: flex; align-items: center; gap: 12px;">
+<acme-toggle-tip class="m-aud" side="top" align="start"><span slot="trigger" class="text-label-13" style="display: inline-flex; align-items: center; gap: 4px;"><span class="m-dim">Answers for:</span> Manager<acme-expand-more-icon></acme-expand-more-icon></span><div style="width: 412px; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 0;">
+<div><span class="text-copy-13 m-dim">Choose who you are, and answers lead with what matters to you. The facts are the same for everyone.</span></div>
+<acme-group attached="" size="small" variant="secondary" role="group" aria-label="Answers for"><acme-toggle-button>Recruiter</acme-toggle-button><acme-toggle-button pressed="">Manager</acme-toggle-button><acme-toggle-button>Engineer</acme-toggle-button><acme-toggle-button>Designer</acme-toggle-button><acme-toggle-button aria-label="Product manager">Product</acme-toggle-button></acme-group>
+<span class="text-copy-12 m-dim">Managers: what Peter owned, with whom, and what came of it.</span>
+</div></acme-toggle-tip>
+<span class="text-label-12 m-dim">Questions are kept anonymously to improve answers.</span>
+</div>
 </form>
 </section>
 
 <section class="m-state" aria-labelledby="s6">
-<div class="m-cap"><h2 id="s6" class="text-label-14" style="margin: 0; font-weight: 600;">6. Offline</h2><span class="text-copy-13 m-dim">Send becomes Queue. A queued question waits above the input with a clock and sends when the connection returns. × removes it; in an empty input, the Up arrow key brings it back.</span></div>
-<acme-alert dismissible="" role="status"><acme-schedule-icon slot="start"></acme-schedule-icon>“What did Peter lead at Highspot?” It sends when you’re back online.</acme-alert>
+<div class="m-cap"><h2 id="s6" class="text-label-14" style="margin: 0; font-weight: 600;">6. Offline</h2><span class="text-copy-13 m-dim">Send becomes Queue. A queued question shows at the end of the conversation with a clock and sends when the connection returns. Edit, or the Up arrow in an empty input, brings it back; × removes it.</span></div>
+<div class="m-msg m-msg-q">
+<p class="m-q text-copy-14"><acme-schedule-icon class="m-clock" aria-label="Queued"></acme-schedule-icon>What did Peter lead at Highspot?</p>
+<div class="m-acts" role="toolbar" aria-label="Queued question actions">
+<span class="text-label-12 m-dim">Sends when you’re back online</span>
+<acme-group size="tiny" variant="tertiary" gap="4px">
+<acme-icon-button aria-label="Edit this question"><acme-edit-icon></acme-edit-icon></acme-icon-button>
+<acme-icon-button aria-label="Remove this question"><acme-close-icon></acme-close-icon></acme-icon-button>
+</acme-group>
+</div>
+</div>
 <form class="m-form">
 <div class="m-field"><acme-textarea aria-label="Your question" value="Is Peter open to remote work?" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-send"><acme-button type="submit" size="small" variant="secondary" shape="circle" aria-label="Queue question, you are offline"><acme-cloud-off-icon></acme-cloud-off-icon></acme-button></span></div>
-<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;"><span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span><acme-button size="small" shape="pill" aria-pressed="true">Recruiter</acme-button><acme-button variant="secondary" size="small" shape="pill">Hiring manager</acme-button><acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button></div>
+<div style="display: flex; align-items: center; gap: 12px;">
+<acme-toggle-tip class="m-aud" side="top" align="start"><span slot="trigger" class="text-label-13" style="display: inline-flex; align-items: center; gap: 4px;"><span class="m-dim">Answers for:</span> Recruiter<acme-expand-more-icon></acme-expand-more-icon></span><div style="width: 412px; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 0;">
+<div><span class="text-copy-13 m-dim">Choose who you are, and answers lead with what matters to you. The facts are the same for everyone.</span></div>
+<acme-group attached="" size="small" variant="secondary" role="group" aria-label="Answers for"><acme-toggle-button pressed="">Recruiter</acme-toggle-button><acme-toggle-button>Manager</acme-toggle-button><acme-toggle-button>Engineer</acme-toggle-button><acme-toggle-button>Designer</acme-toggle-button><acme-toggle-button aria-label="Product manager">Product</acme-toggle-button></acme-group>
+<span class="text-copy-12 m-dim">Recruiters: titles, dates, scope and logistics first.</span>
+</div></acme-toggle-tip>
+<span class="text-label-12 m-dim">Questions are kept anonymously to improve answers.</span>
+</div>
 </form>
 </section>
 
@@ -100,14 +169,46 @@ acme-alert::part(close),acme-alert::part(actions){margin-block:-6px}
 </div>
 <form class="m-form">
 <div class="m-field"><acme-textarea aria-label="Your question" placeholder="Ask a follow-up" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question" disabled=""><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span></div>
-<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;"><span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span><acme-button variant="secondary" size="small" shape="pill">Recruiter</acme-button><acme-button size="small" shape="pill" aria-pressed="true">Hiring manager</acme-button><acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button></div>
+<div style="display: flex; align-items: center; gap: 12px;">
+<acme-toggle-tip class="m-aud" side="top" align="start"><span slot="trigger" class="text-label-13" style="display: inline-flex; align-items: center; gap: 4px;"><span class="m-dim">Answers for:</span> Manager<acme-expand-more-icon></acme-expand-more-icon></span><div style="width: 412px; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 0;">
+<div><span class="text-copy-13 m-dim">Choose who you are, and answers lead with what matters to you. The facts are the same for everyone.</span></div>
+<acme-group attached="" size="small" variant="secondary" role="group" aria-label="Answers for"><acme-toggle-button>Recruiter</acme-toggle-button><acme-toggle-button pressed="">Manager</acme-toggle-button><acme-toggle-button>Engineer</acme-toggle-button><acme-toggle-button>Designer</acme-toggle-button><acme-toggle-button aria-label="Product manager">Product</acme-toggle-button></acme-group>
+<span class="text-copy-12 m-dim">Managers: what Peter owned, with whom, and what came of it.</span>
+</div></acme-toggle-tip>
+<span class="text-label-12 m-dim">Questions are kept anonymously to improve answers.</span>
+</div>
+</form>
+</section>
+
+<section class="m-state" aria-labelledby="s8">
+<div class="m-cap"><h2 id="s8" class="text-label-14" style="margin: 0; font-weight: 600;">8. Answers for, opened</h2><span class="text-copy-13 m-dim">The trigger opens a popover: one line of context, the five audiences and a line for the chosen one. It has no title and no Close button. Pressing the chosen audience again clears it. A click outside or Escape closes it.</span></div>
+<div style="height: 196px;" aria-hidden="true"></div>
+<form class="m-form">
+<div class="m-field"><acme-textarea aria-label="Your question" placeholder="Ask a follow-up" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question" disabled=""><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span></div>
+<div style="display: flex; align-items: center; gap: 12px;">
+<acme-toggle-tip class="m-aud" side="top" align="start" open=""><span slot="trigger" class="text-label-13" style="display: inline-flex; align-items: center; gap: 4px;"><span class="m-dim">Answers for:</span> Manager<acme-expand-more-icon></acme-expand-more-icon></span><div style="width: 412px; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 0;">
+<div><span class="text-copy-13 m-dim">Choose who you are, and answers lead with what matters to you. The facts are the same for everyone.</span></div>
+<acme-group attached="" size="small" variant="secondary" role="group" aria-label="Answers for"><acme-toggle-button>Recruiter</acme-toggle-button><acme-toggle-button pressed="">Manager</acme-toggle-button><acme-toggle-button>Engineer</acme-toggle-button><acme-toggle-button>Designer</acme-toggle-button><acme-toggle-button aria-label="Product manager">Product</acme-toggle-button></acme-group>
+<span class="text-copy-12 m-dim">Managers: what Peter owned, with whom, and what came of it.</span>
+</div></acme-toggle-tip>
+<span class="text-label-12 m-dim">Questions are kept anonymously to improve answers.</span>
+</div>
+</form>
+</section>
+
+<section class="m-state" aria-labelledby="s9">
+<div class="m-cap"><h2 id="s9" class="text-label-14" style="margin: 0; font-weight: 600;">9. Answers for on a phone</h2><span class="text-copy-13 m-dim">Below 520 px of column width, the design system’s select replaces the popover. One tap opens its list. The log line goes under it.</span></div>
+<form class="m-form" style="max-width: 358px;">
+<div class="m-field"><acme-textarea aria-label="Your question" placeholder="Ask a follow-up" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question" disabled=""><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span></div>
+<div style="display: flex; align-items: center; gap: 8px;"><span class="text-label-13 m-dim">Answers for</span><acme-select size="small" value="manager" aria-label="Answers for" style="width: 180px;"><acme-option value="anyone">Anyone</acme-option><acme-option value="recruiter">Recruiter</acme-option><acme-option value="manager">Manager</acme-option><acme-option value="engineer">Engineer</acme-option><acme-option value="designer">Designer</acme-option><acme-option value="product">Product manager</acme-option></acme-select></div>
+<span class="text-label-12 m-dim">Questions are kept anonymously to improve answers.</span>
 </form>
 </section>
 
 </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"appearance":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":1440,"height":1240}}'>
+<script type="text/x-dc" data-dc-script data-props='{"appearance":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":1440,"height":1600}}'>
 class Component extends DCLogic {
 componentDidMount() {
 document.documentElement.setAttribute('data-acme-appearance', this.props.appearance === 'dark' ? 'dark' : 'light');
