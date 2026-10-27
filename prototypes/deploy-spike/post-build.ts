@@ -82,6 +82,7 @@ export const API_ROUTES = [
 export const QUERY_ROUTES = [
   { query: "server", fn: "/__server", probe: false }, // a route's dest to /__server, as the spec's status and health
   { query: "bun1x", fn: "/api/spike-bun1x", probe: true },
+  { query: "cancel", fn: "/api/spike-cancel", probe: true }, // check 7 (D4): /api/spike with supportsCancellation
 ] as const;
 
 /** SPEC-deploy's cron. */

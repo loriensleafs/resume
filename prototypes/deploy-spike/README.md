@@ -17,10 +17,11 @@ What does a real Vercel deployment do with the site's build output? A local buil
 - The site spike from `prototypes/csp-probe/` (its own verdict is in that folder's README), built with Nitro's Vercel preset as in `prototypes/nitro-vercel-output/`. Nitro writes `.vercel/output/`; the pages land in `.vercel/output/static/`.
 - `vercel.json`: `bunVersion`, `framework: null`, the install command `bun ci` and the build command `bun run build`. The Ignored Build Step stays the project's own setting.
 - `bun run build` runs four steps: `bun --bun vite build`, `post-build.ts`, `gen-sw.ts` (the Workbox service worker over `.vercel/output/static/`), then `build-info.ts`.
-- `vite.config.ts` gives Nitro three functions, each a copy of Nitro's server with its own `.vc-config.json`:
+- `vite.config.ts` gives Nitro four functions, each a copy of Nitro's server with its own `.vc-config.json`:
   - `__server`, with SPEC-deploy's `vercel.functions.runtime: "bun1.4.x"`;
   - `/api/spike`, its own function through `vercel.functionRules`, as SPEC-deploy gives `/api/chat`: `bun1.4.x`, `maxDuration` 150, region `iad1`;
-  - the probe `/api/spike-bun1x`, with Nitro's documented runtime value `"bun1.x"`.
+  - the probe `/api/spike-bun1x`, with Nitro's documented runtime value `"bun1.x"`;
+  - `/api/spike-cancel` (D4, check 7): `/api/spike`'s settings plus `supportsCancellation: true`, Vercel's opt-in that ends a function when its client disconnects.
   Each function's `environment` sets `SPIKE_FUNCTION` to its name, so the function can say which one answered.
 - `src/site/routes/api.spike.ts`: `GET /api/spike` answers with `SPIKE_FUNCTION`, `Bun.version`, `Bun.revision`, the path the function saw, `VERCEL_REGION` and `VERCEL_ENV`. A query picks the function: none for `/api/spike`, `?function=server` for `/__server`, `?function=bun1x` for the probe. D4 adds four modes (`?mode=`) for checks 6, 7 and 9, which answer only on the protected hosts (see "Checks 6, 7 and 9").
 - `src/site/routes/api.cron.health.ts` (D4): the route Vercel Cron calls. It records each call in the store and answers which function took it.
@@ -391,6 +392,34 @@ What it shows:
 
 - D4: the production address now answers 308 for every path outside `/api/`. Vercel Cron's `/api/cron/health` is under `/api/`, so the redirect leaves it alone.
 - D5: check 8 can post to `/api/chat` on the production address without meeting the redirect. Each run already sends about 9 `/api/` requests.
+
+## Checks 6, 7 and 9: Vercel Cron, store writes after Stop, and the Upstash tokens
+
+**What D4 adds.**
+
+1. The store: Peter's `resume-deploy-spike-kv` (Upstash for Redis, iad1, pay as you go), attached to Production only with the prefix `KV`. Only the functions hold its variables, so the store calls run in the functions, and `check.ts` reads their flat reports. Every key starts with `spike:` and expires: the stream markers after 15 minutes, the token check's keys after 10 minutes (and it deletes them), the cron record after 7 days.
+2. The store modes of `/api/spike` (`?mode=store`, `stream`, `report-stream`, `report-cron`) answer only when the request's `Host`, `x-forwarded-host` and URL all name a protected host (the deployment URL or the Git branch URL). On the public production address they answer 403, so only a caller with the bypass secret can make them write. The plain `/api/spike` answer (check 2) is unchanged.
+3. `/api/cron/health` records every call: when, the hosts it named, whether its user agent is `vercel-cron/…`, its `x-vercel-cron-schedule`, whether `Authorization` was `Bearer $CRON_SECRET` (a word: `secret`, `absent` or `other`), and the function and commit that answered. It keeps the newest 50 calls. Unlike SPEC-deploy's route, it records a call without the secret too, because what reaches the route is the question. It is public, as SPEC-deploy's route is; the WAF's "api rate limit" bounds it.
+4. The probe cron. Vercel Cron calls only on its schedule, and SPEC-deploy's `17 15 * * *` is hours away from any run. Vercel's docs allow several crons on one path, each call naming its schedule in `x-vercel-cron-schedule`, and on Pro a cron runs "within the minute specified" (https://vercel.com/docs/cron-jobs/manage-cron-jobs). So `post-build.ts` adds a second daily cron on `/api/cron/health`, at the first whole minute 4 minutes after the build (UTC). The record keeps SPEC-deploy's own calls too, so a later read can show the 15:17 call.
+
+**What the checks ask.**
+
+- Check 9 (`?mode=store`), on fresh keys:
+  - the standard token's `/multi-exec` writes a list (`RPUSH`), a hash (`HINCRBY`) and a sorted set (`ZADD GT`, twice, so the lower score must leave the member alone), each with `EXPIREAT` in the same transaction;
+  - the reservation's transaction, as "The daily cap" step 1: `INCRBY` 900000 (the $0.90 in millionths), `EXPIREAT`, `GET` of the spend-limit marker, and `PTTL`, which shows the expiry took; then the take-back, `DECRBY`, which keeps the expiry;
+  - the read-only token's `LRANGE`, `HGETALL`, `ZRANGE … WITHSCORES` and `GET`, one by one and as one `/pipeline`, must read back what was written. Its `/multi-exec` and `SCAN` are recorded;
+  - controls: the read-only token's `SET` and `EXPIREAT` must be refused, with no key made and the expiry unchanged.
+- Check 7 (`?mode=stream`). A "turn" writes once before its stream, where SPEC-deploy reserves; sends up to 40 events 250 ms apart; and after the last event writes twice, as `log.append()` and `telemetry.record()`, the second 2 s after the first, before it ends the stream. The run makes six streams, each followed by 15 s with no request to a function. Streams 1 to 4 run in `/api/spike`, the chat's twin (`maxDuration` 150, iad1), set up as SPEC-deploy sets up `/api/chat`:
+  1. the stopped turn: the run reads 3 events, then aborts its `fetch`, as the browser's Stop does;
+  2. the full turn (control): the run reads to the end, so both writes land while it is connected;
+  3. recorded: the function ends the stream, then writes 2 s later, with no `waitUntil`;
+  4. recorded: the same inside `request.waitUntil`. Nitro's Vercel entry sets it from the context Vercel passes to the function (`req.waitUntil = context?.waitUntil`, `nitro/dist/presets/vercel/runtime/vercel.web.mjs`), so it needs no package;
+  5. recorded: the stopped turn in `/api/spike-cancel` (`?function=cancel`), the same function with `supportsCancellation: true`;
+  6. recorded: the same, with the turn's writes inside `request.waitUntil`.
+  Then the run reads each marker's age from the store's own clock (`PTTL`) and works out when each write landed against its own times, about ±1 s. The pass rule: the stopped turn's two writes are in the store, the second about 2 s after the first, and both landed before the next request reached the function. A write that lands only when a later request arrives would mean the function was frozen until then. The function also reports how it saw the stop: `request.signal`'s abort, the stream's `cancel`, or a failed `enqueue`.
+- Check 6: one plain `GET /api/cron/health` on the production address, without the bypass, must reach `/__server` through the route after the filesystem phase and be recorded. Then the run waits until 30 s after the probe's minute and reads the record every 30 s, for up to 3 minutes. Vercel Cron's call must name the probe's schedule and reach `/__server` at `/api/cron/health`. The line names the host the call reached and whether it is a protected one.
+
+**Local run.** A scratch harness (not committed) ran checks 9, 7 and 6 against the built `__server` function behind a local server, with an in-memory stand-in for Upstash's REST API. All three passed, and every stopped stream saw the stop as `abort` (Bun's own server aborts `request.signal`). A control that held the `record` write 17 s turned check 7 red: "the stopped turn's record landed +19.0 s after its append, not about 2 s". This tests the check code, not Vercel.
 
 ## Seen on the way
 

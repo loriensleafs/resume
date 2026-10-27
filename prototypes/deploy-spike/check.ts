@@ -488,110 +488,116 @@ const IDLE_MS = 15_000;
 /**
  * Check 7: store writes after the last chunk finish when the visitor stops a streamed turn. SPEC-deploy's turn writes
  * log.append() and telemetry.record() after the last chunk (a stand-in in api.spike.ts, mode=stream, kind=turn:
- * the second write comes 2 s after the first). Four streams, each followed by 15 s with no request to the function,
- * so that nothing but the stream itself keeps the function running:
+ * the second write comes 2 s after the first). Six streams, each followed by 15 s with no request to a function,
+ * so that nothing but the stream itself keeps its function running:
  * 1. the stopped turn: the run reads 3 events, then aborts its fetch, as the browser's Stop does;
  * 2. the full turn (control): the run reads to the end, so its writes land while it is connected;
- * 3. after the end, no waitUntil (recorded): the function ends the stream, then writes 2 s later;
- * 4. after the end, with Vercel's waitUntil as Nitro hands it on the request (recorded): the same inside it.
- * Then the run reads each marker's age from the store (PTTL, the store's own clock), so it knows when each write
- * landed against its own times, about ±1 s. A write that lands only after the next request reached the function
- * would mean the function was frozen until then; the pass rule asks for the stopped turn's writes before that.
+ * 3. recorded: the function ends the stream, then writes 2 s later, with no waitUntil;
+ * 4. recorded: the same inside Vercel's waitUntil, as Nitro hands it on the request (request.waitUntil);
+ * 5. recorded: the stopped turn on /api/spike-cancel, the same function with supportsCancellation;
+ * 6. recorded: the same, with the turn's writes inside request.waitUntil.
+ * 1 to 4 run on /api/spike, as SPEC-deploy's chat function is set up. Then the run reads each marker's age from the
+ * store (PTTL, the store's own clock), so it knows when each write landed against its own times, about ±1 s. A
+ * write that lands only after the next request reached the function would mean the function was frozen until
+ * then; the pass rule asks for the stopped turn's writes before that.
  */
 const storeAfterStop: Check = {
   check: 7,
   name: "store writes after Stop",
   ifFails: "use Vercel's waitUntil from @vercel/functions, a new package for Peter's approval",
   async run({ deploymentFetch, report }) {
-    const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()] as const;
-    const path = (kind: string, id: string) => `${SPIKE_PATH}?mode=stream&kind=${kind}&id=${id}`;
-    const at: Record<string, number> = {};
-    const open = async (kind: string, id: string, init?: RequestInit) => {
-      const res = await deploymentFetch(path(kind, id), init);
+    const streams = [
+      { label: "stopped turn", kind: "turn", fn: null, stop: true },
+      { label: "full turn (control)", kind: "turn", fn: null, stop: false },
+      { label: "a write 2 s after the stream's end, no waitUntil", kind: "after-close", fn: null, stop: false },
+      { label: "the same inside request.waitUntil", kind: "after-close-wait", fn: null, stop: false },
+      { label: "with supportsCancellation, stopped turn", kind: "turn", fn: "cancel", stop: true },
+      { label: "with supportsCancellation, stopped turn with its writes inside request.waitUntil", kind: "turn-wait", fn: "cancel", stop: true },
+    ].map((s) => ({ ...s, id: crypto.randomUUID(), sent: 0, end: 0, read: { events: 0, done: false, error: null as string | null } }));
+
+    for (const s of streams) {
+      const stopper = new AbortController();
+      s.sent = Date.now();
+      const res = await deploymentFetch(`${SPIKE_PATH}?${s.fn ? `function=${s.fn}&` : ""}mode=stream&kind=${s.kind}&id=${s.id}`, { signal: stopper.signal });
       if (res.status !== 200 || !res.headers.get("content-type")?.startsWith("text/event-stream")) {
-        throw new Error(`${kind} answered HTTP ${res.status} (${res.headers.get("content-type")}), not an event stream`);
+        throw new Error(`${s.label} answered HTTP ${res.status} (${res.headers.get("content-type")}), not an event stream`);
       }
-      return res;
-    };
+      s.read = await readEvents(res, s.stop ? 3 : null, s.stop ? 10_000 : 30_000);
+      s.end = Date.now(); // the stop, or the stream's end
+      stopper.abort(); // the stop; nothing for a stream that has ended
+      await sleep(IDLE_MS);
+    }
 
-    // 1. The stopped turn.
-    const stopper = new AbortController();
-    at.stopSent = Date.now();
-    const stopRead = await readEvents(await open("turn", ids[0], { signal: stopper.signal }), 3, 10_000);
-    at.stop = Date.now();
-    stopper.abort();
-    await sleep(IDLE_MS);
-    // 2. The full turn.
-    at.fullSent = Date.now();
-    const fullRead = await readEvents(await open("turn", ids[1]), null, 30_000);
-    at.fullEnd = Date.now();
-    await sleep(IDLE_MS);
-    // 3. and 4. Writes after the stream's end.
-    at.closeSent = Date.now();
-    const closeRead = await readEvents(await open("after-close", ids[2]), null, 10_000);
-    at.closeEnd = Date.now();
-    await sleep(IDLE_MS);
-    at.waitSent = Date.now();
-    const waitRead = await readEvents(await open("after-close-wait", ids[3]), null, 10_000);
-    at.waitEnd = Date.now();
-    await sleep(IDLE_MS);
-
-    const read = async () => ({ sent: Date.now(), r: await report(`${SPIKE_PATH}?mode=report-stream&ids=${ids.join(",")}`) });
+    const read = async () => ({ sent: Date.now(), r: await report(`${SPIKE_PATH}?mode=report-stream&ids=${streams.map((s) => s.id).join(",")}`) });
     const first = await read();
     // When a write landed, on the run's clock: the report's time less the marker's age. null: not in the store.
-    const landed = (rep: { sent: number; r: Report }, s: number, marker: string) => {
-      const age = rep.r[`s${s}.${marker}.ageMs`];
+    const landed = (rep: { sent: number; r: Report }, i: number, marker: string) => {
+      const age = rep.r[`s${i}.${marker}.ageMs`];
       return typeof age === "number" ? rep.sent - age : null;
     };
     const rel = (t: number | null, from: number) => (t === null ? "not in the store" : seconds(t - from));
-
+    const next = (i: number) => streams[i + 1]?.sent ?? first.sent; // the run's next request to a function
+    const r = first.r;
     const problems: string[] = [];
     const seen: string[] = [];
-    const r = first.r;
     if (r["read.status"] !== 200) problems.push(`the report could not read the store: HTTP ${r["read.status"]}${word(r["read.error"])}`);
 
-    // The stopped turn: both writes, the second 2 s after the first, before the next request reached the function.
-    const [start0, append0, record0] = ["start", "append", "record"].map((m) => landed(first, 0, m));
-    const ended0 = r["s0.append.ended"];
-    if (start0 === null) problems.push("the stopped turn's write before the stream is not in the store");
-    if (append0 === null || record0 === null) problems.push(`the stopped turn's writes after the last chunk: append ${rel(append0, at.stop!)}, record ${rel(record0, at.stop!)}`);
+    /** A stopped turn: how its function saw the stop, and when its writes landed, from the stop. */
+    const stopped = (i: number) => {
+      const s = streams[i]!;
+      const [start, append, record] = ["start", "append", "record"].map((m) => landed(first, i, m));
+      const ended = r[`s${i}.append.ended`];
+      const how =
+        append === null
+          ? "wrote nothing after the last chunk"
+          : ended === "abort" || ended === "cancel" || ended === "enqueue"
+            ? `saw the stop as "${ended}" after ${r[`s${i}.append.chunks`]} chunks (request.signal aborted: ${r[`s${i}.append.signalAborted`]})`
+            : `did not see the stop: it ended "${ended}" after ${r[`s${i}.append.chunks`]} chunks`;
+      const wait = s.kind === "turn-wait" ? `, waitUntil registered: ${r[`s${i}.append.registered`] ?? "unknown"}` : "";
+      seen.push(
+        `${s.label}: the run read ${s.read.events} events and stopped ${seconds(s.end - s.sent)} after its request; ${r[`s${i}.start.function`] ?? "the function"} ${how}${wait}; ` +
+          `its writes landed, from the stop: before the stream ${rel(start, s.end)}, append ${rel(append, s.end)}, record ${rel(record, s.end)}; the next request came at ${seconds(next(i) - s.end)}`,
+      );
+      return { start, append, record, s };
+    };
+
+    // 1. The stopped turn (judged): both writes, the second 2 s after the first, before the next request.
+    const t = stopped(0);
+    if (t.start === null) problems.push("the stopped turn's write before the stream is not in the store");
+    if (t.append === null || t.record === null) problems.push(`the stopped turn's writes after the last chunk: append ${rel(t.append, t.s.end)}, record ${rel(t.record, t.s.end)}`);
     else {
-      const gap = record0 - append0;
+      const gap = t.record - t.append;
       if (gap < 1_500 || gap > 6_000) problems.push(`the stopped turn's record landed ${seconds(gap)} after its append, not about 2 s: the function was held`);
-      if (record0 > at.fullSent! - 1_000) problems.push(`the stopped turn's record landed ${rel(record0, at.stop!)} after the stop, when the next request had reached the function`);
+      if (t.record > next(0) - 1_000) problems.push(`the stopped turn's record landed ${rel(t.record, t.s.end)} after the stop, when the next request had reached the function`);
     }
-    if (stopRead.events < 3 || stopRead.error) problems.push(`the stopped turn sent ${stopRead.events} events before the stop${stopRead.error ? ` (${stopRead.error})` : ""}`);
-    const sawStop = ended0 === "abort" || ended0 === "cancel" || ended0 === "enqueue";
-    seen.push(
-      `stopped turn: the run read ${stopRead.events} events and stopped ${seconds(at.stop! - at.stopSent!)} after its request; ` +
-        (sawStop
-          ? `the function saw the stop as "${ended0}" after ${r["s0.append.chunks"]} chunks (request.signal aborted: ${r["s0.append.signalAborted"]})`
-          : `the function did not see the stop: it ended "${ended0 ?? "unknown"}" after ${r["s0.append.chunks"] ?? "?"} chunks`) +
-        `; its writes landed, from the stop: before the stream ${rel(start0, at.stop!)}, append ${rel(append0, at.stop!)}, record ${rel(record0, at.stop!)}; the next request came at ${seconds(at.fullSent! - at.stop!)}`,
-    );
+    if (t.s.read.events < 3 || t.s.read.error) problems.push(`the stopped turn sent ${t.s.read.events} events before the stop${t.s.read.error ? ` (${t.s.read.error})` : ""}`);
 
-    // The full turn (control): the done event comes after both writes, so both must land before the stream's end.
+    // 2. The full turn (control): the done event comes after both writes, so both must land before the stream's end.
+    const full = streams[1]!;
     const [append1, record1] = ["append", "record"].map((m) => landed(first, 1, m));
-    if (!fullRead.done || append1 === null || record1 === null || record1 > at.fullEnd! + 1_000 || r["s1.record.ended"] !== "end") {
-      problems.push(`the full turn (control): done event ${fullRead.done}${fullRead.error ? ` (${fullRead.error})` : ""}, append ${rel(append1, at.fullEnd!)}, record ${rel(record1, at.fullEnd!)}, ended "${r["s1.record.ended"]}"`);
+    if (!full.read.done || append1 === null || record1 === null || record1 > full.end + 1_000 || r["s1.record.ended"] !== "end") {
+      problems.push(`the full turn (control): done event ${full.read.done}${full.read.error ? ` (${full.read.error})` : ""}, append ${rel(append1, full.end)}, record ${rel(record1, full.end)}, ended "${r["s1.record.ended"]}"`);
     }
-    seen.push(`full turn (control): ${fullRead.events} events and the done event ${fullRead.done}, append ${rel(append1, at.fullEnd!)} and record ${rel(record1, at.fullEnd!)} from the end`);
+    seen.push(`${full.label}: ${full.read.events} events and the done event ${full.read.done}, append ${rel(append1, full.end)} and record ${rel(record1, full.end)} from the end`);
 
-    // Writes after the stream's end, recorded.
-    seen.push(`a write 2 s after the stream's end, no waitUntil: ${rel(landed(first, 2, "afterClose"), at.closeEnd!)} from the end (${closeRead.events} events)`);
+    // 3. to 6., recorded.
+    seen.push(`${streams[2]!.label}: ${rel(landed(first, 2, "afterClose"), streams[2]!.end)} from the end (${streams[2]!.read.events} events)`);
     seen.push(
-      `the same inside request.waitUntil (on the request: ${r["s3.start.waitUntil"]}, registered: ${r["s3.afterClose.registered"] ?? "unknown"}): ` +
-        `${rel(landed(first, 3, "afterClose"), at.waitEnd!)} from the end (${waitRead.events} events)`,
+      `${streams[3]!.label} (on the request: ${r["s3.start.waitUntil"]}, registered: ${r["s3.afterClose.registered"] ?? "unknown"}): ` +
+        `${rel(landed(first, 3, "afterClose"), streams[3]!.end)} from the end (${streams[3]!.read.events} events)`,
     );
+    stopped(4);
+    stopped(5);
 
     // A write missing at the first read: read once more, to see whether it lands only once a request reaches the function.
-    const missing = [[0, "append"], [0, "record"], [2, "afterClose"], [3, "afterClose"]].filter(([s, m]) => landed(first, s as number, m as string) === null);
+    const missing = ([[0, "append"], [0, "record"], [2, "afterClose"], [3, "afterClose"], [4, "append"], [4, "record"], [5, "append"], [5, "record"]] as const)
+      .filter(([i, m]) => landed(first, i, m) === null);
     if (missing.length) {
       await sleep(10_000);
       const second = await read();
       seen.push(
         `a second read ${seconds(second.sent - first.sent)} after the first: ` +
-          missing.map(([s, m]) => `s${s} ${m} ${rel(landed(second, s as number, m as string), first.sent)} from the first read`).join(", "),
+          missing.map(([i, m]) => `s${i} ${m} ${rel(landed(second, i, m), first.sent)} from the first read`).join(", "),
       );
     }
     return { pass: problems.length === 0, detail: problems.length ? `${problems.join("; ")}; seen: ${seen.join("; ")}` : seen.join("; ") };

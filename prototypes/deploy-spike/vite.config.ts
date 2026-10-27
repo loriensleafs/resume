@@ -34,6 +34,15 @@ export default defineConfig({
           '/api/spike': { maxDuration: 150, regions: ['iad1'], environment: { SPIKE_FUNCTION: '/api/spike' } },
           // The probe: Nitro's documented runtime value, with vercel.json bunVersion "1.4.x".
           '/api/spike-bun1x': { runtime: 'bun1.x', environment: { SPIKE_FUNCTION: '/api/spike-bun1x' } },
+          // Check 7 (D4): the chat's twin with request cancellation on, which Vercel documents for Node.js only
+          // (https://vercel.com/docs/functions/functions-api-reference#cancel-requests). @vercel/build-utils writes the
+          // vercel.json key into the function's config as `supportsCancellation` (dist/lambda.js, 14.12.0).
+          '/api/spike-cancel': {
+            maxDuration: 150,
+            regions: ['iad1'],
+            supportsCancellation: true,
+            environment: { SPIKE_FUNCTION: '/api/spike-cancel' },
+          },
         },
       },
     }),

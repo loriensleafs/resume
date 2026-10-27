@@ -8,12 +8,13 @@
 // numbers, hosts and error words, never a token or a store value it did not write itself.
 // - mode=store (check 9): the key table's writes and the reservation through /multi-exec with EXPIREAT, then the
 //   reader's commands (LRANGE, HGETALL, ZRANGE, GET) with the read-only token, and a write with it as a control.
-// - mode=stream&kind=turn|after-close|after-close-wait&id=<uuid> (check 7): a server-sent-event stream. "turn" is
-//   SPEC-deploy's turn: one write before the stream (the reservation's place), then 40 chunks 250 ms apart, which a
-//   stop ends early, then after the last chunk two writes (log.append() and telemetry.record()), 2 s apart, then
-//   the end of the stream. "after-close" writes 2 s after the stream has ended, with no waitUntil; "after-close-wait"
-//   does the same inside Vercel's waitUntil, which Nitro's Vercel entry puts on the request (request.waitUntil).
-//   Each write is a marker key spike:stream:<id>:<name> that expires after 15 minutes.
+// - mode=stream&kind=turn|turn-wait|after-close|after-close-wait&id=<uuid> (check 7): a server-sent-event stream.
+//   "turn" is SPEC-deploy's turn: one write before the stream (the reservation's place), then 40 chunks 250 ms
+//   apart, which a stop ends early, then after the last chunk two writes (log.append() and telemetry.record()), 2 s
+//   apart, then the end of the stream. "after-close" writes 2 s after the stream has ended, with no waitUntil. The
+//   "-wait" kinds do the same inside Vercel's waitUntil, which Nitro's Vercel entry puts on the request
+//   (request.waitUntil). Each write is a marker key spike:stream:<id>:<name> that expires after 15 minutes.
+//   `?function=cancel` sends a request to /api/spike-cancel, this function with supportsCancellation (vite.config.ts).
 // - mode=report-stream&ids=<uuid>,... (check 7): each marker's age in ms (from PTTL, the store's own clock) and the
 //   facts the turn wrote into it, so check.ts can tell when each write landed.
 // - mode=report-cron&schedule=<probe>&spec=<schedule> (check 6): what spike:cron:calls holds about the calls that
@@ -38,6 +39,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const SCHEDULE = /^[0-9*/ ,-]{1,40}$/
 const MARK_MS = 15 * 60_000 // a stream marker's expiry
 const MARKERS = ['start', 'append', 'record', 'afterClose'] as const
+const STREAM_KINDS = ['turn', 'turn-wait', 'after-close', 'after-close-wait'] as const
+type StreamKind = (typeof STREAM_KINDS)[number]
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const json = (body: Flat, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store' } })
@@ -140,18 +143,20 @@ async function storeCheck(): Promise<Flat> {
  * Check 7: a server-sent-event stream that writes markers. The client stops a "turn" by aborting its fetch; the
  * function sees that as request.signal's abort, the stream's cancel, or a failed enqueue, whichever comes first.
  */
-async function stream(request: Request, kind: 'turn' | 'after-close' | 'after-close-wait', id: string): Promise<Response> {
+async function stream(request: Request, kind: StreamKind, id: string): Promise<Response> {
   const key = (name: string) => `spike:stream:${id}:${name}`
   const mark = (name: (typeof MARKERS)[number], value: Flat) =>
     multiExec('standard', [['PSETEX', key(name), MARK_MS, JSON.stringify(value)]])
   const waitUntil = (request as Request & { waitUntil?: (promise: Promise<unknown>) => void }).waitUntil
   const state: { ended: 'abort' | 'cancel' | 'enqueue' | null } = { ended: null }
   request.signal.addEventListener('abort', () => void (state.ended ??= 'abort'), { once: true })
+  const turn = kind === 'turn' || kind === 'turn-wait'
 
-  // after-close-wait: the write after the stream's end runs inside Vercel's waitUntil, registered while the request lives.
+  // turn-wait and after-close-wait: the writes after the last chunk, or after the stream's end, run inside Vercel's
+  // waitUntil, registered while the request lives and settled after the last write.
   let settled = () => {}
   let registered = false
-  if (kind === 'after-close-wait' && typeof waitUntil === 'function') {
+  if ((kind === 'turn-wait' || kind === 'after-close-wait') && typeof waitUntil === 'function') {
     try {
       waitUntil.call(request, new Promise<void>((resolve) => (settled = resolve)))
       registered = true
@@ -161,11 +166,11 @@ async function stream(request: Request, kind: 'turn' | 'after-close' | 'after-cl
   }
 
   // Before the stream, where SPEC-deploy's turn makes its reservation.
-  await mark('start', { kind, waitUntil: typeof waitUntil === 'function' })
+  await mark('start', { kind, waitUntil: typeof waitUntil === 'function', function: process.env.SPIKE_FUNCTION ?? null })
 
   const encoder = new TextEncoder()
   const run = async (controller: ReadableStreamDefaultController<Uint8Array>) => {
-    const max = kind === 'turn' ? 40 : 4
+    const max = turn ? 40 : 4
     let chunks = 0
     while (state.ended === null && chunks < max) {
       try {
@@ -178,12 +183,13 @@ async function stream(request: Request, kind: 'turn' | 'after-close' | 'after-cl
       await sleep(250)
     }
     const ended = state.ended ?? 'end'
-    if (kind === 'turn') {
+    if (turn) {
       // After the last chunk: log.append(), then telemetry.record(), one transaction each. The 2 s between them
       // stand for a slow settle, so the second write shows whether the function still runs well after a stop.
-      await mark('append', { ended, chunks, signalAborted: request.signal.aborted })
+      await mark('append', { ended, chunks, signalAborted: request.signal.aborted, registered })
       await sleep(2_000)
       await mark('record', { ended, chunks })
+      settled()
       try {
         controller.enqueue(encoder.encode('data: {"done":true}\n\n'))
         controller.close()
@@ -288,13 +294,13 @@ export const Route = createFileRoute('/api/spike')({
         if (!onProtectedHost(request)) return json({ refused: true, ...requestHosts(request) }, 403)
         if (mode === 'store') return json(await storeCheck())
         if (mode === 'stream') {
-          const kind = url.searchParams.get('kind')
+          const kind = url.searchParams.get('kind') as StreamKind | null
           const id = url.searchParams.get('id') ?? ''
-          if ((kind === 'turn' || kind === 'after-close' || kind === 'after-close-wait') && UUID.test(id)) return stream(request, kind, id)
+          if (kind !== null && STREAM_KINDS.includes(kind) && UUID.test(id)) return stream(request, kind, id)
         }
         if (mode === 'report-stream') {
           const ids = (url.searchParams.get('ids') ?? '').split(',')
-          if (ids.length >= 1 && ids.length <= 4 && ids.every((id) => UUID.test(id))) return json(await streamReport(ids))
+          if (ids.length >= 1 && ids.length <= 6 && ids.every((id) => UUID.test(id))) return json(await streamReport(ids))
         }
         if (mode === 'report-cron') {
           const probe = url.searchParams.get('schedule') ?? ''
