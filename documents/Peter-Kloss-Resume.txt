@@ -1,0 +1,62 @@
+Peter Kloss
+Front-End Platform Engineer, Design Systems and AI Developer Tooling
+Redmond, WA | pkloss@gmail.com
+linkedin.com/in/peter-kloss-a0613061 | github.com/loriensleafs
+
+SUMMARY
+
+Front-end platform engineer with 15+ years building what product teams build on: design systems, shared packages and monorepo tooling. At Highspot, led the organization-wide MCP server that gives AI coding agents the design system’s contract, used by ~100 people, and built the platform team’s agent workflow system. Before that, led front-end architecture for FedNow, the Federal Reserve’s instant payment service.
+
+EXPERIENCE
+
+Highspot | Dec 2024 – Aug 2026
+Sr. Software Development Engineer, Polar UI design system team | Seattle, WA
+- Led the organization-wide effort to build the polar-ui MCP server, the design system’s contract for AI coding agents, so agent-written UI follows the design system, including complex components such as the data table. It worked alongside the Figma MCP and became a standard part of every Cursor and Claude Code setup for front-end work, used by ~100 people across all application teams, design, and product.
+- Introduced many of the team’s AI development standards: spec-driven development, shared skills and agents checked into the repo, agent context files (CLAUDE.md, AGENTS.md), and rules that keep agents on Polar UI components.
+- Designed and rolled out an agent workflow system for the platform team, built in TypeScript on Bun: specialist agents and skills turn specs into dependency-mapped plans, where plans and tasks both carry dependencies, so up to 4 developers and their agents know which work is unblocked, claimed, or safe to run in parallel.
+- Used that system to build two major components: a streaming Markdown component, and a TanStack-based data table, built after an AG Grid Enterprise license was blocked and defined by 21 specs and 189 requirement documents.
+- Built accessible React and TypeScript components (WCAG, ARIA) from Figma designs and design tokens, with end-to-end tests in TestCafe and Playwright and visual regression tests.
+
+Federal Reserve Bank of Boston (FedNow) | 2021 – 2024
+Lead Front-End Engineer (promoted from Sr. UI Front End Developer) | Boston, MA
+- Led front-end architecture across FedNow applications, aligning Product, UX, back-end, QA and security teams on one consistent, scalable approach.
+- Cut initial bundle size from over 15 MB to under 1 MB across multiple applications without delaying FedNow’s launch, through code splitting and lazy loading, micro-frontends, a new build setup, fewer heavy dependencies, and design system and shared packages rebuilt as tree-shakeable ES modules. A Git plugin flagged oversized modules for further splitting.
+- Built and maintained the FedNow design system and shared npm packages, used by FedNow’s internal and external applications and its internal platform tools, including several QA applications.
+- Wrote front-end standards adopted by 5+ teams, which reduced code review issues, and built a testing harness that raised test coverage across the organization.
+- Mentored 20+ developers one-on-one and ran weekly office hours open to every development team.
+
+Pippin Title | 2020 – 2021
+Senior Front-End Engineer | Boston, MA
+- Drove the migration from AngularJS to React while feature work continued.
+- Architected and documented a design system on Chakra UI and Styled System.
+- Automated generation of React GraphQL queries from the schema with GraphQL Codegen; led the Stripe payments integration.
+
+LinkSquares | 2019 – 2020
+Senior Front-End Engineer | Boston, MA
+- Built a Storybook-documented design system that let the product move to a new look incrementally.
+- Moved the app to a GraphQL architecture that generated fully typed fragments, queries and mutations colocated with their React components.
+- Built an OCR review widget that flagged words under 90% confidence so clients could correct them quickly.
+
+Sheridan PubFactory | 2017 – 2019
+Senior Front-End Engineer | Boston, MA
+- Built a themeable design system and dynamic templates that let publishing customers create their own themes and layouts from the UI.
+
+Jack Morton Worldwide | 2016 – 2017
+Senior Front-End Engineer | Boston, MA
+- Re-architected Subway’s digital menu boards, the agency’s top-priority project: dynamically loaded modules and a custom animation library tuned to proprietary hardware, migrated without missing deliverables.
+
+Earlier roles
+- Harvard Business School, Front-End Engineer | 2015 – 2016
+- Six Red Marbles, Software Engineer | 2013 – 2015
+- Brigham and Women’s Hospital, UX Engineer | 2009 – 2012
+
+SKILLS
+
+AI platform: MCP servers (including Figma MCP), Claude Code and Cursor (skills, subagents, hooks, plugins), spec-driven development, multi-agent workflow orchestration
+Front end: TypeScript, React, Lit and Web Components, accessibility (WCAG, ARIA), design tokens, TanStack Table, React Query, GraphQL (Apollo, Codegen), Chakra UI, Storybook, Figma
+Platform and tooling: Bun, Node.js, monorepos, webpack, Vite, Rollup, changesets, npm publishing, GitHub Actions, Docker, Podman
+Testing: Jest, TestCafe, Playwright, visual regression testing
+
+EDUCATION
+
+University of Massachusetts Amherst
