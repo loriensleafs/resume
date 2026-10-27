@@ -1,6 +1,6 @@
 # Spec: agents
 
-Approved by Peter on 2026-10-27 (decision record row 142). Peter's answers for this spec are [decision record](../docs/design/interview-2026-10-26.md) Intent paragraph and rows 140 and 141, and his confirmation of the intent on 2026-10-27. Amended on 2026-10-27 with the capability check (row 147), and with Peter's standing approval for every push (row 151).
+Approved by Peter on 2026-10-27 (decision record row 142). Peter's answers for this spec are [decision record](../docs/design/interview-2026-10-26.md) Intent paragraph and rows 140 and 141, and his confirmation of the intent on 2026-10-27. Amended on 2026-10-27 with the capability check (row 147), and with Peter's standing approval for every push (row 151). The `update-mockups` steps put Peter's approval before the new images reach `main` (a conductor decision for his review, [build decisions](../docs/design/build-decisions.md)).
 
 ## Objective
 
@@ -153,9 +153,9 @@ A change to an approved source follows the edit rule: it waits on a branch until
 
 1. Read the design request against the approved specs. A change of product behavior needs Peter's decision first. Done when the change is settled.
 2. Read the canvas "Resume site mockups" with its type's instructions, edit only the boards the change needs, and publish them in one call. Done when the canvas has a new version.
-3. Copy the changed boards and `canvas.json` to `prototypes/site-mockups/boards/` on the branch `prototype/site-mockups`, render the images with its `export.ts`, and commit and push the branch. Done when the branch is pushed.
-4. Replace the changed images in `docs/design/mockups/`, update its README, run the before-commit checks, and commit and push `main`. Board sources never go to `main`. Done when `main` is pushed.
-5. Put the changed boards to Peter for approval. Done when he approved, or named changes; changes go back to step 2.
+3. Copy the changed boards and `canvas.json` to `prototypes/site-mockups/boards/` on the branch `prototype/site-mockups`, render their images with its `export.ts` into a folder outside both checkouts, and commit and push the branch. Done when the branch is pushed.
+4. Look at each new image for the change and for private details, then put the changed boards and their images to Peter for approval. Done when he approved, or named changes; changes go back to step 2.
+5. Replace the changed images in `docs/design/mockups/`, update its README, run the before-commit checks, and commit and push `main` with Peter's approval row. Board sources never go to `main`. Done when `main` is pushed.
 
 **Settings.** Every docs-server entry runs the same command: `bun run --silent design-system-mcp`, with the server name `acme-design-system`. `.gemini/settings.json`:
 

@@ -85,7 +85,7 @@ Needs Peter: no
 Delivers: an agent changing the mockups updates the canvas, the branch sources and the images on `main` together. An agent without the Artifact tool stops after step 1 and tells Peter.
 Blocked by: A2
 Acceptance:
-- `.agents/skills/update-mockups/SKILL.md` has SPEC-agents' five steps, each with a "Done when" line. The decision in step 1 and the approval in step 5 go through `brain:ask-user-question`. Board sources never go to `main`.
+- `.agents/skills/update-mockups/SKILL.md` has SPEC-agents' five steps, each with a "Done when" line. The decision in step 1 and the approval in step 4 go through `brain:ask-user-question`. Board sources never go to `main`.
 - Paths that exist only on the branch `prototype/site-mockups` (`prototypes/site-mockups/boards/`, `export.ts`) are code spans, not links.
 - `.claude/skills/update-mockups` links to the skill, and `bun test ./__tests__` passes.
 Verify: `bun test ./__tests__`; `ls -l .claude/skills`
