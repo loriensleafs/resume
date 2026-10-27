@@ -30,7 +30,7 @@ A missing skill: load it, then continue. A skill that may apply: load it. A docs
 
 | Module | Spec | Folders | Tests | State |
 |---|---|---|---|---|
-| content | [SPEC-content](spec/SPEC-content.md) | `resume.yaml`, `src/content.ts`, `src/build.ts`, `src/print/`, `src/export/`, `documents/` | `bun test src/__tests__ scripts/__tests__/documents` | built; T1 to T4 add its amendments |
+| content | [SPEC-content](spec/SPEC-content.md) | `resume.yaml`, `src/content.ts`, `src/build.ts`, `src/private-details.ts`, `src/print/`, `src/export/`, `documents/` | `bun test src/__tests__ scripts/__tests__/documents` | built; T1 to T4 add its amendments |
 | knowledge | [SPEC-knowledge](spec/SPEC-knowledge.md) | `knowledge/`, `src/knowledge/` | `bun test src/knowledge` | first version built; K1 to K13 build the two layers |
 | site | [SPEC-site](spec/SPEC-site.md) | `src/site/`, `public/` | `bun test src/site` | spec approved |
 | chat | [SPEC-chat](spec/SPEC-chat.md) | `src/chat/`, `evals/` | `bun test src/chat` | spec approved |

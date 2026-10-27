@@ -34,7 +34,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [D7](modules/deploy.md#d7-ci-runs-the-build-the-tests-and-the-audits) CI runs the build, the tests and the audits — blocked by none
 - [x] Peter: the spike's setup: a Vercel Pro team ($20 a month from here on), the throwaway project from `prototype/deploy-spike` (root `prototypes/deploy-spike/`, Standard Protection, no domains, no Anthropic key) and its automation bypass secret as an Actions secret — blocks D1 (done 2026-10-27: team Peter Kloss, project `resume-deploy-spike`, secret `VERCEL_AUTOMATION_BYPASS_SECRET`; details in D1's body)
 - [x] [D1](modules/deploy.md#d1-deploy-spike-part-1-the-throwaway-project-builds-the-spike-branch) Deploy spike, part 1: the throwaway project builds the spike branch — blocked by Peter's spike setup (done 2026-10-27; check 1 passes: Vercel builds with Bun 1.4 when bunVersion is "1.4.x" or the lockfile is version 2)
-- [ ] [D2](modules/deploy.md#d2-deploy-spike-part-2-the-post-build-routes-and-the-function-runtime) Deploy spike, part 2: the post-build routes and the function runtime — blocked by D1
+- [x] [D2](modules/deploy.md#d2-deploy-spike-part-2-the-post-build-routes-and-the-function-runtime) Deploy spike, part 2: the post-build routes and the function runtime — blocked by D1 (done 2026-10-27; checks 2 and 3 pass; the cron is verified by D4 check 6)
 - [ ] [D3](modules/deploy.md#d3-deploy-spike-part-3-headers-the-redirect-the-pdf-and-the-vercel-toolbar) Deploy spike, part 3: headers, the redirect, the PDF and the Vercel Toolbar — blocked by D2 and Peter turning the Vercel Toolbar off for production on the throwaway project (done 2026-10-27, at team level); Peter: open the spike's PDF in Chrome (check 10)
 - [ ] [D4](modules/deploy.md#d4-deploy-spike-part-4-vercel-cron-store-writes-after-stop-and-the-upstash-tokens) Deploy spike, part 4: Vercel Cron, store writes after Stop, and the Upstash tokens — blocked by D2 and Peter's pay-as-you-go Upstash database on the throwaway project (done 2026-10-27); Peter: approve `@vercel/functions` only if check 7 fails
 - [ ] [D5](modules/deploy.md#d5-deploy-spike-part-5-the-waf-rules-and-the-status-helper) Deploy spike, part 5: the WAF rules and the status helper — blocked by D2 and Peter's three WAF rules on the throwaway project (done 2026-10-27)
@@ -44,11 +44,11 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 ## Phase 1: foundations
 
 - [x] [A3](modules/agents.md#a3-every-agent-reaches-the-docs-server-and-gemini-cli-reads-agentsmd) Every agent reaches the docs server, and Gemini CLI reads `AGENTS.md` — blocked by A1 (done 2026-10-27)
-- [ ] [A4](modules/agents.md#a4-the-agent-files-checks-cover-links-scripts-and-private-details-everywhere) The agent files' checks cover links, scripts and private details everywhere — blocked by A1 (runs after A3: same test file)
-- [ ] [A6](modules/agents.md#a6-the-update-mockups-repo-skill) The `update-mockups` repo skill — blocked by A2
+- [x] [A4](modules/agents.md#a4-the-agent-files-checks-cover-links-scripts-and-private-details-everywhere) The agent files' checks cover links, scripts and private details everywhere — blocked by A1 (runs after A3: same test file) (done 2026-10-27; the shared rule src/private-details.ts)
+- [x] [A6](modules/agents.md#a6-the-update-mockups-repo-skill) The `update-mockups` repo skill — blocked by A2 (done 2026-10-27; the mockups branch renders again)
 - [ ] [T1](modules/content.md#t1-each-role-has-its-short-label-x-short) Each role has its short label (`x-short`) — blocked by none; Peter: its wording draft goes to his one review before D37 (row 153)
 - [x] [T2](modules/content.md#t2-bun-run-documents-writes-the-committed-public-documents-and-their-inputs-hash) `bun run documents` writes the committed public documents and their inputs hash — blocked by none (T1 first is preferred) (done 2026-10-27)
-- [ ] [T3](modules/content.md#t3-the-documents-test-checks-the-committed-files-against-a-fresh-build) The documents test checks the committed files against a fresh build — blocked by T2
+- [x] [T3](modules/content.md#t3-the-documents-test-checks-the-committed-files-against-a-fresh-build) The documents test checks the committed files against a fresh build — blocked by T2 (done 2026-10-27)
 - [ ] [A5](modules/agents.md#a5-edit-resume-covers-the-short-labels-and-the-committed-documents) `edit-resume` covers the short labels and the committed documents — blocked by T1, T2, A2
 - [ ] [Checkpoint agents: checks complete](modules/agents.md#checkpoint-agents-checks-complete) — after A3 to A6
 - [ ] [T4](modules/content.md#t4-the-content-module-lands) The content module lands — blocked by T1, T3, A1; Peter: read the fresh-session result
