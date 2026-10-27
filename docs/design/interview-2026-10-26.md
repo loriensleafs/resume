@@ -26,9 +26,18 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 14 | Hosting | Peter: "I’m happy to pay a little bit for the hosting of this." Host: Vercel ([0012](../decisions/0012-vercel-pro-host.md)). The first version of this question mixed host and plan; Peter answered `/wait-what`, and it was split |
 | 15 | Vercel plan | Pro, $20/month |
 | 16 | Chat model | Claude Sonnet 5.5 ([0013](../decisions/0013-claude-sonnet-model.md)) |
+| 17 | Logistics: work arrangement | "Any arrangement nearby". Approved wording in `knowledge/logistics.yaml` |
+| 18 | Logistics: location | "I'd consider relocating for the right role" |
+| 19 | Logistics: availability | Available now. Peter added: "The only caveat to the being able to start immediately is if I need to relocate, that could change things." |
+| 20 | Logistics: target roles | Senior, Staff or Lead roles in front-end platform engineering, design systems, and AI developer tooling and AI platform work. Peter approved all four answers together |
+| 21 | Site: the look of the resume page (the PDF's look, the PDF's look plus side navigation, or a new web design) | A new web design. The recommendation was the PDF's look |
+| 22 | Site: what a visitor sees first (resume, chat or featured deep dives) | The chat first. The recommendation was the resume first |
+| 23 | Site: test seams | The site build output, plus one real-browser test |
+| 24 | Site: speed and accessibility targets | No WCAG 2.2 AA violations; main content visible in under 2.5 s and layout shift under 0.1 on a throttled phone profile; first-load JavaScript under 200 KB compressed |
+
+After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
 ## Still open
 
-- The logistics answers: remote or on-site, location, availability, target roles.
-- The deep dives: which highlights get one, and the interview for each.
+- The site's visual design: Peter's review of the mockups.
 - A domain name, if Peter wants one (Peter buys it; agents never buy).
