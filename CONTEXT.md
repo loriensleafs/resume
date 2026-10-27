@@ -232,6 +232,18 @@ _Avoid_: orchestrator
 One task building in its own git worktree; up to 3 build at once (row 150).
 _Avoid_: slot, worker
 
+**Mockup**:
+The approved look of a view of the site or the chat, kept in three copies: a board on the canvas, its board source, and its images in `docs/design/mockups/` on `main`. The specs of the site and the chat are written from the mockups.
+_Avoid_: wireframe, screenshot, "design" alone
+
+**Canvas**:
+Peter's private Claude Design canvas "Resume site mockups", which holds every board. Each publish gives it a new version number.
+_Avoid_: Figma file, design file
+
+**Board**:
+One drawing on the canvas at a fixed size: a view, or the states of one part, in light mode and often in dark mode. Its copy on the branch `prototype/site-mockups` is its board source.
+_Avoid_: artboard, frame, screen; "page" (a page of the canvas holds many boards)
+
 **Wording draft**:
 A text that a task writes from the mockups and the spec for Peter's approval (row 153). Its file keeps it after he approves it, with the status "approved".
 _Avoid_: "draft" alone, which the glossary keeps out for a queued question
