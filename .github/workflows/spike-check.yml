@@ -1,0 +1,50 @@
+# PROTOTYPE (deploy spike, tasks D1 to D5). This file lives on prototype/deploy-spike only and never reaches main.
+# Each push to the spike branch builds a protected production deployment on the throwaway Vercel project
+# (root folder prototypes/deploy-spike). This workflow waits for that commit's deployment and runs check.ts
+# against it. It prints verdicts, states and hosts only; the bypass secret stays in the environment.
+name: spike-check
+
+on:
+  push:
+    branches: [prototype/deploy-spike]
+
+permissions:
+  contents: read
+  statuses: read
+
+concurrency:
+  group: spike-check
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: prototypes/deploy-spike
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Wait for this commit's deployment
+        id: deployment
+        timeout-minutes: 16
+        run: bun check.ts wait
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # The project's Git branch URL: <project>-git-<branch>-<team>.vercel.app
+          # https://vercel.com/docs/deployments/generated-urls#generated-from-git
+          SPIKE_BRANCH_HOST: resume-deploy-spike-git-prototype-deploy-spike-peterkloss.vercel.app
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+      - name: Run the spike checks
+        run: bun check.ts run "$ORIGIN"
+        env:
+          ORIGIN: ${{ steps.deployment.outputs.origin }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
