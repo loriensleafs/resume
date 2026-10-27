@@ -29,6 +29,11 @@ export type Source = {
 export type SourceFile = { status: "draft" | "approved"; source: Source };
 
 const NOT_PUBLIC = "Not public";
+/**
+ * A line that looks like the Not public heading at any level, case or spacing. Only the exact
+ * "## Not public" is that heading; a near miss would make its text a passage.
+ */
+const LIKE_NOT_PUBLIC = /^\s*#+\s*not\s+public\b/i;
 /** The end of an interview heading whose answer goes on from the passage before it. */
 const CONTINUED = " (continued)";
 /** In an approved source (SPEC-knowledge, Objective; Sources, "Summary"). */
@@ -65,11 +70,17 @@ const sourceFrontMatter = z
     path: ["approved"],
   });
 
-/** Splits the body into "## " sections; a heading needs text, and text before the first one is not allowed. */
+/**
+ * Splits the body into "## " sections. A heading needs text, a line that only looks like the Not
+ * public heading stops it, and text before the first section is not allowed.
+ */
 function splitSections(body: string, file: string): { heading: string; text: string }[] {
   const sections: { heading: string; lines: string[] }[] = [];
   const preamble: string[] = [];
   for (const line of body.split("\n")) {
+    if (line !== `## ${NOT_PUBLIC}` && LIKE_NOT_PUBLIC.test(line)) {
+      throw new KnowledgeError(file, `${JSON.stringify(line)} looks like the ${NOT_PUBLIC} heading: write it exactly "## ${NOT_PUBLIC}"`);
+    }
     const heading = line.match(/^## (.*)$/)?.[1]?.trim();
     if (heading === "") throw new KnowledgeError(file, 'a "## " heading has no text');
     if (heading) sections.push({ heading, lines: [] });
@@ -124,7 +135,8 @@ function approvalProblems(source: Source): string[] {
 
 /** One source file as a source with numbered passages; stops with the file and the field on a broken shape. */
 export function parseSource(text: string, file: string): SourceFile {
-  const match = text.match(/^---\n([\s\S]*?)\n---(?:\n([\s\S]*))?$/);
+  // One line ending first, so a stray carriage return never hides a heading in the text above it.
+  const match = text.replace(/\r\n?/g, "\n").match(/^---\n([\s\S]*?)\n---(?:\n([\s\S]*))?$/);
   if (!match) throw new KnowledgeError(file, "must start with front matter between --- lines");
   const [, yaml, body = ""] = match as unknown as [string, string, string | undefined];
 

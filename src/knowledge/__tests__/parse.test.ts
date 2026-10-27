@@ -183,6 +183,31 @@ describe("parseSource", () => {
     expect(parseSource(deepDiveFile({}, body), SOURCE_FILE).source.notPublic).toBe("");
   });
 
+  test("reads a file with CRLF or CR line endings as it reads the same file with LF", () => {
+    for (const file of [deepDiveFile(), interviewFile()]) {
+      expect(parseSource(file.replaceAll("\n", "\r\n"), SOURCE_FILE)).toEqual(parseSource(file, SOURCE_FILE));
+      expect(parseSource(file.replaceAll("\n", "\r"), SOURCE_FILE)).toEqual(parseSource(file, SOURCE_FILE));
+    }
+  });
+
+  test("keeps Not public text out of every passage when its heading line ends with a carriage return", () => {
+    const deepDive = parseSource(deepDiveFile({}, DEEP_DIVE_BODY.replace("## Not public\n", "## Not public\r\n")), SOURCE_FILE).source;
+    expect(deepDive.passages.at(-1)!.text).toBe("Text for Tools.");
+    expect(deepDive.notPublic).toBe("Internal code.");
+    const middle = "## Why platform work?\n\nAn answer.\n\n## Not public\r\n\nSECRET.\n\n## Not public\n\nColleague names.\n";
+    expect(failure(interviewFile({}, middle))).toContain("the last section, and only the last, must be Not public");
+  });
+
+  test.each(["## not public", "## Not Public", "## NOT PUBLIC", "## Not public ", "##  Not public", "## Not  public", "## Not public", "## Not\tpublic", " ## Not public", "##Not public", "### Not public", "## Not public ##"])(
+    "stops on %p, a line that looks like the Not public heading, and never makes it a passage",
+    (line) => {
+      const body = `## Why platform work?\n\nAn answer.\n\n${line}\n\nSECRET.\n\n## Not public\n\nColleague names.\n`;
+      const message = failure(interviewFile({}, body));
+      expect(message).toContain(`${JSON.stringify(line)} looks like the Not public heading: write it exactly "## Not public"`);
+      expect(message).not.toContain("SECRET");
+    },
+  );
+
   test("stops on a section heading with no text", () => {
     expect(failure(interviewFile({}, "## \n\nAn answer.\n\n## Not public\n\nColleague names.\n"))).toContain('a "## " heading has no text');
   });
