@@ -46,6 +46,7 @@ Each push to the branch starts `spike-check`, which runs on `ubuntu-24.04` with 
 2. After `success`, it reads `/build-info.json` from the project's Git branch URL, `resume-deploy-spike-git-prototype-deploy-spike-peterkloss.vercel.app`, until the file names this commit. The file's `VERCEL_URL` is the deployment's own address.
 3. It then reads `/api/build-info.json` from the production address, `project-8ar0o.vercel.app`, until that address serves the same commit, because the production address can lag the commit status. The `/api/` copy stays reachable after D3 adds the host redirect there, because SPEC-deploy's redirect leaves `/api/` alone. The polling on the protected hosts uses `/build-info.json`, so it does not count against the WAF's `/api/` rule.
 4. `bun check.ts run` runs every check in `CHECKS`, in order, and prints one line per check: `check <n> (<name>): pass|FAIL: <what it saw>`, and for a failure the change from the spec's "If it fails" column. A check that throws gets a FAIL line, and the next check still runs. Then it prints `check 10 (PDF in Chrome's viewer): manual, Peter's: <the PDF on the deployment URL>`, the address for Peter's check.
+5. Last, the job `waf` runs `bun check.ts waf` on a runner of its own: check 8 alone, against the same deployment, whatever the verdicts of step 4 (D5, see "Check 8").
 
 The wait and the checks share one bound: 15 minutes from the start of the wait. The job's own timeout is 17 minutes, which adds room for setup. A newer push cancels the run, and only the newest run is worth a rerun: an older one waits for a commit that the branch URL no longer serves.
 
@@ -66,7 +67,7 @@ The bypass secret is read in one place, and it goes only to hosts that match thi
 
 Notes for later checks:
 - Check 6: Vercel Cron calls on its own schedule, so the check waits inside the run's bound. A newer push cancels the run (`concurrency`), and with it the wait.
-- Check 8: the WAF rules count per IP address over 10 minutes. A rerun within 10 minutes meets the old count, so check 8 runs last.
+- Check 8: the WAF rules count per IP address over 10 minutes. A rerun within 10 minutes meets the old count, so check 8 runs last, in the job `waf` (see "Check 8").
 
 Why this route. With the project's settings, Vercel posts only a commit status, whose link is the dashboard, not the deployment's address; `deployment_status` and `repository_dispatch` are off, and `repository_dispatch` reaches only workflows on `main` anyway.
 
@@ -87,11 +88,11 @@ Why this route. With the project's settings, Vercel posts only a commit status, 
 | 5 | A host redirect keeps the query string | D3 | Pass, 2026-10-27 (run 40583006081, and 40581693149, 40582697904). On the production `.vercel.app` address the route answers 308, and Vercel adds the request's query to the route's `Location`; `/api/` is not redirected. The route needs no query of its own. Vercel writes the query again (`+` becomes `%20`), and the 308 carries the header routes' headers |
 | 6 | Vercel Cron reaches `/api/cron/health` under Standard Protection | D4 | Pending |
 | 7 | Store writes finish after a stopped stream | D4 | Pending |
-| 8 | The WAF rules' case handling and content-type condition | D5 | Pending |
+| 8 | The WAF rules' case handling and content-type condition | D5 | Pass on a preview, 2026-10-27 (runs 40587839966, attempts 1 and 2, and 40588287129). A chat POST with `Content-Type: text/plain` gets the WAF's 403; malformed JSON chat POSTs get the not-found page until the 21st, which gets the WAF's 429. The path condition matches `/API/chat` regardless of case, and it decodes `%63`. Both WAF answers carry `x-vercel-mitigated: deny`. See "Check 8" |
 | 9 | What the Upstash tokens can run | D4 | Pending |
 | 10 | Chrome's PDF viewer with the site's headers | D3 | Pass, 2026-10-27, Peter's check by hand (decision record row 160): he opened https://resume-deploy-spike-26t9pe7rk-peterkloss.vercel.app/Peter-Kloss-Resume.pdf in Chrome, signed in to Vercel, and "Both pages show". That deployment is run 40583006081's; check 4 shows the PDF served byte for byte with the six headers, no policy, `content-type: application/pdf` and `content-disposition: inline` |
 | 11 | The Vercel Toolbar stays off | D3 | Pass for the production setting; the header's own effect is not proven. 2026-10-27, runs 40583006081, 40581693149 and 40582697904 on production deployments. They prove: with the toolbar off for production, Chrome on the deployment URL makes no request to `vercel.live`, has no toolbar element and no policy violation, and receives the built file byte for byte; a plain request without `x-vercel-skip-toolbar` also gets the built file; planted controls prove the listener and both policies work. They do not prove that `x-vercel-skip-toolbar` keeps an enabled toolbar off. Preview run 40584951645 (toolbar on by default) shows that check 11 goes red there: a plain request without the header got other bytes. But headless Chrome got the built file with and without the header, so the header's effect was not seen. Gap for D6; see "Check 11 on a preview" |
-| 12 | The status helper's name and Deployment Checks | D5 | Pending |
+| 12 | The status helper's name and Deployment Checks | D5 | Moved to D32 and setup step 10 (main's decision, 2026-10-27): it needs a workflow on `main`. See "Check 12" |
 
 ## Check 1: the build's Bun
 
@@ -389,6 +390,105 @@ What it shows:
 
 - D4: the production address now answers 308 for every path outside `/api/`. Vercel Cron's `/api/cron/health` is under `/api/`, so the redirect leaves it alone.
 - D5: check 8 can post to `/api/chat` on the production address without meeting the redirect. Each run already sends about 9 `/api/` requests.
+
+## Check 8: the WAF rules
+
+**The rules.** Peter published SPEC-deploy's three rules ("Rate limits") on the throwaway project on 2026-10-27, in this order. Each path condition uses Vercel's "Request Path" field. The windows, keys and the api rule's two groups are from D5's task body.
+
+| Order | Rule | Matches | Action |
+|---|---|---|---|
+| 1 | "chat content type" | Path starts with `/api/chat`, method `POST`, and `Content-Type` does not start with `application/json` | Deny (403) |
+| 2 | "chat rate limit" | Path starts with `/api/chat`, method `POST` | Fixed window, 600 s, 20, key IP address: 429 |
+| 3 | "api rate limit" | Path starts with `/api/` and is not `/api/chat`; or path starts with `/api/` and the method is not `POST` | Fixed window, 600 s, 60, key IP address: 429 |
+
+**Where check 8 ran, and why.** D4 ran on the spike's production deployment at the same time, and each push to `prototype/deploy-spike` makes a new one. So D5 ran on its own throwaway branch, `prototype/d5-waf`, cut from `235c0e0`. As on D3's preview branch, `vercel.json` sets `"ignoreCommand": "exit 1"`, so each push builds a protected preview and leaves production alone. The branch's workflow `spike-d5-waf` waits for the preview, then runs check 8 in a `waf` job like the one in `spike-check.yml`. Two commits stay on that branch only: `f79d477` (the preview build, the wait and the first probe) and `f4adc34` (its workflow runs check 8).
+
+**What Vercel's docs say** (read 2026-10-27):
+
+- **Previews.** A rule can test "Environment: The Vercel Environment that received this request", "Preview or Production" (https://vercel.com/docs/vercel-firewall/vercel-waf/rule-configuration#parameters). So the rules see preview traffic, and a rule with no Environment condition applies to both. The three rules have none.
+- **The order.** "Vercel's platform-wide firewall is the first line of defense […]. Once a request passes this layer, deployment protection checks whether it can continue […]. If allowed to go through, the request is subject to the rules that you configured with the Web Application Firewall (WAF)" (https://vercel.com/docs/vercel-firewall/firewall-concepts). So on a protected host, a request meets the rules only with the bypass. Without it, Vercel's sign-in answers first.
+- **Case.** "All operators are case insensitive" (same rule-configuration page, "Operators").
+- **The two path fields.** "Request Path: The full request path on the incoming request, always starting with a leading `/`". "Raw Path: The raw request path, ignoring any parsing or normalizing that might be done at the framework level" (same page, "Parameters").
+- **Deny.** "Blocks the request and no further rules are evaluated" (same page, "Actions"); "A `403 Forbidden` response is returned. The request does not reach your application." (firewall-concepts, "Deny").
+- **Regions.** "Rate limit counters are tracked on a per-region basis; traffic matching a given rate limit key in multiple regions can exceed the limit you configure for any single region" (https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting).
+- **Persistent actions.** A deny or rate-limit action can carry a time-based block; the dashboard's "for" field "defaults to 1 minute", and then the address "will be blocked for a period of time" before any rule runs (https://vercel.com/docs/vercel-firewall/vercel-waf/custom-rules#persistent-actions).
+
+**First, the fact that decided whether D5 goes on.** Run 40587243876 (commit `f79d477`, preview `resume-deploy-spike-8xxlufo3i-peterkloss.vercel.app`) sent one chat POST with `Content-Type: text/plain` to the preview, with the bypass:
+
+```text
+probe (WAF on a preview, VERCEL_ENV preview): POST /api/chat Content-Type text/plain: HTTP 403, x-vercel-mitigated deny, the not-found page false, content-type text/plain; charset=utf-8, 59 bytes; the rules apply to this preview: true
+```
+
+So the rules apply to a preview's address, as the docs say. Without the WAF, the spike answers that request with `static/404.html` and status 404 (check 3).
+
+**What check 8 asks.** `bun check.ts waf` sends these requests to the deployment's own host, with the bypass, in this order. The spike has no `/api/chat` route, so without the WAF a chat POST gets the not-found page with status 404. Vercel's edge marks its own answer with `x-vercel-mitigated`. For each answer, the check prints the status, that header's value, whether the body is the not-found page byte for byte, and the edge region from the first part of `x-vercel-id`.
+
+1. `POST /api/chat` with `Content-Type: text/plain`. Judged: the WAF's 403.
+2. `POST /API/chat`, `text/plain`. Recorded: does the path condition match another case?
+3. `POST /api/%63hat`, `text/plain` (`%63` is `c`). Recorded: does the Request Path field decode it?
+4. `GET /api/sp%69ke` (`%69` is `i`). Recorded: do the routes send it to the `/api/spike` function (check 2)?
+5. `POST /api/chat` with `Content-Type: application/json` and the malformed body `{"messages":`, until a 429, at most 41 times. Judged: each one before the 429 gets the not-found page, and the WAF's 429 comes by the 41st (SPEC-deploy's smoke check). The first is the control: it shows that the content type decides the 403, not the path. When the first already gets 429, the address met the limit in the last 10 minutes, and the check fails with "rerun later".
+6. After the 429, `GET /build-info.json` (from `ce2f1c1`). Recorded: does the limited address still get the site?
+
+A local run against two fake servers (one that answers as the WAF should, one with no WAF), and a third whose address was already counted, gave pass, FAIL and FAIL. It tests the check code, not Vercel, and it is not committed.
+
+**The runs.** Each was a fresh runner's address. Each one drove its address to the chat rate limit, in the `waf` job, on purpose; no run met a limit it did not cause. The probe run sent one chat POST and met none.
+
+| Run | Commit | Edge region | `text/plain` to `/api/chat`, `/API/chat`, `/api/%63hat` | `GET /api/sp%69ke` | JSON chat POSTs | After the 429 |
+|---|---|---|---|---|---|---|
+| 40587839966, attempt 1 | `f4adc34` | sfo1 | 403, `x-vercel-mitigated: deny`, each | 200 from `/api/spike` | 1 to 20: the not-found page; 21: 429, `deny` | Not asked |
+| 40587839966, attempt 2 (the `waf` job again, on a new runner) | `f4adc34` | iad1 | The same | The same | The same | Not asked |
+| 40588287129 | `ce2f1c1` | sfo1 | The same | The same | The same | `GET /build-info.json`: 200 |
+
+The verdict lines, word for word:
+
+```text
+40587839966, attempt 1: check 8 (WAF rules): pass: POST /api/chat text/plain: HTTP 403, x-vercel-mitigated deny; POST /API/chat text/plain: HTTP 403, x-vercel-mitigated deny: the path condition matches /API/chat regardless of case; POST /api/%63hat text/plain: HTTP 403, x-vercel-mitigated deny: the path condition decodes %63; GET /api/sp%69ke: HTTP 200 from the function /api/spike: the routes decode %69; POST /api/chat application/json (malformed): 1 to 20 got the not-found page with status 404; 21 got HTTP 429, x-vercel-mitigated deny; edge region sfo1
+40587839966, attempt 2: check 8 (WAF rules): pass: POST /api/chat text/plain: HTTP 403, x-vercel-mitigated deny; POST /API/chat text/plain: HTTP 403, x-vercel-mitigated deny: the path condition matches /API/chat regardless of case; POST /api/%63hat text/plain: HTTP 403, x-vercel-mitigated deny: the path condition decodes %63; GET /api/sp%69ke: HTTP 200 from the function /api/spike: the routes decode %69; POST /api/chat application/json (malformed): 1 to 20 got the not-found page with status 404; 21 got HTTP 429, x-vercel-mitigated deny; edge region iad1
+40588287129: check 8 (WAF rules): pass: POST /api/chat text/plain: HTTP 403, x-vercel-mitigated deny; POST /API/chat text/plain: HTTP 403, x-vercel-mitigated deny: the path condition matches /API/chat regardless of case; POST /api/%63hat text/plain: HTTP 403, x-vercel-mitigated deny: the path condition decodes %63; GET /api/sp%69ke: HTTP 200 from the function /api/spike: the routes decode %69; POST /api/chat application/json (malformed): 1 to 20 got the not-found page with status 404; 21 got HTTP 429, x-vercel-mitigated deny; edge region sfo1; then GET /build-info.json: HTTP 200: the limited address still gets the site
+```
+
+**What the runs show.**
+
+- **The rules apply to previews.** The probe and every check 8 run were on `VERCEL_ENV preview`, and the WAF answered each time.
+- **The content-type rule works as written.** A `text/plain` chat POST got the WAF's 403. A JSON chat POST to the same path passed the rule and got the not-found page. So the content type decides the 403, not the path.
+- **The chat rate limit.** Twenty malformed JSON chat POSTs passed, and the 21st got the WAF's 429, in sfo1 and in iad1. So the smoke check's bound, a 429 by the 41st, holds with room: 41 also covers a fixed window that starts again during the run.
+- **Denied requests do not count toward the rate limit.** Three `text/plain` chat POSTs came first, and the 429 still came at the 21st JSON POST. This matches the docs: a deny stops the rules, and "chat content type" comes first.
+- **Case.** The path condition matches `/API/chat` regardless of case. The Request Path field with "starts with" did it; the docs say all operators are case insensitive. So the WAF matches more than the routes do: the case-sensitive API routes send `/API/chat` to the not-found page (check 3), and the WAF denies or counts it before that. Either way, `/API/chat` never reaches a function.
+- **Encoding.** The Request Path field decodes `%63`, and the routes decode `%69`. So the encoded paths met the WAF and the routes alike, and no encoded path reached a function past the chat rules. One encoded letter was tested each way; `%2F`, `//`, `/./` and a trailing slash were not.
+- **Raw Path: not tested.** No rule uses it. The question "which field handles `/API/chat`" has one answer from the runs: Request Path matches it.
+- **Telling the WAF's answer apart.** Both the 403 and the 429 carry `x-vercel-mitigated: deny`; the value does not tell a deny from a limit, the status does. The WAF's 403 body is `text/plain` (59 bytes in the probe), and the not-found page carries no such header. So D27's smoke check can look for `x-vercel-mitigated` to tell the WAF's 403 from the chat handler's 403 `FORBIDDEN_ORIGIN`. No run saw a function's 403, so that the handler's answer has no such header is expected, not seen.
+- **No persistent action.** After each 403, the next request got its normal answer, and after the 429, `GET /build-info.json` got 200. So neither the deny rule nor the chat rate limit blocks the address beyond the requests they match: a visitor at the chat limit still gets the site.
+
+**The scope of this verdict.**
+
+- **One environment and one host.** The runs used previews only, on each deployment's own protected host, with the bypass. No run asked the spike's production deployment, its public `.vercel.app` address or a custom domain. The docs say the rules apply to both environments, and none of the three rules has a Hostname or Environment condition. Once D5's commits are on `prototype/deploy-spike`, its `waf` job runs the same check on each production deployment.
+- **Why not the production address.** The earlier plan ("For D4 and D5", above) posted to the production address. On this branch that address serves the spike branch's commits, not this one's, and the deployment's own host with the bypass works on both branches the same way. On the spike branch the deployment is a production deployment, so check 8 there tests the production environment.
+- **The "api rate limit" rule: not tested.** No run sent 61 `/api/` requests that the rule counts. Each check 8 run sends one (`GET /api/sp%69ke`); `/api/%63hat` decoded to a chat POST, which the rule leaves out.
+- **Regions.** Each run's chat POSTs reached one edge region. A client whose requests reach two regions can pass 20 in each (docs); no run tried that.
+- **Not seen:** a rerun from an address that met the limit in the last 10 minutes. The local run tests that the check fails then; no Vercel run met it.
+
+**For D6** (nothing in the spec changes here):
+
+- Check 8: pass on a preview. The three rules work as SPEC-deploy writes them, so "If it fails" (the rules change) is not needed.
+- SPEC-deploy's line "Whether a WAF path condition matches without regard to case, and whether the content-type condition works as written, are spike checks" gets its answers: the path condition matches without regard to case, and the content-type condition works as written.
+- Research 12 can add:
+  - the order: platform firewall, then Deployment Protection, then the project's rules;
+  - the rules apply to previews (the Environment parameter);
+  - the WAF's 403 and 429 both carry `x-vercel-mitigated: deny`;
+  - a denied request does not count toward a later rate-limit rule;
+  - the Request Path field matches without regard to case, and it decoded a percent-encoded letter (`%63`), as the routes did (`%69`).
+- Setup step 7 can say: leave each rule's "for" field (a persistent action) empty. The deny rule and the chat rate limit have none on the throwaway project (seen; the api rate limit never fired), and the runs show that a visitor at the chat limit still gets the site. This is a spec change for Peter's approval.
+- D27: on a protected deployment URL, the WAF checks need the bypass, because Deployment Protection comes first. `x-vercel-mitigated` can tell the WAF's 403 from the handler's (expected, not seen for the handler). The 429 came at the 21st in each run, so "by the 41st" stays.
+
+## Check 12: moved to D32
+
+Check 12 asks for the status helper's name, and whether Deployment Checks hold the domains until its status passes. It cannot run on a spike branch:
+
+- The release check starts on Vercel's `vercel.deployment.ready` event, a `repository_dispatch` event. GitHub's docs: "This event will only trigger a workflow run if the workflow file exists on the default branch" (https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#repository_dispatch). Research 12 says the same from Vercel's docs.
+- Spike code never reaches `main` (brain's prototype rules). Also, the throwaway project has `repository_dispatch` off ("Why this route", above).
+
+So check 12 moved to D32 and setup step 10 (main's decision, 2026-10-27). At setup step 10, the release check's first production run shows the status helper's name. Peter requires that name in Deployment Checks, and the run shows whether they hold the deployment until the status passes. Research 12 records the verdict then. D32's body also names a point for that first run: in its source, the status helper posts `failure` only when a step concluded `failure`, so a cancelled step would post `success`; no run has shown it yet.
 
 ## Seen on the way
 
