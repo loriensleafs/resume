@@ -7,15 +7,15 @@ import { createBuilder } from "vite";
 const VITE_CONFIG = join(import.meta.dir, "../../vite.config.ts");
 
 export type BuildSiteOptions = {
-  /** The folder that holds the project's files: resume.yaml, private.yaml, knowledge/ and documents/.
-   *  The pages read none of them yet. */
+  /** The folder that holds the project's files: resume.yaml, private.yaml, knowledge/ and documents/. The pages' data
+   *  comes from its resume.yaml (src/site/data.ts). A relative path starts at the working folder. */
   root: string;
   /** The build writes Nitro's Vercel output to <outDir>/.vercel/output/, and the pages to its static/ folder.
    *  A relative path starts at the working folder. */
   outDir: string;
 };
 
-export async function buildSite({ outDir }: BuildSiteOptions): Promise<void> {
+export async function buildSite({ root, outDir }: BuildSiteOptions): Promise<void> {
   // Vite makes a production build only when NODE_ENV is "production" or unset; any other value gives a development
   // build (https://vite.dev/guide/env-and-mode#node-env-and-modes). `bun test` sets NODE_ENV to "test", and with it
   // the prerender fails, because the server bundle then calls React's development JSX runtime. So the build pins
@@ -32,8 +32,10 @@ export async function buildSite({ outDir }: BuildSiteOptions): Promise<void> {
     // <Vite root>/node_modules/.nitro/last-build.json, and the prerender's preview server reads that file to find
     // the output. Nitro fixes that path; its buildDir option does not move it (nitro 3.0.260903-beta,
     // dist/_build/common.mjs). So two builds at once can prerender from each other's output.
+    // The site's data plugin reads its root from the `siteData` key in the same way (src/site/data.ts).
     const builder = await createBuilder({
       configFile: VITE_CONFIG,
+      siteData: { root: resolve(root) },
       nitro: { output: { dir: resolve(outDir, ".vercel/output") } },
     });
     await builder.buildApp();

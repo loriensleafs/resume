@@ -5,6 +5,7 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
 import { defineConfig } from "vite";
+import { siteData } from "./src/site/data";
 
 export default defineConfig({
   // Vite's root is this folder, wherever Vite starts (https://vite.dev/config/shared-options#root; the default is
@@ -14,6 +15,9 @@ export default defineConfig({
   root: import.meta.dirname,
   server: { port: 3000 },
   plugins: [
+    // The pages' data, made at build time from resume.yaml (src/site/data.ts). buildSite() sets `siteData.root`;
+    // `vite dev` reads this folder's resume.yaml.
+    siteData(),
     // Static prerendering (SPEC-site, Tech Stack), with the options of TanStack Start's guide:
     // https://tanstack.com/start/latest/docs/framework/react/guide/static-prerendering
     tanstackStart({
