@@ -89,8 +89,28 @@ The id of the passage or resume entry an answer used, shown with the answer.
 _Avoid_: source link, reference
 
 **Saved session**:
-A visitor's conversation and open views, kept in their own browser and restored when they return.
+A visitor's conversation and open views, kept in their own browser and restored when they return. The site's part is the saved views: the open tab, the open source and its marked passage, and the scope.
 _Avoid_: account, profile
+
+**Workspace**:
+The site's main view at `/`: the app bar, the career timeline, the chat column and the document panel. Also the contract the site gives the chat module.
+_Avoid_: dashboard, home page
+
+**Career timeline**:
+The full-width band of Peter's roles at their true lengths; selecting a role sets the scope.
+_Avoid_: timeline chart, history bar
+
+**Document panel**:
+The area beside the chat that shows the resume, or a source opened from a citation, in tabs.
+_Avoid_: artifact panel, side panel
+
+**Scope**:
+The role the chat is asking about, set from the career timeline and shown in the chat input.
+_Avoid_: filter, context
+
+**Source page**:
+The standalone prerendered page of one approved source at `/sources/<id>`, readable without JavaScript.
+_Avoid_: deep-dive page, article page
 
 **Refusal**:
 The chat's answer to a topic outside its scope (salary, immigration, health, age, personal life): it declines and points to Peter's email.

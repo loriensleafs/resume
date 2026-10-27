@@ -11,4 +11,4 @@ Consequences:
 - A deep dive is one kind of knowledge entry, not a page a visitor browses. The document panel shows the resume; a source opens there only from a citation or a request such as "show me where that came from", with the cited passage marked.
 - The chat's depth comes from the knowledge base, so the knowledge base must grow well past the nine deep dives. Peter asked for that in the same answer: "we're going to have to somehow be able to provide this AI with a lot more information".
 - [SPEC-knowledge](../../spec/SPEC-knowledge.md) changes: new entry kinds and a larger size budget. The merged mockups drop the deep-dive tab and gain a source view.
-- Open, for the site spec: whether each source also gets a standalone prerendered page for search engines, sharing and offline reading.
+- Open, for the site spec: whether each source also gets a standalone prerendered page for search engines, sharing and offline reading. Settled on 2026-10-27: Peter chose pages at `/sources/<id>` and `/resume`, with no list of sources ([SPEC-site](../../spec/SPEC-site.md)).

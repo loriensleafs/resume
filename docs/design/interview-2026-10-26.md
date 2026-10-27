@@ -86,6 +86,8 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 74 | (Peter, 2026-10-27) Scope chip | "Asking about FedNow, 2021 – 2024" sits inside the input, above the text, on desktop and phone |
 | 75 | (Peter, 2026-10-27) Mockup review and where they live | "I think this all looks pretty good." Only the chosen app icon stays. The mockups go into the repo: images of every board, light and dark, on `main` in `docs/design/mockups/`, and the board sources on the branch `prototype/site-mockups`. The recommendation was this split |
 | 76 | (Peter, 2026-10-27) Specs before building? | All remaining specs first (site, chat, deploy, agents), then one rewritten plan; task 11 waits. Peter: "I feel like we should get all the specs, I think, done before the plans." The interviews can run at any time |
+| 77 | Should each source also get its own page (decision 0015's open choice)? | Pages for the resume and every approved source, at `/resume` and `/sources/<id>`, readable without JavaScript, with no list of sources. The recommendation was this option |
+| 78 | Approve SPEC-site.md? | Approved, with the calls named in the question: the chat column's contents belong to SPEC-chat behind one workspace contract; saved views in IndexedDB through TanStack DB, the theme kept apart; one column below 1024 px with sheets, one source tab at a time; the install offer's rules; self-hosted fonts and no third-party requests; no update prompt; suggested questions in one file that Peter approves; the named dependencies |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
