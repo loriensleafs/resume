@@ -31,6 +31,6 @@ Updated 2026-10-27, at the end of the first `/brain:build auto` session. This fi
 
 - Repository: github.com/loriensleafs/resume, public, branch `main`.
 - Setup done with Peter (2026-10-27): the Vercel Pro team Peter Kloss; peterkloss.dev, pkloss.dev and pwk.dev bought in that team (each renews on Oct 27, 2027); the team's Vercel Toolbar off for production; a $20 spend budget with pause off; Vercel's GitHub app limited to `loriensleafs/resume`; the spike project `resume-deploy-spike` (production branch `prototype/deploy-spike`, root `prototypes/deploy-spike`, protected, Upstash database, three WAF rules).
-- Nothing red. `bun test` passes on `main`. CI (`.github/workflows/ci.yml`) runs on every push; `audit-all` stays red until the `zod` override (A9's second commit) or Peter's fixed release lands.
+- Nothing red. `bun test` passes on `main`. CI (`.github/workflows/ci.yml`) runs on every push; its first run (40576866231, on `cf536f2`) passed `test` and `audit` on Ubuntu; `audit-all` stays red until the `zod` override (A9's second commit) or Peter's fixed release lands.
 - Pushes: everything up to this STATUS commit is on `origin/main`, pushed through the `release` skill under Peter's standing approval. No deploy of `main` exists yet, so nothing live changed.
 - Finished worktrees under `.claude/worktrees/` are merged; they can be removed with `git worktree remove`.
