@@ -1,5 +1,9 @@
 node_modules/
 dist/
+# The site's build output: Nitro's Vercel output (SPEC-site, Boundaries).
+.vercel/
+# TanStack Router's generator writes its temporary files here.
+.tanstack/
 # Private details (phone number). Never commit this file.
 private.yaml
 # Downloaded by `bun run fonts`.
