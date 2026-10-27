@@ -1,6 +1,6 @@
 # Spec: agents
 
-Draft one, 2026-10-27, for Peter's review. Peter's answers for this spec are [decision record](../docs/design/interview-2026-10-26.md) rows 7, 140 and 141, and his confirmation of the intent on 2026-10-27.
+Approved by Peter on 2026-10-27 (decision record row 142). Peter's answers for this spec are [decision record](../docs/design/interview-2026-10-26.md) rows 7, 140 and 141, and his confirmation of the intent on 2026-10-27.
 
 ## Objective
 

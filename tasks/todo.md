@@ -41,8 +41,8 @@ Order (Peter, 2026-10-27): write and approve every remaining spec first (tasks 9
 - [ ] 13. Long-form interviews, one subject at a time: career, working style, stories, opinions, side projects, skills
   - Acceptance: each subject has at least one approved interview source; every raw answer is saved privately first.
   - Verify: `bun run knowledge` lists the sources; `bun test`
-- [ ] 14. Write SPEC-chat.md (with the Agent Design plugin), then SPEC-deploy.md and SPEC-agents.md, each for Peter's review
+- [x] 14. Write SPEC-chat.md (with the Agent Design plugin), then SPEC-deploy.md and SPEC-agents.md, each for Peter's review
   - [x] SPEC-chat.md, approved 2026-10-27 (decision record row 84)
   - [x] SPEC-deploy.md, approved 2026-10-27 (decision record row 127); its first plan task is the deploy spike
   - [x] Adversarial reviews of SPEC-knowledge, SPEC-site and SPEC-chat, plus a cross-spec pass (row 123): 100 findings; Peter decided rows 128 to 136; fixes applied to all five specs and the mockups (canvas version 46); the scope chip's label (row 137) and five texts (row 138) decided; a consistency check's 15 findings fixed. Peter approved the amended specs and mockups (row 139).
-  - [ ] SPEC-agents.md
+  - [x] SPEC-agents.md, approved 2026-10-27 (decision record row 142)

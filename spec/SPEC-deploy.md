@@ -72,7 +72,11 @@ tasks/
 evals/
 .agents/
 .claude/
+.codex/
+.cursor/
+.gemini/
 .github/
+.vscode/
 tests/**/*.test.ts
 AGENTS.md
 CLAUDE.md
@@ -81,6 +85,7 @@ README.md
 ```
 
 - Every other tracked path is a site file. A missing entry makes an extra release, never a skipped one.
+- `.gemini/` matches a tracked file once the agents task writes `.gemini/settings.json`, which comes before the docs-only test. `.mcp.json` joins the list once Peter adds it ([SPEC-agents](SPEC-agents.md)); until then it would match no tracked file.
 - The list has no `prototypes/` entry. Prototypes stay on their own branches, so no file on `main` matches it, and an entry that matches no tracked file fails the docs-only test.
 - Shared test helpers, such as `tests/chat/fixtures.ts`, are site files: the preview's fake model bundles them with the chat function.
 - `scripts/site-changed.sh <from> <to>` exits 1 when a site file differs between two commits, 0 when none does, and 128 on an error. It runs `git diff --quiet <from> <to> -- . ':(exclude,glob)<entry>'…` for each entry. The ignore step, the release check and the GitHub health check all use it, so the list is read in one place.
@@ -112,7 +117,7 @@ README.md
 
 A small window remains: a site change pushed during step 5 can let the older deployment take the domains after the newer one. The GitHub health check then finds the live commit behind `main` and fails.
 
-Because a push of site changes is a release, agents ask Peter before pushing site changes to `main`. SPEC-agents, which is not written yet, puts this rule in [AGENTS.md](../AGENTS.md) and points to `scripts/docs-only.txt`.
+Because a push of site changes is a release, agents ask Peter before pushing site changes to `main`. [AGENTS.md](../AGENTS.md) carries this rule and points to `scripts/docs-only.txt` ([SPEC-agents](SPEC-agents.md)).
 
 **Rollback.** Instant Rollback in the dashboard moves the domains back in seconds, and turns domain auto-assignment off. While it is off, passing deployments do not go live, and the GitHub health check reports the lag. After the fix's deployment passes its checks, Peter selects "Undo Rollback" and chooses that deployment. That makes it live and turns auto-assignment on again. `docs/runbooks/rollback.md` has the steps and ends with a check that the next release goes live without help.
 
@@ -607,7 +612,7 @@ Approving this spec approves these amendments:
 - **SPEC-content.**
   - `bun run documents` (`scripts/documents.ts`) writes the public documents to `documents/`, with `documents/inputs.sha256`; the document test above checks them. SPEC-content lists the script, the folder and the test, and defines the hash's inputs.
   - The line "`bun run build --public` (the website and CI use this)" changes: the website uses the committed `documents/`, and CI runs `bun run build` to check that the documents still build.
-- **SPEC-agents**, when it is written. It does not exist yet, so these changes wait for it:
+- **SPEC-agents** (approved 2026-10-27, row 142) carries these into `AGENTS.md`:
   - AGENTS.md: a push that changes a site file (a path not in `scripts/docs-only.txt`) is a release and needs Peter's approval.
   - AGENTS.md, Verify: `bun run build`, `bun run build:site` and `bun test` before every commit.
   - `bun run smoke`, `bun run documents` and the runbooks join the commands.

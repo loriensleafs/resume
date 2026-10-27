@@ -96,7 +96,7 @@ source: Interview with Peter, 2026-10-26
 Peter chose long-form interviews, one topic at a time ([decision record](../docs/design/interview-2026-10-26.md), rows 32 to 34).
 
 1. Questions go in normal chat messages, typed or spoken, never through the host's question tool: the chat history does not keep its answers.
-2. Each answer is saved word for word to Peter's private repo `loriensleafs/resume-private`, in its folder `interviews/`, before anything is written from it ([decision 0024](../docs/decisions/0024-private-interview-repo.md), row 129). Peter creates the repo; later sessions attach it. The raw answers never enter this repository.
+2. Each answer is saved word for word to Peter's private repo `loriensleafs/resume-private`, in its folder `interviews/`, before anything is written from it ([decision 0024](../docs/decisions/0024-private-interview-repo.md), row 129). The repo exists since 2026-10-27; later sessions attach it, and the `write-source` repo skill runs these steps ([SPEC-agents](SPEC-agents.md)). The raw answers never enter this repository.
 3. The interview source is written from the raw answers as a draft source file, with transcription errors fixed and filler and false starts smoothed. The meaning stays, and so do Peter's words for what he did ("helped" stays "helped").
 4. Redaction: material of a kind that is not public (a colleague's name, an internal link) comes out of the text, and the `Not public` section names its kind. Each removal is listed for Peter's approval. The redaction list stays in the private repo beside the raw answers, never in this repository.
 5. The source stays a draft until Peter approves it (see "Drafts and approval").
