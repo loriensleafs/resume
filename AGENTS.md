@@ -8,7 +8,7 @@ Complete these steps before the requested work.
 
 1. Read [status](docs/STATUS.md), [domain routing](docs/agents/domain.md) and [the glossary](CONTEXT.md), each to its last line.
 2. Read [the capability map](spec/README.md), then the spec, [plan](tasks/plan.md) and [task list](tasks/todo.md) that status names, each to its last line. Read [the record layout](docs/agents/workflow.md).
-3. Check `git status` and the branch. Check `bun --version` (1.4.2 or later). Keep work you did not start.
+3. Check `git status` and the branch. Check `bun --version` (1.4.4 or later). Keep work you did not start.
 4. Report the phase, the last completed step, the next step, anything red and the pending decisions, in five lines or fewer. Then follow Peter's request. A request to continue resumes the next approved task.
 
 ## Work through brain
@@ -59,7 +59,7 @@ Write all tooling in Bun and TypeScript, with Bun's APIs ([decision 0004](docs/d
 
 ## Verify
 
-Run `bun run build` and `bun test` before every commit. Once `package.json` has the `build:site` script (task D16), also run `bun run build:site` ([SPEC-deploy](spec/SPEC-deploy.md)). The PDF stays exactly 2 pages. The tests need Google Chrome (or `CHROME_PATH`) and poppler (`pdftotext`, `pdffonts`).
+Run `bun run typecheck`, `bun run build` and `bun test` before every commit. Once `package.json` has the `build:site` script (task D16), also run `bun run build:site` ([SPEC-deploy](spec/SPEC-deploy.md)). The PDF stays exactly 2 pages. The tests need Google Chrome (or `CHROME_PATH`) and poppler (`pdftotext`, `pdffonts`).
 
 ## Releases and approvals
 

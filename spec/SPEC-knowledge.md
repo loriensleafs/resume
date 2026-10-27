@@ -118,7 +118,7 @@ Unchanged: `knowledge/logistics.yaml`, one entry per topic, with `topic`, `answe
 
 ## Tech Stack
 
-Bun 1.4.2 and TypeScript; `Bun.YAML` for front matter and `logistics.yaml`; `zod` 4.6.7 for the schemas. The parser is the existing section splitter. No new dependency.
+Bun 1.4.4 and TypeScript; `Bun.YAML` for front matter and `logistics.yaml`; `zod` 4.6.7 for the schemas. The parser is the existing section splitter. No new dependency.
 
 ## Commands
 

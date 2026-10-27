@@ -1,4 +1,4 @@
-# CI: the build, the tests and the audits, on every push and pull request (SPEC-deploy, "CI").
+# CI: the type check, the build, the tests and the audits, on every push and pull request (SPEC-deploy, "CI").
 # The workflow name `ci` and the job ids `test` and `audit` make the check names `ci / test` and
 # `ci / audit` that setup step 10 requires. Renaming either, or giving a job a `name:` or a matrix,
 # breaks them. `ci / audit-all` shows but is not required.
@@ -35,10 +35,12 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.4
       # pdftotext, pdfinfo and pdffonts for the document checks.
       - run: sudo apt-get update && sudo apt-get install -y poppler-utils
       - run: bun ci
+      # The type check (row 157). bun check writes a GitHub annotation for each error itself.
+      - run: bun run typecheck
       # No private.yaml in CI, so only the public documents are built.
       - run: bun run build
       - run: bun test
@@ -52,7 +54,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.4
       # bun audit reads bun.lock, so no install comes first. Only production packages decide a release.
       - run: bun audit --prod --audit-level=high
 
@@ -65,6 +67,6 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.4
       # Every package, development tools included.
       - run: bun audit --audit-level=high

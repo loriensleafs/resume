@@ -1,6 +1,6 @@
 # Spec: agents
 
-Approved by Peter on 2026-10-27 (decision record row 142). Peter's answers for this spec are [decision record](../docs/design/interview-2026-10-26.md) Intent paragraph and rows 140 and 141, and his confirmation of the intent on 2026-10-27. Amended on 2026-10-27 with the capability check (row 147), and with Peter's standing approval for every push (row 151). The `update-mockups` steps put Peter's approval before the new images reach `main` (a conductor decision for his review, [build decisions](../docs/design/build-decisions.md)).
+Approved by Peter on 2026-10-27 (decision record row 142). Peter's answers for this spec are [decision record](../docs/design/interview-2026-10-26.md) Intent paragraph and rows 140 and 141, and his confirmation of the intent on 2026-10-27. Amended on 2026-10-27 with the capability check (row 147), with Peter's standing approval for every push (row 151), and with the type check (row 157, task A9). The `update-mockups` steps put Peter's approval before the new images reach `main` (a conductor decision for his review, [build decisions](../docs/design/build-decisions.md)).
 
 ## Objective
 
@@ -29,7 +29,7 @@ Acceptance criteria:
 
 ## Tech Stack
 
-Markdown for the agent files and skills; TOML and JSON for the agents' settings. Bun 1.4.2 and TypeScript for the test, with `Bun.YAML` for skill front matter and `Bun.TOML` for Codex's settings. No new dependency.
+Markdown for the agent files and skills; TOML and JSON for the agents' settings. Bun 1.4.4 and TypeScript for the test, with `Bun.YAML` for skill front matter and `Bun.TOML` for Codex's settings. The type check adds `typescript` 7.0.2 and `@types/bun` 1.4.4, development only (row 157, [research 13](../docs/research/13-type-check.md)); no other dependency is new.
 
 How each agent reads the files ([research 03](../docs/research/03-agent-instruction-files.md)):
 
@@ -49,6 +49,7 @@ Gemini CLI reads its own context file name by default, so `.gemini/settings.json
 ```sh
 bun test ./__tests__           # the agent files' checks, and the tests of the release skill's two checks
 bun test                       # all tests, the agent files' checks included
+bun run typecheck              # the type check, `bun check`, before every commit and in CI (row 157)
 bun .agents/skills/release/scripts/private-detail-check.ts origin/main..main   # prints one number, never a value
 bun .agents/skills/release/scripts/approval-check.ts origin/main..main         # prints each change that needs Peter
 ```
@@ -78,6 +79,7 @@ __tests__/agent-files.test.ts          the agent files' checks (new)
 .agents/skills/release/scripts/        the release skill's checks: private-detail-check.ts, approval-check.ts and git.ts (new)
 __tests__/private-detail-check.test.ts their tests, here because Bun's test runner skips folders that start with a dot (new)
 __tests__/approval-check.test.ts
+__tests__/typescript-version.test.ts   Bun's TypeScript equals the typescript version package.json pins (new, row 157)
 ```
 
 Peter adds `.mcp.json` and `.claude/settings.json` from the README section, because an agent's safety check blocks an agent from writing its own settings ([decision 0014](../docs/decisions/0014-library-skills-and-docs-mcp.md)).
@@ -109,7 +111,7 @@ The task that builds a module updates its row: the folders and the test command 
 
 **Libraries** names the design-system skills that views need (`choose-and-compose` always; `react-integration`, `forms-and-accessibility` or `data-layouts` as a view needs; `migration-between-releases` for an upgrade), and the docs server's first call, `resolve_version` with the installed version from `package.json` and the framework `react`. Work with no UI needs neither.
 
-**Verify** says: run `bun run build` and `bun test` before every commit; once `package.json` has the `build:site` script (task D16), also `bun run build:site` ([SPEC-deploy](SPEC-deploy.md)). The PDF stays exactly 2 pages. The tests need Google Chrome (or `CHROME_PATH`) and poppler.
+**Verify** says: run `bun run typecheck`, `bun run build` and `bun test` before every commit (row 157 for the type check); once `package.json` has the `build:site` script (task D16), also `bun run build:site` ([SPEC-deploy](SPEC-deploy.md)). The PDF stays exactly 2 pages. The tests need Google Chrome (or `CHROME_PATH`) and poppler.
 
 **Releases and approvals** says, each rule with its spec:
 
@@ -143,7 +145,7 @@ A change to an approved source follows the edit rule: it waits on a branch until
 **`release`** (new; [SPEC-deploy](SPEC-deploy.md), "Releases"). While `scripts/site-changed.sh` is missing, step 1 tells Peter that the deploy module is not built. The skill then runs steps 2, 3, 4 and 6, and step 3 records every file the commits change ([plan](../tasks/plan.md), order rule 2).
 
 1. Check what the push sends, on every push; a push of another branch, such as `prototype/deploy-spike`, runs this step only. Two scripts in `.agents/skills/release/scripts/` read the push range: the private-detail check, which exits 1 when the range holds a value of `private.yaml` and never prints one, and the approval check, which prints each change that needs Peter (AGENTS.md, "Releases and approvals"). Exit 0 lets the push go on; any other exit code stops it, and an approval goes on only with a decision record row that quotes Peter's answer. On `main`, then the site changes: `scripts/site-changed.sh origin/main main`. Exit 0 means no site file changed: the push is not a release, and steps 2, 3 and 5 are left out. Done when both checks let the push go on, and on `main` the exit code is known.
-2. Run `bun run build`, `bun run build:site` and `bun test`. Done when all pass.
+2. Run `bun run typecheck`, `bun run build`, `bun run build:site` and `bun test`. Done when all pass.
 3. Record the push: the commit to push, the commits and the site files they change. Done when the record names the commit to push.
 4. Push to `main`, after a check that `main` is still the commit that passed steps 1 and 2. Done when the push is on GitHub.
 5. Watch `ci / test`, `ci / audit` and the release check on the commit with `gh`, as background commands, for at most 90 minutes from the push for the whole wait; find the CI run in at most 10 tries. Done when all three passed, one failed, no CI run appeared, or the 90 minutes are up.
@@ -170,7 +172,7 @@ A change to an approved source follows the edit rule: it waits on a branch until
 
 ## Testing Strategy
 
-Two seams (row 141), and a third for the two checks that the `release` skill runs (row 151's reviews).
+Two seams (row 141), a third for the two checks that the `release` skill runs (row 151's reviews), and the type check's version test in the same `__tests__/` folder (row 157).
 
 1. **The agent files on disk**, `__tests__/agent-files.test.ts`, under `bun test`. It checks:
    - Every relative link in the agent files' Markdown (`AGENTS.md`, `CLAUDE.md`, `README.md`, every file in `docs/agents/` and every Markdown file of a repo skill) points to a file or folder that exists. A `#section` part is ignored. The checks read the files that `git ls-files` lists, new ones included, and a failure names the file, the line and the rule, never the file's text.
@@ -185,10 +187,11 @@ Two seams (row 141), and a third for the two checks that the `release` skill run
 3. **The `release` skill's two checks**, `__tests__/private-detail-check.test.ts` and `__tests__/approval-check.test.ts`, under `bun test`. Each test makes a temporary repository with fake commits, and runs a script on a range.
    - The private-detail check, with a fixture `private.yaml`, prints `0` for clean commits. It counts a value in a changed file, a commit message, the committer, a commit that a later one undoes, a merge's conflict resolution, a PDF's compressed text, a Word file's text, a binary file's bytes and a file that `.gitattributes` marks as binary; an email in any letter case; and a phone number split by dashes, up to 4 separators, underscores, a zero-width space, a blank line or indentation, or written in other digits. It finds each value through the one rule for private details, `src/private-details.ts` ([SPEC-content](SPEC-content.md)). It counts a `private.yaml` that the range or an earlier commit tracks. It exits 2 with "cannot check" for a missing, empty or broken `private.yaml`, a number in it with fewer than 7 digits, an unknown range and an argument that is not a range, and it never prints a value.
    - The approval check lists a change to a docs-only list that the base holds; a change to or a move of an approved knowledge source, with `status` read as YAML (quoted, or with a comment); a new approved source and a draft that becomes approved; a change to approved logistics answers; in every `package.json` the range adds or changes, a nested one such as a prototype's included, a package that the range adds, overrides included; a package whose spec changes to anything but an exact version (a git URL, a GitHub reference, a range, `file:`, `npm:`); and a newly trusted package. It passes a new docs-only list, a draft source, a new draft source and a new exact version of a package, and exits 2 for a `package.json` that does not parse and for an argument that is not a range.
+4. **The type check's TypeScript**, `__tests__/typescript-version.test.ts`, under `bun test`. `bun check` reports the errors of the TypeScript built into Bun, and an editor runs the `typescript` package. The test checks that `process.versions.typescript` equals the version that `package.json` pins, so a Bun upgrade that moves one fails the test ([research 13](../docs/research/13-type-check.md), "Risks").
 
 ## Boundaries
 
-- **Always:** keep each rule in its spec or decision, and point to it from `AGENTS.md`. Update a module's row when its task lands. Keep `AGENTS.md` at 120 lines or fewer. Use the glossary's words. Run `bun run build` and `bun test` (and `bun run build:site` once `package.json` has it) before a commit.
+- **Always:** keep each rule in its spec or decision, and point to it from `AGENTS.md`. Update a module's row when its task lands. Keep `AGENTS.md` at 120 lines or fewer. Use the glossary's words. Run `bun run typecheck`, `bun run build` and `bun test` (and `bun run build:site` once `package.json` has it) before a commit.
 - **Ask first:** a new repo skill; a change to an approval rule in `AGENTS.md`; settings for a new agent; a new section in `AGENTS.md`.
 - **Never:** an agent writes `.mcp.json` or `.claude/settings.json`; Peter adds them. Never put raw interview answers, the redaction list, the phone number or an internal link in an agent file; they live in the private repo or in `private.yaml`.
 

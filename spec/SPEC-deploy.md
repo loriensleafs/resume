@@ -489,9 +489,9 @@ The two health checks watch each other (row 122). Vercel Cron and GitHub's sched
 `.github/workflows/ci.yml` runs on every push and pull request, on `ubuntu-24.04` (pinned: `ubuntu-latest` moves to 26.04 in November 2026). Every helper is pinned to an exact commit, and each workflow grants only the permissions it needs (row 120).
 
 - **Job `test`:**
-  1. `actions/checkout`, then `oven-sh/setup-bun` with `bun-version: 1.4.2`.
+  1. `actions/checkout`, then `oven-sh/setup-bun` with `bun-version: 1.4.4`. Every job uses this Bun.
   2. `sudo apt-get update && sudo apt-get install -y poppler-utils`.
-  3. `bun ci`.
+  3. `bun ci`, then `bun run typecheck` (row 157).
   4. `bun run build` (the content module's documents, public only), then `bun run build:site`.
   5. `bun test`, with `CHROME_PATH=/usr/bin/google-chrome`. This includes the document checks.
 - **Job `audit`:** `bun audit --prod --audit-level=high`, as its own job, so a registry outage shows as its own failure. Only the production packages decide a release.
@@ -839,7 +839,7 @@ The real platform is checked by the deploy spike, by the release check, by the t
 44. As Peter, I want a numbered setup list that adds the key last, so that the chat never runs in production without its guards.
 45. As Peter, I want a runbook for every alert, so that I know the first thing to do when my phone buzzes.
 46. As Peter, I want the platform questions answered by a throwaway deployment first, so that the real one is built on facts.
-47. As Peter, I want CI on a pinned image with Bun 1.4.2, Chrome and poppler, and pinned helpers, so that nothing changes under me.
+47. As Peter, I want CI on a pinned image with Bun 1.4.4, Chrome and poppler, and pinned helpers, so that nothing changes under me.
 48. As Peter, I want no Node or Python tooling in this repository, so that it stays pure Bun.
 49. As an engineer reviewing the repository, I want the platform settings, the routes and the workflows in code, so that I can read how the site is run.
 50. As an engineer reviewing the repository, I want the strict policy, its probes and its checks on the real deployment on record, so that I see the security work.

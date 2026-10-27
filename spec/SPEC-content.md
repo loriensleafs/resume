@@ -23,7 +23,7 @@ Acceptance criteria:
 
 ## Tech Stack
 
-- Bun 1.4.2 and TypeScript; Bun APIs only (`Bun.file`, `Bun.write`, `Bun.YAML`, `Bun.spawn`, `$`). No Node tooling, no Python.
+- Bun 1.4.4 and TypeScript; Bun APIs only (`Bun.file`, `Bun.write`, `Bun.YAML`, `Bun.spawn`, `$`). No Node tooling, no Python.
 - `zod` 4.6.7 for the schema. `docx` 9.14.0 for the Word file. `harfbuzzjs` 1.6.4 (dev) for cutting fonts.
 - Google Chrome or Chromium, driven over the DevTools protocol, prints the PDF.
 - Tests use `pdftotext` and `pdffonts` from poppler (`brew install poppler` on macOS; `poppler-utils` on Ubuntu).

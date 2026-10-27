@@ -72,6 +72,7 @@ Done, for another branch, when both checks let the push go on and the branch is 
 ## 2. Run the before-commit checks
 
 ```sh
+bun run typecheck
 bun run build
 bun run build:site
 bun test

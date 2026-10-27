@@ -83,8 +83,8 @@ async function devToolsUrl(stderr: ReadableStream<Uint8Array>): Promise<string> 
   let text = "";
   for await (const chunk of stderr) {
     text += decoder.decode(chunk, { stream: true });
-    const match = text.match(/DevTools listening on (ws:\/\/\S+)/);
-    if (match) return match[1];
+    const url = text.match(/DevTools listening on (ws:\/\/\S+)/)?.[1];
+    if (url) return url;
   }
   throw new Error(`Chrome exited before it opened DevTools:\n${text}`);
 }
