@@ -82,6 +82,17 @@ At a few thousand entries a month the store costs nothing on any of the three. W
 - **Vercel Cron** calls the production deployment URL and does not follow redirects. https://vercel.com/docs/cron-jobs
 - **Protection bypass in a browser:** also send `x-vercel-set-bypass-cookie: true`, so follow-up requests carry the bypass. https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation
 
+## The committed documents: fixed dates (2026-10-27)
+
+The build image has no Chrome (above), so the site serves the public documents committed in `documents/` ([SPEC-deploy](../../spec/SPEC-deploy.md), Documents). SPEC-deploy asked the plan to check whether the Word library and Chrome accept a fixed date. Verdict: neither does, so two builds of the same inputs never match byte for byte. The inputs hash alone keeps the committed documents stable: `bun run documents` writes nothing while `documents/inputs.sha256` matches the inputs. SPEC-content and SPEC-deploy need no change.
+
+- **The Word file** (`docx` 9.14.0, `node_modules/docx/dist/index.mjs`) changes on each build in three places:
+  - `docProps/core.xml` gets `dcterms:created` and `dcterms:modified` from `new Date()` (lines 19304 to 19326). The core-properties options have no date field.
+  - Each `ExternalHyperlink` gets a random relationship id when its paragraph is written: `uniqueId()`, which calls nanoid's non-secure `Math.random()` (lines 13528 to 13537, 4846 and 4663). The id appears in `word/document.xml` and `word/_rels/document.xml.rels`. T1's builder found this.
+  - The compiler adds each part to the zip with `zip.file(path, data)` and no date (lines 35224 to 35234), so JSZip stamps every entry with the build time.
+- **The PDF** (Chrome 156.0.8078.48): `Page.printToPDF` has 17 parameters, and none sets a date or metadata. Sources: the installed Chrome's own `/json/protocol`, and https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-printToPDF. Chrome writes the print time into `/CreationDate` and `/ModDate`.
+- **Two public builds, one after the other** (`bun run build --public`, 2026-10-27): the text file and the print preview were identical. The PDFs had the same size and differed only in `/CreationDate` and `/ModDate`. The Word files differed only in the two `dcterms` dates, the 3 hyperlink ids and the zip entry dates.
+
 ## Alert channels
 
 - **Twilio SMS:** about $0.0083 a text plus carrier fees (about $0.012 to $0.013 in total), $1.15 a month for a local number; "Anyone sending SMS/MMS messages over a 10DLC number from an application to the US must register for A2P 10DLC", hobbyists included. https://www.twilio.com/en-us/sms/pricing/us, https://www.twilio.com/docs/messaging/compliance/a2p-10dlc
