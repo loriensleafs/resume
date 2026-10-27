@@ -3,18 +3,18 @@
 # See spec/SPEC-knowledge.md.
 topics:
   - topic: work-arrangement
-    answer:
-    status: draft
-    approved:
+    answer: Peter is open to remote, hybrid or on-site roles in the Seattle area.
+    status: approved
+    approved: 2026-10-26
   - topic: location
-    answer:
-    status: draft
-    approved:
+    answer: Peter is based in Redmond, Washington, in the Seattle area, and would consider relocating for the right role.
+    status: approved
+    approved: 2026-10-26
   - topic: availability
-    answer:
-    status: draft
-    approved:
+    answer: Peter is available to start immediately. If a role requires him to relocate, the start date would depend on the move.
+    status: approved
+    approved: 2026-10-26
   - topic: target-roles
-    answer:
-    status: draft
-    approved:
+    answer: Peter is looking for Senior, Staff or Lead roles in front-end platform engineering, design systems, and AI developer tooling and AI platform work.
+    status: approved
+    approved: 2026-10-26

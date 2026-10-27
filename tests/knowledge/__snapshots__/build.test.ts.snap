@@ -124,5 +124,13 @@ Building it was not just a matter of picking a library. Highspot's application w
 Result: The component shipped as part of Polar UI and gave Highspot one consistent Markdown experience across the application, streamed or not, with very high rendering performance. Highspot's AI features adopted it, and all new functionality was required to use it. That was easy to follow, because it was part of Polar UI: every part of the application being updated to Polar UI used it as the Markdown component.
 Tools: React and TypeScript, Jest, Storybook, and Chromatic, which the design system used for visual regression testing. It was built on existing Markdown parsers; Peter built it some time ago, no longer has access to the code, and does not remember which parsers they were.
 Not public: The component's source code, its caching implementation and Highspot's internal repositories. The names of colleagues and Highspot's internal team structure.
+
+
+# Job-search logistics
+
+[logistics:work-arrangement] work-arrangement: Peter is open to remote, hybrid or on-site roles in the Seattle area.
+[logistics:location] location: Peter is based in Redmond, Washington, in the Seattle area, and would consider relocating for the right role.
+[logistics:availability] availability: Peter is available to start immediately. If a role requires him to relocate, the start date would depend on the move.
+[logistics:target-roles] target-roles: Peter is looking for Senior, Staff or Lead roles in front-end platform engineering, design systems, and AI developer tooling and AI platform work.
 "
 `;

@@ -25,6 +25,6 @@ Current phase: 3 (knowledge and site). Each task ends with its verification.
 - [x] 7. Interview Peter and approve the nine deep dives, one at a time (all nine approved 2026-10-26; two follow-ups in .scratch/knowledge/issues/)
   - Acceptance: each file in `knowledge/deep-dives/` has `status: approved` with Peter's date, and every statement traces to his answers.
   - Verify: `bun run knowledge` lists `deep:<id>` for all nine; `bun test`
-- [ ] 8. Interview Peter and approve the four logistics answers
+- [x] 8. Interview Peter and approve the four logistics answers (all four approved 2026-10-26)
   - Verify: `bun run knowledge` lists the four `logistics:` entries
 - [ ] 9. Write SPEC-site.md for Peter's review
