@@ -78,6 +78,9 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 66 | (Peter, 2026-10-27) Answer actions | Under each answer, on hover: Copy and Retry, then how long ago. The latest answer always shows Copy and Retry. Drawn: its time shows on hover |
 | 67 | (Peter, 2026-10-27) Long questions | A question past a length shows truncated, with the design system's Show more. Drawn: four lines, fading out |
 | 68 | (Peter, 2026-10-27) Scroll to the latest | Away from the bottom of a long conversation, a floating round icon button with a shadow and a down arrow sits just above the input, moves with a growing input, and scrolls to the bottom when selected |
+| 69 | (Peter, 2026-10-27) Message spacing | The space between a question and its answer matches the space between an answer and the next question. Every message keeps room for its action row, shown or not, and the steps line fits between a question and its answer. Drawn: a 28 px action row under each message and 20 px between messages |
+| 70 | (Peter, 2026-10-27) Action icon spacing | Spaced like Claude's: drawn as the design system's tiny icon buttons, 4 px apart, under questions and answers alike |
+| 71 | (Peter, 2026-10-27) Text sizes | Answers use the same text size as questions; the steps line uses that size too, in gray |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
