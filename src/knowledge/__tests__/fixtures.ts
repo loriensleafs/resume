@@ -74,7 +74,7 @@ const DEEP_DIVE_FRONT: Front = {
 /** The six deep-dive sections, each with one line of text. */
 export const DEEP_DIVE_BODY = SECTIONS.map((s) => `## ${s}\n\n${s === "Not public" ? "Internal code." : `Text for ${s}.`}\n`).join("\n");
 
-/** A source file in the new front matter: `DEEP_DIVE_FRONT` with `front` laid over it, then `body`. */
+/** A deep-dive source file: `DEEP_DIVE_FRONT` with `front` laid over it, then `body`. */
 export function deepDiveFile(front: Front = {}, body = DEEP_DIVE_BODY): string {
   return sourceFile(DEEP_DIVE_FRONT, front, body);
 }
@@ -101,15 +101,7 @@ const INTERVIEW_BODY = [
   "## Not public\n\nColleague names.\n",
 ].join("\n");
 
-/** A source file in the new front matter: `INTERVIEW_FRONT` with `front` laid over it, then `body`. */
+/** An interview source file: `INTERVIEW_FRONT` with `front` laid over it, then `body`. */
 export function interviewFile(front: Front = {}, body = INTERVIEW_BODY): string {
   return sourceFile(INTERVIEW_FRONT, front, body);
-}
-
-export function deepDive(overrides: { front?: string; body?: string } = {}): string {
-  const front =
-    overrides.front ??
-    "id: sample\ntitle: A sample deep dive\nrole: acme\nhighlights: [1]\nstatus: approved\napproved: 2026-10-27\nsource: Interview with Peter, 2026-10-27";
-  const body = overrides.body ?? SECTIONS.map((s) => `## ${s}\n\n${s === "Not public" ? "" : `Text for ${s}.`}\n`).join("\n");
-  return `---\n${front}\n---\n\n${body}`;
 }
