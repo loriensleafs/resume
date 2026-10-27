@@ -10,12 +10,11 @@ Updated 2026-10-26. This file is the one current handoff. A fresh session resume
 
 ## Waiting on Peter
 
-- When to make the repository public ([decision 0006](decisions/0006-public-repo-private-details.md)).
 - Hosting and model choice, after the hosting research note lands as `docs/research/07-…`.
 - Logistics answers and deep-dive interviews, during the knowledge module.
 
 ## Working state
 
-- Repository: github.com/loriensleafs/resume, private, branch `main`.
+- Repository: github.com/loriensleafs/resume, public since 2026-10-26, branch `main`.
 - Peter's local clone: `git clone https://github.com/loriensleafs/resume ~/Dev/resume`, then create `private.yaml` there (see README).
 - Nothing red. CI does not exist yet; it arrives with the deploy module.

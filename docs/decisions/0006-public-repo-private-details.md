@@ -6,4 +6,4 @@ Decided 2026-10-26 by Peter.
 
 Considered: keep the repository private (hides the work sample); a private source repository plus a public site repository (two repositories to keep in sync).
 
-Consequences: the first commit, which contained the phone number, is rewritten before the repository is made public. Peter approves that force-push and the visibility change separately.
+Consequences: the first commit, which contained the phone number, was rewritten and force-pushed on 2026-10-26, and the repository was made public the same day; Peter approved each step. A test fails if a tracked file ever contains a private detail.
