@@ -121,7 +121,7 @@ type ChatError = {
 
 - **Stream errors.** A chunk middleware rewrites every `RUN_ERROR` event to `{ code, message }`, with a fixed message for each code. It drops `rawEvent`, `metadata` and `usage`, so no Anthropic error body reaches the browser. The code is the handler's own (`DAILY_LIMIT`, `SPEND_LIMIT`, `DEADLINE` or `MAX_TOKENS`) or the model API's.
 - **Limits.** A refusal by `budget.reserve()` is not a `ChatError`, because TanStack AI's browser client does not read the body of a response that is not 200. It is an HTTP 200 stream with one `RUN_ERROR` event whose code is `DAILY_LIMIT` or `SPEND_LIMIT`, so the browser makes an answer message for it. A turn that meets Anthropic's limit during the run also ends with `RUN_ERROR` and `SPEND_LIMIT`. The handler finds that limit from the Anthropic error's status and body, not its message text ([SPEC-deploy](SPEC-deploy.md)).
-- **Origin.** In production the handler accepts a request whose `Origin` header is `https://peterkloss.dev` or the deployment's own address (`https://$VERCEL_URL`); elsewhere, the request's own origin. Any other origin gets 403 `FORBIDDEN_ORIGIN`, so another site's page cannot spend the chat's budget through its visitors' browsers. A request with no `Origin` header passes this check; the rate limits and the cap still apply to it.
+- **Origin.** In production the handler accepts a request whose `Origin` header is `https://peterkloss.dev` or the deployment's own address (`https://$VERCEL_URL`); elsewhere, the request's own origin. The route computes these from `VERCEL_ENV` and `VERCEL_URL` and passes them as `ChatDeps.origins`. Any other origin gets 403 `FORBIDDEN_ORIGIN`, so another site's page cannot spend the chat's budget through its visitors' browsers. A request with no `Origin` header passes this check; the rate limits and the cap still apply to it.
 
 - **Trust.** Every message in the request is visitor material, the earlier answers included: the browser holds the conversation, so a visitor can edit it. Earlier reads go to the model as ids only, so edited source text never reaches it. The question and a pasted posting are material to answer from, never instructions.
 - **Edited answers (a documented trade-off).** A visitor who edits an earlier answer misleads only their own session, and every approved source is public. So the answers carry no signature, and `open_source` accepts any passage of an approved source that the conversation cites (see Tools).
@@ -391,9 +391,10 @@ It holds no question text, `threadId`, IP address or other visitor data. The que
 - `adapter`: `createAnthropicChat("claude-sonnet-5-5", key)`, where `key` is `ANTHROPIC_API_KEY` from `.secrets/local.env` (the `resume-evals` key), loaded with `--env-file`. The evals do not use `anthropicText()`, because it reads `ANTHROPIC_AUTH_TOKEN` and `ANTHROPIC_OAUTH_TOKEN` first, and a shell can hold those.
 - `knowledge`: the real `buildKnowledge()` output.
 - `log`, `budget` and `telemetry`: the in-memory ones. The budget always allows, and the telemetry keeps each `chat_turn` event for the review file. The evals write nothing to the store.
+- `origins`: empty.
 - `now`: the real clock.
 
-Each case states its checks with this schema; a case passes when all of its checks pass:
+A case is `{ id, question, expect }`, plus optional `history` (earlier turns, as `{ role: "user" | "assistant", text }` pairs, sent before the question), `scope` (a role id) and `audience` (one of the five audiences), so a scoped follow-up and each audience can be asked. Each case states its checks with this schema; a case passes when all of its checks pass:
 
 ```ts
 export const EvalExpect = z.strictObject({
@@ -423,7 +424,7 @@ The cases cover: each topic outside the chat's topics; an employer, project or s
 
 Versions checked on 2026-10-27 from the published packages.
 
-- `@tanstack/ai` 1.0.0, `@tanstack/ai-react` 1.0.0 and `@tanstack/ai-anthropic` 1.0.0, all on 1.0 together ([research 07](../docs/research/07-tanstack-ai-hosting-model.md)). In production the adapter is `anthropicText("claude-sonnet-5-5")` ([decision 0013](../docs/decisions/0013-claude-sonnet-model.md)); the evals use `createAnthropicChat()`, and the tests `createAnthropicChatWithClient()` with a stub client. Answers stream as server-sent events (`toServerSentEventsResponse`). The route sets `promptCache: "short"` explicitly, a 5-minute cache.
+- `@tanstack/ai` 1.0.0, `@tanstack/ai-react` 1.0.0 and `@tanstack/ai-anthropic` 1.0.0, all on 1.0 together ([research 07](../docs/research/07-tanstack-ai-hosting-model.md)). In production the adapter is `anthropicText("claude-sonnet-5-5")` ([decision 0013](../docs/decisions/0013-claude-sonnet-model.md)); the evals use `createAnthropicChat()`, and the tests `createAnthropicChatWithClient()` with a stub client. Answers stream as server-sent events (`toServerSentEventsResponse`). The handler sets `promptCache: "short"` itself, a 5-minute cache; it is not a `ChatDeps` field, because no caller chooses it.
 - `fakeText()` from `@tanstack/ai/testing` scripts the model in tests and in the preview. When `VERCEL_ENV` is not `production`, the route always uses it, whatever variables are set. The preview's fake model picks its scripted turn from `tests/chat/fixtures.ts` by the question text.
 - `@tanstack/markdown` 0.0.13, the version the design system already depends on, as a direct dependency, to render answers with the rules in "Rendering answers".
 - The site's stack from [SPEC-site](SPEC-site.md): TanStack Start, React, `@tanstack/react-db`, `@acmelabs/design-system-react`, zod.
@@ -498,6 +499,8 @@ export type ChatDeps = {
   log: QuestionLog;
   budget: Budget;              // this module's interface; SPEC-deploy implements it; tests pass an in-memory one
   telemetry: Telemetry;        // this module's interface; SPEC-deploy prints the chat_turn line and adds it to the daily totals
+  origins: string[];           // the allowed Origin values; the route computes them from VERCEL_ENV and VERCEL_URL;
+                               // empty means the request's own origin (outside production, tests, evals)
   now(): Date;
 };
 

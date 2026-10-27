@@ -89,7 +89,7 @@ README.md
 - The list has no `prototypes/` entry. Prototypes stay on their own branches, so no file on `main` matches it, and an entry that matches no tracked file fails the docs-only test.
 - Shared test helpers, such as `tests/chat/fixtures.ts`, are site files: the preview's fake model bundles them with the chat function.
 - `scripts/site-changed.sh <from> <to>` exits 1 when a site file differs between two commits, 0 when none does, and 128 on an error. It runs `git diff --quiet <from> <to> -- . ':(exclude,glob)<entry>'…` for each entry. The ignore step, the release check and the GitHub health check all use it, so the list is read in one place.
-- `tests/site/docs-only.test.ts` fails when an entry matches no tracked file, or when an entry matches a file that the site build reads. The site build test records those files: Vite's module graph and the files `buildSite()` opens.
+- `tests/site/docs-only.test.ts` fails when an entry matches no tracked file, or when an entry matches a file that the site build reads. `buildSite()` returns the files it read: Vite's module graph and the files it opens. The task that writes the docs-only test adds that return value. The built-output checks (each page's policy tag, no `style=` attribute) live once, in the site's build test; this module's tests check `addPolicyTags()` and `writeVercelConfig()` at unit level.
 
 **The steps of a release.**
 
@@ -172,7 +172,8 @@ nitro({
 4. Site: `writeServiceWorker(staticDir)` (Workbox `generateSW`). Its precache includes `device-index.json` and `404.html`.
 5. Deploy: `writeVercelConfig(outputDir)` from `src/deploy/routes.ts`.
 
-- The script writes `.vercel/output/` under the repo root. With `--out <folder>`, it writes `<folder>/.vercel/output/` instead and passes that folder to every step; the tests' seam-1 folder is made this way.
+- The script writes `.vercel/output/` under the repo root. With `--out <folder>`, it writes `<folder>/.vercel/output/` instead and passes that folder to every step; the tests' seam-1 folder is made this way. With `--root <folder>`, every step reads the project's files (`resume.yaml`, `private.yaml`, `knowledge/`, `documents/`) from that folder; the tests pass a fixture root whose `private.yaml` holds a fake phone number.
+- A module whose step the script runs wires its own call into the script, as the site's `writeServiceWorker()` task does for step 4.
 - The script is the composition root at build time, as the route files are at run time. The site's code imports neither this module nor the chat module.
 - The policy tags come before the service worker, so the precache holds each page with its tag.
 

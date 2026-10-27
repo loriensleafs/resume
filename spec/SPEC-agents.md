@@ -1,10 +1,10 @@
 # Spec: agents
 
-Approved by Peter on 2026-10-27 (decision record row 142). Peter's answers for this spec are [decision record](../docs/design/interview-2026-10-26.md) rows 7, 140 and 141, and his confirmation of the intent on 2026-10-27.
+Approved by Peter on 2026-10-27 (decision record row 142). Peter's answers for this spec are [decision record](../docs/design/interview-2026-10-26.md) Intent paragraph and rows 140 and 141, and his confirmation of the intent on 2026-10-27.
 
 ## Objective
 
-Every coding agent that works on this project starts from the same agent files and finds the right spec, rule and procedure for its work without Peter repeating them. The agents are Claude Code, Codex, Cursor, GitHub Copilot, Gemini CLI and Antigravity (row 7: "every AI agent supported in this repository").
+Every coding agent that works on this project starts from the same agent files and finds the right spec, rule and procedure for its work without Peter repeating them. The agents are Claude Code, Codex, Cursor, GitHub Copilot, Gemini CLI and Antigravity (the decision record's Intent paragraph: "every AI agent supported in this repository").
 
 This module owns the agent files:
 

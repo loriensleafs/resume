@@ -72,7 +72,7 @@ source: Interview with Peter, 2026-10-26
 ...
 ```
 
-- **Passages:** every `## ` section is one passage, except `## Not public`, which comes last in every source.
+- **Passages:** every `## ` section is one passage, except `## Not public`, which comes last in every source. In an approved source every passage holds text; only `Not public` may be empty.
 - **Append-only:** passages in an approved source are append-only. A change never removes, moves, splits or merges an approved passage. A new passage goes after the last one, before `Not public`. A correction to a passage's text keeps the passage in its place and follows the edit rule. A deep dive's six sections are fixed, so only their text can change.
 - **Deep dive:** the sections are, in order, Problem, What Peter did, How it worked, Result, Tools, Not public. Written in the third person ("Peter led …"). All nine existing deep dives get `kind: deep-dive`, `subject: project` and a one-line summary. Peter approves the nine summaries with the move, under the edit rule.
 - **Interview:** each passage heading is the question as asked, and its text is Peter's answer in his own words, in the first person. An answer longer than one passage continues in the next passage, under the same heading with " (continued)" at its end: `## Why front-end platform work? (continued)`. A "(continued)" heading comes directly after the heading it continues.
