@@ -46,6 +46,10 @@ _Avoid_: export, artifact (artifact means a published claude.ai page)
 The generated `resume.html` that Chrome prints to the PDF; open it to see the PDF layout.
 _Avoid_: template (the template is the code that renders it)
 
+**Inputs hash**:
+The file `documents/inputs.sha256`: one hash for each input of the committed public documents, which are the resume source, the content module's code, the fonts and its locked packages. It decides when the documents are rebuilt, and the tests fail while it does not match the inputs.
+_Avoid_: checksum file, manifest
+
 ## Site and chat
 
 **Site**:

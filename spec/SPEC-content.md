@@ -19,6 +19,7 @@ Acceptance criteria:
 - An invalid `resume.yaml` stops the build with a message that names the file and the field.
 - Each role has an `x-short` field, an extension: the short label the site's career timeline shows for that role ([SPEC-site](SPEC-site.md)). Its values are the labels of the approved mockups, and Peter approves each one. No document prints it.
 - `bun run documents` writes the public documents to `documents/`, with `documents/inputs.sha256`, a hash of the inputs. The inputs are `resume.yaml`, this module's source files, `fonts/`, and the locked versions of this module's own packages, read from `bun.lock`. The hash does not cover the whole of `bun.lock`, so a change to another module's packages needs no rebuild. It writes nothing when the hash is unchanged. The website serves these committed files, because Vercel's build has no Chrome ([SPEC-deploy](SPEC-deploy.md)). `scripts/__tests__/documents.test.ts` checks the hash, the page count, the fonts and the text of a fresh build, and, where `private.yaml` exists, that no committed document's extracted text holds the phone number.
+- `documents/inputs.sha256` holds one line per input in `sha256sum` form, `<sha256>  <name>`, sorted by name: a file's name is its path from the repo root, and a locked package is `bun.lock#<package>`, hashed from its `bun.lock` entry. When the lines differ, the documents test names each input that changed.
 
 ## Tech Stack
 

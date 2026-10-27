@@ -60,7 +60,7 @@ Needs Peter: no (the prompt's wording is approved in C15)
 Delivers: a malformed, oversized or cross-site request gets one JSON error shape and never reaches the model.
 Blocked by: C3
 Acceptance:
-- The server reads the request in the spec's order: a body over 256 KB gets 413 `REQUEST_TOO_LARGE`; bad JSON, a body `chatParamsFromRequestBody()` rejects, a `system` message and a user image part each get 400 `INVALID_REQUEST`; a question of 10,001 characters gets 413 `QUESTION_TOO_LONG`; each is the `ChatError` JSON, never a plain-text body; `forwardedProps` without its three keys passes `ChatProps` (The request; Testing Strategy, "Request checks").
+- The server reads the request in the spec's order: a body over 256 KB gets 413 `REQUEST_TOO_LARGE`; bad JSON, a body `chatParamsFromRequestBody()` rejects, a `system` message, a `reasoning` message and a user image part each get 400 `INVALID_REQUEST`; a question of 10,001 characters gets 413 `QUESTION_TOO_LONG`; each is the `ChatError` JSON, never a plain-text body; `forwardedProps` without its three keys passes `ChatProps` (The request; Testing Strategy, "Request checks").
 - `Origin: https://example.com` gets 403 `FORBIDDEN_ORIGIN`. The handler allows the origins in `deps.origins` (`ChatDeps` gains `origins: string[]`; main's decision, written into SPEC-chat), and an empty list allows only the request's own origin; no `Origin` header passes (The request, "Origin"). C17's route fills `origins`.
 - None of these calls the model or writes the log, and a body that carries its own `tools` and `context` still gives the model the handler's tools only; `turnLimits` holds the spec's values (Limits).
 Verify: `bun test src/chat`
@@ -76,6 +76,7 @@ Acceptance:
 - A read then an answer keeps a citation to a read passage and removes one to an unread passage; `chat.citations` reports 1 removed (Testing Strategy, "Citations").
 - No streamed event holds passage text or the fixture's `Not public` text; each `read_sources` `TOOL_CALL_RESULT` holds `{ read, unknown, skipped }` only, and the model's next call still gets the full read text (Read results on the wire).
 - A call with 21 ids, or with an id of 65 characters, gets a tool error from the input schema, and the run goes on (Tools; "Read limits").
+- The wire middleware, a new instance per request, passes only the allowlisted event types; an unknown event type that a test middleware adds is dropped (The request, "Events on the wire"; Testing Strategy, "Events on the wire"; row 155's review).
 Verify: `bun test src/chat`
 Files: `src/chat/server/tools.ts`, `src/chat/server/wire.ts`, `src/chat/server/markers.ts`, `src/chat/server/handle-chat.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
@@ -151,8 +152,9 @@ Acceptance:
 - A `budget` that refuses gives an HTTP 200 stream with one `RUN_ERROR` event and its code (`DAILY_LIMIT` or `SPEND_LIMIT`), no model call and no log entry (The request, "Limits"; Testing Strategy, "Limits").
 - Every `RUN_ERROR` on the wire holds only its code and the fixed message for it: no `rawEvent`, `metadata`, `usage` or Anthropic error body (Stream errors).
 - A model error gives `RUN_ERROR` and an `error` entry; an aborted request gives a `stopped` entry (Testing Strategy, "Endings").
+- Every `RUN_ERROR` comes from `wireError(code)` and its one table of fixed messages. A middleware that throws a marker string: the marker never reaches the wire, the stream ends with `RUN_ERROR` `SERVER_ERROR`, the server log line holds the error alone, and `finishTurn()` writes exactly one `error` entry (The request, "Stream errors" and "A thrown run"; Question log; row 155).
 Verify: `bun test src/chat`
-Files: `src/chat/server/handle-chat.ts`, `src/chat/server/wire.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
+Files: `src/chat/server/handle-chat.ts`, `src/chat/server/wire.ts`, `src/chat/server/finish-turn.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
 Needs Peter: no
 
@@ -163,9 +165,11 @@ Blocked by: C11
 Acceptance:
 - The stub's spend-limit errors, with both documented bodies (HTTP 400 `invalid_request_error` starting "You have reached your specified"; HTTP 429 `error.details.error_code` `enforced_spend_limit_reached`), built with the SDK's real error class, end the stream with `SPEND_LIMIT` and write a `limit` entry; the handler reads the status and body, not the message text (The request, "Limits"; SPEC-deploy, "The monthly limit").
 - The stub's `max_tokens` stop ends the stream with `RUN_ERROR` `MAX_TOKENS` and writes an `error` entry; partial text is not kept (How a turn ends; Testing Strategy, "Endings").
-- The stub sees adaptive thinking with effort `medium`, the thinking text omitted, `max_tokens` 8,000 and the short prompt cache on every model call; `handleChat()` sets the cache itself, with no `ChatDeps` field (Limits, "Thinking"; Testing Strategy, "Thinking"; main's decision, written into SPEC-chat).
+- The stub sees adaptive thinking with effort `medium`, `display: "summarized"`, `max_tokens` 8,000 and the short prompt cache on every model call; `handleChat()` sets the cache itself, with no `ChatDeps` field (Limits, "Thinking"; Testing Strategy, "Thinking"; main's decision, written into SPEC-chat; row 156).
+- The wire middleware turns the thinking summary into `chat.thinking` events that carry only `active` or `delta`; no `REASONING_*` event reaches the wire, and the stub's signature string appears nowhere in the wire output. An `[id]` or `<<…>>` in the thinking summary gives no kept citation, refusal or follow-up question and 0 removed. A thinking summary of 25,000 characters reaches the wire as 20,000, ending with "…" (Thinking; Markers, "Answer text only"; rows 155 and 156).
+- The wire output of a turn with thinking, run through the real `@tanstack/ai-client` stream processor, gives a next request that passes the request check and holds no thinking text (The request, "No thinking in the request").
 Verify: `bun test src/chat`
-Files: `src/chat/server/__tests__/stub-anthropic.ts`, `src/chat/server/handle-chat.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
+Files: `src/chat/server/__tests__/stub-anthropic.ts`, `src/chat/server/handle-chat.ts`, `src/chat/server/wire.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
 Needs Peter: no
 
@@ -187,9 +191,10 @@ Blocked by: C4, C12
 Acceptance:
 - Two finished model calls, then a Stop during the third: telemetry gets the sum of the two calls' usage as SPEC-deploy's five counts; the counts are `null` when no call finished (Turn telemetry; Testing Strategy, "Usage").
 - Each turn hands one `chat_turn` event with its reservation to `telemetry.record()`, a rejected request with `rejected` and a refusal before the model call with `limit`; no event holds question text or the `threadId` (Turn telemetry; Testing Strategy, "Telemetry").
+- `finishTurn()` writes the event with the log entry, so a thrown run also gives exactly one `chat_turn` event (Question log; Testing Strategy, "Stream errors"; row 155).
 - The response ends only after the log and telemetry writes, and a log or telemetry write that fails never breaks the answer (Testing Strategy, "Usage"; Question log; SPEC-deploy amendment 10).
 Verify: `bun test src/chat`
-Files: `src/chat/server/telemetry.ts`, `src/chat/server/handle-chat.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
+Files: `src/chat/server/telemetry.ts`, `src/chat/server/finish-turn.ts`, `src/chat/server/handle-chat.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
 Needs Peter: no
 
@@ -266,6 +271,7 @@ Acceptance:
 - The chat opens `peterkloss-chat` once with `createIndexedDB({ name: "peterkloss-chat", version: 1, stores: ["messages", "queue", "session"] })` and one `indexedDBCollectionOptions` collection per store; the sending tab writes a message's row when it is added and again when it ends, never the whole conversation, and `useChat` runs without its own persistence (Saved conversation). The DB names are checked against the package's skills first.
 - A reload restores the conversation at the latest answer with no notice: the collections are read before the first render and passed as `initialMessages` and `threadId`; the restore calls `setConversationActive(true)`, or `setConversationActive(false)` with nothing saved (A returning visitor; Testing Strategy, seam 2). S34 checks the effect: the first view never shows, layout shift stays under 0.1, and with nothing saved the first view shows.
 - A `session` row with an unknown `version` clears the chat's stores, and blocked storage works as a first visit with the conversation in memory (Saved conversation, "Version").
+- An answer's row keeps its thinking summary as `answer.thinking`, written when thinking ends and when the message ends; the history builder gives `useChat` text parts and id-only tool results only, so after a reload the next request holds no thinking text. A scripted thinking summary of 25,000 characters is saved as at most 20,000, ending with "…", also after a reload (Saved conversation, "The thinking summary"; Limits, "Conversation sent"; Testing Strategy, seam 2; row 156).
 Verify: `bun test src/site/__tests__/browser.test.ts`
 Files: `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
@@ -337,12 +343,13 @@ Needs Peter: no
 
 ### C26: The answer steps
 
-Delivers: while the chat works, the visitor sees what it found, read and checked; afterwards the record folds into one line.
-Blocked by: C23
+Delivers: while the chat works, the visitor sees what it found, read and checked, and its thinking summary; afterwards the record folds into one line.
+Blocked by: C23, C12 (`chat.thinking` on the wire)
 Acceptance:
 - While answering, each step appears in a bordered box as it happens: "Found 1 source about <topic>", "Reading <title>", and "Checking citations" from the first answer text after the last read until `chat.citations` arrives; the current step has a spinner and a moving highlight and is announced politely (Answer steps; Accessibility).
-- When done, the box folds into one line above the answer, "Read 1 source and checked 3 citations", shown only when the turn read; opened, each row opens on its own: the passages read by number and heading, and "Each citation points to a passage the chat read, to the resume or to one of Peter's logistics answers." (row 138); a removed marker reads "Checked 3 citations, removed 1." (Answer steps).
+- When done, the box folds into one line above the answer, "Read 1 source and checked 3 citations", shown when the turn read or has a thinking summary (for a turn with no read, a wording draft such as "Thought it through"); opened, each row opens on its own: the passages read by number and heading, and "Each citation points to a passage the chat read, to the resume or to one of Peter's logistics answers." (row 138); a removed marker reads "Checked 3 citations, removed 1." (Answer steps).
 - The browser test sees the steps one by one, then the answer (Testing Strategy, seam 2 bullet 1).
+- While `chat.thinking` is active, the step that shows the thinking summary is the current step: plain text only, added once per animation frame, under its label (a wording draft, row 153); only the label is announced. After the answer it stays in the opened steps and is not counted in the folded line. Stop or an error while it streams closes the step, with no live spinner left. A scripted thinking summary with HTML, a script tag, a Markdown link, an image and a citation marker shows each as literal text. A scripted thinking summary of 25,000 characters shows at most 20,000 in the live step, ending with "…" (Views, "Answer steps"; Accessibility; Testing Strategy, seam 2; row 156).
 Verify: `bun test src/site/__tests__/browser.test.ts`
 Files: `src/chat/ui/AnswerSteps.tsx`, `src/chat/ui/Answer.tsx`, `src/chat/server/__tests__/fixtures.ts`, `src/site/__tests__/browser.test.ts`
 Size: M
@@ -516,7 +523,7 @@ Delivers: Peter has an eval suite he can run on demand, which costs nothing unti
 Blocked by: C10, C13, C14, C15 (the whole handler, with the approved prompt)
 Acceptance:
 - `evals/trick-questions.yaml` covers each topic outside the chat's topics; an employer, project or skill not in the record; false premises; wording upgrades; requests for `Not public` details; prompt injection in a question and in a posting; the fit check; "show me his resume"; "show me where that came from"; a scoped follow-up; one question under each audience; and citation integrity; each case states its checks with `EvalExpect` (Evals). A case may carry optional `history` (questions asked first, through `handleChat()`), `scope` and `audience` (main's decision, written into SPEC-chat).
-- `bun run evals` loads `.secrets/local.env` with `--env-file`, uses `createAnthropicChat("claude-sonnet-5-5", key)`, the real `buildKnowledge()`, the in-memory log, budget (always allows) and telemetry, and the real clock; it asks each case through `handleChat()`, checks it, and writes every answer and `chat_turn` event to `.scratch/evals/<date>.md`, which git ignores (Evals).
+- `bun run evals` loads `.secrets/local.env` with `--env-file`, uses `createAnthropicChat("claude-sonnet-5-5", key)`, the real `buildKnowledge()`, the in-memory log, budget (always allows) and telemetry, and the real clock; it asks each case through `handleChat()`, checks it, and writes every answer, its thinking summary and its `chat_turn` event to `.scratch/evals/<date>.md`, which git ignores; `mustNotContain` checks the answer and its thinking summary (Evals; row 156).
 - Nothing in `bun test` or CI runs it (Evals; SPEC-deploy, CI).
 Verify: `bun test`; `git check-ignore .scratch/evals/x.md`; no run in this task.
 Files: `evals/trick-questions.yaml`, `scripts/evals.ts`, `package.json`, `.gitignore`
@@ -543,7 +550,7 @@ After C2. `bun test src/chat` passes; the deploy module's ops work (D9) can star
 
 ### Checkpoint chat: the handler
 
-After C15. `bun test src/chat` passes every seam-1 item in SPEC-chat's Testing Strategy; `bun run build` and `bun test` pass; a review against the Boundaries ("Never": no read, `Not public` or thinking text on the wire; no `threadId` in the log); Peter has approved the system prompt (C15).
+After C15. `bun test src/chat` passes every seam-1 item in SPEC-chat's Testing Strategy; `bun run build` and `bun test` pass; a review against the Boundaries ("Never": no read result's text, `Not public` section, thinking block, signature or `REASONING_*` event on the wire, and the thinking summary only in `chat.thinking`; no `threadId` in the log); Peter has approved the system prompt (C15).
 
 ### Checkpoint chat: the first answer
 

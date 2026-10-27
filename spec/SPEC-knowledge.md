@@ -191,6 +191,7 @@ export function roleId(role: string): string;                // "role:<role id>"
 export function highlightId(role: string, n: number): string; // "highlight:<role id>.<n>"
 export function skillsId(groupName: string): string;         // "skills:<slug>"
 export function logisticsId(topic: string): string;          // "logistics:<topic>"
+export function passageId(sourceId: string, n: number): string; // "<source id>.<n>"
 /** How a slug is written, for error messages. */
 export const SLUG_RULE: string;
 ```

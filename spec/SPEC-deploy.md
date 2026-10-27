@@ -2,7 +2,7 @@
 
 Approved by Peter on 2026-10-27 (decision record row 127), with the amendments to other specs below. Peter's answers are rows 107 to 127 of the [decision record](../docs/design/interview-2026-10-26.md); the facts are in [research 12](../docs/research/12-deploy-platform.md); the static site with build-time data is [decision 0023](../docs/decisions/0023-static-site-build-time-data.md). Three adversarial reviews found 18, 16 and 39 issues. This version answers all of them, with the local checks that the third review asked for (row 126). What only a real Vercel deployment can settle is the plan's first task, the [deploy spike](#deploy-spike).
 
-Corrected on 2026-10-27 after the reviews of the other specs (decision record rows 128 to 136). Approved by Peter with the updated mockups on 2026-10-27 (decision record row 139); the scope label and the texts follow rows 137 and 138.
+Corrected on 2026-10-27 after the reviews of the other specs (decision record rows 128 to 136). Approved by Peter with the updated mockups on 2026-10-27 (decision record row 139); the scope label and the texts follow rows 137 and 138. Amended on 2026-10-27 after C1 (row 155): the error share and the `errorCode` list name `SERVER_ERROR`.
 
 ## Objective
 
@@ -477,7 +477,7 @@ The two health checks watch each other (row 122). Vercel Cron and GitHub's sched
 | GitHub health check: `.github/workflows/health.yml` | GitHub schedule, daily at 21:17 UTC, and by hand | It reads the live commit from `/api/status`, checks that it is an ancestor of `main`, and checks it out. Then it runs that commit's smoke check with `--browser --production --documents documents/` from outside Vercel. That `/api/status` shows a passing Vercel run less than 50 hours old. That `scripts/site-changed.sh <live commit> origin/main` exits 0, or that the newest site change on `main` is less than 2 hours old. At the end, pass or fail, it records that it ran | An ntfy push from the workflow, tried 3 times |
 
 - The GitHub check uses the live commit's documents and smoke check, so a release still in its checks never makes it fail.
-- The error share counts only turns that reached the model: `answered`, the refusals, `stopped` and `error`. A turn stopped by `max_tokens` (`errorCode: "MAX_TOKENS"`) does not count as an error there, because it is not an outage; the totals still show it. Rejected requests and limit refusals are not in the totals.
+- The error share counts only turns that reached the model: `answered`, the refusals, `stopped` and `error`. A turn stopped by `max_tokens` (`errorCode: "MAX_TOKENS"`) does not count as an error there, because it is not an outage; the totals still show it. A thrown run (`errorCode: "SERVER_ERROR"`, SPEC-chat row 155) counts as an error, because it is a fault in the server's own code. Rejected requests and limit refusals are not in the totals.
 - GitHub stops a schedule after 60 days with no repository activity; the Vercel job then reports that the GitHub check has not run. If Vercel itself is down, the GitHub check reports it. The runbook covers turning a schedule back on.
 
 ## CI
@@ -587,7 +587,7 @@ Approving this spec approves these amendments:
   4. Limits:
      - a refusal by `budget.reserve()` is an HTTP 200 stream with one `RUN_ERROR` event and the code `DAILY_LIMIT` or `SPEND_LIMIT`;
      - the handler finds `SPEND_LIMIT` from the Anthropic error's status and body, as above, and ends the stream with that code;
-     - `ChatTurnEvent.outcome` gains `limit`, and `errorCode` gains `DAILY_LIMIT`, `SPEND_LIMIT` and `MAX_TOKENS`;
+     - `ChatTurnEvent.outcome` gains `limit`, and `errorCode` gains `DAILY_LIMIT`, `SPEND_LIMIT` and `MAX_TOKENS` (SPEC-chat's row 155 later added `SERVER_ERROR`, for a thrown run);
      - the saved answer's outcome and `QuestionLogEntry.outcome` gain `limit`; a turn refused before the model call writes no question-log entry;
      - the views gain the "limit reached" state, and the question queue pauses on it.
   5. Usage:
