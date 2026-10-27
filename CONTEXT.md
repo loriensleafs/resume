@@ -212,6 +212,10 @@ _Avoid_: notification, page, alarm
 The dated record of the product questions put to Peter and his answers, one numbered row per decision, in `docs/design/interview-<date>.md`. A row number names one decision, as in "row 131".
 _Avoid_: "interview" alone (an interview is a source), interview notes, transcript
 
+**Standing approval**:
+Peter's approval, given once, that covers every push, releases included (row 151). It does not cover a force-push or the other approvals `AGENTS.md` lists.
+_Avoid_: blanket approval, auto-approve
+
 **Agent files**:
 What a coding agent reads to work on this project: the shared instructions, each agent's own entry file and settings, and the repo skills. They are not site files.
 _Avoid_: rules files, prompts, agent config

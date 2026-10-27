@@ -1,13 +1,13 @@
 ---
 name: release
-description: Release procedure for every push to `main` in this repository. It checks the branch, finds whether the push changes a site file, runs the checks, records Peter's standing approval, pushes, watches the required checks and confirms whether peterkloss.dev is live. Use before every push to `main`, even one that looks docs-only, and whenever Peter asks to push to `main`, release or deploy a change.
+description: Release procedure for every push to `main` in this repository. It checks the branch, checks the commits for private details, finds whether the push changes a site file, runs the checks, records the push, pushes, watches the required checks and confirms whether peterkloss.dev is live. Use before every push to `main`, even one that looks docs-only, and whenever Peter asks to push to `main`, release or deploy a change.
 ---
 
 # Release
 
-A push to `main` that changes a site file is a release. Once its three required checks pass, it goes live at peterkloss.dev ([SPEC-deploy](../../../spec/SPEC-deploy.md), "Releases"). A site file is any tracked path that `scripts/docs-only.txt` does not list. A push that changes no site file is not a release. Peter's standing approval covers every push, releases included (decision record row 151): push without a question once the before-commit checks pass. Peter does not see a release before it goes live, so steps 5 and 6 tell him the outcome.
+A push to `main` that changes a site file is a release. Once its three required checks pass, it goes live at peterkloss.dev ([SPEC-deploy](../../../spec/SPEC-deploy.md), "Releases"). A site file is any tracked path that `scripts/docs-only.txt` does not list. A push that changes no site file is not a release. Peter's standing approval (decision record row 151) covers every push except a force-push, releases included: push once the checks pass. Peter does not see a push before it happens, so step 1 checks it for private details, and steps 5 and 6 tell him the outcome.
 
-## 1. Find the site changes
+## 1. Check what the push sends
 
 Start on `main`, with every commit from GitHub:
 
@@ -22,7 +22,18 @@ git rev-list --count origin/main..main
 - When the first count is not `0`, GitHub has commits that the local `main` lacks. Run `git rebase --autostash origin/main`, then the before-commit checks of step 2. On a conflict, run `git rebase --abort`, stop, and tell Peter.
 - When the second count is `0`, the local `main` has nothing to push. Stop.
 
-Then find the site changes. Run the second command only when the first one finds the script:
+Then check the commits for private details ([decision 0006](../../../docs/decisions/0006-public-repo-private-details.md)). Every commit and its message reach GitHub, so the second command reads `git log -p`, not only the final diff. It prints how many values of `private.yaml` the commits hold, and never a value:
+
+```sh
+git ls-files private.yaml
+git log -p origin/main..main | bun -e 'const f = Bun.file("private.yaml"); if (!(await f.exists())) { console.log("no private.yaml"); process.exit(0); } const values = []; const walk = (v) => { if (v && typeof v === "object") Object.values(v).forEach(walk); else if (v != null && String(v).trim()) values.push(String(v).trim()); }; walk(Bun.YAML.parse(await f.text())); const sent = await Bun.stdin.text(); console.log(values.filter((v) => sent.includes(v)).length);'
+```
+
+- The first command prints nothing, and the second prints `0`: go on.
+- The second prints `no private.yaml`: this clone holds no private details. Go on.
+- The first prints a path, or the second prints a number above `0`: stop, and push nothing. Tell Peter which check failed, and never the value.
+
+This check runs on every push, a docs-only push included. Then find the site changes. Run the second command only when the first one finds the script:
 
 ```sh
 ls scripts/site-changed.sh
@@ -30,11 +41,11 @@ sh scripts/site-changed.sh origin/main main; echo "exit $?"
 ```
 
 - **No script:** the deploy module is not built yet. No script decides which files are site files, and no release check runs. Tell Peter so. Then do steps 2, 3, 4 and 6. In step 3, record every file that the commits change.
-- **Exit 0:** no site file changed, so the push is not a release. Leave out steps 2, 3 and 5.
+- **Exit 0:** no site file changed, so the push is not a release. Leave out steps 2, 3 and 5. The before-commit checks ran on each commit ([AGENTS.md](../../../AGENTS.md), "Verify"), and the private-detail check above ran on this push.
 - **Exit 1:** a site file changed, so the push is a release. Go on to step 2.
 - **Any other exit code:** the script failed. Treat the push as a release, and put the error in step 3's record. An extra release watch is safe; a skipped one hides a change.
 
-Done when the branch is `main`, the first count is `0` and the second is not, and the exit code is known or the script is known to be missing.
+Done when the branch is `main`, the first count is `0` and the second is not, the private-detail check passed, and the exit code is known or the script is known to be missing. Note `git rev-parse main`: this is the checked commit, which steps 2 and 4 use.
 
 ## 2. Run the before-commit checks
 
@@ -46,11 +57,11 @@ bun test
 
 Run `bun run build:site` once `package.json` has it ([AGENTS.md](../../../AGENTS.md), "Verify"). CI runs the same checks on the pushed commit. Run them here first, so that every release already builds when it reaches GitHub.
 
-Done when all of them pass. After a failure, fix it in a new commit and start again at step 1, so that step 3 records the fix.
+Done when all of them pass on the checked commit. After a failure, fix it in a new commit and start again at step 1, so that step 3 records the fix.
 
-## 3. Record the standing approval
+## 3. Record the push
 
-Peter's standing approval (decision record row 151) covers this push, so go on to step 4 without a question. Write down, for the report in step 6:
+Write down, for the report in step 6:
 
 - the commit to push, from `git rev-parse --short main`;
 - the commits, from `git log --oneline origin/main..main`;
@@ -61,7 +72,7 @@ Done when the record holds these four items.
 
 ## 4. Push
 
-When step 3 recorded a commit, check that `git rev-parse --short main` still prints it. Then push, and compare GitHub's `main` with the local one:
+Check that `git rev-parse main` still prints the checked commit from step 1. When it prints another commit, a commit came in after the checks: start again at step 1. Then push, and compare GitHub's `main` with the local one:
 
 ```sh
 git push origin main

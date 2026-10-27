@@ -63,10 +63,10 @@ Run `bun run build` and `bun test` before every commit. Once `package.json` has 
 
 ## Releases and approvals
 
-- A push to `main` that changes a site file is a release. A site file is any tracked path not in `scripts/docs-only.txt`. Peter's standing approval covers every push, releases included (row 151): push without a question once the before-commit checks pass. Follow the [release skill](.agents/skills/release/SKILL.md) for every push to `main` ([SPEC-deploy](spec/SPEC-deploy.md)).
+- A push to `main` that changes a site file is a release. A site file is any tracked path not in `scripts/docs-only.txt`. Peter's standing approval covers every push except a force-push, releases included (row 151): push once the before-commit checks pass. Follow the [release skill](.agents/skills/release/SKILL.md) for every push to `main` ([SPEC-deploy](spec/SPEC-deploy.md)).
 - An approved knowledge source changes only after Peter approves the change in the question dialog; the change waits on a branch until then ([SPEC-knowledge](spec/SPEC-knowledge.md), row 130).
 - `bun run evals` costs money: run it only after Peter approves that run ([SPEC-chat](spec/SPEC-chat.md)).
-- Force-push, changing a repository's visibility, deploying by hand, and anything that costs money need Peter's approval each time. Agents never sign in to a dashboard and never buy anything ([SPEC-deploy](spec/SPEC-deploy.md)).
+- Force-push, changing a repository's visibility, changing `scripts/docs-only.txt` (it decides which pushes are releases), deploying by hand, and anything that costs money need Peter's approval each time. Agents never sign in to a dashboard and never buy anything ([SPEC-deploy](spec/SPEC-deploy.md)).
 
 ## Task end
 

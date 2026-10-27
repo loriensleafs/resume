@@ -119,7 +119,7 @@ README.md
 
 A small window remains: a site change pushed during step 5 can let the older deployment take the domains after the newer one. The GitHub health check then finds the live commit behind `main` and fails.
 
-A push of site changes to `main` is a release. Peter's standing approval covers every push, releases included (row 151), so agents push without a question once the before-commit checks pass, and follow the `release` skill. [AGENTS.md](../AGENTS.md) carries this rule and points to `scripts/docs-only.txt` ([SPEC-agents](SPEC-agents.md)).
+A push of site changes to `main` is a release. Peter's standing approval covers every push, releases included (row 151), so agents push once the before-commit checks pass, and follow the `release` skill. [AGENTS.md](../AGENTS.md) carries this rule and points to `scripts/docs-only.txt` ([SPEC-agents](SPEC-agents.md)).
 
 **Rollback.** Instant Rollback in the dashboard moves the domains back in seconds, and turns domain auto-assignment off. While it is off, passing deployments do not go live, and the GitHub health check reports the lag. After the fix's deployment passes its checks, Peter selects "Undo Rollback" and chooses that deployment. That makes it live and turns auto-assignment on again. `docs/runbooks/rollback.md` has the steps and ends with a check that the next release goes live without help.
 
@@ -556,7 +556,7 @@ Peter does these steps once, in this order, so that the chat never runs in produ
 The plan's first task, before any production code. A local build cannot answer these questions; a throwaway deployment can.
 
 - **Setup.** Peter creates a second Vercel project in his Pro team from the branch `prototype/deploy-spike`, with no domains and no Anthropic key, and a pay-as-you-go Upstash database for it. The spike costs cents beyond the Pro plan.
-- **Approval.** Each push to that project deploys. Peter's standing approval covers each one (row 151), so the agent pushes without a question.
+- **Approval.** Each push to that project deploys. Peter's standing approval covers each one (row 151), so the agent pushes once the checks pass.
 - **Throwaway.** The spike code stays on its branch (brain's prototype rules); its verdicts go into research 12 and, where they change a rule, into this spec. Peter removes the project afterwards.
 
 | # | Check | If it fails |

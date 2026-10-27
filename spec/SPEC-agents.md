@@ -19,7 +19,7 @@ It documents the other five modules; no module depends on it ([capability map](R
 Acceptance criteria:
 
 - `AGENTS.md` routes by module: one table names each module's spec, its folders, its test command and whether it is built. It repeats no spec. It stays at 120 lines or fewer.
-- `AGENTS.md` carries the rules the specs hand to the agent files: a push that changes a site file is a release, and Peter's standing approval covers every push (row 151; [SPEC-deploy](SPEC-deploy.md)); the before-commit checks; `bun run evals` only with Peter's approval ([SPEC-chat](SPEC-chat.md)); an approved source changes only after Peter approves the change ([SPEC-knowledge](SPEC-knowledge.md), row 130).
+- `AGENTS.md` carries the rules the specs hand to the agent files: a push that changes a site file is a release, and Peter's standing approval covers every push except a force-push (row 151; [SPEC-deploy](SPEC-deploy.md)); the before-commit checks; `bun run evals` only with Peter's approval ([SPEC-chat](SPEC-chat.md)); an approved source changes only after Peter approves the change ([SPEC-knowledge](SPEC-knowledge.md), row 130).
 - `AGENTS.md` carries Peter's capability check (row 147), and it is the check's only home: which skills and the docs server each piece of work confirms, when to check again, what to do when one is missing, and what every sub-agent brief names.
 - Four repo skills exist, each as `.agents/skills/<name>/SKILL.md` with a `.claude/skills/<name>` link: `edit-resume` (updated), `write-source`, `release` and `update-mockups` (row 140).
 - Gemini CLI reads `AGENTS.md` through `.gemini/settings.json`. Codex, Cursor, Copilot and Antigravity read it directly; Claude Code reads it through `CLAUDE.md`.
@@ -108,10 +108,10 @@ The task that builds a module updates its row: the folders and the test command 
 
 **Releases and approvals** says, each rule with its spec:
 
-- A push to `main` that changes a site file is a release. A site file is any tracked path not in `scripts/docs-only.txt`. Peter's standing approval covers every push, releases included (row 151): push without a question once the before-commit checks pass. Follow the `release` skill for every push to `main` ([SPEC-deploy](SPEC-deploy.md)).
+- A push to `main` that changes a site file is a release. A site file is any tracked path not in `scripts/docs-only.txt`. Peter's standing approval covers every push except a force-push, releases included (row 151): push once the before-commit checks pass. Follow the `release` skill for every push to `main` ([SPEC-deploy](SPEC-deploy.md)).
 - An approved knowledge source changes only after Peter approves the change in the question dialog; the change waits on a branch until then (row 130).
 - `bun run evals` costs money: run it only after Peter approves that run ([SPEC-chat](SPEC-chat.md)).
-- Force-push, changing a repository's visibility, deploying by hand, and anything that costs money need Peter's approval each time. Agents never sign in to a dashboard and never buy anything.
+- Force-push, changing a repository's visibility, changing `scripts/docs-only.txt` (it decides which pushes are releases), deploying by hand, and anything that costs money need Peter's approval each time. Agents never sign in to a dashboard and never buy anything.
 
 **Repo skills.** Each `SKILL.md` has front matter with `name` (the folder's name, kebab-case, 64 characters at most) and `description` (1,024 characters at most), which says what the skill does, then each case that should start it. The body is numbered steps; each step ends on a "Done when" line that an agent can check. A skill stops at each of Peter's approvals and puts the question through `brain:ask-user-question`. A skill longer than about 150 lines moves its reference material to a file beside `SKILL.md` and points to it.
 
@@ -137,10 +137,10 @@ A change to an approved source follows the edit rule: it waits on a branch until
 
 **`release`** (new; [SPEC-deploy](SPEC-deploy.md), "Releases"). While `scripts/site-changed.sh` is missing, step 1 tells Peter that the deploy module is not built. The skill then runs steps 2, 3, 4 and 6, and step 3 records every file the commits change ([plan](../tasks/plan.md), order rule 2).
 
-1. Find the site changes on `main`, after a fetch and a rebase onto `origin/main`: `scripts/site-changed.sh origin/main main`. Exit 0 means no site file changed: the push is not a release, and steps 2, 3 and 5 are left out. Peter's standing approval covers every push (row 151). Done when the exit code is known.
+1. Check what the push sends on `main`, after a fetch and a rebase onto `origin/main`. First the private details, on every push: `git ls-files private.yaml` prints nothing, and no value from `private.yaml` appears in `git log -p origin/main..main`, the commits and their messages; the check prints a count, never a value. Then the site changes: `scripts/site-changed.sh origin/main main`. Exit 0 means no site file changed: the push is not a release, and steps 2, 3 and 5 are left out; the before-commit checks ran on each commit. Done when the private-detail check passed and the exit code is known.
 2. Run `bun run build`, `bun run build:site` and `bun test`. Done when all pass.
-3. Record the standing approval (row 151), with no question to Peter: the commit to push, the commits and the site files they change. Done when the record names the commit to push.
-4. Push to `main`. Done when the push is on GitHub.
+3. Record the push: the commit to push, the commits and the site files they change. Done when the record names the commit to push.
+4. Push to `main`, after a check that `main` is still the commit that passed steps 1 and 2. Done when the push is on GitHub.
 5. Watch `ci / test`, `ci / audit` and the release check on the commit with `gh`. Done when all three passed, one failed, or no release check ran.
 6. Report, with step 3's record: live (the live commit from `/api/status` equals the pushed one), or which check failed and the limit alert Peter got. On a failure, never promote or roll back by hand; point Peter to `docs/runbooks/rollback.md`.
 
@@ -212,6 +212,7 @@ Two seams (row 141).
 24. As Peter, I want no private detail in any agent file, so that the public repo stays clean.
 25. As Peter, I want every agent and every sub-agent to load the skills and reach the docs server its work needs, at its start and at each phase change, so that no convention is guessed.
 26. As Peter, I want each sub-agent brief to name its skills and the same check, so that a task in a clean context works to the same rules.
+27. As Peter, I want every push checked for my private details before it leaves the machine, so that a push I do not see never publishes them.
 
 ## Out of scope
 
