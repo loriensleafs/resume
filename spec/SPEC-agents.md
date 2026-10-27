@@ -1,6 +1,6 @@
 # Spec: agents
 
-Approved by Peter on 2026-10-27 (decision record row 142). Peter's answers for this spec are [decision record](../docs/design/interview-2026-10-26.md) Intent paragraph and rows 140 and 141, and his confirmation of the intent on 2026-10-27.
+Approved by Peter on 2026-10-27 (decision record row 142). Peter's answers for this spec are [decision record](../docs/design/interview-2026-10-26.md) Intent paragraph and rows 140 and 141, and his confirmation of the intent on 2026-10-27. Amended on 2026-10-27 with the capability check (row 147).
 
 ## Objective
 
@@ -20,6 +20,7 @@ Acceptance criteria:
 
 - `AGENTS.md` routes by module: one table names each module's spec, its folders, its test command and whether it is built. It repeats no spec. It stays at 120 lines or fewer.
 - `AGENTS.md` carries the rules the specs hand to the agent files: a push that changes a site file is a release and needs Peter's approval each time ([SPEC-deploy](SPEC-deploy.md)); the before-commit checks; `bun run evals` only with Peter's approval ([SPEC-chat](SPEC-chat.md)); an approved source changes only after Peter approves the change ([SPEC-knowledge](SPEC-knowledge.md), row 130).
+- `AGENTS.md` carries Peter's capability check (row 147), and it is the check's only home: which skills and the docs server each piece of work confirms, when to check again, what to do when one is missing, and what every sub-agent brief names.
 - Four repo skills exist, each as `.agents/skills/<name>/SKILL.md` with a `.claude/skills/<name>` link: `edit-resume` (updated), `write-source`, `release` and `update-mockups` (row 140).
 - Gemini CLI reads `AGENTS.md` through `.gemini/settings.json`. Codex, Cursor, Copilot and Antigravity read it directly; Claude Code reads it through `CLAUDE.md`.
 - Every agent that takes project settings reaches the design system's docs server with the same command.
@@ -98,6 +99,10 @@ Before you change a module, read its spec to the last line and the decisions it 
 ```
 
 The task that builds a module updates its row: the folders and the test command as built, and the state.
+
+**Work through brain** keeps `brain:ask-user-question` loaded at all times and holds the capability check (Peter, row 147). The check confirms the brain skills for the work's phase, the library and design-system skills, `brain:ask-user-question`, and the docs server through one real read-only call when the work needs it. It runs at the start of a task, at each phase change, before a sub-agent starts, after a compaction or a long run of tool calls, and before a guess at a convention. A missing skill is loaded; a docs server that does not answer stops the work that depends on it, and Peter hears what failed. Each sub-agent brief names the skills the sub-agent loads and whether it needs the docs server, tells it to run the same check, to confirm the result in its first report and to stop when a required part fails, and brings its questions back in its report.
+
+**Libraries** names the design-system skills that views need (`choose-and-compose` always; `react-integration`, `forms-and-accessibility` or `data-layouts` as a view needs; `migration-between-releases` for an upgrade), and the docs server's first call, `resolve_version` with the installed version from `package.json` and the framework `react`. Work with no UI needs neither.
 
 **Verify** says: run `bun run build` and `bun test` before every commit; once `package.json` has the `build:site` script (task D16), also `bun run build:site` ([SPEC-deploy](SPEC-deploy.md)). The PDF stays exactly 2 pages. The tests need Google Chrome (or `CHROME_PATH`) and poppler.
 
@@ -205,6 +210,8 @@ Two seams (row 141).
 22. As Peter, I want a fresh session tested when each module lands, so that I know the agent files still lead to the next task.
 23. As a future reader, I want the agent files to repeat no spec, so that a rule changes in one place.
 24. As Peter, I want no private detail in any agent file, so that the public repo stays clean.
+25. As Peter, I want every agent and every sub-agent to load the skills and reach the docs server its work needs, at its start and at each phase change, so that no convention is guessed.
+26. As Peter, I want each sub-agent brief to name its skills and the same check, so that a task in a clean context works to the same rules.
 
 ## Out of scope
 
