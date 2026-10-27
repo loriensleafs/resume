@@ -152,6 +152,7 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 140 | SPEC-agents: which repo skills to add besides edit-resume (write-source, release, update-mockups, review-questions)? | write-source, release and update-mockups now; review-questions waits until there is a question log. The recommendation was this option |
 | 141 | SPEC-agents: how are the agent files tested? | A Bun test in `tests/agents/` (links, skill names, the `.claude/skills` links, every `bun run` command named, the MCP configs), plus a fresh agent session that resumes from AGENTS.md and STATUS when each module lands. The recommendation was this option |
 | 142 | Approve SPEC-agents draft one (AGENTS.md Modules table and Releases and approvals section, Gemini CLI settings, four repo skills, `tests/agents` and the fresh-session check, the docs-only additions)? | Approved. The recommendation was this option |
+| 143 | Approve the plan for all six modules (140 tasks, 26 checkpoints, six phases): task size, order, and task boundaries? | Approved all three as proposed: the size is right; the order is right, with Phase 2 after the deploy spike; no task merged or split. The recommendation was this option each time |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
