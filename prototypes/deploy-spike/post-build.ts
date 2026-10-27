@@ -86,7 +86,7 @@ const routes: Route[] = [
 
 const written = {
   ...config,
-  overrides,
+  overrides: {}, // CONTROL RUN (D2): no overrides. The restore commit puts `overrides` back.
   routes,
   crons: [{ path: "/api/cron/health", schedule: "17 15 * * *" }],
 };
