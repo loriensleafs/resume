@@ -49,8 +49,8 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [T1](modules/content.md#t1-each-role-has-its-short-label-x-short) Each role has its short label (`x-short`) — blocked by none; Peter: its wording draft goes to his one review before D37 (row 153) (done 2026-10-27; the wording draft is written; the knowledge fixture has the field)
 - [x] [T2](modules/content.md#t2-bun-run-documents-writes-the-committed-public-documents-and-their-inputs-hash) `bun run documents` writes the committed public documents and their inputs hash — blocked by none (T1 first is preferred) (done 2026-10-27)
 - [x] [T3](modules/content.md#t3-the-documents-test-checks-the-committed-files-against-a-fresh-build) The documents test checks the committed files against a fresh build — blocked by T2 (done 2026-10-27)
-- [ ] [A5](modules/agents.md#a5-edit-resume-covers-the-short-labels-and-the-committed-documents) `edit-resume` covers the short labels and the committed documents — blocked by T1, T2, A2
-- [ ] [Checkpoint agents: checks complete](modules/agents.md#checkpoint-agents-checks-complete) — after A3 to A6
+- [x] [A5](modules/agents.md#a5-edit-resume-covers-the-short-labels-and-the-committed-documents) `edit-resume` covers the short labels and the committed documents — blocked by T1, T2, A2 (done 2026-10-27; label changes go to T1's wording draft until Peter approves it)
+- [x] [Checkpoint agents: checks complete](modules/agents.md#checkpoint-agents-checks-complete) — after A3 to A6 (passed 2026-10-27: each check of SPEC-agents' Testing Strategy 1 has a test in `__tests__/agent-files.test.ts`; `bun test` passes, 353)
 - [ ] [T4](modules/content.md#t4-the-content-module-lands) The content module lands — blocked by T1, T3, A1; Peter: read the fresh-session result
 - [ ] [Checkpoint content: lands](modules/content.md#checkpoint-content-lands) — after T1 to T4; Peter: look at the committed `documents/`
 - [x] [S2](modules/site.md#s2-buildsite-prerenders--and-resume-and-no-other-page) `buildSite()` prerenders `/` and `/resume`, and no other page — blocked by S1 (done 2026-10-27; `/` loads 110.1 KB gzip; one build per checkout at a time)
