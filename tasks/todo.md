@@ -27,13 +27,13 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [A2](modules/agents.md#a2-the-release-repo-skill) The `release` repo skill — blocked by A1
 - [ ] [Checkpoint agents: before the first release](modules/agents.md#checkpoint-agents-before-the-first-release) — after A1, A2; Peter: read the new Modules and Releases and approvals sections; no task waits for it ([plan](plan.md), "Running the plan")
 - [x] [K1](modules/knowledge.md#k1-the-id-grammar-in-one-module) The id grammar in one module — blocked by none (done 2026-10-27; Peter added the id grammar's own test seam, row 146)
-- [ ] [C1](modules/chat.md#c1-install-the-chats-packages-and-check-spec-chats-tanstack-ai-names) Install the chat's packages and check SPEC-chat's TanStack AI names — blocked by none; Peter: approve a SPEC-chat amendment, only if a TanStack AI name differs
+- [x] [C1](modules/chat.md#c1-install-the-chats-packages-and-check-spec-chats-tanstack-ai-names) Install the chat's packages and check SPEC-chat's TanStack AI names — blocked by none; Peter: approve a SPEC-chat amendment, only if a TanStack AI name differs (done 2026-10-27; SPEC-chat amended, rows 155 and 156)
 - [x] [C2](modules/chat.md#c2-the-question-log-budget-and-telemetry-contracts-with-the-contract-suite) The question log, budget and telemetry contracts, with the contract suite — blocked by none (done 2026-10-27)
 - [x] [Checkpoint chat: contracts](modules/chat.md#checkpoint-chat-contracts) — after C2 (passed 2026-10-27: `bun test src/chat` passes; D9 can start)
-- [ ] [S1](modules/site.md#s1-the-tanstack-start-app-on-bun-with-nitros-vercel-output) The TanStack Start app on Bun, with Nitro's Vercel output — blocked by none
+- [x] [S1](modules/site.md#s1-the-tanstack-start-app-on-bun-with-nitros-vercel-output) The TanStack Start app on Bun, with Nitro's Vercel output — blocked by none (done 2026-10-27; the server function exports fetch(req, context) and runs on bun1.x until D20 sets 1.4)
 - [ ] [D7](modules/deploy.md#d7-ci-runs-the-build-the-tests-and-the-audits) CI runs the build, the tests and the audits — blocked by none
 - [x] Peter: the spike's setup: a Vercel Pro team ($20 a month from here on), the throwaway project from `prototype/deploy-spike` (root `prototypes/deploy-spike/`, Standard Protection, no domains, no Anthropic key) and its automation bypass secret as an Actions secret — blocks D1 (done 2026-10-27: team Peter Kloss, project `resume-deploy-spike`, secret `VERCEL_AUTOMATION_BYPASS_SECRET`; details in D1's body)
-- [ ] [D1](modules/deploy.md#d1-deploy-spike-part-1-the-throwaway-project-builds-the-spike-branch) Deploy spike, part 1: the throwaway project builds the spike branch — blocked by Peter's spike setup
+- [x] [D1](modules/deploy.md#d1-deploy-spike-part-1-the-throwaway-project-builds-the-spike-branch) Deploy spike, part 1: the throwaway project builds the spike branch — blocked by Peter's spike setup (done 2026-10-27; check 1 passes: Vercel builds with Bun 1.4 when bunVersion is "1.4.x" or the lockfile is version 2)
 - [ ] [D2](modules/deploy.md#d2-deploy-spike-part-2-the-post-build-routes-and-the-function-runtime) Deploy spike, part 2: the post-build routes and the function runtime — blocked by D1
 - [ ] [D3](modules/deploy.md#d3-deploy-spike-part-3-headers-the-redirect-the-pdf-and-the-vercel-toolbar) Deploy spike, part 3: headers, the redirect, the PDF and the Vercel Toolbar — blocked by D2 and Peter turning the Vercel Toolbar off for production on the throwaway project (done 2026-10-27, at team level); Peter: open the spike's PDF in Chrome (check 10)
 - [ ] [D4](modules/deploy.md#d4-deploy-spike-part-4-vercel-cron-store-writes-after-stop-and-the-upstash-tokens) Deploy spike, part 4: Vercel Cron, store writes after Stop, and the Upstash tokens — blocked by D2 and Peter's pay-as-you-go Upstash database on the throwaway project (done 2026-10-27); Peter: approve `@vercel/functions` only if check 7 fails
@@ -43,11 +43,11 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 
 ## Phase 1: foundations
 
-- [ ] [A3](modules/agents.md#a3-every-agent-reaches-the-docs-server-and-gemini-cli-reads-agentsmd) Every agent reaches the docs server, and Gemini CLI reads `AGENTS.md` — blocked by A1
+- [x] [A3](modules/agents.md#a3-every-agent-reaches-the-docs-server-and-gemini-cli-reads-agentsmd) Every agent reaches the docs server, and Gemini CLI reads `AGENTS.md` — blocked by A1 (done 2026-10-27)
 - [ ] [A4](modules/agents.md#a4-the-agent-files-checks-cover-links-scripts-and-private-details-everywhere) The agent files' checks cover links, scripts and private details everywhere — blocked by A1 (runs after A3: same test file)
 - [ ] [A6](modules/agents.md#a6-the-update-mockups-repo-skill) The `update-mockups` repo skill — blocked by A2
 - [ ] [T1](modules/content.md#t1-each-role-has-its-short-label-x-short) Each role has its short label (`x-short`) — blocked by none; Peter: its wording draft goes to his one review before D37 (row 153)
-- [ ] [T2](modules/content.md#t2-bun-run-documents-writes-the-committed-public-documents-and-their-inputs-hash) `bun run documents` writes the committed public documents and their inputs hash — blocked by none (T1 first is preferred)
+- [x] [T2](modules/content.md#t2-bun-run-documents-writes-the-committed-public-documents-and-their-inputs-hash) `bun run documents` writes the committed public documents and their inputs hash — blocked by none (T1 first is preferred) (done 2026-10-27)
 - [ ] [T3](modules/content.md#t3-the-documents-test-checks-the-committed-files-against-a-fresh-build) The documents test checks the committed files against a fresh build — blocked by T2
 - [ ] [A5](modules/agents.md#a5-edit-resume-covers-the-short-labels-and-the-committed-documents) `edit-resume` covers the short labels and the committed documents — blocked by T1, T2, A2
 - [ ] [Checkpoint agents: checks complete](modules/agents.md#checkpoint-agents-checks-complete) — after A3 to A6
@@ -55,8 +55,8 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [Checkpoint content: lands](modules/content.md#checkpoint-content-lands) — after T1 to T4; Peter: look at the committed `documents/`
 - [ ] [S2](modules/site.md#s2-buildsite-prerenders--and-resume-and-no-other-page) `buildSite()` prerenders `/` and `/resume`, and no other page — blocked by S1
 - [ ] [D16](modules/deploy.md#d16-the-build-script-writes-pages-with-their-policy-tags) The build script writes pages with their policy tags — blocked by S2
-- [ ] [K2](modules/knowledge.md#k2-the-source-parser-reads-deep-dives-and-interviews) The source parser reads deep dives and interviews — blocked by K1
-- [ ] [K3](modules/knowledge.md#k3-the-core-with-its-catalog-from-approved-sources) The core with its catalog, from approved sources — blocked by K2
+- [x] [K2](modules/knowledge.md#k2-the-source-parser-reads-deep-dives-and-interviews) The source parser reads deep dives and interviews — blocked by K1 (done 2026-10-27)
+- [x] [K3](modules/knowledge.md#k3-the-core-with-its-catalog-from-approved-sources) The core with its catalog, from approved sources — blocked by K2 (done 2026-10-27)
 - [ ] [K4](modules/knowledge.md#k4-remove-the-deep-dive-parser) Remove the deep-dive parser — blocked by K3
 - [ ] [Checkpoint knowledge: old contract gone](modules/knowledge.md#checkpoint-knowledge-old-contract-gone) — after K1 to K4; Peter: review before the rules and reads
 - [ ] [K5](modules/knowledge.md#k5-the-rules-on-approved-sources-stop-the-build) The rules on approved sources stop the build — blocked by K3
@@ -70,7 +70,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [13](modules/knowledge.md#task-13-long-form-interviews-one-subject-at-a-time-career-working-style-stories-opinions-side-projects-skills) Long-form interviews, one subject at a time: career, working style, stories, opinions, side projects, skills — blocked by A7, K10 (ongoing); Peter: the interviews; the kind line for interview sources, before the first interview source is approved; each source's approval
 - [ ] [A8](modules/agents.md#a8-the-agents-module-lands) The agents module lands — blocked by A1 to A7 and A9; Peter: read the fresh-session result
 - [ ] [Checkpoint agents: lands](modules/agents.md#checkpoint-agents-lands) — after A7, A8
-- [ ] [D9](modules/deploy.md#d9-createops-gives-in-memory-parts-outside-production) `createOps()` gives in-memory parts outside production — blocked by C2
+- [x] [D9](modules/deploy.md#d9-createops-gives-in-memory-parts-outside-production) `createOps()` gives in-memory parts outside production — blocked by C2 (done 2026-10-27)
 - [ ] [Checkpoint deploy: createOps ready](modules/deploy.md#checkpoint-deploy-createops-ready) — after D9
 - [ ] [A9](modules/agents.md#a9-the-type-check) The type check — blocked by C1
 - [ ] Peter: release a `@acmelabs/design-system-mcp` with `zod` 4.6.6 or later (acmelabs-15/design-system#9); then a follow-up task removes the `zod` override (row 158) — after A9; blocks nothing
@@ -137,7 +137,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [C23](modules/chat.md#c23-answers-render-as-untrusted-markdown-with-the-link-and-image-rules) Answers render as untrusted Markdown, with the link and image rules — blocked by C18, C16
 - [ ] [C24](modules/chat.md#c24-kept-citations-as-numbered-buttons-numbered-per-answer) Kept citations as numbered buttons, numbered per answer — blocked by C23, S14, S18
 - [ ] [C25](modules/chat.md#c25-the-citations-card) The citations card — blocked by C24
-- [ ] [C26](modules/chat.md#c26-the-answer-steps) The answer steps — blocked by C23; Peter: its wording draft goes to his one review before D37 (row 153)
+- [ ] [C26](modules/chat.md#c26-the-answer-steps) The answer steps — blocked by C23, C12; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [C27](modules/chat.md#c27-copy-retry-and-follow-up-questions-on-an-answer) Copy, Retry and follow-up questions on an answer — blocked by C25, C22
 - [ ] [C28](modules/chat.md#c28-the-resume-card-and-the-open-tools-in-a-live-stream) The resume card, and the open tools in a live stream — blocked by C24, S3, S14
 - [ ] [C29](modules/chat.md#c29-question-actions-and-long-questions) Question actions and long questions — blocked by C27
