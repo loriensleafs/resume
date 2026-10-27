@@ -49,24 +49,48 @@ _Avoid_: template (the template is the code that renders it)
 ## Site and chat
 
 **Site**:
-The public TanStack Start progressive web app that shows the resume and its deep dives, offline included.
+The public TanStack Start progressive web app: the chat, the resume beside it, and the sources it opens on demand, offline included.
 _Avoid_: portfolio, website app
 
-**Knowledge file**:
-Everything the chat may answer from: the resume source, the deep dives and the logistics answers, each entry with an id.
-_Avoid_: corpus, context file, training data
+**Knowledge base**:
+Everything the chat may answer from, in two layers: the core and the sources. Peter approves every part.
+_Avoid_: knowledge file, corpus, context file, training data
+
+**Core**:
+The part of the knowledge base sent with every question: the resume entries, the logistics answers and the catalog.
+_Avoid_: system prompt (that is the chat's instructions), base context
+
+**Catalog**:
+The list in the core of every approved source, each with its id, title and a one-line summary, from which the chat chooses what to read.
+_Avoid_: index, table of contents
+
+**Source**:
+An approved file in the knowledge base that the chat reads only when a question needs it: a deep dive or an interview. Not the resume source, which is `resume.yaml`.
+_Avoid_: document (that is a built resume file), article, page
+
+**Passage**:
+One numbered section of a source: the smallest part an answer can cite and the site can mark.
+_Avoid_: chunk, snippet, paragraph
+
+**Interview**:
+A source that holds Peter's answers in his own words, each under the question asked, with transcription errors fixed and filler smoothed.
+_Avoid_: transcript (the raw record, kept privately), Q&A
 
 **Deep dive**:
-A knowledge-file entry that explains one highlight or project in Peter's own words: the problem, what he did, how it worked, the result and the tools.
+A source that explains one highlight or project in the third person, written from Peter's answers: the problem, what he did, how it worked, the result and the tools.
 _Avoid_: case study, project write-up
 
 **Logistics answer**:
-A knowledge-file entry Peter approves about his job search: remote or on-site, location, availability, target roles.
+An entry in the core that Peter approves about his job search: remote or on-site, location, availability, target roles.
 _Avoid_: FAQ, preferences
 
 **Citation**:
-The id of the knowledge-file entry a chat answer used, shown with the answer.
+The id of the passage or resume entry an answer used, shown with the answer.
 _Avoid_: source link, reference
+
+**Saved session**:
+A visitor's conversation and open views, kept in their own browser and restored when they return.
+_Avoid_: account, profile
 
 **Refusal**:
 The chat's answer to a topic outside its scope (salary, immigration, health, age, personal life): it declines and points to Peter's email.

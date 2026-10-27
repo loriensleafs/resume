@@ -41,6 +41,10 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 29 | (Peter, 2026-10-27) Install | The site offers to install itself as an app, on phones and on computers. "When it installs, it should open a standalone app." |
 | 30 | (Peter, 2026-10-27) App icon | Design "a little logo for the app" for the installed app |
 | 31 | (Peter, 2026-10-27) Domain plan | "lets try to use peterkloss.dev as main with pkloss.dev and pwk.dev both as short ones" ([0018](../decisions/0018-domains.md)) |
+| 32 | Interview recovery: how to gather new material, now that the dialog answers are lost from the chat history? | Long-form interviews, one topic at a time, in normal chat messages. Peter then attached his own copy of the 2026-10-26 interview; it is kept privately |
+| 33 | Which kinds of material should the interviews gather? | Career and working style; stories and opinions; side projects and skills. Not interests outside work ([0019](../decisions/0019-wider-chat-scope.md)) |
+| 34 | How much cleanup of spoken answers before approval? | Fix transcription errors and smooth filler and false starts, without changing meaning. The recommendation was errors only |
+| 35 | Test seams for the updated knowledge spec | The same two seams, extended: `buildKnowledge()` and the source parser |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 

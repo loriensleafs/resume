@@ -22,3 +22,4 @@ These records explain the choices behind this repository and their reasons. Numb
 | [0016](0016-two-layer-knowledge.md) | The knowledge base has two layers: a core in every request, sources read by a tool |
 | [0017](0017-saved-visitor-session.md) | The visitor's session is saved on their device, with a way to start over |
 | [0018](0018-domains.md) | The site lives at peterkloss.dev; pkloss.dev and pwk.dev redirect to it |
+| [0019](0019-wider-chat-scope.md) | The chat also answers about Peter's career story, working style, opinions, side projects and skill depth |
