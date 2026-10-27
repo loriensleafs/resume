@@ -67,3 +67,5 @@ Rows 60 to 63: alert icons stay on the first line of text. A new board pair, "Co
 Rows 64 to 68: the "Conversation states" boards now hold seven states: a hovered question with its grouped actions, a long question with Show more, answer actions (an earlier answer on hover, the latest always), scrolling up with the jump-to-latest button, and the steps while answering, done and opened in a bordered box. The answer and return views show Copy and Retry under the latest answer.
 
 Rows 69 to 71: every message keeps a 28 px action row, shown or not, and messages sit 20 px apart, on desktop and phone. Answers use the questions' text size. The returning-visitor view now keeps its notice above the conversation and shows the conversation scrolled to the latest answer.
+
+Rows 72 to 74: an answer reads steps line, text, Copy and Retry, then its citations in an outline card. Steps use the full chat width. The scope chip sits inside the input.

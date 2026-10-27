@@ -81,6 +81,9 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 69 | (Peter, 2026-10-27) Message spacing | The space between a question and its answer matches the space between an answer and the next question. Every message keeps room for its action row, shown or not, and the steps line fits between a question and its answer. Drawn: a 28 px action row under each message and 20 px between messages |
 | 70 | (Peter, 2026-10-27) Action icon spacing | Spaced like Claude's: drawn as the design system's tiny icon buttons, 4 px apart, under questions and answers alike |
 | 71 | (Peter, 2026-10-27) Text sizes | Answers use the same text size as questions; the steps line uses that size too, in gray |
+| 72 | (Peter, 2026-10-27) Answer layout | Copy and Retry come right after the answer text, before the citations. The citations sit in the design system's outline card |
+| 73 | (Peter, 2026-10-27) Widths | Messages and answer steps use the full width of the chat column; the steps line and the step box are the same width. In the canvas, styles set on the design system's own elements did not apply, which indented the steps; they now sit on plain wrappers |
+| 74 | (Peter, 2026-10-27) Scope chip | "Asking about FedNow, 2021 – 2024" sits inside the input, above the text, on desktop and phone |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
