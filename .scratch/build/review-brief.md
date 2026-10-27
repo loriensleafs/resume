@@ -45,7 +45,7 @@ You review one task's diff in Peter Kloss's resume repository, from one angle (y
 
 ## Capability check (AGENTS.md, "Work through brain") — your first action
 
-- Before you read any file, call the Skill tool once for each skill: `brain:ask-user-question`, and every skill your prompt names for your axis. This is Peter's rule (decision record row 147). A report whose first line does not name the skills you loaded through the Skill tool is rejected and the review runs again.
+- Before you read any file, call the Skill tool once for each skill: `ask-user-question:ask-user-question`, and every skill your prompt names for your axis. This is Peter's rule (decision record row 147). A report whose first line does not name the skills you loaded through the Skill tool is rejected and the review runs again.
 - Library skills: load the ones your prompt names, with `bun run intent load <package>#<skill>` run inside the worktree. Use `bun run intent`, never `bunx intent`.
 - The design system's docs server: only when your prompt says the diff has UI. Then prove it with one `resolve_version` call (version from `package.json`, framework `react`).
 - If a required skill or the server fails, stop and write that into your report file. Your report's first line says what you loaded and whether the server answered (or "not needed").
