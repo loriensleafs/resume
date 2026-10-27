@@ -62,6 +62,9 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 50 | (Peter, 2026-10-27) Timeline heading | "Career timeline". The state lines next to it ("FedNow is selected, and the chat is scoped to it", "Restored: …") are removed; the instructions "Select a role to read it and scope the chat" and "Swipe for earlier roles" stay |
 | 51 | (Peter, 2026-10-27) App bar name | A blue box with rounded corners and "Peter Kloss" inside replaces icon B and the bold name (replaces the answers to questions 37 and 38), because the timeline icon did not say it is Peter's app |
 | 52 | (Peter, 2026-10-27) Installed app icon | "PK" in capitals in Google Sans on the site's blue, option A (settles question 30) |
+| 53 | (Peter, 2026-10-27) Light and dark together | One canvas page, "Merged, light and dark", shows each view in light and dark side by side, desktop and phone. The separate "Merged, dark" page is gone |
+| 54 | (Peter, 2026-10-27) Tab close icon | A simple ×, the same icon as in the "Asking about FedNow" chip |
+| 55 | (Peter, 2026-10-27) Send button inside the input | Peter wondered whether the send button belongs inside the input, without the outline around it. Drawn for his review: the button sits inside the input at its right end, and the box around the input and the button is gone; "Answers for" stays underneath |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
