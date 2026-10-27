@@ -10,3 +10,4 @@ Source observations and experiments behind the decisions. Each note keeps its da
 | [04](04-pdf-fonts.md) | Fonts in Chrome's PDF output |
 | [05](05-framework-support.md) | TanStack adapters and the design system's React support |
 | [06](06-resume-chat.md) | A public resume site with an AI chat |
+| [07](07-tanstack-ai-hosting-model.md) | TanStack AI 1.0, hosting and the model |

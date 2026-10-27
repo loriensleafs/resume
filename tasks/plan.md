@@ -25,7 +25,7 @@ TanStack AI server route, chat UI with design-system parts, citations, refusals,
 
 ## Phase 5: deploy (spec to write)
 
-Host, rate limit, spend cap, domain, CI that builds the public variant and runs the evals. Making the repository public happens here at the latest.
+Vercel Pro with the Bun runtime ([0012](../docs/decisions/0012-vercel-pro-host.md)); WAF rate limit per IP; Anthropic workspace spend limit; the free first-year domain; CI that builds the public variant and runs the evals. The repository is already public.
 
 ## Risks
 

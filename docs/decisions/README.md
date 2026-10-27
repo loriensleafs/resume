@@ -15,3 +15,5 @@ These records explain the choices behind this repository and their reasons. Numb
 | [0009](0009-chat-scope.md) | Chat scope: resume facts plus approved logistics |
 | [0010](0010-offline-chat.md) | Offline, the chat keeps its history and queues new questions |
 | [0011](0011-word-and-text-documents.md) | The build also makes Word and text documents |
+| [0012](0012-vercel-pro-host.md) | Host the site and chat on Vercel Pro, with the Bun runtime |
+| [0013](0013-claude-sonnet-model.md) | The chat starts on Claude Sonnet 5.5 |

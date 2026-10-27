@@ -10,7 +10,7 @@ Updated 2026-10-26. This file is the one current handoff. A fresh session resume
 
 ## Waiting on Peter
 
-- Hosting and model choice, after the hosting research note lands as `docs/research/07-…`.
+- Vercel Pro sign-up and an Anthropic API key with a workspace spend limit, when the deploy module starts ([0012](decisions/0012-vercel-pro-host.md), [0013](decisions/0013-claude-sonnet-model.md)). Peter signs up and pays; agents never do.
 - Logistics answers and deep-dive interviews, during the knowledge module.
 
 ## Working state
