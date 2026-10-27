@@ -59,7 +59,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [K3](modules/knowledge.md#k3-the-core-with-its-catalog-from-approved-sources) The core with its catalog, from approved sources — blocked by K2 (done 2026-10-27)
 - [x] [K4](modules/knowledge.md#k4-remove-the-deep-dive-parser) Remove the deep-dive parser — blocked by K3 (done 2026-10-27; the only `deep:` match left is the id grammar's rejection case)
 - [x] [Checkpoint knowledge: old contract gone](modules/knowledge.md#checkpoint-knowledge-old-contract-gone) — after K1 to K4; Peter: review before the rules and reads (checks passed 2026-10-27: build and tests pass, the search finds only `ids.test.ts`'s rejection case, `bun run knowledge` prints the core in three parts with an empty catalog; Peter's review is open and does not stop the run)
-- [ ] [K5](modules/knowledge.md#k5-the-rules-on-approved-sources-stop-the-build) The rules on approved sources stop the build — blocked by K3
+- [x] [K5](modules/knowledge.md#k5-the-rules-on-approved-sources-stop-the-build) The rules on approved sources stop the build — blocked by K3 (done 2026-10-27; one `checkSource()` returns every problem, for K10 to reuse)
 - [ ] [K6](modules/knowledge.md#k6-rendered-sources-and-the-passage-id-snapshot) Rendered sources and the passage-id snapshot — blocked by K3 (runs after K5: same files)
 - [ ] [K7](modules/knowledge.md#k7-readpassages-reads-approved-sources-by-id) `readPassages()` reads approved sources by id — blocked by K6
 - [ ] [K8](modules/knowledge.md#k8-readlimits-bound-every-read) `readLimits` bound every read — blocked by K7
