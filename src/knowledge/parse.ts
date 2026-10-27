@@ -3,7 +3,7 @@
 // the old contract's parser for knowledge/deep-dives/, until K4 removes it.
 
 import { z } from "zod";
-import { parseId } from "./ids";
+import { parseId, passageId } from "./ids";
 
 /** A deep dive's sections, in order. */
 export const SECTIONS = ["Problem", "What Peter did", "How it worked", "Result", "Tools", "Not public"] as const;
@@ -178,7 +178,7 @@ export function parseSource(text: string, file: string): SourceFile {
   const sections = splitSections(body, file);
   checkSections(front.kind, sections.map((s) => s.heading), file);
   // checkSections() leaves Not public as the last section, so every section before it is a passage.
-  const passages = sections.slice(0, -1).map((s, i) => ({ id: `${front.id}.${i + 1}`, heading: s.heading, text: s.text }));
+  const passages = sections.slice(0, -1).map((s, i) => ({ id: passageId(front.id, i + 1), heading: s.heading, text: s.text }));
   const source: Source = { ...front, notPublic: sections.at(-1)!.text, passages };
 
   if (status === "approved") {
