@@ -70,23 +70,43 @@ const sourceFrontMatter = z
     path: ["approved"],
   });
 
+/** A code fence line (CommonMark): up to three spaces, three or more backticks or tildes, then the rest. */
+const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+
 /**
  * Splits the body into "## " sections. A heading needs text, a line that only looks like the Not
- * public heading stops it, and text before the first section is not allowed.
+ * public heading stops it, and text before the first section is not allowed. Inside a fenced code
+ * block every line is text, as in Markdown, and a fence that is never closed stops it.
  */
 function splitSections(body: string, file: string): { heading: string; text: string }[] {
   const sections: { heading: string; lines: string[] }[] = [];
   const preamble: string[] = [];
+  let fence: { marks: string; section: string | undefined } | undefined;
   for (const line of body.split("\n")) {
+    const text = sections.at(-1)?.lines ?? preamble;
+    const marks = line.match(FENCE);
+    if (fence) {
+      // A closing fence uses the same mark, at least as many of them, and nothing after them.
+      if (marks && marks[1]![0] === fence.marks[0] && marks[1]!.length >= fence.marks.length && !marks[2]!.trim()) fence = undefined;
+      text.push(line);
+      continue;
+    }
+    // A backtick fence's info string has no backtick in it; a line like ```a``` is inline code.
+    if (marks && !(marks[1]![0] === "`" && marks[2]!.includes("`"))) {
+      fence = { marks: marks[1]!, section: sections.at(-1)?.heading };
+      text.push(line);
+      continue;
+    }
     if (line !== `## ${NOT_PUBLIC}` && LIKE_NOT_PUBLIC.test(line)) {
       throw new KnowledgeError(file, `${JSON.stringify(line)} looks like the ${NOT_PUBLIC} heading: write it exactly "## ${NOT_PUBLIC}"`);
     }
     const heading = line.match(/^## (.*)$/)?.[1]?.trim();
     if (heading === "") throw new KnowledgeError(file, 'a "## " heading has no text');
     if (heading) sections.push({ heading, lines: [] });
-    else (sections.at(-1)?.lines ?? preamble).push(line);
+    else text.push(line);
   }
   if (preamble.join("").trim()) throw new KnowledgeError(file, "text before the first section is not allowed");
+  if (fence) throw new KnowledgeError(file, `the code fence ${fence.marks} in section "${fence.section}" is never closed`);
   return sections.map((s) => ({ heading: s.heading, text: s.lines.join("\n").trim() }));
 }
 

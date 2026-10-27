@@ -208,6 +208,46 @@ describe("parseSource", () => {
     },
   );
 
+  test("keeps a ## line inside a fenced code block as text of its passage, as Markdown does", () => {
+    const answer = [
+      "## How is a source laid out?",
+      "",
+      "Like this:",
+      "",
+      "```markdown title=x",
+      "## Problem",
+      "## not public",
+      "```",
+      "",
+      "~~~",
+      "```",
+      "## Still code",
+      "~~~~",
+      "",
+      "````",
+      "## Code again",
+      "`````",
+      "",
+      "## Not public",
+      "",
+      "Colleague names.",
+    ].join("\n");
+    const { source } = parseSource(interviewFile({}, answer), SOURCE_FILE);
+    expect(source.passages.map((p) => p.heading)).toEqual(["How is a source laid out?"]);
+    expect(source.passages[0]!.text).toContain("```markdown title=x\n## Problem\n## not public\n```");
+    expect(source.passages[0]!.text).toContain("~~~\n```\n## Still code\n~~~~");
+    expect(source.notPublic).toBe("Colleague names.");
+
+    // A backtick line whose info string holds a backtick is inline code, not a fence.
+    const inline = "## First question?\n\n```a``` is inline.\n\n## Second question?\n\nAn answer.\n\n## Not public\n\nColleague names.\n";
+    expect(parseSource(interviewFile({}, inline), SOURCE_FILE).source.passages.map((p) => p.heading)).toEqual(["First question?", "Second question?"]);
+  });
+
+  test("stops on a code fence that is never closed, naming its section", () => {
+    const body = "## How is a source laid out?\n\n```markdown\n## Problem\n\n## Not public\n\nColleague names.\n";
+    expect(failure(interviewFile({}, body))).toContain('the code fence ``` in section "How is a source laid out?" is never closed');
+  });
+
   test("stops on a section heading with no text", () => {
     expect(failure(interviewFile({}, "## \n\nAn answer.\n\n## Not public\n\nColleague names.\n"))).toContain('a "## " heading has no text');
   });
