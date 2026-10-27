@@ -1,6 +1,6 @@
 # Spec: knowledge
 
-Approved by Peter on 2026-10-26, and its two-layer update on 2026-10-27 ([decision record](../docs/design/interview-2026-10-26.md) row 36). Amended on 2026-10-27 after the spec reviews (interview rows 128 to 136).
+Approved by Peter on 2026-10-26, and its two-layer update on 2026-10-27 ([decision record](../docs/design/interview-2026-10-26.md) row 36). Amended on 2026-10-27 after the spec reviews (decision record rows 128 to 136).
 
 ## Objective
 
@@ -80,7 +80,7 @@ source: Interview with Peter, 2026-10-26
 - **Roles:** the roles the source is about, by role id. When an answer cites one of its passages, the site lights these roles on the career timeline (`setCited()`, [SPEC-site](SPEC-site.md)).
 - **Highlights:** deep dives only. Each is a highlight id from the core, such as `highlight:fednow.1`, for a highlight the deep dive explains.
 - **Summary:** one line, at most 200 characters, written from the source and approved with it. The catalog shows it, so the chat can choose what to read.
-- **Links:** exact public URLs, for side projects. Each is an absolute `https://` URL with no user name or password; the build stops on any other form. The rendered source lists them, so the chat can give them. An answer renders a link only for `https://peterkloss.dev/…`, `https://github.com/loriensleafs/…`, `https://github.com/acmelabs-15/…`, `mailto:` and the exact URLs in approved sources' `links` ([SPEC-chat](SPEC-chat.md)).
+- **Links:** exact public URLs, for side projects. Each is an absolute `https://` URL with no user name or password; the build stops on any other form. The rendered source lists them, so the chat can give them. An answer renders a link only for `https://peterkloss.dev/…`, `https://github.com/loriensleafs/…`, `https://github.com/acmelabs-15/…`, `mailto:` with Peter's email and the exact URLs in approved sources' `links` ([SPEC-chat](SPEC-chat.md)).
 - **Not public:** the last section of every source; it may be empty. It names kinds of material only, never the material itself: for example internal code, customer names, security details, colleague names, internal links, or figures an employer has not made public. It holds no URL and no email address. It tells the chat what to decline to describe. The chat receives it with a read, on the server only, and never cites it: it has no passage id.
 
 **Drafts and approval.**

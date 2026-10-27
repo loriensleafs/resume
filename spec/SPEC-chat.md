@@ -1,6 +1,6 @@
 # Spec: chat
 
-Approved by Peter on 2026-10-27. Amended after an audit with the missing brain skills and the design system's skills and MCP server, and approved again the same day ([decision record](../docs/design/interview-2026-10-26.md) rows 85 to 106). Amended again on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (row 127): the turn's budget, the limit state, the request caps, the Origin check, the usage fields, and the read tool staying listed. Amended on 2026-10-27 after the spec reviews (interview rows 128 to 136).
+Approved by Peter on 2026-10-27. Amended after an audit with the missing brain skills and the design system's skills and MCP server, and approved again the same day ([decision record](../docs/design/interview-2026-10-26.md) rows 85 to 106). Amended again on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (row 127): the turn's budget, the limit state, the request caps, the Origin check, the usage fields, and the read tool staying listed. Amended on 2026-10-27 after the spec reviews (decision record rows 128 to 136).
 
 ## Objective
 
@@ -301,7 +301,7 @@ type QueuedQuestion = {
 };
 
 /** The session store: one row, with the id "session". */
-type SavedSession = {
+type SavedConversationState = {
   id: "session";
   version: 1;
   threadId: string;
@@ -361,7 +361,7 @@ export type Telemetry = { record(event: ChatTurnEvent, reservation?: string): Pr
 So that Peter can tell whether the chat works and what it costs, the server writes one structured log line per turn, from the terminal middleware hook. The tokens follow one rule:
 
 - TanStack AI calls `onUsage` once for each model call that finishes. The telemetry middleware sums those calls for the turn, with [SPEC-deploy](SPEC-deploy.md)'s mapping of the usage fields to the five counts.
-- A model call that does not finish (Stop, the deadline, `max_tokens`, a broken stream) reports no usage. So a turn whose last model call did not finish keeps its whole $0.90 reservation, and its token counts cover the finished calls only.
+- A model call that does not finish (Stop, the deadline, `max_tokens`, a broken stream) reports no usage. TanStack AI calls `onUsage` only on `RUN_FINISHED`; the Anthropic adapter ends a `max_tokens` stop with `RUN_ERROR`, so `onUsage` does not run for it. So a turn whose last model call did not finish keeps its whole $0.90 reservation, and its token counts cover the finished calls only.
 - The counts are `null` when no model call finished.
 
 ```ts
@@ -437,10 +437,10 @@ Approving this spec approves adding these dependencies.
 bun run dev                        # the site with the chat and the fake model
 bun run build:site                 # SPEC-deploy's build script; the chat's Vite plugin bundles the knowledge base with the route and emits device-index.json
 bun run preview                    # the built site with the fake model, because VERCEL_ENV is not production
-bun run preview --dir <folder>     # serves a build in another folder, such as the seam-1 build the browser test uses
+bun run preview --dir <folder>     # serves the .vercel/output/ in <folder>, such as SPEC-site's seam-1 build that the browser test uses
 PREVIEW_LIMIT=day bun run preview  # the in-memory budget refuses every turn with DAILY_LIMIT; PREVIEW_LIMIT=month gives SPEND_LIMIT
 bun test tests/chat                # seam 1: the handler
-bun test tests/site                # seam 2: the build output and the browser test, chat included
+bun test tests/site                # seam 2: SPEC-site's build output and browser test, chat included
 bun test                           # every test
 bun run evals                      # the trick questions against the real model; costs money; Peter approves each run
 ```
@@ -452,7 +452,7 @@ bun run evals                      # the trick questions against the real model;
 ```text
 src/chat/server/handle-chat.ts     handleChat(request, deps): the module's server entry point, the request checks in order, and the About read
 src/chat/server/props.ts           ChatProps and the messages schema
-src/chat/server/prompt.ts          the system prompt and the scope, audience and about lines
+src/chat/server/prompt.ts          the system prompt, with the core from SPEC-knowledge's renderCore(knowledge), and the scope, audience and about lines
 src/chat/server/tools.ts           read_sources (its input checks readLimits), open_resume, open_source
 src/chat/server/limits.ts          turnLimits; the readBudget and deadline middleware
 src/chat/server/markers.ts         the marker middleware and the chat.citations event
@@ -546,7 +546,7 @@ export function readBudget(max = turnLimits.reads, readsBefore = 0): ChatMiddlew
    - **Usage.** Two finished model calls, then a Stop during the third: telemetry gets the sum of the two calls' usage, and the stopped call adds nothing. The response ends only after the log and telemetry writes.
    - **Telemetry.** Each turn hands one `chat_turn` event to `telemetry.record()`, with no question text and no `threadId`.
    - **The QuestionLog contract.** `tests/chat/question-log-contract.ts` exports the suite, and seam 1 runs it against the in-memory log; SPEC-deploy runs it against its store. An appended entry comes back from `list(1)`. On 2026-10-27, `list(7)` returns the entries dated 2026-10-21 to 2026-10-27, newest first, and none dated 2026-10-20. An empty log returns no entries.
-2. **The browser test**, from SPEC-site. It runs after the seam-1 build and serves that build's folder with `bun run preview --dir <folder>`; it builds nothing itself. The preview uses the fake model, because `VERCEL_ENV` is not `production`, and picks each scripted turn from `tests/chat/fixtures.ts` by the question text:
+2. **The browser test**, from SPEC-site. It runs after SPEC-site's seam-1 build (`bun run build:site --out <folder>`) and serves that folder with `bun run preview --dir <folder>`; it builds nothing itself. The preview uses the fake model, because `VERCEL_ENV` is not `production`, and picks each scripted turn from `tests/chat/fixtures.ts` by the question text:
    - Selecting a suggested question sends it once. The steps show one by one, then the answer, its citations card, Copy and Retry, and follow-up questions. Citation 1 opens the source tab with the passage marked, and the cited role lights up on the timeline.
    - Each kept citation renders as a numbered button. A second answer's citations start again at 1, and its card lists only its own citations. A `#cite:` link to an id that the answer did not keep shows as its text.
    - A question during an answer appears at the end of the conversation with a clock and "Sends when this answer finishes"; the Up arrow and Edit bring it back; Remove removes it; after the answer, or after Stop, it sends. Send now stops the answer and sends that question first.
@@ -665,7 +665,7 @@ export function readBudget(max = turnLimits.reads, readsBefore = 0): ChatMiddlew
 
 ## Success Criteria
 
-- `bun test tests/chat` and `bun test tests/site` pass on a clean checkout with Chrome installed and no API key. Seam 1 builds the site first, and the browser test serves that build.
+- `bun test tests/chat` and `bun test tests/site` pass on a clean checkout with Chrome installed and no API key. SPEC-site's seam 1 builds the site first, and the browser test serves that build.
 - One approved `bun run evals` run passes every deterministic check, and Peter approves the answers in the review file.
 - Peter reviews the running chat against the approved mockups at desktop and phone sizes, in light and dark, and approves it.
 

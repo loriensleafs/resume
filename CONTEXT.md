@@ -173,7 +173,7 @@ The anonymous record the server keeps of the questions visitors ask and how each
 _Avoid_: analytics, chat history, transcript
 
 **Trick question**:
-An eval case that tries to make the chat state something false, leave its scope or ignore its rules.
+An eval case that tries to make the chat state something false, leave the chat's topics or ignore its rules.
 _Avoid_: jailbreak test, red-team prompt
 
 ## Running the site

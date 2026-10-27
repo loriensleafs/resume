@@ -1,6 +1,6 @@
 # Spec: site
 
-Approved by Peter on 2026-10-27. Amended (the resume view's ⋯ menu, `openResume()`, the optional citation number, the app bar's end slot, the route files as the only place site and chat meet, design-system parts for sheets and the menu) and approved again the same day ([interview record](../docs/design/interview-2026-10-26.md) rows 81 and 85 to 106). Amended again on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (row 127): Nitro's Vercel output, build-time data for the pages, the policy tags, the static not-found page, the service worker's network-first navigations and the committed documents ([decision 0023](../docs/decisions/0023-static-site-build-time-data.md)). Amended on 2026-10-27 after the spec reviews (interview rows 128 to 136).
+Approved by Peter on 2026-10-27. Amended (the resume view's ⋯ menu, `openResume()`, the optional citation number, the app bar's end slot, the route files as the only place site and chat meet, design-system parts for sheets and the menu) and approved again the same day ([decision record](../docs/design/interview-2026-10-26.md) rows 81 and 85 to 106). Amended again on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (row 127): Nitro's Vercel output, build-time data for the pages, the policy tags, the static not-found page, the service worker's network-first navigations and the committed documents ([decision 0023](../docs/decisions/0023-static-site-build-time-data.md)). Amended on 2026-10-27 after the spec reviews (decision record rows 128 to 136).
 
 ## Objective
 
@@ -9,7 +9,7 @@ Build the site: the public TanStack Start progressive web app at peterkloss.dev 
 The site is the shell. The chat column's contents belong to the chat module ([SPEC-chat](SPEC-chat.md)): the conversation, the input and its states, the answer steps, the message actions, the citations card, queued questions, "Answers for", New chat and `/api/chat`. The site gives the chat module one contract, the workspace contract (see Code Style). The site's code imports neither the chat module nor the deploy module ([capability map](README.md)). Only these files put the modules together:
 
 - The route files in `src/site/routes/`, at run time. The workspace route renders the chat column. `api.chat.ts` calls the chat's handler ([SPEC-chat](SPEC-chat.md)); `api.status.ts` and `api.cron.health.ts` call the deploy module ([SPEC-deploy](SPEC-deploy.md)).
-- `vite.config.ts`, which adds the chat's Vite plugin to the Vite build.
+- `vite.config.ts`, which adds the chat's Vite plugin to the Vite build and holds SPEC-deploy's Nitro `vercel` settings.
 - `scripts/build-site.ts`, at build time. SPEC-deploy owns it. It runs the site's `buildSite()` (during whose Vite build the chat's plugin writes `device-index.json`), the deploy module's `addPolicyTags()`, the site's `writeServiceWorker()` and the deploy module's `writeVercelConfig()`, in that order.
 
 Acceptance criteria:
@@ -26,7 +26,7 @@ Acceptance criteria:
 - The saved views (the open tab, the open source and its marked passage, and the scope) come back on the next visit, also in the installed app. Blocked or empty browser storage gives a first visit.
 - The site installs as a standalone app with the PK icon, named "Peter Kloss", with its start address and scope at `https://peterkloss.dev/`.
 - After one visit, `/`, `/resume`, every source page, the workspace addresses with `?source=` or `?role=`, the fonts and the three documents load with no network.
-- No WCAG 2.2 AA violation on any view, in light and dark. On a throttled phone profile, the main content is visible in under 2.5 s and layout shift stays under 0.1. JavaScript loaded by `/` before any interaction is under 200 KB compressed. (Peter's targets, [interview record](../docs/design/interview-2026-10-26.md) row 24.)
+- No WCAG 2.2 AA violation on any view, in light and dark. On a throttled phone profile, the main content is visible in under 2.5 s and layout shift stays under 0.1. JavaScript loaded by `/` before any interaction is under 200 KB compressed. (Peter's targets, [decision record](../docs/design/interview-2026-10-26.md) row 24.)
 
 ## Views
 
@@ -56,7 +56,7 @@ The first view never shows before a restored conversation:
 
 **Document panel.** Right of the chat column, with the design system's `acme-tabs`: "Resume", and "Source: <title>" while a source is open. At most one source tab is open, and a new source replaces it. A × after the source tab's title closes the source tab and shows the Resume tab (rows 49 and 54). `acme-tab` is a native button, and the design system has no close control for a tab. So the × is a separately built `acme-icon-button` named "Close source", outside the tab's own button; the plan checks that its place keeps the tab list valid under axe. The panel notes which citation opened the source ("Opened from citation 1").
 
-- **Resume view:** the lead, each role with its highlights, the earlier roles, skills and education, from `resume.yaml`. Each resume entry carries its knowledge id on its element: `basics` on the lead, `role:<id>` on each role's heading, `highlight:<role id>.<n>` on each highlight, `skills:<slug>` on each skills group and `education` on the education entry. Each entry the latest answer cites shows its citation number. The entry that a citation opened is also tinted, and its number is blue; the other cited entries' numbers are gray, with no tint, as in the citations card ([SPEC-chat](SPEC-chat.md)). Hovering or focusing a highlight shows "Ask about this". A ⋯ icon button ("More actions") at the view's top-right corner opens the design system's `acme-menu`: PDF, Word, Text. Each item downloads that public document; the plan checks how a menu item starts a download. The menu appears wherever the resume view does: the Resume tab, the phone resume sheet and `/resume` (Peter, [interview record](../docs/design/interview-2026-10-26.md) row 81; the desktop boards show it).
+- **Resume view:** the lead, each role with its highlights, the earlier roles, skills and education, from `resume.yaml`. Each resume entry carries its knowledge id on its element: `basics` on the lead, `role:<id>` on each role's heading, `highlight:<role id>.<n>` on each highlight, `skills:<slug>` on each skills group and `education` on the education entry. Each entry the latest answer cites shows its citation number. The entry that a citation opened is also tinted, and its number is blue; the other cited entries' numbers are gray, with no tint, as in the citations card ([SPEC-chat](SPEC-chat.md)). Hovering or focusing a highlight shows "Ask about this". A ⋯ icon button ("More actions") at the view's top-right corner opens the design system's `acme-menu`: PDF, Word, Text. Each item downloads that public document; the plan checks how a menu item starts a download. The menu appears wherever the resume view does: the Resume tab, the phone resume sheet and `/resume` (Peter, [decision record](../docs/design/interview-2026-10-26.md) row 81; the desktop boards show it).
 - **Source view:** the title, a line naming its kind and approval ("Deep dive, written from Peter's answers and approved by him. FedNow, 2021 – 2024. 5 passages."), and the numbered passages. The marked passage is tinted, scrolled into view and shows "Ask about this passage".
 
 **Phone sheets.** Sheets are the design system's `acme-drawer` with `placement="bottom"`: focus moves into the sheet, stays there, Escape or a tap outside closes it, and focus returns to what opened it. Each sheet has a × button ("Close") at its top right. The drawer has no swipe dismissal (design system 0.3.2), so no sheet shows a grab handle.
@@ -109,7 +109,7 @@ So a visitor shares a role or a source by copying the address. An unknown source
 
 ## Saved views
 
-The site stores its part of the saved session, the saved views, in IndexedDB through TanStack DB. The site and the chat each own a separate database (Peter, [interview record](../docs/design/interview-2026-10-26.md) row 134):
+The site stores its part of the saved session, the saved views, in IndexedDB through TanStack DB. The site and the chat each own a separate database (Peter, [decision record](../docs/design/interview-2026-10-26.md) row 134):
 
 | Database | Owner | Stores |
 |---|---|---|
@@ -173,7 +173,7 @@ The chat's behavior offline is the chat module's ([decision 0010](../docs/decisi
 Versions checked on 2026-10-26 ([research 05](../docs/research/05-framework-support.md), [research 09](../docs/research/09-site-feasibility.md)); the plan pins exact versions when it installs them.
 
 - Bun 1.4.2 and TypeScript; Bun APIs for scripts. Vite runs under `bun --bun` ([decision 0004](../docs/decisions/0004-bun-only.md)).
-- `react-dom` 19.3.1 and `nitro` 3.0.260903-beta, both pinned to these exact versions. Peter approved both ([interview record](../docs/design/interview-2026-10-26.md) row 135). Nitro's Vercel preset writes `.vercel/output/` ([SPEC-deploy](SPEC-deploy.md)).
+- `react-dom` 19.3.1 and `nitro` 3.0.260903-beta, both pinned to these exact versions. Peter approved both ([decision record](../docs/design/interview-2026-10-26.md) row 135). Nitro's Vercel preset writes `.vercel/output/` ([SPEC-deploy](SPEC-deploy.md)).
 - `@tanstack/react-start` 1.169.4 with `@tanstack/react-router` 1.170.46, React 19.3.1, Vite 8.3.5, `@vitejs/plugin-react` 6.1.2. App source in `src/site` (`srcDirectory`), static prerendering with `crawlLinks` and `failOnError`. The prerender settings in `vite.config.ts`:
   - `pages` lists `/`, `/resume` and `/sources/<id>` for each approved source id from `publicKnowledge(knowledge)`. No prerendered page links every source (decision 0015), so link crawling alone would prerender no source page.
   - `prerender.filter` rejects any path with `?`. The crawler strips the query from a page's output path, so a crawled `/?source=` or `/?role=` link would otherwise overwrite `index.html`.
@@ -195,7 +195,7 @@ bun run dev               # Vite dev server for the site at http://localhost:300
 bun run build:site        # scripts/build-site.ts (SPEC-deploy): buildSite(), the device index, the policy tags, writeServiceWorker(), the routes → .vercel/output/
 bun run icons             # renders the app icon and the favicon with Chrome into public/icons/; commit the files
 bun run preview           # serves .vercel/output/ at http://localhost:4173 as Vercel does, the API routes included
-bun run preview --dir <folder>  # serves another build output folder, such as the tests' temporary one
+bun run preview --dir <folder>  # serves the .vercel/output/ in <folder>, as `bun run build:site --out <folder>` writes it (the tests' temporary folder)
 bun test tests/site       # this module's tests: the build output and the browser test
 bun test                  # every test
 bun run build             # the documents only, unchanged (content module)
@@ -221,7 +221,7 @@ src/site/build.ts            buildSite({ root, outDir }): the Vite build with pr
 src/site/service-worker.ts   writeServiceWorker(staticDir): Workbox generateSW over the static folder
 scripts/build-site.ts        `bun run build:site`: the build-time composition root (owned by SPEC-deploy)
 scripts/icons.ts             `bun run icons`: renders the icons with Chrome into public/icons/
-scripts/preview-site.ts      `bun run preview [--dir <folder>]`: Bun.serve over a build output folder with the routes of its config.json
+scripts/preview-site.ts      `bun run preview [--dir <folder>]`: Bun.serve over `<folder>/.vercel/output/` (default: the repo root's) with the routes of its config.json
 public/icons/                the committed icons: 192 px, 512 px, maskable 512 px and the favicon
 vite.config.ts               TanStack Start, React, Nitro and prerender settings; adds the chat's Vite plugin
 tests/site/build.test.ts     seam 1: the build output
@@ -263,7 +263,7 @@ export type Workspace = {
 export function useWorkspace(): Workspace;
 ```
 
-Peter approved this contract on 2026-10-27 ([interview record](../docs/design/interview-2026-10-26.md) row 134). The site implements each member as follows:
+Peter approved this contract on 2026-10-27 ([decision record](../docs/design/interview-2026-10-26.md) row 134). The site implements each member as follows:
 
 | Member | What the site does |
 |---|---|
@@ -283,7 +283,7 @@ Peter approved this contract on 2026-10-27 ([interview record](../docs/design/in
 
 ## Testing Strategy
 
-`bun test`, at the two seams Peter confirmed on 2026-10-26 ([interview record](../docs/design/interview-2026-10-26.md) row 23):
+`bun test`, at the two seams Peter confirmed on 2026-10-26 ([decision record](../docs/design/interview-2026-10-26.md) row 23):
 
 1. **The build output.** `scripts/build-site.ts` ([SPEC-deploy](SPEC-deploy.md)) runs its five steps once into a temporary output folder, with a fixture `private.yaml` that holds a fake phone number. The tests read the files:
    - `/`, `/resume` and one page per approved source exist; no page for a draft source. No HTML file comes from a path with `?`, and the sitemap lists no address with `?`.
@@ -296,7 +296,7 @@ Peter approved this contract on 2026-10-27 ([interview record](../docs/design/in
    - Each HTML file starts with a policy tag that lists exactly the hashes of its own inline scripts. Each page except `404.html` holds the head script right after its policy tag. No file holds a `style=` attribute.
    - The not-found page `404.html` exists and has no script.
    - Each page has a title, a description, a canonical address on `https://peterkloss.dev`, and Open Graph tags; the sitemap lists every page.
-2. **One real-browser test.** Playwright drives Chromium under Bun against `bun run preview --dir <folder>`, which serves the output folder of seam 1. So the test builds first and passes on a clean checkout. The chat's scripted answers come from the preview's fake model ([SPEC-chat](SPEC-chat.md)).
+2. **One real-browser test.** Playwright drives Chromium under Bun against `bun run preview --dir <folder>`, where `<folder>` is the one seam 1 built into with `bun run build:site --out <folder>`. So the test builds first and passes on a clean checkout. The chat's scripted answers come from the preview's fake model ([SPEC-chat](SPEC-chat.md)).
    - **Accessibility.** axe-core reports no WCAG 2.2 AA violation, in light and dark, on `/`, `/resume`, a source page and the workspace with a source open, at 1440 × 900 and 390 × 844. At 390 × 844 also with the source sheet, the resume sheet, the ⋯ menu and the install sheet open.
    - **Speed.** With 4× CPU slowdown and a slow 4G network: the largest content paint on `/` and `/resume` is under 2.5 s, and layout shift is under 0.1. From the network log, the JavaScript that `/` loads before any interaction, gzip-compressed, is under 200 KB.
    - **Design-system parts.** After load, each part the pages use is defined and upgraded, with its shadow root.
@@ -379,7 +379,7 @@ Peter approved this contract on 2026-10-27 ([interview record](../docs/design/in
 - Accounts, server-side storage of visitors and analytics.
 - An update prompt for a new site version.
 - Languages other than English.
-- Cards inside answers: the chat module owns answers, and its only card is the resume card (interview rows 63 and 81).
+- Cards inside answers: the chat module owns answers, and its only card is the resume card (decision record rows 63 and 81).
 
 ## Prior-art tests
 

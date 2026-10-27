@@ -2,7 +2,7 @@
 
 The approved look of the site, as images. Peter reviewed the mockups on 2026-10-27: "I think this all looks pretty good." [SPEC-site](../../../spec/SPEC-site.md) and [SPEC-chat](../../../spec/SPEC-chat.md) are written from them.
 
-Updated later on 2026-10-27 (canvas version 44; [interview record](../interview-2026-10-26.md) rows 81 and 85 to 105):
+Updated later on 2026-10-27 (canvas version 44; [decision record](../interview-2026-10-26.md) rows 81 and 85 to 105):
 
 - Queued questions are question messages with a clock at the end of the conversation, with Send now, Edit and Remove.
 - "Answers for" is a compact trigger, "Answers for: Anyone ▾", that opens a popover with a line of context, the five audiences and a line for the chosen one. The popover has no title and no Close button. On phones it is a select.
@@ -11,7 +11,7 @@ Updated later on 2026-10-27 (canvas version 44; [interview record](../interview-
 - The conversation board shows the resume card.
 - The "Welcome back" notice is gone.
 
-Updated again on 2026-10-27 after the spec reviews (canvas version 45; [interview record](../interview-2026-10-26.md) rows 133 and 136). These changes wait for Peter's approval with the amended specs:
+Updated again on 2026-10-27 after the spec reviews (canvas version 45; [decision record](../interview-2026-10-26.md) rows 133 and 136). These changes wait for Peter's approval with the amended specs:
 
 - Each answer numbers its own citations from 1, and its card lists only its own citations (row 133). Citation numbers in answers are drawn as the citation buttons on every board.
 - In the resume, every highlight the latest answer cites shows its number; only the opened one is tinted, with a blue number.
@@ -24,7 +24,7 @@ Updated again on 2026-10-27 after the spec reviews (canvas version 45; [intervie
 
 The mockups were made on a private Claude Design canvas, "Resume site mockups", with Peter's ACME design system 0.3.2. These images are rendered from the canvas boards. The board sources are on the branch [`prototype/site-mockups`](https://github.com/loriensleafs/resume/tree/prototype/site-mockups/prototypes/site-mockups), not on `main`, because they open only inside the canvas.
 
-The choices behind each view are in the [interview record](../interview-2026-10-26.md), rows 21 to 75, and in decisions [0015](../../decisions/0015-sources-on-demand.md) to [0019](../../decisions/0019-wider-chat-scope.md).
+The choices behind each view are in the [decision record](../interview-2026-10-26.md), rows 21 to 75, and in decisions [0015](../../decisions/0015-sources-on-demand.md) to [0019](../../decisions/0019-wider-chat-scope.md).
 
 ## Desktop
 

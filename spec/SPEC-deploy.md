@@ -1,8 +1,8 @@
 # Spec: deploy
 
-Approved by Peter on 2026-10-27 (interview row 127), with the amendments to other specs below. Peter's answers are rows 107 to 127 of the [interview record](../docs/design/interview-2026-10-26.md); the facts are in [research 12](../docs/research/12-deploy-platform.md); the static site with build-time data is [decision 0023](../docs/decisions/0023-static-site-build-time-data.md). Three adversarial reviews found 18, 16 and 39 issues. This version answers all of them, with the local checks that the third review asked for (row 126). What only a real Vercel deployment can settle is the plan's first task, the [deploy spike](#deploy-spike).
+Approved by Peter on 2026-10-27 (decision record row 127), with the amendments to other specs below. Peter's answers are rows 107 to 127 of the [decision record](../docs/design/interview-2026-10-26.md); the facts are in [research 12](../docs/research/12-deploy-platform.md); the static site with build-time data is [decision 0023](../docs/decisions/0023-static-site-build-time-data.md). Three adversarial reviews found 18, 16 and 39 issues. This version answers all of them, with the local checks that the third review asked for (row 126). What only a real Vercel deployment can settle is the plan's first task, the [deploy spike](#deploy-spike).
 
-Corrected on 2026-10-27 after the reviews of the other specs (interview rows 128 to 136).
+Corrected on 2026-10-27 after the reviews of the other specs (decision record rows 128 to 136).
 
 ## Objective
 
@@ -216,7 +216,7 @@ The Content Security Policy:
 - The browser enforces both policies, so a page gets the header's rules and the tag's script rule. `frame-ancestors` lives in the header, because a tag cannot carry it.
 - Why a tag and not a per-path header: a tag travels with its page, also from the service worker's cache, and every HTML response is now a file with a tag.
 - TanStack Start's per-request nonce does not fit static pages. `addPolicyTags(staticDir)` writes each tag after prerendering (step 3 of the build script), and a build test fails on any HTML file without one.
-- The second probe on `prototype/csp-probe` ran this split policy, the static not-found page and the service worker with no violation: on first and second visits, a deep-dive page, client navigation, and an unknown path online and offline (research 12). It was a local server, so the release check and the GitHub health check also load the real deployment in Chrome.
+- The second probe on `prototype/csp-probe` ran this split policy, the static not-found page and the service worker with no violation: on first and second visits, a source page, client navigation, and an unknown path online and offline (research 12). It was a local server, so the release check and the GitHub health check also load the real deployment in Chrome.
 - Prerendered HTML holds no `style="…"` attribute, because `style-src 'self'` blocks it and hashes cannot allow it. A style a page needs, such as a role's width on the career timeline, or a Markdown table column's alignment, comes from a class in a stylesheet file the build writes. A test fails on any `style=` in the built pages. The chat's answers set styles through the DOM after load, which the policy allows. Allowing inline style attributes (`style-src-attr 'unsafe-inline'`) is an ask-first change.
 - The policies enforce SPEC-site's rule of no third-party requests: fonts, scripts, images and connections come only from the site's own address.
 - The Vercel Toolbar injects a script from `vercel.live`, which the policy blocks. Setup step 5 turns the toolbar off for production, and the checks send `x-vercel-skip-toolbar: 1`.
@@ -288,7 +288,7 @@ The prices and both limits live in `src/ops/limits.ts`. A test checks the estima
 **Which usage a turn settles with.** TanStack AI calls `onUsage` once for each model call that finishes. A call that does not finish reports no usage: the abort event carries none.
 
 - SPEC-chat's telemetry sums `onUsage` across the turn's finished model calls (amendment 5). The token counts in the daily totals are that sum, so they stay true.
-- One rule settles the cost: a turn whose last model call did not finish keeps its whole $0.90 reservation. This covers a stopped turn, a turn cut off by the deadline (`DEADLINE`) and a turn whose stream broke. Its real cost is not known, because the unfinished call reports no usage.
+- One rule settles the cost: a turn whose last model call did not finish keeps its whole $0.90 reservation. This covers a stopped turn, a turn cut off by the deadline (`DEADLINE`), a turn whose answer reached `max_tokens` (`MAX_TOKENS`) and a turn whose stream broke. Its real cost is not known, because TanStack AI reports usage only for a call that finishes (SPEC-chat).
 - A turn with no usage at all, for example after a crash, also keeps its whole reservation.
 - A turn whose model calls all finished settles with the cost of its summed usage.
 
@@ -323,7 +323,7 @@ Either gives `errorCode: "SPEND_LIMIT"` and sets the marker `limit:spend` with t
 - A refusal before the model call is an HTTP 200 server-sent-event stream with one `RUN_ERROR` event and the code `DAILY_LIMIT` or `SPEND_LIMIT`. The browser then makes an answer message, as it does for any stream.
 - A turn that meets Anthropic's limit during the run ends with `RUN_ERROR` and the code `SPEND_LIMIT`.
 - In both cases the telemetry outcome is `limit`, and the saved answer keeps the outcome `limit`, so a reload shows the same state.
-- The browser shows the "limit reached" state, with Peter's email, a link that opens the resume, and no Try again. The question stays in the input for the next day or month, and the question queue pauses.
+- The browser shows the "limit reached" state, with Peter's email, a link that opens the resume, and no Try again. The question goes back into the input only when the input is empty, and the question queue pauses until the visitor sends again (SPEC-chat).
 - The words come to Peter with the other wordings. These are amendments to SPEC-chat (below).
 
 ## The question log, daily totals, alerts and status
@@ -586,7 +586,7 @@ Approving this spec approves these amendments:
   5. Usage:
      - `ChatTurnEvent` gains `cacheWriteTokens` and `cacheWrite1hTokens`, and `inputTokens` means uncached input only;
      - telemetry sums `onUsage` across the turn's finished model calls; the token counts are `null` when no call finished;
-     - a turn whose last model call did not finish (stopped, `DEADLINE` or a broken stream), and a turn with no usage, keep their whole reservation.
+     - a turn whose last model call did not finish (stopped, `DEADLINE`, `MAX_TOKENS` or a broken stream), and a turn with no usage, keep their whole reservation.
   6. The route sets `promptCache: "short"` explicitly.
   7. The 429 text becomes "Try again in a few minutes".
   8. `bun run questions` (`scripts/questions.ts`) moves to this spec, which owns `createOpsReader()`. It also prints the daily totals and the day's and the month's cost. `QuestionLog` keeps `append(entry)` and `list(days)`, and the reader also uses `list(days)`.
@@ -627,7 +627,7 @@ No npm package is added. Approving this spec approves the three GitHub helpers a
 
 ```sh
 bun run documents                        # rebuilds documents/ when its inputs changed (needs Chrome)
-bun run build:site                       # scripts/build-site.ts: .vercel/output/ with pages, policy tags, device index, service worker, functions, routes
+bun run build:site                       # scripts/build-site.ts: .vercel/output/ with pages and functions, the device index, policy tags, service worker, routes
 bun run preview                          # serves .vercel/output/ as Vercel does
 bun run build:site --out <folder>        # the same build into <folder>/.vercel/output/; the tests' seam-1 folder
 bun run preview --dir <folder>           # serves the .vercel/output/ in <folder>; the tests pass the seam-1 folder

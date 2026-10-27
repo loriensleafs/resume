@@ -2,7 +2,7 @@
 
 Peter's answers in the knowledge interviews are saved word for word before any source is written from them ([SPEC-knowledge](../../spec/SPEC-knowledge.md)). These raw answers can hold colleague names or internal links, and this repository is public ([decision 0006](0006-public-repo-private-details.md)). The workflow guide sent interview answers to the public `docs/design/`. Later sessions must still read the raw answers to write a source or to check one.
 
-Decided 2026-10-27 by Peter ([interview record](../design/interview-2026-10-26.md), row 129).
+Decided 2026-10-27 by Peter ([decision record](../design/interview-2026-10-26.md), row 129).
 
 - Peter creates a private GitHub repo for the raw answers. Its default name is `loriensleafs/resume-private`, and the answers go in its folder `interviews/`.
 - Each answer is saved there word for word before anything is written from it.

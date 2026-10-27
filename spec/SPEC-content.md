@@ -1,8 +1,8 @@
 # Spec: content
 
-Amended on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (interview row 127): the committed public documents in `documents/`.
+Amended on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (decision record row 127): the committed public documents in `documents/`.
 
-Amended on 2026-10-27 after the spec reviews (interview rows 128 to 136): the documents' files and test seam, the narrower documents hash, the one before-commit rule, and each role's `x-short` field.
+Amended on 2026-10-27 after the spec reviews (decision record rows 128 to 136): the documents' files and test seam, the narrower documents hash, the one before-commit rule, and each role's `x-short` field.
 
 ## Objective
 
@@ -45,7 +45,7 @@ bun run fonts               # only to change a font weight or add characters
 ```text
 resume.yaml               content, JSON Resume shape plus marked extensions
 private.yaml              phone number; ignored by git
-src/content.ts            schema, loader, date and title formatting
+src/content.ts            schema, loadResume(variant, root), date and title formatting
 src/build.ts              build({ root, outDir, variants }): the module's one entry point
 src/print/                print HTML template, its CSS, the hyphen script, Chrome printing
 src/export/docx.ts        Word renderer
