@@ -67,7 +67,7 @@ You review one task's diff in Peter Kloss's resume repository, from one angle (y
 
 ## Report
 
-Write your report to the file your prompt names, in plain talk (ASD-STE100: short sentences, active voice, one idea each), under 400 words. Then reply with one line: the path and the count of findings by severity.
+Write your report to the file your prompt names, in plain talk (ASD-STE100: short sentences, active voice, one idea each), under 400 words. Then reply with exactly one line: the path and the count of findings by severity. A merge agent reads your file, and the conductor reads only the merged table, so put everything in the file; anything else in your reply is lost.
 
 - Line 1: the capability check (skills loaded; server answered or not needed).
 - Report per file and hunk where relevant. For each finding give the severity label, the tag, the quoted hunk, `file:line` and the fix.
