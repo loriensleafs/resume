@@ -5,7 +5,6 @@ Peter Kloss's resume: one content source (`resume.yaml`), the PDF, Word and text
 ## Session start
 
 Complete these steps before the requested work.
-
 1. Read [status](docs/STATUS.md), [domain routing](docs/agents/domain.md) and [the glossary](CONTEXT.md), each to its last line.
 2. Read [the capability map](spec/README.md), then the spec, [plan](tasks/plan.md) and [task list](tasks/todo.md) that status names, each to its last line. Read [the record layout](docs/agents/workflow.md).
 3. Check `git status` and the branch. Check `bun --version` (1.4.4 or later). Keep work you did not start.
@@ -13,10 +12,9 @@ Complete these steps before the requested work.
 
 ## Work through brain
 
-Load `brain:using-brain` and pick the skill for the work. Keep `brain:ask-user-question` loaded at all times: every decision or permission for Peter goes through it, one question per call, with your recommendation and its reason. Setup, wait-what, handoff, triage and wayfinder start from Peter's prompt; when one is needed, give him the command. [CLAUDE.md](CLAUDE.md) has the Claude spellings.
+Load `brain:using-brain` and pick the skill for the work. Keep `ask-user-question:ask-user-question` loaded at all times: every decision or permission for Peter goes through it, one question per call, with your recommendation and its reason. Setup, wait-what, handoff, triage and wayfinder start from Peter's prompt; when one is needed, give him the command. [CLAUDE.md](CLAUDE.md) has the Claude spellings.
 
-**The capability check** (Peter, row 147). Confirm that every skill the current work needs is loaded: the brain skills for its phase, the library and design-system skills (see Libraries), and `brain:ask-user-question`. When the work needs the design system's docs server, prove it with one real read-only call; a tool name in your list is no proof. Run the check:
-
+**The capability check** (Peter, row 147). Confirm that every skill the current work needs is loaded: the brain skills for its phase, the library and design-system skills (see Libraries), and `ask-user-question:ask-user-question`. When the work needs the design system's docs server, prove it with one real read-only call; a tool name in your list is no proof. Run the check:
 - at the start of a task, and at each phase change (plan, build, test, review, ship);
 - before you start a sub-agent;
 - after a compaction or a long run of tool calls;
@@ -24,18 +22,18 @@ Load `brain:using-brain` and pick the skill for the work. Keep `brain:ask-user-q
 
 A missing skill: load it, then continue. A skill that may apply: load it. A docs server that does not answer: stop the work that depends on it and tell Peter what failed; design-system facts come only from its skills and the server. Say in one line what you loaded or fixed, and nothing when all was in place.
 
-**Sub-agent briefs.** Each brief names the skills the sub-agent loads (its brain skills, the design-system skills its part needs, and `brain:ask-user-question`) and says whether it needs the docs server. It tells the sub-agent to run the capability check at its own start and at its own phase changes, to confirm in its first report what it loaded and whether the server answered, and to stop and report when a required skill or the server fails. A sub-agent has no question tool, so its questions for Peter come back in its report.
+**Sub-agent briefs.** Each brief names the skills the sub-agent loads (its brain skills, the design-system skills its part needs, and `ask-user-question:ask-user-question`) and says whether it needs the docs server. It tells the sub-agent to run the capability check at its own start and at its own phase changes, to confirm in its first report what it loaded and whether the server answered, and to stop and report when a required skill or the server fails. A sub-agent has no question tool, so its questions for Peter come back in its report.
 
 ## Modules
 
-| Module | Spec | Folders | Tests | State |
-|---|---|---|---|---|
-| content | [SPEC-content](spec/SPEC-content.md) | `resume.yaml`, `src/content.ts`, `src/build.ts`, `src/private-details.ts`, `src/print/`, `src/export/`, `scripts/build.ts`, `scripts/documents.ts`, `scripts/make-fonts.ts`, `fonts/`, `documents/` | `bun test src/__tests__ scripts/__tests__/documents` | built |
-| knowledge | [SPEC-knowledge](spec/SPEC-knowledge.md) | `knowledge/`, `src/knowledge/` | `bun test src/knowledge` | first version built; K1 to K13 build the two layers |
-| site | [SPEC-site](spec/SPEC-site.md) | `src/site/`, `public/` | `bun test src/site` | spec approved |
-| chat | [SPEC-chat](spec/SPEC-chat.md) | `src/chat/`, `evals/` | `bun test src/chat` | spec approved |
-| deploy | [SPEC-deploy](spec/SPEC-deploy.md) | `src/deploy/`, `src/ops/`, `scripts/build-site.ts`, `.github/` | `bun test src/ops src/deploy scripts/__tests__/docs-only scripts/__tests__/smoke` | spec approved |
-| agents | [SPEC-agents](spec/SPEC-agents.md) | the agent files | `bun test ./__tests__` | being built (A1 to A9) |
+| Module    | Spec                                     | Folders                                                                                                                                                                                             | Tests                                                                             | State                                               |
+| --------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------- |
+| content   | [SPEC-content](spec/SPEC-content.md)     | `resume.yaml`, `src/content.ts`, `src/build.ts`, `src/private-details.ts`, `src/print/`, `src/export/`, `scripts/build.ts`, `scripts/documents.ts`, `scripts/make-fonts.ts`, `fonts/`, `documents/` | `bun test src/__tests__ scripts/__tests__/documents`                              | built                                               |
+| knowledge | [SPEC-knowledge](spec/SPEC-knowledge.md) | `knowledge/`, `src/knowledge/`                                                                                                                                                                      | `bun test src/knowledge`                                                          | first version built; K1 to K13 build the two layers |
+| site      | [SPEC-site](spec/SPEC-site.md)           | `src/site/`, `public/`                                                                                                                                                                              | `bun test src/site`                                                               | spec approved                                       |
+| chat      | [SPEC-chat](spec/SPEC-chat.md)           | `src/chat/`, `evals/`                                                                                                                                                                               | `bun test src/chat`                                                               | spec approved                                       |
+| deploy    | [SPEC-deploy](spec/SPEC-deploy.md)       | `src/deploy/`, `src/ops/`, `scripts/build-site.ts`, `.github/`                                                                                                                                      | `bun test src/ops src/deploy scripts/__tests__/docs-only scripts/__tests__/smoke` | spec approved                                       |
+| agents    | [SPEC-agents](spec/SPEC-agents.md)       | the agent files                                                                                                                                                                                     | `bun test ./__tests__`                                                            | being built (A1 to A9)                              |
 
 Before you change a module, read its spec to the last line and the decisions it links ([index](docs/decisions/README.md)). Use the glossary's words.
 
