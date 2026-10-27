@@ -61,3 +61,5 @@ Later still (interview rows 41 to 52): "Start over" became "New chat" at the top
 Rows 53 to 55: the page is now "Merged, light and dark", with each view's light and dark versions side by side, desktop first, then phones, then the chat input, app icon and timeline boards. The source tab closes with the same × as the scope chip. The send button sits inside the input, with no box around the two.
 
 Rows 56 to 59: the send button is an end add-on inside a one-line input. The error alert uses the alert's heading, so its circled "!" lines up with the text. Queued questions, offline or asked during an answer, show in a notice with a clock icon, the question and ×; the Up arrow key in an empty input brings one back. The board "Chat input states" has a seventh state for a question waiting during an answer.
+
+Rows 60 to 63: alert icons stay on the first line of text. A new board pair, "Conversation states", shows a hovered question (time sent, Retry, Edit, Copy) and the answer steps while answering, when done (one closed line) and opened. The answer view's "Read 1 source" row became that closed steps line.

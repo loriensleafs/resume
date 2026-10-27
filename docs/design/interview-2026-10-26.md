@@ -69,6 +69,10 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 57 | (Peter, 2026-10-27) Error alert | The design system's error alert with its circled "!" icon, the message as the alert's bold heading, the icon centered on it |
 | 58 | (Peter, 2026-10-27) Offline queue notice | No "Queued:" label; the clock icon says it. The notice keeps the question, when it sends, and × |
 | 59 | (Peter, 2026-10-27) Questions asked during an answer | Enter during an answer queues the new question in the same notice (clock, question, ×); it sends when the answer finishes. In an empty input, the Up arrow key brings a queued question back into the input and takes it off the queue. This applies to the offline queue too |
+| 60 | (Peter, 2026-10-27) Alert icon alignment | The icon stays on the first line of the text, also when the text wraps. The × and the actions line up with that first line |
+| 61 | (Peter, 2026-10-27) Question actions | Hovering a question shows how long ago it was sent, then Retry, Edit and Copy icon buttons. Drawn: Edit puts the question back in the input; on an earlier question, Retry and Edit replace that answer and the ones after it; on phones, a tap shows the row |
+| 62 | (Peter, 2026-10-27) Answer steps | While the chat works, its steps show one by one, not expandable yet; the current step has a spinner and a moving highlight over its text. After the answer, the steps stay above it as one closed line that opens, and steps with details open on their own. Drawn steps: finding the source, reading it (its passages), checking the citations |
+| 63 | (Peter, 2026-10-27) Artifact cards in the chat | Peter was unsure whether cards like Claude's artifact cards fit this site. Advice given: the citation list already does that job for sources; the one case that fits is the resume file when a visitor asks for it. Open |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
