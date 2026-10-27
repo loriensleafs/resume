@@ -94,3 +94,46 @@ The earlier site spike ([research 09](09-site-feasibility.md)) was served with `
 
 - A prerendered page has four inline scripts, one of them TanStack Router's hydration bootstrap with per-page data, so each page has its own hashes. TanStack Start's per-request `ssr.nonce` does not fit pages served as static files.
 - The design system adds its styles as constructable stylesheets; it uses `<style>` elements with `window.litNonce` only where a browser lacks them. So `style-src 'self'` is enough.
+
+## Local checks and facts after the third review (2026-10-27)
+
+The third review found 39 issues (interview row 126). These are the facts behind draft four of SPEC-deploy, and the local checks run for it. What only a real deployment can show is the spec's deploy spike.
+
+**Nitro's Vercel output** (local build of the site spike, Nitro `3.0.260903-beta`, `preset: "vercel"`, Bun 1.4.2; kept on `prototype/csp-probe` in `prototypes/nitro-vercel-output/`):
+
+- `.vercel/output/config.json` has four routes: `/assets/(.*)` with `cache-control: public, max-age=31536000, immutable`; `{ "handle": "filesystem" }`; `/api/chat` to its own function; and `/(.*)` to `/__server`. So every path that is not a file is rendered by a function at request time, with no policy tag.
+- `config.json` has `"overrides": {}`. Prerendered pages are stored as `static/<path>/index.html`.
+- Each function's `.vc-config.json` has `"runtime": "bun1.x"` when nothing sets a version, `"launcherType": "Nodejs"` and `"supportsResponseStreaming": true`. A `functionRules` entry for `/api/chat` gives that function its own folder and `"maxDuration": 90`.
+
+**Build Output API** (https://vercel.com/docs/build-output-api/configuration):
+
+- A route has `src` ("A PCRE-compatible regular expression that matches each incoming pathname (excluding querystring)"), `dest`, `headers` (a map, so one value per header name), `methods`, `continue`, `caseSensitive`, `status`, `has`, `missing`, `mitigate` and `transforms`. A `transforms` entry can `append`, `set` or `delete` a response header.
+- A `has` host condition takes a string or a matcher such as `{ "eq": "pkloss.dev" }`.
+- `status` "Can be used in tandem with Location: header to implement redirects"; the example is `{ "src": "/redirect", "status": 308, "headers": { "Location": "https://example.com/" } }`. The page does not say whether a query string is added to `Location`.
+- The `handle` phases include `filesystem` ("check matches after the filesystem misses"), `miss` and `error`.
+- `overrides` maps a static file to another URL path: `"blog.html": { "path": "blog" }`.
+- `crons` lists `{ path, schedule }` "for the production deployment of a project".
+- vercel.json reference (https://vercel.com/docs/project-configuration/vercel-json#routes): "With `routes`, the `src` property is case-insensitive"; `redirects` and `headers` sources are case-sensitive. The `bunVersion` example is `"1.4.x"`.
+
+**Client navigation needs a server function** (`prototypes/csp-probe-2/nav-check.ts`): during a client-side navigation, the spike's route loader called `GET /_serverFn/<hash>`. A static server answered 404 and the page had no `<h1>`. TanStack Start's own skill says the same: "Route loaders run on BOTH server (during SSR) AND client (during navigation)" (`@tanstack/start-client-core` skill `start-core/execution-model`). So a site with no request-time server gives its loaders build-time data.
+
+**The split policy** (`prototypes/csp-probe-2/`): the header policy without `default-src` or `script-src`, a policy tag in each page, one full policy for the worker files, and a static not-found page with no script. Chrome reported no violation, page error or service-worker console message on first and second visits, a deep-dive page, client navigation, and an unknown path online and offline.
+
+**Workbox's `navigateFallback`** (same probe): with `navigateFallback: "/404.html"`, the worker served the not-found page with status 200 for an unknown path also online. It answers every navigation it has not precached, so after a release adds a page, an old worker would show "not found" for it until the worker updates.
+
+**TanStack AI 1.0.0** (installed packages, read by the third review):
+
+- `onUsage` runs only when a run finishes (`RUN_FINISHED`). A run that ends in `RUN_ERROR` (abort, `max_tokens`, a stream error) carries its usage on that event.
+- The browser client's `assertResponseOk` throws "HTTP error! status: <n>" on a response that is not OK, without reading its body (it reads only a 401 body). A refusal must therefore arrive as a 200 stream to show its code.
+- The Anthropic adapter's cache markers include the last tool, so a change to the tool list changes the cached prefix. Anthropic's prompt-caching guide lists tool-definition changes among those that invalidate the whole cache (https://docs.claude.com/en/docs/build-with-claude/prompt-caching).
+
+**Other services:**
+
+- Upstash REST: a pipeline runs commands in order but is not atomic; `/multi-exec` runs them as one transaction (https://upstash.com/docs/redis/features/restapi).
+- ntfy.sh limits each visitor's address to 250 messages a day (https://docs.ntfy.sh/publish/#limitations). Vercel's and GitHub's outgoing addresses are shared.
+- Vercel Spend Management: "Setting a spend amount does not automatically stop usage"; to pause, "you must enable the option" (https://vercel.com/docs/spend-management). The third review read a changelog as saying the pause can start on, so the setup list checks the switch.
+- Instant Rollback turns domain auto-assignment off; "Undo Rollback" chooses a deployment to make live and turns it back on (https://vercel.com/docs/instant-rollback).
+- A Redeploy runs the Ignored Build Step again unless "Use project's Ignore Build Step" is unchecked, so a redeploy of an unchanged commit is skipped (https://vercel.com/docs/project-configuration/project-settings#ignored-build-step).
+- The Vercel Toolbar loads a script from `vercel.live`; automated tests can skip it with the header `x-vercel-skip-toolbar: 1` (https://vercel.com/docs/vercel-toolbar).
+- Bun loads `.env`, `.env.<NODE_ENV>` and `.env.local` into a run on its own (https://bun.com/docs/runtime/environment-variables). `bun audit --prod` leaves development packages out (https://bun.com/docs/pm/cli/audit).
+- Nitro's Bun runtime (installed `nitro` 3.0.260903-beta, `_presets.mjs` `resolveVercelRuntime` and its Vercel page): the value comes from `vercel.functions.runtime`; without it, Nitro writes `"bun1.x"` when `vercel.json` has `bunVersion` or the build runs in Bun. Nitro's docs show only `"bun1.x"`, so whether a function can name `"bun1.4.x"` is a spike check.

@@ -170,12 +170,20 @@ _Avoid_: jailbreak test, red-team prompt
 A push of site changes to `main`, which goes live at peterkloss.dev once its checks pass. Peter approves each one.
 _Avoid_: ship, go-live, promotion
 
+**Site file**:
+A file in the repository that can change what the live site serves. Specs, docs, tests and agent files are not site files, so a push that changes only them is not a release.
+_Avoid_: app file, production file
+
+**Release check**:
+The check on a new production deployment that runs the smoke check in Chrome after CI passes. Until it passes, the deployment stays off peterkloss.dev.
+_Avoid_: deploy check, gate
+
 **Smoke check**:
 A short set of requests that checks a running copy of the site, its pages, headers, redirects and the chat's request checks, without asking the model anything.
 _Avoid_: end-to-end test, ping, e2e
 
 **Health check**:
-The daily smoke check of peterkloss.dev, which also reads the day before's daily totals.
+A daily check of peterkloss.dev: a smoke check, plus a look at the day before's daily totals or at whether the live site matches `main`. Two run, one on Vercel and one on GitHub, and each checks that the other ran.
 _Avoid_: uptime monitor, heartbeat
 
 **Daily totals**:
@@ -183,5 +191,5 @@ The server's per-day record of how chat turns ended, the tokens they used and ho
 _Avoid_: metrics, analytics, stats
 
 **Limit alert**:
-An urgent push to Peter's phone when the chat's spend nears or reaches its monthly limit, or when the health check fails.
+An urgent push to Peter's phone when the chat's spend nears or reaches a limit, or when a health check, a release check or the question log's store fails.
 _Avoid_: notification, page, alarm
