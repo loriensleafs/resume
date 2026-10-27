@@ -678,7 +678,8 @@ const CHAT_POSTS = 41; // SPEC-deploy's smoke check: a 429 must come by the 41st
  * a chat POST with Content-Type text/plain gets the WAF's 403; chat POSTs with a malformed JSON body get the
  * not-found page (the first is the control: the content type, not the path, decides the 403) until one gets the
  * WAF's 429, which must come by the 41st. Recorded, not judged: whether the path condition matches /API/chat and
- * /api/%63hat, and whether the routes send /api/sp%69ke to its function. The rules count per address for 10
+ * /api/%63hat, whether the routes send /api/sp%69ke to its function, and whether the address still gets a page
+ * after its 429. The rules count per address for 10
  * minutes, so this check runs in a job of its own, after the other checks, and a rerun within 10 minutes from the
  * same address meets the old count.
  */
@@ -736,6 +737,14 @@ export const wafRules = {
       if (!limited.waf) problems.push(`the 429 at ${limited.n} is not the WAF's`);
       if (limited.n === 1) problems.push("the control got 429: this address met the limit in the last 10 minutes; rerun later");
       if (before.length) problems.push("a malformed chat POST before the 429 did not get the not-found page");
+      // Recorded: does the limited address still get a page? A persistent action would block it everywhere.
+      const page = await deploymentFetch("/build-info.json");
+      const pageWho = page.status === 200 ? null : await whoAnswered(page, info);
+      seen.push(
+        pageWho
+          ? `then GET /build-info.json: ${pageWho.text}: the limited address is blocked beyond chat POSTs`
+          : "then GET /build-info.json: HTTP 200: the limited address still gets the site",
+      );
     }
     return { pass: problems.length === 0, detail: problems.length ? `${problems.join("; ")}; seen: ${seen.join("; ")}` : seen.join("; ") };
   },
