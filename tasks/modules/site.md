@@ -11,7 +11,7 @@ The mockups that the tasks draw are in `docs/design/mockups/`: first view, after
 - **Seam 1** is `src/site/__tests__/build.test.ts`. Until S8 it runs `buildSite({ root, outDir })` directly, with a fixture root whose `private.yaml` holds a fake phone number (main's decision, 2026-10-27). From S8 it runs `bun run build:site --root <fixture root> --out <folder>` once. The built-output checks (each HTML file's policy tag, no `style=` attribute) live here only; deploy's `src/deploy/__tests__/config.test.ts` checks `addPolicyTags()` and `writeVercelConfig()` at unit level. **Seam 2** is `src/site/__tests__/browser.test.ts`: Playwright drives Chrome (`CHROME_PATH`) under Bun against `bun run preview --dir <folder>`.
 - **The workspace contract.** S14 exports the whole `Workspace` type; each member whose behavior a later task adds is a no-op until then. The chat's tasks check that they call a member; S32 to S36, which run after those chat tasks, check the effect.
 - **Composition roots.** `scripts/build-site.ts`, `vite.config.ts` and the route files import several modules; the module that provides a step wires it in (S28 adds the `writeServiceWorker()` call as the build script's step 4).
-- Every task ends with `bun run build`, `bun test` and, once S8 lands, `bun run build:site` (AGENTS.md, Verify). A push that changes a site file is a release and needs Peter's approval (SPEC-deploy, Releases); the checkpoints name it.
+- Every task ends with `bun run build`, `bun test` and, once S8 lands, `bun run build:site` (AGENTS.md, Verify). A push that changes a site file is a release (AGENTS.md, "Releases and approvals").
 - S31 to S36 each wait for a chat task, because only a scripted answer from the preview's fake model reaches these contract members. S31 runs right after C17; the rest run in phase 4.
 
 ## Tasks
@@ -21,13 +21,13 @@ The mockups that the tasks draw are in `docs/design/mockups/`: first view, after
 Delivers: Peter can run `bun run dev` and open `/`, and a Vite build writes Nitro's Vercel output in `.vercel/output/`.
 Blocked by: none
 Acceptance:
-- The spec's packages are installed at their exact versions: `@tanstack/react-start` 1.169.4, `@tanstack/react-router` 1.170.46, `react` and `react-dom` 19.3.1, `vite` 8.3.5, `@vitejs/plugin-react` 6.1.2 and `nitro` 3.0.260903-beta. Vite runs under `bun --bun`, with `srcDirectory: "src/site"` and Nitro's `vercel` preset (Tech Stack).
+- The spec's packages are installed at their exact versions: `@tanstack/react-start` 1.169.4, `@tanstack/react-router` 1.170.46, `react` and `react-dom` 19.3.1, `vite` 8.3.5, `@vitejs/plugin-react` 6.1.2 and `nitro` 3.0.260903-beta. `@types/react` and `@types/react-dom` 19.3.0 are exact development dependencies, so the type check (A9) reads the React code (row 159). Vite runs under `bun --bun`, with `srcDirectory: "src/site"` and Nitro's `vercel` preset (Tech Stack).
 - `bun --bun vite build` writes `.vercel/output/config.json` and `.vercel/output/static/`, and git ignores `.vercel/` (AC; Boundaries: never commit `.vercel/`).
 - The task confirms that each function's `index.mjs` in `.vercel/output/functions/` has a default export with `fetch(request)`, which `bun run preview` needs, and records what it found in its `tasks/todo.md` entry (Commands: "the plan confirms it when it installs Nitro").
 Verify: `bun install`; `bun run dev`, then `curl -s http://localhost:3000/ | grep -c '<html lang="en"'` prints 1; `bun --bun vite build && ls .vercel/output/static .vercel/output/functions`; `bun run build`; `bun test` (43 pass)
 Files: `package.json` and `bun.lock`, `.gitignore`, `vite.config.ts`, `src/site/router.tsx`, `src/site/routes/__root.tsx`
 Size: M
-Needs Peter: no. Peter approved `nitro` and `react-dom` (row 135); approving the spec approved the rest.
+Needs Peter: no. Peter approved `nitro` and `react-dom` (row 135), and `@types/react` and `@types/react-dom` (row 159); approving the spec approved the rest.
 
 ### S2: `buildSite()` prerenders `/` and `/resume`, and no other page
 
@@ -94,15 +94,15 @@ Needs Peter: no
 ### S7: Google Sans Flex served from the site itself
 
 Delivers: the pages use a committed Latin subset of the Google Sans Flex variable font, weights 400 to 700, from the site's own address.
-Blocked by: S4; Peter: the font file format
+Blocked by: S4. The font file format is a wording draft for Peter's one review before D37 (row 153).
 Acceptance:
 - `scripts/site-fonts.ts` cuts a Latin subset of the variable font, weights 400 to 700, with `harfbuzzjs`; the files are committed in `public/fonts/`, and the build copies them and downloads nothing (Tech Stack; SPEC-deploy, Documents). The script and folder names are the site planner's choice: the spec names neither, and a new script keeps the content module's `scripts/make-fonts.ts`, which the documents hash covers, unchanged.
-- The files use the format Peter chose: WOFF2, with an encoder package he approves, or WOFF, with none (Open Questions).
+- The files use WOFF, which needs no new package; `docs/design/wording-drafts/S7.md` holds this wording draft. WOFF2 needs an encoder package, and a new package needs Peter's approval first (AGENTS.md, Code), so WOFF2 comes only from his review, as a follow-up task (Open Questions; row 153).
 - No output file names a font on another host; the `@font-face` rules point at the site's own files (Boundaries: no request to a third party).
 Verify: `bun run scripts/site-fonts.ts` (with the variable font present); `bun test src/site/__tests__/build.test.ts`; `bun test`
-Files: `scripts/site-fonts.ts`, `public/fonts/` (the cut files), `src/site/styles/fonts.css`, `src/site/routes/__root.tsx`, `src/site/__tests__/build.test.ts`
+Files: `scripts/site-fonts.ts`, `public/fonts/` (the cut files), `src/site/styles/fonts.css`, `src/site/routes/__root.tsx`, `src/site/__tests__/build.test.ts`, `docs/design/wording-drafts/S7.md`
 Size: M
-Needs Peter: yes. Choose WOFF2 (and approve its encoder package) or WOFF.
+Needs Peter: approval of the font format in his one review before D37 (row 153); WOFF2 also needs his approval of its encoder package. The task finishes on the wording draft, WOFF.
 
 ### S8: Seam 1 runs the build script
 
@@ -145,15 +145,15 @@ Needs Peter: no
 ### S11: The workspace and its first view on wide screens
 
 Delivers: `/` is the workspace, as the first-view board shows: the app bar, the career timeline band, the chat column with the first view's static parts, and the document panel with the Resume tab.
-Blocked by: S10; Peter: the suggested questions' wording
+Blocked by: S10. The suggested questions' wording is a wording draft for Peter's one review before D37 (row 153).
 Acceptance:
 - On a wide screen `/` shows the chat column, 560 px at its outer edge to the document panel's border, and the document panel, whose `acme-tabs` holds the "Resume" tab with the resume view. Below 1024 px it shows one column (AC; Views: Chat column, Document panel).
 - With JavaScript off, `/` shows the first view's static parts: "Ask about Peter's work.", the line about where answers come from, and the suggested questions from `src/site/suggested-questions.ts`, each a button (Views: Chat column; AC: each page reads without JavaScript).
 - axe reports no violation on `/` at 1440 × 900 and 390 × 844 (Testing 2: Accessibility).
 Verify: `bun test src/site`; `bun run build:site`; `bun test`
-Files: `src/site/routes/index.tsx`, `src/site/shell/DocumentPanel.tsx`, `src/site/suggested-questions.ts`, `src/site/styles/layout.css`, `src/site/__tests__/browser.test.ts`
+Files: `src/site/routes/index.tsx`, `src/site/shell/DocumentPanel.tsx`, `src/site/suggested-questions.ts`, `src/site/styles/layout.css`, `src/site/__tests__/browser.test.ts`, `docs/design/wording-drafts/S11.md`
 Size: M
-Needs Peter: yes. Approve the wording of the overall suggested questions (Boundaries: ask first).
+Needs Peter: approval of the wording of the overall suggested questions (Boundaries: ask first), in his one review before D37 (row 153). The task finishes on the wording draft in `docs/design/wording-drafts/S11.md`.
 
 ### S12: The head script
 
@@ -196,14 +196,14 @@ Needs Peter: no
 ### S15: The first view names the selected role
 
 Delivers: with a role selected, the first view says "Ask about FedNow.", gives the role's title, employer and dates, offers "Read FedNow in the resume" and that role's suggested questions; a suggested question sets the workspace's `suggestedQuestion`.
-Blocked by: S14; Peter: the wording of each role's suggested questions
+Blocked by: S14. Each role's suggested questions are a wording draft for Peter's one review before D37 (row 153).
 Acceptance:
 - With a role selected, the first view names it, gives its title, employer and dates from `resume.yaml`, offers "Read FedNow in the resume" (on wide screens it shows the role in the resume), and lists that role's suggested questions (Views: Chat column).
 - Selecting a suggested question sets `suggestedQuestion` to its text, and `clearSuggestedQuestion()` clears it (Code Style table). The chat's test "Selecting a suggested question sends it once" proves the hand-over.
 Verify: `bun test src/site`; `bun test`
-Files: `src/site/routes/index.tsx`, `src/site/suggested-questions.ts`, `src/site/workspace.ts`, `src/site/__tests__/browser.test.ts`
+Files: `src/site/routes/index.tsx`, `src/site/suggested-questions.ts`, `src/site/workspace.ts`, `src/site/__tests__/browser.test.ts`, `docs/design/wording-drafts/S15.md`
 Size: S
-Needs Peter: yes. Approve the wording of each role's suggested questions.
+Needs Peter: approval of the wording of each role's suggested questions, in his one review before D37 (row 153). The task finishes on the wording draft in `docs/design/wording-drafts/S15.md`.
 
 ### S16: Source pages
 
@@ -474,16 +474,16 @@ Needs Peter: no
 
 ### Checkpoint site: the build output
 
-After S1 to S8, with D16. `bun run build`, `bun run build:site` and `bun test` pass, and seam 1 runs through the build script with a fake-phone fixture root. Peter looks at `/` and `/resume` in `bun run dev` with the app bar, the fonts and the not-found page, and approves a push (it changes site files, so it is a release).
+After S1 to S8, with D16. `bun run build`, `bun run build:site` and `bun test` pass, and seam 1 runs through the build script with a fake-phone fixture root. Peter looks at `/` and `/resume` in `bun run dev` with the app bar, the fonts and the not-found page. The push changes site files, so it is a release.
 
 ### Checkpoint site: the wide workspace
 
-After S9 to S22, with D17. The wide workspace works end to end in the browser test: the timeline, the scope, a source from its address, the × on the source tab, the saved views, the theme and the downloads, with no axe violation in light and dark. Peter reviews the running preview at 1440 × 900, light and dark, against the first-view, career-timeline-states and answer-with-source boards (the source half), and approves a push.
+After S9 to S22, with D17. The wide workspace works end to end in the browser test: the timeline, the scope, a source from its address, the × on the source tab, the saved views, the theme and the downloads, with no axe violation in light and dark. Peter reviews the running preview at 1440 × 900, light and dark, against the first-view, career-timeline-states and answer-with-source boards (the source half).
 
 ### Checkpoint site: phones, offline, install
 
-After S23 to S30. Phones, the icon, the manifest, offline and the speed budget pass; `bun test src/site` passes on a clean checkout with Chrome. Peter reviews the preview at 390 × 844 against the phone boards and the installed-app board, and approves a push.
+After S23 to S30. Phones, the icon, the manifest, offline and the speed budget pass; `bun test src/site` passes on a clean checkout with Chrome. Peter reviews the preview at 390 × 844 against the phone boards and the installed-app board.
 
 ### Checkpoint site: lands
 
-After S31 to S36, with the chat tasks they name. SPEC-site's Success Criteria: `bun test src/site` passes on a clean checkout with Chrome installed, the chat included, and with it the effect checks for C20, C24, C27, C28, C35 and C36. Peter reviews the running preview against the approved mockups at desktop and phone sizes, in light and dark, and approves it and its push. The site rows of `AGENTS.md`'s Modules table and `spec/README.md` say built, and the fresh-session check passes.
+After S31 to S36, with the chat tasks they name. SPEC-site's Success Criteria: `bun test src/site` passes on a clean checkout with Chrome installed, the chat included, and with it the effect checks for C20, C24, C27, C28, C35 and C36. Peter reviews the running preview against the approved mockups at desktop and phone sizes, in light and dark, and approves it. The site rows of `AGENTS.md`'s Modules table and `spec/README.md` say built, and the fresh-session check passes.
