@@ -177,7 +177,9 @@ describe("the private-detail check", () => {
     git(root, "add", "notes.md");
     const result = Bun.spawnSync([...GIT, "commit", "-q", "-m", "change"], {
       cwd: root,
-      env: { ...Bun.env, GIT_COMMITTER_NAME: "Someone", GIT_COMMITTER_EMAIL: FAKE_EMAIL },
+      // process.env, not Bun.env: vite/client types Bun.env with Vite's DEV, PROD and SSR booleans, which no
+      // environment holds. https://bun.com/docs/runtime/child-process builds a child's env from process.env too.
+      env: { ...process.env, GIT_COMMITTER_NAME: "Someone", GIT_COMMITTER_EMAIL: FAKE_EMAIL },
     });
     expect(result.exitCode).toBe(0);
     expectCount(root, 1);

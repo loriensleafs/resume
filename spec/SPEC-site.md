@@ -172,7 +172,7 @@ The chat's behavior offline is the chat module's ([decision 0010](../docs/decisi
 
 Versions checked on 2026-10-26 ([research 05](../docs/research/05-framework-support.md), [research 09](../docs/research/09-site-feasibility.md)); the plan pins exact versions when it installs them.
 
-- Bun 1.4.2 and TypeScript; Bun APIs for scripts. Vite runs under `bun --bun` ([decision 0004](../docs/decisions/0004-bun-only.md)).
+- Bun 1.4.4 and TypeScript; Bun APIs for scripts. Vite runs under `bun --bun` ([decision 0004](../docs/decisions/0004-bun-only.md)).
 - `react-dom` 19.3.1 and `nitro` 3.0.260903-beta, both pinned to these exact versions. Peter approved both ([decision record](../docs/design/interview-2026-10-26.md) row 135). Nitro's Vercel preset writes `.vercel/output/` ([SPEC-deploy](SPEC-deploy.md)).
   - `nitro` 3.0.260903-beta is a beta. On 2026-10-27 no stable 3.x release exists: npm marks `3.0.0` deprecated, and every other 3.x version is an alpha or a beta. 3.0.260903-beta is the newest, and npm's `latest` tag points to it. Each later bump of `nitro` is reviewed by hand, never through a version range.
 - `@tanstack/react-start` 1.169.4 with `@tanstack/react-router` 1.170.46, React 19.3.1, Vite 8.3.5, `@vitejs/plugin-react` 6.1.2. App source in `src/site` (`srcDirectory`), static prerendering with `crawlLinks` and `failOnError`. The prerender settings in `vite.config.ts`:
@@ -319,7 +319,7 @@ Peter approved this contract on 2026-10-27 ([decision record](../docs/design/int
 
 ## Boundaries
 
-- **Always:** take every fact from `resume.yaml` and `publicKnowledge(knowledge)`. Build to the approved mockups. Keep every page readable without JavaScript. Use the glossary's words and SPEC-knowledge's ids. Run `bun run build`, `bun run build:site` and `bun test` before a commit.
+- **Always:** take every fact from `resume.yaml` and `publicKnowledge(knowledge)`. Build to the approved mockups. Keep every page readable without JavaScript. Use the glossary's words and SPEC-knowledge's ids. Run `bun run typecheck`, `bun run build`, `bun run build:site` and `bun test` before a commit.
 - **Ask first:** a dependency not named in this spec; a change from the approved mockups; the wording of the suggested questions; a change to the workspace contract, because the chat module depends on it; any request to a third party (fonts, analytics, scripts).
 - **Never:** put private details in any output, or a source's `Not public` text in any file under `.vercel/output/static/`. Add a list of sources to browse. Store anything that identifies a visitor on a server (the chat's anonymous question log is [decision 0020](../docs/decisions/0020-anonymous-question-log.md)). Render a design-system part's shadow DOM on the server; the prerender writes only its tag and light-DOM content. Run a page or a server function at request time. Add Node or Python tooling. Commit `dist/` or `.vercel/`.
 

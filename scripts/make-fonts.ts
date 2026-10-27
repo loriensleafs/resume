@@ -33,7 +33,34 @@ const UNICODES = [
   0x2013, 0x2014, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2026, 0x2122, 0x2192,
 ];
 
-type Hb = Record<string, (...args: number[]) => number> & { memory: WebAssembly.Memory };
+// The HarfBuzz functions this script calls. harfbuzz-subset.wasm exports them as raw C functions, which take and
+// return numbers (pointers, sizes, flags); harfbuzzjs's typed API has no subsetting.
+const HB_FUNCTIONS = [
+  "malloc",
+  "free",
+  "hb_blob_create",
+  "hb_blob_destroy",
+  "hb_blob_get_data",
+  "hb_blob_get_length",
+  "hb_face_create",
+  "hb_face_destroy",
+  "hb_face_reference_blob",
+  "hb_set_add",
+  "hb_set_clear",
+  "hb_set_invert",
+  "hb_subset_input_create_or_fail",
+  "hb_subset_input_destroy",
+  "hb_subset_input_get_flags",
+  "hb_subset_input_pin_axis_location",
+  "hb_subset_input_set",
+  "hb_subset_input_set_flags",
+  "hb_subset_input_unicode_set",
+  "hb_subset_or_fail",
+] as const;
+type Hb = Record<(typeof HB_FUNCTIONS)[number], (...args: number[]) => number> & { memory: WebAssembly.Memory };
+
+const isHarfBuzz = (exports: WebAssembly.Exports): exports is WebAssembly.Exports & Hb =>
+  exports.memory instanceof WebAssembly.Memory && HB_FUNCTIONS.every((name) => typeof exports[name] === "function");
 
 // From hb-subset.h.
 const SETS_NAME_ID = 4;
@@ -46,7 +73,8 @@ const tag = (s: string) =>
 async function loadHarfBuzz(): Promise<Hb> {
   const wasmPath = Bun.resolveSync("harfbuzzjs/dist/harfbuzz-subset.wasm", import.meta.dir);
   const { instance } = await WebAssembly.instantiate(await Bun.file(wasmPath).arrayBuffer());
-  return instance.exports as unknown as Hb;
+  if (!isHarfBuzz(instance.exports)) throw new Error(`${wasmPath} lacks a HarfBuzz function that this script calls`);
+  return instance.exports;
 }
 
 function instanceFont(hb: Hb, source: Uint8Array, axes: Record<string, number>): Uint8Array {
