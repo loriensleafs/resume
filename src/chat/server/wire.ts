@@ -26,9 +26,19 @@ const MODEL_API_ERROR_CODE = /^(?:[1-5][0-9]{2}|context_overflow)$/;
 /** The code of a RUN_ERROR event and of a chat_turn event: the handler's own or the model API's. Never a message or a stack trace. */
 export type RunErrorCode = HandlerErrorCode | ModelApiErrorCode;
 
-export const isRunErrorCode = (code: string): code is RunErrorCode => Object.hasOwn(MESSAGES, code) || MODEL_API_ERROR_CODE.test(code);
+const isHandlerErrorCode = (code: string): code is HandlerErrorCode => Object.hasOwn(MESSAGES, code);
 
-/** A new RUN_ERROR event with the code and its fixed message, and nothing else. */
+/**
+ * The code when it is the handler's own or the model API's, and SERVER_ERROR for any other value.
+ * The types allow no other value, so this is a runtime guard for callers the types do not reach,
+ * such as another module's Budget: an error's text never passes as a code.
+ */
+export function runErrorCode(code: string): RunErrorCode {
+  return isHandlerErrorCode(code) || MODEL_API_ERROR_CODE.test(code) ? (code as RunErrorCode) : "SERVER_ERROR";
+}
+
+/** A new RUN_ERROR event with the code and its fixed message, and nothing else. A code that is not the handler's own (the same runtime guard) becomes SERVER_ERROR. */
 export function wireError(code: HandlerErrorCode): RunErrorEvent {
-  return { type: EventType.RUN_ERROR, code, message: MESSAGES[code], timestamp: Date.now() };
+  const known = isHandlerErrorCode(code) ? code : "SERVER_ERROR";
+  return { type: EventType.RUN_ERROR, code: known, message: MESSAGES[known], timestamp: Date.now() };
 }

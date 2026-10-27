@@ -3,7 +3,7 @@
 // Each test sends a request the way the browser does and reads the server-sent events, the log and
 // the telemetry events.
 
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { uiMessagesToWire, type TextOptions, type UIMessage } from "@tanstack/ai";
 import { fakeText } from "@tanstack/ai/testing";
 import { buildKnowledge } from "../../../knowledge/build";
@@ -11,7 +11,7 @@ import { renderCore } from "../../../knowledge/render";
 import { deepDiveFile, fixture, removeFixtures } from "../../../knowledge/__tests__/fixtures";
 import type { Knowledge } from "../../../knowledge/types";
 import { handleChat, type ChatDeps } from "../handle-chat";
-import { inMemoryBudget, inMemoryQuestionLog, inMemoryTelemetry, type Telemetry } from "../question-log";
+import { inMemoryBudget, inMemoryQuestionLog, inMemoryTelemetry, type Budget, type QuestionLog, type Telemetry } from "../question-log";
 import type { ChatTurnEvent } from "../telemetry";
 import { questionLogContract } from "./question-log-contract";
 
@@ -119,6 +119,50 @@ describe("citations", () => {
   });
 });
 
+// fakeText() streams every answer in TEXT_MESSAGE_CONTENT events of 4 characters each
+// (@tanstack/ai/testing, chunksOf()), so each marker below reaches the handler split over several
+// events. The streamed deltas show what the marker middleware held.
+describe("markers: holding", () => {
+  /** The deltas of the TEXT_MESSAGE_CONTENT events, as the browser receives them. */
+  const deltas = (events: WireEvent[]) => events.filter((e) => e.type === "TEXT_MESSAGE_CONTENT").map((e) => String(e.delta));
+
+  test("a citation marker split over text events is held and checked whole", async () => {
+    const fake = fakeText();
+    fake.setResponses([{ text: "Test Person built the first thing [highlight:acme.1] and planned the next [role:nobody]." }]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), seamDeps(fake)));
+
+    expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1] and planned the next .");
+    expect(deltas(events)).toContain("[highlight:acme.1]");
+    expect(deltas(events).some((delta) => delta.includes("nobody"))).toBe(false);
+    expect(citationEvents(events)).toEqual([{ citations: ["highlight:acme.1"], removed: 1 }]);
+  });
+
+  test("text from an open [ passes as text once it is past 120 characters, before the bracket closes", async () => {
+    const fake = fakeText();
+    const text = `Test Person wrote [${"a".repeat(150)}] once.`;
+    fake.setResponses([{ text }]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person write?")]), seamDeps(fake)));
+
+    expect(streamedText(events)).toBe(text);
+    const opening = deltas(events).find((delta) => delta.includes("["));
+    expect(opening).not.toContain("]");
+    expect(citationEvents(events)).toEqual([{ citations: [], removed: 0 }]);
+  });
+
+  test("text held at the end of a message is flushed as text", async () => {
+    const fake = fakeText();
+    const text = "Test Person built the first thing [highlight:acme";
+    fake.setResponses([{ text }]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), seamDeps(fake)));
+
+    expect(streamedText(events)).toBe(text);
+    expect(citationEvents(events)).toEqual([{ citations: [], removed: 0 }]);
+  });
+});
+
 describe("the model request", () => {
   test("holds the system prompt with the rendered core, then the earlier turns and the question", async () => {
     const fake = fakeText();
@@ -215,6 +259,21 @@ describe("turn telemetry", () => {
     expect(JSON.stringify(telemetry.records)).not.toContain(THREAD_ID);
   });
 
+  test("a refusal whose code is no known code puts SERVER_ERROR on the wire and in the telemetry, and never the error's message or stack", async () => {
+    // A budget from another module that hands back an error's text as its code.
+    const thrown = new Error("boom: the budget store failed");
+    const budget = { reserve: async () => ({ ok: false, errorCode: String(thrown.stack) }) } as unknown as Budget;
+    const telemetry = recordingTelemetry();
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), seamDeps(fakeText(), { budget, telemetry })));
+
+    expect(events).toEqual([{ type: "RUN_ERROR", code: "SERVER_ERROR", message: expect.any(String), timestamp: expect.any(Number) }]);
+    expect(telemetry.records.map((record) => record.event.errorCode)).toEqual(["SERVER_ERROR"]);
+    const everything = JSON.stringify({ events, records: telemetry.records });
+    expect(everything).not.toContain("boom");
+    expect(everything).not.toContain("handle-chat.test.ts");
+  });
+
   test.each(["DAILY_LIMIT", "SPEND_LIMIT"] as const)(
     "a turn the budget refuses with %s hands one chat_turn event, limit with that code, with no model call and no token counts",
     async (code) => {
@@ -270,5 +329,55 @@ describe("the question log", () => {
       },
     ]);
     expect(JSON.stringify(entries)).not.toContain(THREAD_ID);
+  });
+
+  test("two turns with the same log and telemetry write one entry and one chat_turn event each", async () => {
+    const fake = fakeText();
+    fake.setResponses([{ text: "At Acme [role:acme]." }, { text: "The first thing [highlight:acme.1]." }]);
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(fake, { telemetry });
+
+    await readEvents(await handleChat(chatRequest([question("Where does Test Person work?")]), deps));
+    await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), deps));
+
+    expect((await deps.log.list(1)).map((entry) => [entry.question, entry.citations])).toEqual([
+      ["What did Test Person build?", ["highlight:acme.1"]],
+      ["Where does Test Person work?", ["role:acme"]],
+    ]);
+    expect(telemetry.events.map((event) => [event.outcome, event.citations])).toEqual([
+      ["answered", 1],
+      ["answered", 1],
+    ]);
+  });
+
+  test("a question-log write that fails never breaks the answer, and the server's log line holds neither the question nor the error's message", async () => {
+    const fake = fakeText();
+    const text = "Test Person built the first thing [highlight:acme.1].";
+    fake.setResponses([{ text }]);
+    const asked = "What did Test Person build at Acme?";
+    // A store whose error repeats the entry it was given, question included.
+    const log: QuestionLog = {
+      append: async (entry) => {
+        throw new Error(`the store refused ${JSON.stringify(entry)}`);
+      },
+      list: async () => [],
+    };
+    const telemetry = inMemoryTelemetry();
+    const consoleError = spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const events = await readEvents(await handleChat(chatRequest([question(asked)]), seamDeps(fake, { log, telemetry })));
+
+      expect(streamedText(events)).toBe(text);
+      expect(events.at(-1)?.type).toBe("RUN_FINISHED");
+      expect(telemetry.events.map((event) => event.outcome)).toEqual(["answered"]);
+      const lines = consoleError.mock.calls.map((args) => args.map(String).join(" "));
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain("question-log");
+      expect(lines[0]).not.toContain(asked);
+      expect(lines[0]).not.toContain("the store refused");
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });

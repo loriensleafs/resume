@@ -4,8 +4,9 @@
 // writes each record exactly once, and a failed write never breaks the answer.
 
 import { utcDay, type QuestionLog, type QuestionLogEntry, type Telemetry } from "./question-log";
+import { logServerError } from "./server-log";
 import type { ChatTurnEvent, TurnUsage } from "./telemetry";
-import { isRunErrorCode, type RunErrorCode } from "./wire";
+import { runErrorCode, type RunErrorCode } from "./wire";
 
 /** How the turn ended, and what its middleware learned by then. */
 export type TurnEnding = Pick<QuestionLogEntry, "outcome" | "read" | "citations" | "removed"> & {
@@ -27,8 +28,8 @@ export function createFinishTurn(
   return async (ending) => {
     if (finished) return;
     finished = true;
-    // Only a known code reaches the telemetry. Any other value would be a bug here, and could hold an error's text.
-    const errorCode = ending.errorCode === null || isRunErrorCode(ending.errorCode) ? ending.errorCode : "SERVER_ERROR";
+    // Only a known code reaches the telemetry (wire.ts, runErrorCode()).
+    const errorCode = ending.errorCode === null ? null : runErrorCode(ending.errorCode);
     const event: ChatTurnEvent = {
       event: "chat_turn",
       outcome: ending.outcome,
@@ -59,11 +60,11 @@ export function createFinishTurn(
   };
 }
 
-/** Runs one write; a failure is logged on the server and never thrown. The log line holds the error alone, never the question. */
+/** Runs one write; a failure is logged on the server and never thrown, so it never breaks the answer. */
 async function attempt(store: string, write: () => Promise<void>): Promise<void> {
   try {
     await write();
   } catch (error) {
-    console.error(`chat finishTurn: the ${store} write failed:`, error);
+    logServerError(`chat finishTurn: the ${store} write failed`, error);
   }
 }

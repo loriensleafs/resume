@@ -9,6 +9,7 @@
 import { EventType, type ChatMiddleware, type StreamChunk } from "@tanstack/ai";
 import { parseId } from "../../knowledge/ids";
 import type { Knowledge } from "../../knowledge/types";
+import { logServerError } from "./server-log";
 
 /** Text from "[" is held at most this many characters, "[" included (SPEC-chat, Markers, "Holding"). */
 const HOLD_CHARACTERS = 120;
@@ -131,12 +132,12 @@ export function citationMarkers(knowledge: Knowledge): { middleware: ChatMiddlew
       name: "markers",
       // TanStack AI does not guard onChunk, and a throw out of chat() would put its message on the
       // wire. So the middleware catches its own error and decides: the chunk it could not check is
-      // dropped, so no unchecked marker reaches the browser. The log line holds the error alone.
+      // dropped, so no unchecked marker reaches the browser.
       onChunk: (_ctx, chunk) => {
         try {
           return onChunk(chunk);
         } catch (error) {
-          console.error("chat markers: a chunk could not be checked and was dropped:", error);
+          logServerError("chat markers: a chunk could not be checked and was dropped", error);
           return null;
         }
       },
