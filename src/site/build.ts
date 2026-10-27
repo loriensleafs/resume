@@ -20,6 +20,7 @@ export async function buildSite({ outDir }: BuildSiteOptions): Promise<void> {
   // build (https://vite.dev/guide/env-and-mode#node-env-and-modes). `bun test` sets NODE_ENV to "test", and with it
   // the prerender fails, because the server bundle then calls React's development JSX runtime. So the build pins
   // NODE_ENV for its own run and gives the caller's value back.
+  // Run one build per process at a time: process.env is shared, so a second build would see this swap.
   const callersNodeEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = "production";
   try {
@@ -27,6 +28,10 @@ export async function buildSite({ outDir }: BuildSiteOptions): Promise<void> {
     // https://vite.dev/guide/api-environment-frameworks#building-programmatically-with-createbuilder
     // Nitro reads the `nitro` key of the Vite config, and its Vercel preset puts the functions and the static
     // folder inside output.dir: https://nitro.build/docs/vite#configuring-nitro-with-vite
+    // Limit: run one build per checkout at a time. Nitro records each build's output folder in
+    // <Vite root>/node_modules/.nitro/last-build.json, and the prerender's preview server reads that file to find
+    // the output. Nitro fixes that path; its buildDir option does not move it (nitro 3.0.260903-beta,
+    // dist/_build/common.mjs). So two builds at once can prerender from each other's output.
     const builder = await createBuilder({
       configFile: VITE_CONFIG,
       nitro: { output: { dir: resolve(outDir, ".vercel/output") } },

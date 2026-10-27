@@ -24,6 +24,7 @@ async function htmlFiles(): Promise<string[]> {
  */
 async function scriptsLoadedBy(page: string): Promise<string[]> {
   const entries: string[] = [];
+  // Each selector matches only elements that have the attribute, so getAttribute() returns a string.
   new HTMLRewriter()
     .on("script[src]", { element: (element) => void entries.push(element.getAttribute("src")!) })
     .on('link[rel="modulepreload"]', { element: (element) => void entries.push(element.getAttribute("href")!) })

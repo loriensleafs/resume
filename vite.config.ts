@@ -23,9 +23,11 @@ export default defineConfig({
         enabled: true,
         crawlLinks: true,
         failOnError: true,
-        // The crawler drops a page's query from its output path, so a crawled /?source= or /?role= link would
-        // overwrite index.html. The crawler also adds a crawled page to the sitemap's page list before this filter
-        // runs, so the filter takes the page out of the sitemap as well (@tanstack/start-plugin-core, prerender.js).
+        // The filter drops each page whose path has "?", and keeps that page out of the sitemap. Why: the crawler
+        // drops a page's query from its output path, so a crawled /?source= or /?role= link would overwrite
+        // index.html. And the crawler adds a crawled page to the sitemap's page list before this filter runs, so
+        // a dropped page stays in the sitemap unless the filter excludes it (@tanstack/start-plugin-core,
+        // prerender.js).
         filter: (page) => {
           if (!page.path.includes("?")) return true;
           page.sitemap = { ...page.sitemap, exclude: true };
