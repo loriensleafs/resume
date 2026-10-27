@@ -118,7 +118,7 @@ Unchanged: `knowledge/logistics.yaml`, one entry per topic, with `topic`, `answe
 
 ## Tech Stack
 
-Bun 1.4.2 and TypeScript; `Bun.YAML` for front matter and `logistics.yaml`; `zod` 4.6.7 for the schemas. The parser is the existing section splitter. No new dependency.
+Bun 1.4.4 and TypeScript; `Bun.YAML` for front matter and `logistics.yaml`; `zod` 4.6.7 for the schemas. The parser is the existing section splitter. No new dependency.
 
 ## Commands
 
@@ -277,7 +277,7 @@ No test can check three rules: that `Not public` names kinds only, that headings
 
 ## Boundaries
 
-- **Always:** take every statement from Peter's answers or his records. Save each raw interview answer to `loriensleafs/resume-private` before writing from it. Keep a source file a draft until Peter approves it in the host's question tool; then set `status: approved` and the date, and record the approval in the decision record. Make each change to an approved source on a branch, and land it only after Peter approves it, with a new `approved:` date. Add a passage only after the last one. Run `bun run build`, `bun run build:site` and `bun test` before a commit.
+- **Always:** take every statement from Peter's answers or his records. Save each raw interview answer to `loriensleafs/resume-private` before writing from it. Keep a source file a draft until Peter approves it in the host's question tool; then set `status: approved` and the date, and record the approval in the decision record. Make each change to an approved source on a branch, and land it only after Peter approves it, with a new `approved:` date. Add a passage only after the last one. Run `bun run typecheck`, `bun run build`, `bun run build:site` and `bun test` before a commit.
 - **Ask first:** a new subject or source; any wording that goes beyond what Peter said; a smoothing edit that could change what he meant; each removal on the redaction list.
 - **Never:** approve a source on Peter's behalf. Ask interview questions through the host's question tool. Put material of a `Not public` kind in a source: internal code, customer names, security details, colleague names, internal links or non-public figures. The `Not public` section names these kinds only. Put private details, the raw interview answers or a redaction list in this repository. Change an approved source on `main` without Peter's approval. Remove, move or renumber an approved passage.
 

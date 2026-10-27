@@ -49,7 +49,7 @@ TanStack Start, Router, AI 1.0 and both design-system packages ship their own `.
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true
   },
-  "include": ["src", "scripts", "__tests__", "evals", "*.ts"]
+  "include": ["src", "scripts", "__tests__", "evals", ".agents/skills", "*.ts"]
 }
 ```
 
@@ -60,7 +60,7 @@ This is Bun's recommended file [B4] with four changes:
 | No `verbatimModuleSyntax` | TanStack Start: it "can result in server bundles leaking into client bundles" [S1, start-core skill]. Start wins: the leak would hit the chat's server code. Today's code passes with it on, so nothing is lost. |
 | `isolatedModules: true` | Vite transpiles one file at a time and requires it [V1]. |
 | `DOM`, `DOM.Iterable` in `lib` | React needs `dom` [R1]. TanStack's examples set it [S2]. `@types/bun` works with DOM since Bun 1.2.7 [B6]. |
-| Explicit `include` | `.claude/worktrees/` holds other checkouts with `node_modules`. A `**/*` include checks them too. |
+| Explicit `include` | `.claude/worktrees/` holds other checkouts with `node_modules`. A `**/*` include checks them too. `.agents/skills` is in the list because the release skill's scripts check every push (added in A9's review). |
 
 When a task installs Vite, it adds `"vite/client"` to `types`: TypeScript 7 checks side-effect imports, so `import "./x.css"` needs that declaration [B1, V1]. Commit `src/site/routeTree.gen.ts` [S3]; the generator marks it `// @ts-nocheck` (verified in `@tanstack/router-generator` 1.167.46).
 

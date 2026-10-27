@@ -53,7 +53,7 @@ describe("createOps() outside production", () => {
   test.each([
     ["day", "DAILY_LIMIT"],
     ["month", "SPEND_LIMIT"],
-  ])("with PREVIEW_LIMIT=%s, the budget refuses every turn with %s", async (previewLimit, errorCode) => {
+  ] as const)("with PREVIEW_LIMIT=%s, the budget refuses every turn with %s", async (previewLimit, errorCode) => {
     const ops = createOps({ VERCEL_ENV: "preview", PREVIEW_LIMIT: previewLimit });
 
     expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode });

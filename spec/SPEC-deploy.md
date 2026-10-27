@@ -489,9 +489,9 @@ The two health checks watch each other (row 122). Vercel Cron and GitHub's sched
 `.github/workflows/ci.yml` runs on every push and pull request, on `ubuntu-24.04` (pinned: `ubuntu-latest` moves to 26.04 in November 2026). Every helper is pinned to an exact commit, and each workflow grants only the permissions it needs (row 120).
 
 - **Job `test`:**
-  1. `actions/checkout`, then `oven-sh/setup-bun` with `bun-version: 1.4.2`.
+  1. `actions/checkout`, then `oven-sh/setup-bun` with `bun-version: 1.4.4`. Every job uses this Bun.
   2. `sudo apt-get update && sudo apt-get install -y poppler-utils`.
-  3. `bun ci`.
+  3. `bun ci`, then `bun run typecheck` (row 157).
   4. `bun run build` (the content module's documents, public only), then `bun run build:site`.
   5. `bun test`, with `CHROME_PATH=/usr/bin/google-chrome`. This includes the document checks.
 - **Job `audit`:** `bun audit --prod --audit-level=high`, as its own job, so a registry outage shows as its own failure. Only the production packages decide a release.
@@ -620,7 +620,7 @@ Approving this spec approves these amendments:
   - The line "`bun run build --public` (the website and CI use this)" changes: the website uses the committed `documents/`, and CI runs `bun run build` to check that the documents still build.
 - **SPEC-agents** (approved 2026-10-27, row 142) carries these into `AGENTS.md`:
   - AGENTS.md: a push that changes a site file (a path not in `scripts/docs-only.txt`) is a release, and its "Releases and approvals" says which pushes need Peter (row 151).
-  - AGENTS.md, Verify: `bun run build`, `bun run build:site` and `bun test` before every commit.
+  - AGENTS.md, Verify: `bun run typecheck`, `bun run build`, `bun run build:site` and `bun test` before every commit.
   - `bun run smoke`, `bun run documents` and the runbooks join the commands.
   - The edit-resume skill runs `bun run documents` and checks the committed PDF's page count.
 
@@ -774,7 +774,7 @@ The real platform is checked by the deploy spike, by the release check, by the t
   - keep previews and local runs on the fake model and the in-memory store, by code;
   - commit a resume change together with its rebuilt documents;
   - treat a failed store or push call as a printed `ops_error`, never as a failed answer;
-  - run `bun run build`, `bun run build:site` and `bun test` before a commit.
+  - run `bun run typecheck`, `bun run build`, `bun run build:site` and `bun test` before a commit.
 - **Ask first:**
   - changing `scripts/docs-only.txt`;
   - a change to a limit, the cap, the reservation, a size cap, a header, the policy, a route, a redirect, a WAF rule or a cache rule;
@@ -839,7 +839,7 @@ The real platform is checked by the deploy spike, by the release check, by the t
 44. As Peter, I want a numbered setup list that adds the key last, so that the chat never runs in production without its guards.
 45. As Peter, I want a runbook for every alert, so that I know the first thing to do when my phone buzzes.
 46. As Peter, I want the platform questions answered by a throwaway deployment first, so that the real one is built on facts.
-47. As Peter, I want CI on a pinned image with Bun 1.4.2, Chrome and poppler, and pinned helpers, so that nothing changes under me.
+47. As Peter, I want CI on a pinned image with Bun 1.4.4, Chrome and poppler, and pinned helpers, so that nothing changes under me.
 48. As Peter, I want no Node or Python tooling in this repository, so that it stays pure Bun.
 49. As an engineer reviewing the repository, I want the platform settings, the routes and the workflows in code, so that I can read how the site is run.
 50. As an engineer reviewing the repository, I want the strict policy, its probes and its checks on the real deployment on record, so that I see the security work.

@@ -10,7 +10,8 @@
     "fonts": "bun run scripts/make-fonts.ts",
     "intent": "bun --bun node_modules/@tanstack/intent/dist/cli.mjs",
     "design-system-mcp": "bun --bun node_modules/@acmelabs/design-system-mcp/dist/cli.js",
-    "knowledge": "bun run scripts/knowledge.ts"
+    "knowledge": "bun run scripts/knowledge.ts",
+    "typecheck": "bun check"
   },
   "dependencies": {
     "@acmelabs/design-system": "0.3.2",
@@ -29,11 +30,16 @@
   "devDependencies": {
     "@acmelabs/design-system-mcp": "0.3.2",
     "@tanstack/intent": "0.5.6",
+    "@types/bun": "1.4.4",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
     "harfbuzzjs": "1.6.4",
+    "typescript": "7.0.2",
     "vite": "8.3.5"
+  },
+  "overrides": {
+    "@acmelabs/design-system-mcp>zod": "4.6.7"
   },
   "intent": {
     "skills": [
