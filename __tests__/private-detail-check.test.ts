@@ -136,18 +136,27 @@ describe("the private-detail check", () => {
     ["a space between each digit", "Call 5 5 5 5 5 5 0 1 0 0.\n"],
     ["a blank line", "Call 555\n\n555-0100.\n"],
     ["indentation", "Call 555\n        555-0100.\n"],
+    ["underscores", "Call 555_555_0100.\n"],
+    ["a zero-width space", "Call 555​555​0100.\n"],
   ])("counts a phone number split by %s", async (_name, text) => {
     const root = await repo();
     await commit(root, "notes.md", text);
     expectCount(root, 1);
   });
 
-  test("matches a value with fewer than 7 digits only as written", async () => {
-    const root = await repo("basics:\n  code: 123-456\n");
-    await commit(root, "notes.md", "Code 123 456.\n");
-    expectCount(root, 0);
-    await commit(root, "notes.md", "Code 123-456.\n");
+  test("counts a phone number written in other digits", async () => {
+    const root = await repo();
+    await commit(root, "notes.md", "Call ５５５-５５５-０１００.\n");
     expectCount(root, 1);
+  });
+
+  test("cannot check a number with fewer than 7 digits, and quotes none of it", async () => {
+    const root = await repo("basics:\n  code: 123-456\n");
+    await commit(root, "notes.md", "Code 123-456.\n");
+    const result = check(root);
+    expect(result.stdout).toBe("");
+    expect(result.exitCode).toBe(2);
+    expect(result.all).not.toContain("123");
   });
 
   test("matches an email in any letter case", async () => {

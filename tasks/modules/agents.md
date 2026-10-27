@@ -65,7 +65,7 @@ Verify: `bun test ./__tests__`. By hand, in a scratch copy: a broken link, `bun 
 Files: `__tests__/agent-files.test.ts`
 Size: S
 Needs Peter: no
-Notes: the scratch run found that today's files pass the first two checks. The exemption for the made-up range is a small choice that can be reversed. The other way, comparing against `private.yaml`, would not run in CI, and the spec asks for a pattern.
+Notes: the scratch run found that today's files pass the first two checks. The exemption for the made-up range is a small choice that can be reversed. As built, the phone check is a pattern (`findPhoneNumbers()` in `src/private-details.ts`, the one rule for private details), so it runs in CI, which has no `private.yaml`. Where `private.yaml` exists, the check also compares against it through `holds()`: the content module's tracked-file test and the `release` skill's push guard compare every file, the agent files included, in any format. The scans read every file from `git ls-files`, new and dot-folder files included, and the Highspot check covers every tracked text file (decision 0024). A failure names the file, the line and the rule, and never quotes the file.
 
 ### A5: `edit-resume` covers the short labels and the committed documents
 

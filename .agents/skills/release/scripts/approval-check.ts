@@ -10,11 +10,13 @@
 //   version before or after the change is approved: its YAML front matter, or for a YAML file any entry, holds
 //   `status: approved` (SPEC-knowledge, "Drafts and approval"). A new approved source and a draft that becomes
 //   approved both count, so each needs the row that holds Peter's approval.
-// - "new package: <name>" for a name that the dependency fields of package.json add; "package without an exact
+// - "new package: <name>" for a name that the dependency fields of a package.json add; "package without an exact
 //   version: <name>" for a known name whose spec changes to anything but an exact registry version (a range, a git
 //   or GitHub reference, a URL, a tarball, `file:`, `link:`, `workspace:`, `npm:` or a nested override), because
 //   that brings in other code; and "newly trusted package: <name>" for a name that trustedDependencies adds.
-//   A change from one exact version to another passes: each task's review checks it.
+//   A change from one exact version to another passes: each task's review checks it. This covers every
+//   package.json that the range adds or changes, at any path, such as a prototype's; a line for a package.json
+//   other than the root one ends with " in <path>".
 //
 // Exit 0: none. Exit 1: some. Exit 2: it cannot check, and stderr says why (fail closed).
 
@@ -68,7 +70,7 @@ function isApproved(path: string, text: string | null): boolean {
 }
 
 /** The package.json fields that this check reads, each as a map from name to spec. */
-function dependencies(json: string | null): { specs: Map<string, Map<string, unknown>>; trusted: Set<string> } {
+function dependencies(json: string | null, path: string): { specs: Map<string, Map<string, unknown>>; trusted: Set<string> } {
   const specs = new Map<string, Map<string, unknown>>();
   const trusted = new Set<string>();
   if (json === null) return { specs, trusted };
@@ -76,7 +78,7 @@ function dependencies(json: string | null): { specs: Map<string, Map<string, unk
   try {
     parsed = JSON.parse(json) ?? {};
   } catch {
-    throw new CannotCheck("package.json does not parse");
+    throw new CannotCheck(`${path} does not parse`);
   }
   for (const field of DEPENDENCY_FIELDS) {
     const map = parsed[field];
@@ -87,21 +89,22 @@ function dependencies(json: string | null): { specs: Map<string, Map<string, unk
   return { specs, trusted };
 }
 
-/** The changes to package.json that need Peter's approval. */
-function packageChanges(before: string | null, after: string | null): string[] {
-  const base = dependencies(before);
-  const tip = dependencies(after);
+/** The changes to the package.json at `path` that need Peter's approval. */
+function packageChanges(path: string, before: string | null, after: string | null): string[] {
+  const base = dependencies(before, path);
+  const tip = dependencies(after, path);
   const known = new Set([...base.specs.values()].flatMap((map) => [...map.keys()]));
+  const where = path === "package.json" ? "" : ` in ${path}`;
   const lines = new Set<string>();
   for (const field of DEPENDENCY_FIELDS) {
     for (const [name, spec] of tip.specs.get(field)!) {
-      if (!known.has(name)) lines.add(`new package: ${name}`);
+      if (!known.has(name)) lines.add(`new package: ${name}${where}`);
       else if (spec !== base.specs.get(field)!.get(name) && !(typeof spec === "string" && EXACT_VERSION.test(spec))) {
-        lines.add(`package without an exact version: ${name}`);
+        lines.add(`package without an exact version: ${name}${where}`);
       }
     }
   }
-  for (const name of tip.trusted) if (!base.trusted.has(name)) lines.add(`newly trusted package: ${name}`);
+  for (const name of tip.trusted) if (!base.trusted.has(name)) lines.add(`newly trusted package: ${name}${where}`);
   return [...lines];
 }
 
@@ -123,7 +126,13 @@ export async function approvalsNeeded(range: string, cwd: string): Promise<strin
     }
   }
 
-  changes.push(...packageChanges(await fileAt(root, base, "package.json"), await fileAt(root, to, "package.json")));
+  // Every package.json that the range adds or changes, at any depth; `**/` also matches the root.
+  const manifests = (await gitText(root, ["diff", "--name-only", "-z", "--no-renames", "--diff-filter=AM", base, to, "--", ":(glob)**/package.json"]))
+    .split("\0")
+    .filter(Boolean);
+  for (const path of manifests) {
+    changes.push(...packageChanges(path, await fileAt(root, base, path), await fileAt(root, to, path)));
+  }
   return changes;
 }
 

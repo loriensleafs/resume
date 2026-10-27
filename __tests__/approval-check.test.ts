@@ -155,6 +155,32 @@ describe("the approval check", () => {
     expect(check(root)).toMatchObject({ exitCode: 1, lines: ["newly trusted package: zod"] });
   });
 
+  test("lists each package that a nested package.json adds, with its path", async () => {
+    const root = await repo({ "package.json": PACKAGE });
+    await change(root, { "prototypes/site/package.json": JSON.stringify({ dependencies: { "left-pad": "1.3.0" } }) });
+    expect(check(root)).toMatchObject({ exitCode: 1, lines: ["new package: left-pad in prototypes/site/package.json"] });
+  });
+
+  test("lists a package in a nested package.json whose spec changes to a range", async () => {
+    const root = await repo({ "package.json": PACKAGE, "prototypes/site/package.json": PACKAGE });
+    await change(root, { "prototypes/site/package.json": PACKAGE.replace('"4.6.7"', '"^4.6.7"') });
+    expect(check(root)).toMatchObject({ exitCode: 1, lines: ["package without an exact version: zod in prototypes/site/package.json"] });
+  });
+
+  test("passes a new exact version in a nested package.json", async () => {
+    const root = await repo({ "package.json": PACKAGE, "prototypes/site/package.json": PACKAGE });
+    await change(root, { "prototypes/site/package.json": PACKAGE.replace("4.6.7", "4.6.8") });
+    expect(check(root)).toMatchObject({ exitCode: 0, lines: [] });
+  });
+
+  test("cannot check a nested package.json that does not parse", async () => {
+    const root = await repo({ "package.json": PACKAGE });
+    await change(root, { "prototypes/site/package.json": "{ not json" });
+    const result = check(root);
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toStartWith("cannot check");
+  });
+
   test("cannot check a package.json that does not parse", async () => {
     const root = await repo({ "package.json": PACKAGE });
     await change(root, { "package.json": "{ not json" });
