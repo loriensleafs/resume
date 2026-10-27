@@ -149,8 +149,12 @@ describe("parseSource", () => {
     expect(failure(deepDiveFile({}, body("a".repeat(3001))))).toContain(
       'passage sample.2 ("What Peter did") has 3001 characters; an approved passage holds at most 3000',
     );
-    expect(parseSource(deepDiveFile({}, body("a".repeat(3000))), SOURCE_FILE).source.passages[1]!.text).toHaveLength(3000);
     expect(parseSource(deepDiveFile({ status: "draft" }, body("a".repeat(3001))), SOURCE_FILE).status).toBe("draft");
+  });
+
+  test("lets an approved passage hold exactly 3,000 characters", () => {
+    const body = DEEP_DIVE_BODY.replace("Text for What Peter did.", "a".repeat(3000));
+    expect(parseSource(deepDiveFile({}, body), SOURCE_FILE).source.passages[1]!.text).toHaveLength(3000);
   });
 
   test("stops an approved source whose summary is not one line of 1 to 200 characters; a draft passes", () => {
@@ -158,8 +162,11 @@ describe("parseSource", () => {
     expect(failure(deepDiveFile({ summary: "a".repeat(201) }))).toContain(`${rule}; it has 201 characters on 1 line`);
     expect(failure(deepDiveFile({ summary: "|\n  First line.\n  Second line." }))).toContain(`${rule}; it has 24 characters on 2 lines`);
     expect(failure(deepDiveFile({ summary: '""' }))).toContain(`${rule}; it has 0 characters on 1 line`);
-    expect(parseSource(deepDiveFile({ summary: "a".repeat(200) }), SOURCE_FILE).source.summary).toHaveLength(200);
     expect(parseSource(deepDiveFile({ status: "draft", summary: "a".repeat(201) }), SOURCE_FILE).status).toBe("draft");
+  });
+
+  test("lets an approved summary be exactly 200 characters", () => {
+    expect(parseSource(deepDiveFile({ summary: "a".repeat(200) }), SOURCE_FILE).source.summary).toHaveLength(200);
   });
 
   test("names every rule an approved source breaks, in one message", () => {

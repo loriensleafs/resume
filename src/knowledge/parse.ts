@@ -5,9 +5,15 @@
 import { z } from "zod";
 import { parseId, passageId } from "./ids";
 
+/** A broken rule in a knowledge file: the message starts with the file, then names the field. */
+export class KnowledgeError extends Error {
+  constructor(file: string, detail: string) {
+    super(`${file}: ${detail}`);
+  }
+}
+
 /** A deep dive's sections, in order. */
 export const SECTIONS = ["Problem", "What Peter did", "How it worked", "Result", "Tools", "Not public"] as const;
-export type Section = (typeof SECTIONS)[number];
 
 const SUBJECTS = ["project", "career", "working-style", "story", "opinion", "side-project", "skill"] as const;
 export type Subject = (typeof SUBJECTS)[number];
@@ -59,6 +65,7 @@ const sourceFrontMatter = z
     links: z.array(z.string()).default([]),
     status: z.enum(["draft", "approved"]),
     approved: z.iso.date().nullish(),
+    // Provenance: where the facts come from, such as "Interview with Peter, 2026-10-26". Not a Source.
     source: nonEmpty,
   })
   .refine((f) => f.kind === "deep-dive" || f.highlights.length === 0, {
@@ -188,6 +195,10 @@ export function parseSource(text: string, file: string): SourceFile {
   return { status, source };
 }
 
+// --- The old contract: K4 deletes everything from here to the end of the file. ---
+
+export type Section = (typeof SECTIONS)[number];
+
 /** Sections that may stay empty in an approved deep dive. */
 const OPTIONAL: ReadonlySet<Section> = new Set(["Not public"]);
 
@@ -210,12 +221,6 @@ const frontMatter = z
   });
 
 export type DeepDive = z.infer<typeof frontMatter> & { sections: Record<Section, string> };
-
-export class KnowledgeError extends Error {
-  constructor(file: string, detail: string) {
-    super(`${file}: ${detail}`);
-  }
-}
 
 export function parseDeepDive(source: string, file: string): DeepDive {
   const match = source.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
