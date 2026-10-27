@@ -27,4 +27,16 @@ Current phase: 3 (knowledge and site). Each task ends with its verification.
   - Verify: `bun run knowledge` lists `deep:<id>` for all nine; `bun test`
 - [x] 8. Interview Peter and approve the four logistics answers (all four approved 2026-10-26)
   - Verify: `bun run knowledge` lists the four `logistics:` entries
-- [ ] 9. Write SPEC-site.md for Peter's review
+- [ ] 9. Write SPEC-site.md for Peter's review (after task 12)
+- [x] 10. Update SPEC-knowledge.md for the two layers (approved 2026-10-27)
+- [ ] 11. Move the nine deep dives to `knowledge/sources/` with `kind`, `subject` and a one-line summary; build the source parser, the core with its catalog, and `readPassages()`
+  - Acceptance: every check in SPEC-knowledge.md "Testing Strategy" is a passing test; Peter approves the nine summaries.
+  - Verify: `bun test tests/knowledge`; `bun run knowledge` shows nine catalog entries and a core under 80,000 characters
+  - Files: `knowledge/sources/*`, `src/knowledge/*`, `scripts/knowledge.ts`, `tests/knowledge/*`, `knowledge/README.md`
+- [ ] 12. Update the mockups for decisions 0015 to 0019, for Peter's review
+  - Acceptance: the "Merged" page shows the source view instead of the deep-dive tab, the visible source read and passage citations, Start over with its confirmation, a restored session, the install offer, the installed standalone app, and app icon options.
+  - Verify: Peter's review of the canvas
+- [ ] 13. Long-form interviews, one subject at a time: career, working style, stories, opinions, side projects, skills
+  - Acceptance: each subject has at least one approved interview source; every raw answer is saved privately first.
+  - Verify: `bun run knowledge` lists the sources; `bun test`
+- [ ] 14. Write SPEC-chat.md (with the Agent Design plugin), then SPEC-deploy.md and SPEC-agents.md, each for Peter's review

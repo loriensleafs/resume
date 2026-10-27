@@ -12,12 +12,14 @@ Checkpoint A: `bun run build` and `bun test` pass. The private PDF is pixel-iden
 
 `AGENTS.md`, `CLAUDE.md`, the `edit-resume` skill and the README describe the repository as it is. Each later module updates them when it lands.
 
-## Phase 3: knowledge and site (specs to write)
+## Phase 3: knowledge and site
 
-- knowledge: the knowledge-file format (entries with ids), its build from the resume source, deep dives and logistics answers, and the interviews that fill them.
-- site: TanStack Start app on Bun, prerendered resume and deep-dive pages, design-system theme, PWA offline cache, document downloads.
+- knowledge, first version: built and approved on 2026-10-26 (nine deep dives, four logistics answers).
+- knowledge, two layers ([SPEC-knowledge](../spec/SPEC-knowledge.md), approved 2026-10-27): move the nine deep dives to sources with catalog summaries; the source parser, the core with its catalog, and `readPassages()`; then the long-form interviews, one subject at a time (career, working style, stories, opinions, side projects, skills).
+- mockups: update the "Merged" page for decisions 0015 to 0019 (source view, the visible source read, passage citations, Start over, a restored session, the install offer, the standalone app, app icon options), for Peter's review before SPEC-site.
+- site: SPEC-site.md after the mockup review. TanStack Start app on Bun, the chat beside the resume, sources on demand, saved sessions, install as a standalone app, design-system theme, PWA offline cache, document downloads.
 
-These two can run in parallel once their specs are approved; site pages for deep dives wait for the knowledge format.
+The knowledge build and the mockups can run in parallel. The interviews can start once the source format is built.
 
 ## Phase 4: chat (spec to write)
 
@@ -27,11 +29,15 @@ TanStack AI server route, chat UI with design-system parts, citations, refusals,
 
 Vercel Pro with the Bun runtime ([0012](../docs/decisions/0012-vercel-pro-host.md)); WAF rate limit per IP; Anthropic workspace spend limit; the free first-year domain; CI that builds the public variant and runs the evals. The repository is already public.
 
+## Specs still to write
+
+In build order: SPEC-site (after the mockup review), SPEC-chat (with the Agent Design plugin), SPEC-deploy, and SPEC-agents (the agent files already exist; the spec records their rules). Each is written and approved before its tasks start.
+
 ## Risks
 
 | Risk | Mitigation |
 |---|---|
 | The design system renames parts during its systematization pass | Pin exact versions; upgrade deliberately |
 | The design system's React package does not server-render | Prerender resume text as plain HTML; design-system parts render client-side |
-| The chat states a wrong fact | Knowledge file only, citations, trick-question evals in CI |
+| The chat states a wrong fact | Knowledge base only, passage citations, trick-question evals in CI |
 | Abuse runs up the API bill | Rate limit per visitor and a hard spend cap at the provider |

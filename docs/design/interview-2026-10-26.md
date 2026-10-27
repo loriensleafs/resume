@@ -45,6 +45,7 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 33 | Which kinds of material should the interviews gather? | Career and working style; stories and opinions; side projects and skills. Not interests outside work ([0019](../decisions/0019-wider-chat-scope.md)) |
 | 34 | How much cleanup of spoken answers before approval? | Fix transcription errors and smooth filler and false starts, without changing meaning. The recommendation was errors only |
 | 35 | Test seams for the updated knowledge spec | The same two seams, extended: `buildKnowledge()` and the source parser |
+| 36 | Approve the updated SPEC-knowledge? | Approved. Peter added that four specs in the capability map are not written yet (site, chat, deploy, agents), and that the mockups must reflect the latest changes |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
