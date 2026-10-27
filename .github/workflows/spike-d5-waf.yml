@@ -1,8 +1,8 @@
 # THROWAWAY (deploy spike, D5). This file lives on the branch prototype/d5-waf only; it never reaches the spike
 # branch or main. vercel.json's ignoreCommand "exit 1" overrides the project's Ignored Build Step, so this branch
 # builds a protected preview, and its pushes leave the spike's production deployment alone (D4 runs there).
-# The WAF probe runs in a job of its own, after the wait. It prints states, hosts and status codes only; the bypass
-# secret stays in the environment.
+# Check 8 runs in a job of its own, after the wait, as in spike-check. It prints states, hosts and status codes
+# only; the bypass secret stays in the environment.
 name: spike-d5-waf
 
 on:
@@ -46,8 +46,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
-  probe:
+  # The same job as spike-check's waf job, after this branch's preview wait.
+  waf:
     needs: wait
+    if: ${{ !cancelled() && needs.wait.outputs.deployment != '' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     defaults:
@@ -62,8 +64,8 @@ jobs:
         with:
           bun-version: 1.4.2
 
-      - name: One chat POST with Content-Type text/plain on this preview
-        run: bun check.ts waf-probe
+      - name: Check 8, the WAF rules
+        run: bun check.ts waf
         env:
           DEPLOYMENT_HOST: ${{ needs.wait.outputs.deployment }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
