@@ -90,9 +90,7 @@ const written = {
   routes,
   crons: [{ path: "/api/cron/health", schedule: "17 15 * * *" }],
 };
-// CONTROL RUN (D2): Vercel gets the config.json Nitro wrote. The next commit restores the write.
-void written;
-console.log("post-build: CONTROL RUN: config.json stays as Nitro wrote it");
+await Bun.write(configPath, JSON.stringify(written, null, 2) + "\n");
 console.log(
   `post-build: 404.html; ${routes.length} routes; function folders sent to 404.html: ${hidden.join(", ")}; overrides for ${Object.values(overrides).map((o) => `/${o.path}`).join(", ")}; ` +
     `cron ${written.crons.map((c) => `${c.path} "${c.schedule}"`).join(", ")}`,

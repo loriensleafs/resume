@@ -107,9 +107,9 @@ const postBuildRoutes: Check = {
     const seen: string[] = [`config.json has ${info.routeCount} routes`];
 
     for (const route of FUNCTION_ROUTES) {
-      const runtime = info.functions[route.fn]?.runtime ?? "absent";
       const r = await report(route.request).catch((error: Error) => void problems.push(`${route.request}: ${error.message}`));
       if (!r) continue;
+      const runtime = info.functions[String(r.function)]?.runtime ?? "unknown"; // of the function that answered
       seen.push(`${route.request} reached ${r.function} (runtime "${runtime}"): Bun ${r.bunVersion}, path ${r.path}`);
       if (r.function !== route.fn) problems.push(`${route.request} reached ${r.function}, not ${route.fn}`);
       if (r.path !== "/api/spike") problems.push(`${route.fn} saw the path ${r.path}, not /api/spike`);
