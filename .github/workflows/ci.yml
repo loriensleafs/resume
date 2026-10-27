@@ -1,11 +1,20 @@
 # CI: the build, the tests and the audits, on every push and pull request (SPEC-deploy, "CI").
-# Deployment Checks require `ci / test` and `ci / audit`; `ci / audit-all` shows but is not required.
+# The workflow name `ci` and the job ids `test` and `audit` make the check names `ci / test` and
+# `ci / audit` that setup step 10 requires. Renaming either, or giving a job a `name:` or a matrix,
+# breaks them. `ci / audit-all` shows but is not required.
 # Each helper is pinned to the full commit of its release, with the tag in a comment (row 120).
 name: ci
 
 on:
   push:
   pull_request:
+
+# A newer run cancels an older one on the same branch or pull request. On main, the release check
+# waits for the run of the deployment's own commit, so each main commit gets its own group: a run
+# there is never cancelled, and never left pending, which GitHub would cancel when a third arrives.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # The token only reads the repository, for the checkout (row 120).
 permissions:
