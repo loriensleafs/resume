@@ -3,7 +3,8 @@
 // - /api/build-info.json, which stays reachable on the production .vercel.app address after D3 adds the host
 //   redirect there (SPEC-deploy's redirect leaves /api/ alone), so `wait` can confirm that address too.
 // Checks take their expected values from this file, read from the built output, not from constants in check.ts:
-// each function's runtime, the prerendered pages with their overrides, the not-found page and the crons.
+// each function's runtime, the prerendered pages with their overrides, the not-found page, the crons, and the
+// files and names that checks 4 and 11 compare.
 // It writes named fields only: the build environment also holds VERCEL_AUTOMATION_BYPASS_SECRET.
 import { $, Glob } from "bun";
 
@@ -42,6 +43,12 @@ for await (const file of new Glob("**/index.html").scan({ cwd: `${output}/static
 }
 pages.sort((a, b) => a.path.localeCompare(b.path));
 
+// D3 (checks 4 and 11): the files those checks compare byte for byte, Workbox's hashed runtime and one hashed asset.
+const files: Record<string, string | null> = {};
+for (const file of ["index.html", "Peter-Kloss-Resume.pdf", "sw.js"]) files[file] = await sha256(`${output}/static/${file}`);
+const workbox = (await Array.fromAsync(new Glob("workbox-*.js").scan({ cwd: `${output}/static` }))).sort();
+const asset = (await Array.fromAsync(new Glob("*.js").scan({ cwd: `${output}/static/assets` }))).sort()[0] ?? null;
+
 const info = {
   commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
   vercelEnv: process.env.VERCEL_ENV ?? null,
@@ -57,6 +64,9 @@ const info = {
   routeCount: config.routes?.length ?? 0,
   pages, // each prerendered page except /, with the clean address its config.json override names (or null)
   notFoundSha256: await sha256(`${output}/static/404.html`),
+  files, // SHA-256 of index.html, the PDF and sw.js
+  workbox, // the workbox-<hash>.js files
+  asset, // one file in assets/, for its cache rule
   crons: config.crons ?? [],
   builtAt: new Date().toISOString(),
 };
