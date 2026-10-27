@@ -1,6 +1,9 @@
 // Turn telemetry (SPEC-chat, Turn telemetry): the one chat_turn event per turn that the handler
-// hands to Telemetry.record(). It holds no question text, threadId, IP address or other visitor data.
+// hands to Telemetry.record(), and the middleware that counts the turn's model calls and sums the
+// usage of each call that finishes. The event holds no question text, threadId, IP address or other
+// visitor data.
 
+import type { ChatMiddleware } from "@tanstack/ai";
 import type { QuestionLogEntry } from "./question-log";
 
 export type ChatTurnEvent = {
@@ -16,5 +19,55 @@ export type ChatTurnEvent = {
   cacheWrite1hTokens: number | null;
   outputTokens: number | null;
   durationMs: number;
-  errorCode: string | null;  // the model API's code, "DEADLINE", "MAX_TOKENS", "DAILY_LIMIT" or "SPEND_LIMIT"; never a message or stack trace
+  errorCode: string | null;  // the model API's code, "DEADLINE", "MAX_TOKENS", "SERVER_ERROR", "DAILY_LIMIT" or "SPEND_LIMIT"; never a message or stack trace
 };
+
+/** A turn's model calls and token counts, as its chat_turn event carries them. */
+export type TurnUsage = Pick<
+  ChatTurnEvent,
+  "modelCalls" | "inputTokens" | "cachedInputTokens" | "cacheWriteTokens" | "cacheWrite1hTokens" | "outputTokens"
+>;
+
+/** A turn with no model call. The counts are null, because no model call finished. */
+export const NO_MODEL_CALL: TurnUsage = {
+  modelCalls: 0,
+  inputTokens: null,
+  cachedInputTokens: null,
+  cacheWriteTokens: null,
+  cacheWrite1hTokens: null,
+  outputTokens: null,
+};
+
+type Counts = Omit<TurnUsage, "modelCalls">;
+
+/**
+ * The usage middleware for one turn, and the turn's usage so far. TanStack AI calls `onUsage` once
+ * for each model call that finishes, so the sum covers the finished calls only, and the counts stay
+ * null until one finishes. The five counts follow SPEC-deploy's mapping: the adapter's
+ * `promptTokens` holds the uncached input, the cache reads and the cache writes together.
+ */
+export function turnUsage(): { middleware: ChatMiddleware; sum(): TurnUsage } {
+  let modelCalls = 0;
+  let sum: { [K in keyof Counts]: number } | undefined;
+  return {
+    middleware: {
+      name: "turn-usage",
+      onIteration: () => {
+        modelCalls++;
+      },
+      onUsage: (_ctx, usage) => {
+        const cached = usage.promptTokensDetails?.cachedTokens ?? 0;
+        const writes = usage.promptTokensDetails?.cacheWriteTokens ?? 0;
+        const writes1h = usage.promptTokensDetails?.cacheWrite1hTokens ?? 0;
+        sum = {
+          inputTokens: (sum?.inputTokens ?? 0) + usage.promptTokens - cached - writes,
+          cachedInputTokens: (sum?.cachedInputTokens ?? 0) + cached,
+          cacheWriteTokens: (sum?.cacheWriteTokens ?? 0) + writes,
+          cacheWrite1hTokens: (sum?.cacheWrite1hTokens ?? 0) + writes1h,
+          outputTokens: (sum?.outputTokens ?? 0) + usage.completionTokens,
+        };
+      },
+    },
+    sum: () => ({ ...NO_MODEL_CALL, ...sum, modelCalls }),
+  };
+}

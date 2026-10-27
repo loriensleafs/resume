@@ -28,7 +28,7 @@ export type Telemetry = { record(event: ChatTurnEvent, reservation?: string): Pr
 const DAY_MS = 86_400_000;
 
 /** The UTC day of a time, as "2026-10-27". */
-const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+export const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** A question log in memory. `now` says which UTC day is today. */
 export function inMemoryQuestionLog(now: () => Date): QuestionLog {
