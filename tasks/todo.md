@@ -53,7 +53,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [Checkpoint agents: checks complete](modules/agents.md#checkpoint-agents-checks-complete) — after A3 to A6
 - [ ] [T4](modules/content.md#t4-the-content-module-lands) The content module lands — blocked by T1, T3, A1; Peter: read the fresh-session result
 - [ ] [Checkpoint content: lands](modules/content.md#checkpoint-content-lands) — after T1 to T4; Peter: look at the committed `documents/`
-- [ ] [S2](modules/site.md#s2-buildsite-prerenders--and-resume-and-no-other-page) `buildSite()` prerenders `/` and `/resume`, and no other page — blocked by S1
+- [x] [S2](modules/site.md#s2-buildsite-prerenders--and-resume-and-no-other-page) `buildSite()` prerenders `/` and `/resume`, and no other page — blocked by S1 (done 2026-10-27; `/` loads 110.1 KB gzip; one build per checkout at a time)
 - [ ] [D16](modules/deploy.md#d16-the-build-script-writes-pages-with-their-policy-tags) The build script writes pages with their policy tags — blocked by S2
 - [x] [K2](modules/knowledge.md#k2-the-source-parser-reads-deep-dives-and-interviews) The source parser reads deep dives and interviews — blocked by K1 (done 2026-10-27)
 - [x] [K3](modules/knowledge.md#k3-the-core-with-its-catalog-from-approved-sources) The core with its catalog, from approved sources — blocked by K2 (done 2026-10-27)
