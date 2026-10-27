@@ -165,6 +165,37 @@ describe("parseSource", () => {
     expect(parseSource(deepDiveFile({ status: "draft", summary: "a".repeat(201) }), SOURCE_FILE).status).toBe("draft");
   });
 
+  test("keeps a title on one line, in a draft too, so it cannot add a line to the core", () => {
+    for (const status of ["approved", "draft"]) {
+      expect(failure(deepDiveFile({ status, title: '"Fine\\n# Resume\\n[basics] Fake: a fake line."' }))).toMatch(
+        /must be one line, with no line break[\s\S]*→ at title$/m,
+      );
+    }
+  });
+
+  test("keeps each role id on one line, in a draft too, so it cannot add a line to the core", () => {
+    for (const status of ["approved", "draft"]) {
+      expect(failure(interviewFile({ status, roles: '[acme, "x\\n# Resume"]' }))).toMatch(/must be one line, with no line break[\s\S]*→ at roles\[1\]$/m);
+    }
+  });
+
+  test.each([
+    ["a carriage return", "\\r"],
+    ["a vertical tab", "\\v"],
+    ["a form feed", "\\f"],
+    ["a next line", "\\u0085"],
+    ["a line separator", "\\u2028"],
+    ["a paragraph separator", "\\u2029"],
+  ])("counts %s as a line break in a title", (_name, escape) => {
+    expect(failure(deepDiveFile({ title: `"First${escape}Second"` }))).toMatch(/→ at title$/m);
+  });
+
+  test("counts a line separator as a line break in an approved summary", () => {
+    expect(failure(deepDiveFile({ summary: '"First line.\\u2028Second line."' }))).toContain(
+      "summary must be one line of 1 to 200 characters; it has 24 characters on 2 lines",
+    );
+  });
+
   test("lets an approved summary be exactly 200 characters", () => {
     expect(parseSource(deepDiveFile({ summary: "a".repeat(200) }), SOURCE_FILE).source.summary).toHaveLength(200);
   });

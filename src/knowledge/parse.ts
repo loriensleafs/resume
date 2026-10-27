@@ -46,6 +46,15 @@ const CONTINUED = " (continued)";
 const PASSAGE_CHARACTERS = 3000;
 const SUMMARY_CHARACTERS = 200;
 
+/**
+ * Every line break Unicode knows (UAX #14's mandatory breaks), not only "\n": a YAML string can
+ * hold any of them through an escape, and YAML 1.2 keeps a raw U+2028 inside a plain value.
+ */
+const LINE_BREAK = /\r\n|[\n\v\f\r\x85\u{2028}\u{2029}]/u;
+/** A title, a role id and a summary each print on one line of the core, so none holds a line break. */
+const ONE_LINE = "must be one line, with no line break";
+const oneLine = (s: string) => !LINE_BREAK.test(s);
+
 const nonEmpty = z.string().trim().min(1);
 
 // The shape of the front matter, for a draft and an approved source alike. The build checks
@@ -54,10 +63,10 @@ const nonEmpty = z.string().trim().min(1);
 const sourceFrontMatter = z
   .strictObject({
     id: z.string().min(1),
-    title: nonEmpty,
+    title: nonEmpty.refine(oneLine, ONE_LINE),
     kind: z.enum(["deep-dive", "interview"]),
     subject: z.enum(SUBJECTS),
-    roles: z.array(z.string()).default([]),
+    roles: z.array(z.string().refine(oneLine, ONE_LINE)).default([]),
     highlights: z
       .array(z.string().refine((h) => parseId(h)?.form === "highlight", "not a highlight id: use highlight:<role id>.<n>"))
       .default([]),
@@ -146,7 +155,7 @@ function checkSections(kind: Source["kind"], headings: string[], file: string): 
 /** Each rule of an approved source's sizes that `source` breaks. A draft meets them only once approved. */
 function approvalProblems(source: Source): string[] {
   const problems: string[] = [];
-  const lines = source.summary.split(/\r\n|\r|\n/).length;
+  const lines = source.summary.split(LINE_BREAK).length;
   if (lines > 1 || source.summary.length < 1 || source.summary.length > SUMMARY_CHARACTERS) {
     problems.push(
       `summary must be one line of 1 to ${SUMMARY_CHARACTERS} characters; it has ${source.summary.length} characters on ${lines} line${lines === 1 ? "" : "s"}`,
