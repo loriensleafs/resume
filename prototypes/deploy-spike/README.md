@@ -23,17 +23,20 @@ What does a real Vercel deployment do with the site's build output? A local buil
   - the probe `/api/spike-bun1x`, with Nitro's documented runtime value `"bun1.x"`.
   Each function's `environment` sets `SPIKE_FUNCTION` to its name, so the function can say which one answered.
 - `src/site/routes/api.spike.ts`: `GET /api/spike` answers with `SPIKE_FUNCTION`, `Bun.version`, `Bun.revision`, the path the function saw, `VERCEL_REGION` and `VERCEL_ENV`. A query picks the function: none for `/api/spike`, `?function=server` for `/__server`, `?function=bun1x` for the probe.
-- `post-build.ts`, the spike's twin of SPEC-deploy's `writeVercelConfig()`: it writes `static/404.html` (no script), replaces Nitro's `routes` in `config.json` with the list in "Checks 2 and 3" below, keeps Nitro's other fields, and adds an override for each prerendered page and the cron `/api/cron/health` at `17 15 * * *`. It exports its route and cron values, and `check.ts` imports them, so the two cannot drift apart. The build runs only when the file is the entry point (`import.meta.main`, https://bun.com/docs/guides/util/entrypoint), so the import writes nothing.
+- `post-build.ts`, the spike's twin of SPEC-deploy's `writeVercelConfig()` and `addPolicyTags()`: it writes `static/404.html` (no script), gives each HTML file its policy tag (D3), replaces Nitro's `routes` in `config.json` with the list in "Checks 2 and 3" below and the redirect and header routes in "Checks 4, 5, 10 and 11", keeps Nitro's other fields, and adds an override for each prerendered page and the cron `/api/cron/health` at `17 15 * * *`. The tags come before `gen-sw.ts`, as SPEC-deploy's build step 3 comes before step 4. It exports its route, header, policy and cron values, and `check.ts` imports them, so the two cannot drift apart. The build runs only when the file is the entry point (`import.meta.main`, https://bun.com/docs/guides/util/entrypoint), so the import writes nothing.
+- `public/Peter-Kloss-Resume.pdf`: `main`'s `documents/Peter-Kloss-Resume.pdf`, blob `a83144c` (2 pages, US Letter, tagged). Vite copies `public/` into `.vercel/output/static/`, so the deployment serves it at `/Peter-Kloss-Resume.pdf` (check 10).
 - `build-info.ts` writes `build-info.json` into the static output, at `/build-info.json` and again at `/api/build-info.json`. It holds:
   - the commit, `VERCEL_ENV`, and three addresses: the deployment's own (`VERCEL_URL`), the Git branch URL and the production address (`VERCEL_PROJECT_PRODUCTION_URL`);
   - `vercel.json`'s `bunVersion` and `bun.lock`'s `lockfileVersion`;
   - the output of `bun --version`, with the binary's path and revision;
   - each function's `runtime` and `maxDuration`, read from the built `.vc-config.json` files;
   - from `config.json`: the number of routes and the crons;
-  - each prerendered page except `/`, read from the files, with its file's SHA-256 and the path its override names, and the SHA-256 of `404.html`.
+  - each prerendered page except `/`, read from the files, with its file's SHA-256 and the path its override names, and the SHA-256 of `404.html`;
+  - the SHA-256 of `index.html`, the PDF and `sw.js`, the names of the `workbox-<hash>.js` files and one file in `assets/` (D3).
 - It writes named fields only, because the build environment also holds the bypass secret. Checks take their expected values from this file, not from constants in `check.ts`.
 - The prerender crawler skips the links to `.pdf`, `.docx` and `.txt`: they are files, not pages, and this branch commits none. Without the filter the build fails with "Failed to fetch /resume.pdf: Not Found".
 - `check.ts` and `.github/workflows/spike-check.yml` (below).
+- `local-checks.ts`: checks 4, 5 and 11 against local servers that answer as the D3 routes should, with two controls (see "Checks 4, 5, 10 and 11"). It tests the check code, not Vercel.
 
 ## How the checks reach the deployment
 
@@ -42,7 +45,7 @@ Each push to the branch starts `spike-check`, which runs on `ubuntu-24.04` with 
 1. `bun check.ts wait` reads the commit's statuses through GitHub's API and waits for Vercel's status for this project. A `failure` or `error` ends the run with Vercel's description and its dashboard link.
 2. After `success`, it reads `/build-info.json` from the project's Git branch URL, `resume-deploy-spike-git-prototype-deploy-spike-peterkloss.vercel.app`, until the file names this commit. The file's `VERCEL_URL` is the deployment's own address.
 3. It then reads `/api/build-info.json` from the production address, `project-8ar0o.vercel.app`, until that address serves the same commit, because the production address can lag the commit status. The `/api/` copy stays reachable after D3 adds the host redirect there, because SPEC-deploy's redirect leaves `/api/` alone. The polling on the protected hosts uses `/build-info.json`, so it does not count against the WAF's `/api/` rule.
-4. `bun check.ts run` runs every check in `CHECKS`, in order, and prints one line per check: `check <n> (<name>): pass|FAIL: <what it saw>`, and for a failure the change from the spec's "If it fails" column. A check that throws gets a FAIL line, and the next check still runs.
+4. `bun check.ts run` runs every check in `CHECKS`, in order, and prints one line per check: `check <n> (<name>): pass|FAIL: <what it saw>`, and for a failure the change from the spec's "If it fails" column. A check that throws gets a FAIL line, and the next check still runs. Then it prints `check 10 (PDF in Chrome's viewer): manual, Peter's: <the PDF on the deployment URL>`, the address for Peter's check.
 
 The wait and the checks share one bound: 15 minutes from the start of the wait. The job's own timeout is 17 minutes, which adds room for setup. A newer push cancels the run, and only the newest run is worth a rerun: an older one waits for a commit that the branch URL no longer serves.
 
@@ -53,10 +56,11 @@ The wait and the checks share one bound: 15 minutes from the start of the wait. 
 | `deployment`, `production` | The deployment's own host (protected) and the production address (public) |
 | `info` | This deployment's `build-info.json`, the source of expected values: each function's `runtime`, the prerendered pages with their hashes and overrides, the hash of `404.html`, and the crons |
 | `deadline` | The end of the run's 15 minutes |
-| `deploymentFetch(path, init)` | A request to the deployment, with the bypass and `x-vercel-skip-toolbar: 1`; redirects are not followed |
+| `deploymentFetch(path, init, options)` | A request to the deployment, with the bypass and `x-vercel-skip-toolbar: 1` (`{ skipToolbar: false }` leaves that header out); redirects are not followed |
 | `productionFetch(path, init)` | A request to the production address, with `x-vercel-skip-toolbar: 1` and never the bypass; redirects are not followed (check 5 reads the 308's `Location`) |
 | `report(path)` | A flat JSON object that a spike function on the deployment reports: booleans, hosts and times. The store checks (7 and 9) run inside the function, which holds the `KV_*` variables, so the runner needs no new secret |
 | `poll(label, maxMs, attempt)` | Calls `attempt` every 10 s until it returns a value, or until `maxMs` or the run's deadline passes. Check 6 polls a function's record of the cron's calls this way |
+| `chrome(paths)` | Loads each path on the deployment in the runner's Chrome (`/usr/bin/google-chrome`, or `CHROME_PATH`), each in a fresh browser context, through the DevTools protocol over Bun's `WebSocket`, so the spike adds no package. Only requests to the deployment's host get the bypass and `x-vercel-skip-toolbar: 1`; the first also sends `x-vercel-set-bypass-cookie: true`, so the service worker's own requests pass. It reports, per page: the document's status and SHA-256, the page's policy violations, requests to `vercel.live` and to other hosts (the page's and its service worker's), a toolbar element, whether a service worker controls the page, console errors, and the violations of two planted controls (check 11) |
 
 The bypass secret is read in one place, and it goes only to hosts that match this project's protected `*.vercel.app` names. The production address must equal the workflow's `SPIKE_PRODUCTION_HOST`.
 
@@ -79,14 +83,14 @@ Why this route. With the project's settings, Vercel posts only a commit status, 
 | 1 | Which Bun runs the build, and whether `bunVersion` decides it | D1 | Pass, 2026-10-27 (run 40567813019). Bun 1.4.4 (`/bun1.4/bun`) runs the build. `bunVersion` decides it together with the lockfile: the build gets Bun 1.4 when `bunVersion` is `"1.4.x"` or `bun.lock` has `lockfileVersion: 2`, else Vercel's default Bun 1.3.14. SPEC-deploy's setup has both. See "Check 1" below |
 | 2 | The post-build routes, the `overrides`, the cron, and the functions' Bun | D2 | Routes, overrides and the functions' Bun: pass, 2026-10-27 (run 40572167592). Vercel serves the routes and overrides that `post-build.ts` writes. A function with `runtime: "bun1.4.x"` runs Bun 1.4.1; one with `"bun1.x"` runs Bun 1.3.14, also with `bunVersion` `"1.4.x"`. Vercel also serves `<path>/index.html` at `<path>` with no override. The cron: not verified. The build's own `config.json` holds the cron entry, and Vercel built the deployment with it; that the project runs the cron stays unverified until D4's check 6 sees Vercel Cron call it. See "Checks 2 and 3" |
 | 3 | Unknown paths, `/API/chat` and `/sources/x` get `/404.html` with status 404 | D2 | Pass, 2026-10-27 (run 40572167592), after one change to the routes: Nitro's `__server.func` answered at `/__server` (run 40570467882) until a route before the filesystem sent that path to `/404.html`. `caseSensitive: true` keeps `/API/spike` off its function. See "Checks 2 and 3" |
-| 4 | How route headers merge | D3 | Pending |
-| 5 | A host redirect keeps the query string | D3 | Pending |
+| 4 | How route headers merge | D3 | Pass, 2026-10-27 (run 40583006081, and 40581693149). For one header from two routes, the last matching route wins: the worker files get exactly one policy, the worker policy, and with the worker route first they get the header policy (control run 40582697904). The PDF gets no policy. The six headers and the header policy reach a function response and the not-found page from both its routes; the route's HSTS replaces Vercel's own. See "Checks 4, 5, 10 and 11" |
+| 5 | A host redirect keeps the query string | D3 | Pass, 2026-10-27 (run 40583006081, and 40581693149, 40582697904). On the production `.vercel.app` address the route answers 308, and Vercel adds the request's query to the route's `Location`; `/api/` is not redirected. The route needs no query of its own. Vercel writes the query again (`+` becomes `%20`), and the 308 carries the header routes' headers |
 | 6 | Vercel Cron reaches `/api/cron/health` under Standard Protection | D4 | Pending |
 | 7 | Store writes finish after a stopped stream | D4 | Pending |
 | 8 | The WAF rules' case handling and content-type condition | D5 | Pending |
 | 9 | What the Upstash tokens can run | D4 | Pending |
-| 10 | Chrome's PDF viewer with the site's headers | D3 | Pending |
-| 11 | The Vercel Toolbar stays off | D3 | Pending |
+| 10 | Chrome's PDF viewer with the site's headers | D3 | Pending: Peter's check by hand, at https://resume-deploy-spike-26t9pe7rk-peterkloss.vercel.app/Peter-Kloss-Resume.pdf. The runs show the PDF served byte for byte with the six headers, no policy, `content-type: application/pdf` and `content-disposition: inline` (check 4) |
+| 11 | The Vercel Toolbar stays off | D3 | Pass, 2026-10-27 (run 40583006081, and 40581693149, 40582697904). In Chrome on the deployment URL, with the toolbar off for production and `x-vercel-skip-toolbar: 1`: no request to `vercel.live`, no toolbar element, no policy violation, and the built file byte for byte; without the header the page is the built file too. Planted controls prove the listener and both policies work. No run saw the toolbar on |
 | 12 | The status helper's name and Deployment Checks | D5 | Pending |
 
 ## Check 1: the build's Bun
@@ -128,7 +132,7 @@ Runs 40564053962 and 40564247218 used the first rule, which compared the build's
 
 **The routes `post-build.ts` writes**, in order. The steps in parentheses are SPEC-deploy's ("Routes"):
 
-1. `^/assets/(.*)$`: `cache-control: public, max-age=31536000, immutable`, with `continue: true`. This is Nitro's rule, kept. D3 adds the rest of step 2, the headers.
+1. `^/assets/(.*)$`: `cache-control: public, max-age=31536000, immutable`, with `continue: true`. This is Nitro's rule, kept. D3 adds Workbox's file to it and the rest of step 2, the headers, and puts the host redirect before it (see "Checks 4, 5, 10 and 11").
 2. Spike only: `^/api/spike$` with the query `function=server` goes to `/__server`, and with `function=bun1x` to `/api/spike-bun1x`. Both are case-sensitive and come before the filesystem, because the filesystem phase matches `/api/spike` to its own function first.
 3. New to the spec's list: each function folder that no API route names gets `/404.html` with status 404, by its own path: `^/__server(?:/.*)?$` and `^/api/spike-bun1x(?:/.*)?$`. `post-build.ts` finds the folders in the output and follows symlinks.
 4. `{ "handle": "filesystem" }` (step 3), with an override for each deep-dive page.
@@ -242,6 +246,99 @@ check 3 (not-found paths): pass: /no-such-page, /API/chat, /API/spike, /sources/
 - D4: route 5 sends `/api/cron/health` to `/__server`; D4 adds the handler file. Vercel sends `x-vercel-cron-schedule` with each cron call (https://vercel.com/docs/cron-jobs/manage-cron-jobs#reading-the-cron-schedule-header).
 - D5: each run sends about 7 requests to `/api/` paths (see the FYI under "What the checks ask"), and they count toward the "api rate limit" rule (60 in 10 minutes per address).
 
+## Checks 4, 5, 10 and 11: the headers, the redirect, the PDF and the toolbar
+
+**What D3 adds to the build.** The steps in parentheses are SPEC-deploy's ("Routes", "Headers", "The build script").
+
+1. The host redirect (step 1), first of all routes: `^/(?!api/)(.*)$` with `has` host `{ "eq": "project-8ar0o.vercel.app" }`, `status: 308` and `Location: https://peterkloss.dev/$1`. `$1` is the path without its leading slash, and the route names no query. The spike has this one host route: pkloss.dev, pwk.dev and www.peterkloss.dev have no domain on this project, so no request reaches them.
+2. The header routes (step 2), each with `continue: true`, in this order:
+   1. `^/(?:assets/.*|workbox-[0-9a-f]+\.js)$`: `cache-control: public, max-age=31536000, immutable` (Nitro's rule, plus Workbox's file).
+   2. `^/(.*)$`: the six headers of SPEC-deploy's table.
+   3. `^/(?!(?:Peter-Kloss-Resume\.pdf|Peter-Kloss-Resume\.docx|Peter-Kloss-Resume\.txt)$).*$`: the header policy.
+   4. `^/(?:sw\.js|workbox-[0-9a-f]+\.js)$`: the worker policy. The worker files match routes 3 and 4, so they get the policy header from two routes: this is the merge that check 4 asks about.
+   Every route writes each header name in lower case, so no two routes set one header under two spellings.
+3. The policy tags (step 3): each HTML file, `404.html` included, starts its `<head>` with `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' <hashes>">`. The three prerendered pages have 4 inline scripts each; `404.html` has none and gets `script-src 'self'` alone. The tags come before `gen-sw.ts`, so the precache holds the tagged pages.
+4. The PDF: `public/Peter-Kloss-Resume.pdf`, `main`'s committed public PDF.
+
+**What the checks ask.**
+
+- Check 4: nine paths on the deployment, each against the six headers (exact values), the policy header (exact value, so two policies would arrive joined by ", " and fail) and the cache rule where SPEC-deploy names one: `/`, a deep dive, `/sw.js`, `/workbox-<hash>.js`, an `/assets/` file, the PDF (also `application/pdf`, byte for byte), the function `/api/spike`, and the not-found page from the last route (`/no-such-page`) and from the route before the filesystem (`/__server`).
+- Check 5: on the production address, `/resume?x=1`, `/?a=1&b=two` and a deep dive with no query must answer 308 with exactly that path and query on peterkloss.dev, and `/api/build-info.json` must answer 200 with this commit. A path with encoded characters, and the headers on the 308, are recorded, not judged.
+- Check 11: Chrome loads `/`, a deep dive and `/no-such-page` on the deployment URL, each in a fresh browser context, with `x-vercel-skip-toolbar: 1` and the bypass on its requests to that host only. Each load must show no request to `vercel.live`, no toolbar element, no policy violation, the right status, and the built file byte for byte as Chrome received it, so Vercel injected nothing. After that, two planted controls must each give a violation: an image from `example.invalid` (the header's `img-src`) and an inline script (the tag's `script-src`). They prove that the listener works and that both policies are enforced on the real deployment. Last, a plain request for `/` without `x-vercel-skip-toolbar` must get the built file too, which shows that the production setting alone keeps the toolbar out.
+- Check 10 is Peter's, by hand. The run prints the PDF's address on the deployment URL.
+
+`local-checks.ts` runs checks 4, 5 and 11 against two local servers that answer as these routes should. All three pass; with `merge-first` check 4 fails on the worker files, and with `style-none` check 11 fails on the pages' own violations. It tests the check code and Chrome's part, not Vercel.
+
+**The runs.**
+
+| Run | Commit | What the commit changed | Check 4 | Check 5 | Check 11 |
+|---|---|---|---|---|---|
+| 40581693149 | `d092eb6` | The D3 routes, tags, PDF and checks | Pass | Pass | Pass |
+| 40582697904 | `82ba906` | Control: the worker policy route before the header policy route (on top of `3ad148b`, which records the 308's headers and adds `local-checks.ts`) | FAIL: the worker files get the header policy | Pass | Pass |
+| 40583006081 | `4929a15` | The final code: the control reverted | Pass | Pass | Pass |
+
+Checks 1 to 3 passed in all three runs, as in D2.
+
+The verdict lines, word for word.
+
+Run 40581693149 (`d092eb6`, the D3 code):
+
+```text
+check 4 (route headers): pass: / (a page): HTTP 200, the six headers, the header policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline"; /deep-dives/agent-workflows (a deep dive): HTTP 200, the six headers, the header policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"agent-workflows\""; /sw.js (the service worker): HTTP 200, the six headers, the worker policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"sw.js\""; /workbox-1ce433d4.js (Workbox): HTTP 200, the six headers, the worker policy, cache-control "public, max-age=31536000, immutable", content-disposition "inline; filename=\"workbox-1ce433d4.js\""; /assets/_id-CtqVfDmn.js (a hashed asset): HTTP 200, the six headers, the header policy, cache-control "public, max-age=31536000, immutable", content-disposition "inline; filename=\"_id-CtqVfDmn.js\""; /Peter-Kloss-Resume.pdf (the PDF): HTTP 200, the six headers, no policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"Peter-Kloss-Resume.pdf\""; /api/spike (a function): HTTP 200, the six headers, the header policy, cache-control "no-store"; /no-such-page (the not-found page, last route): HTTP 404, the six headers, the header policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"404.html\""; /__server (the not-found page, route before the filesystem): HTTP 404, the six headers, the header policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"404.html\""
+check 5 (host redirect): pass: /resume?x=1: HTTP 308 to https://peterkloss.dev/resume?x=1; /?a=1&b=two: HTTP 308 to https://peterkloss.dev/?a=1&b=two; /deep-dives/agent-workflows: HTTP 308 to https://peterkloss.dev/deep-dives/agent-workflows; /a%20b/%C3%A9?q=%2F&r=a+b: HTTP 308 to https://peterkloss.dev/a%20b/%C3%A9?q=%2F&r=a%20b; the 308 carries strict-transport-security, x-content-type-options, referrer-policy, permissions-policy, cross-origin-opener-policy, x-frame-options, cache-control "public, max-age=0, must-revalidate"; /api/build-info.json: HTTP 200, commit d092eb6
+check 11 (Vercel Toolbar): pass: /: HTTP 200, the built file byte for byte, 0 policy violations, 0 requests to vercel.live, other hosts: none, planted controls: script-src-elem inline, img-src https://example.invalid/spike-control.png, img-src https://example.invalid/spike-control.png, service worker controls the page, 2 console errors (console: TypeError: Invalid action variant at set variant (https://resume-deploy-spike-pqcn5i4qt-peterkloss.vercel.app/assets/routes-DcKKjtoG.js:395:15588) at Reflect.se | network: Failed to load resource: the server responded with a status of 404 ()); /deep-dives/agent-workflows: HTTP 200, the built file byte for byte, 0 policy violations, 0 requests to vercel.live, other hosts: none, planted controls: script-src-elem inline, img-src https://example.invalid/spike-control.png, img-src https://example.invalid/spike-control.png, service worker controls the page, 0 console errors; /no-such-page: HTTP 404, the built file byte for byte, 0 policy violations, 0 requests to vercel.live, other hosts: none, planted controls: script-src-elem inline, img-src https://example.invalid/spike-control.png, img-src https://example.invalid/spike-control.png, service worker does not control the page, 1 console errors (network: Failed to load resource: the server responded with a status of 404 ()); / without x-vercel-skip-toolbar: HTTP 200, the built file byte for byte
+check 10 (PDF in Chrome's viewer): manual, Peter's: https://resume-deploy-spike-pqcn5i4qt-peterkloss.vercel.app/Peter-Kloss-Resume.pdf
+```
+
+Run 40582697904 (`82ba906`, control: the worker policy route first), check 4 and check 5:
+
+```text
+check 4 (route headers): FAIL: /sw.js (the service worker): the header policy, not the worker policy; /workbox-1ce433d4.js (Workbox): the header policy, not the worker policy; seen: / (a page): HTTP 200, the six headers, the header policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline"; /deep-dives/agent-workflows (a deep dive): HTTP 200, the six headers, the header policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"agent-workflows\""; /sw.js (the service worker): HTTP 200, the six headers, the header policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"sw.js\""; /workbox-1ce433d4.js (Workbox): HTTP 200, the six headers, the header policy, cache-control "public, max-age=31536000, immutable", content-disposition "inline; filename=\"workbox-1ce433d4.js\""; /assets/_id-CtqVfDmn.js (a hashed asset): HTTP 200, the six headers, the header policy, cache-control "public, max-age=31536000, immutable", content-disposition "inline; filename=\"_id-CtqVfDmn.js\""; /Peter-Kloss-Resume.pdf (the PDF): HTTP 200, the six headers, no policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"Peter-Kloss-Resume.pdf\""; /api/spike (a function): HTTP 200, the six headers, the header policy, cache-control "no-store"; /no-such-page (the not-found page, last route): HTTP 404, the six headers, the header policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"404.html\""; /__server (the not-found page, route before the filesystem): HTTP 404, the six headers, the header policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"404.html\""; if it fails: the header routes change, so each path gets exactly one policy
+check 5 (host redirect): pass: /resume?x=1: HTTP 308 to https://peterkloss.dev/resume?x=1; /?a=1&b=two: HTTP 308 to https://peterkloss.dev/?a=1&b=two; /deep-dives/agent-workflows: HTTP 308 to https://peterkloss.dev/deep-dives/agent-workflows; /a%20b/%C3%A9?q=%2F&r=a+b: HTTP 308 to https://peterkloss.dev/a%20b/%C3%A9?q=%2F&r=a%20b; the 308 carries the six headers, the header policy, cache-control "public, max-age=0, must-revalidate"; /api/build-info.json: HTTP 200, commit 82ba906
+```
+
+Run 40583006081 (`4929a15`, the final code):
+
+```text
+check 4 (route headers): pass: / (a page): HTTP 200, the six headers, the header policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline"; /deep-dives/agent-workflows (a deep dive): HTTP 200, the six headers, the header policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"agent-workflows\""; /sw.js (the service worker): HTTP 200, the six headers, the worker policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"sw.js\""; /workbox-1ce433d4.js (Workbox): HTTP 200, the six headers, the worker policy, cache-control "public, max-age=31536000, immutable", content-disposition "inline; filename=\"workbox-1ce433d4.js\""; /assets/_id-CtqVfDmn.js (a hashed asset): HTTP 200, the six headers, the header policy, cache-control "public, max-age=31536000, immutable", content-disposition "inline; filename=\"_id-CtqVfDmn.js\""; /Peter-Kloss-Resume.pdf (the PDF): HTTP 200, the six headers, no policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"Peter-Kloss-Resume.pdf\""; /api/spike (a function): HTTP 200, the six headers, the header policy, cache-control "no-store"; /no-such-page (the not-found page, last route): HTTP 404, the six headers, the header policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"404.html\""; /__server (the not-found page, route before the filesystem): HTTP 404, the six headers, the header policy, cache-control "public, max-age=0, must-revalidate", content-disposition "inline; filename=\"404.html\""
+check 5 (host redirect): pass: /resume?x=1: HTTP 308 to https://peterkloss.dev/resume?x=1; /?a=1&b=two: HTTP 308 to https://peterkloss.dev/?a=1&b=two; /deep-dives/agent-workflows: HTTP 308 to https://peterkloss.dev/deep-dives/agent-workflows; /a%20b/%C3%A9?q=%2F&r=a+b: HTTP 308 to https://peterkloss.dev/a%20b/%C3%A9?q=%2F&r=a%20b; the 308 carries the six headers, the header policy, cache-control "public, max-age=0, must-revalidate"; /api/build-info.json: HTTP 200, commit 4929a15
+check 11 (Vercel Toolbar): pass: /: HTTP 200, the built file byte for byte, 0 policy violations, 0 requests to vercel.live, other hosts: none, planted controls: script-src-elem inline, img-src https://example.invalid/spike-control.png, img-src https://example.invalid/spike-control.png, service worker controls the page, 2 console errors (console: TypeError: Invalid action variant at set variant (https://resume-deploy-spike-26t9pe7rk-peterkloss.vercel.app/assets/routes-DcKKjtoG.js:395:15588) at Reflect.se | network: Failed to load resource: the server responded with a status of 404 ()); /deep-dives/agent-workflows: HTTP 200, the built file byte for byte, 0 policy violations, 0 requests to vercel.live, other hosts: none, planted controls: script-src-elem inline, img-src https://example.invalid/spike-control.png, img-src https://example.invalid/spike-control.png, service worker controls the page, 0 console errors; /no-such-page: HTTP 404, the built file byte for byte, 0 policy violations, 0 requests to vercel.live, other hosts: none, planted controls: script-src-elem inline, img-src https://example.invalid/spike-control.png, img-src https://example.invalid/spike-control.png, service worker does not control the page, 1 console errors (network: Failed to load resource: the server responded with a status of 404 ()); / without x-vercel-skip-toolbar: HTTP 200, the built file byte for byte
+check 10 (PDF in Chrome's viewer): manual, Peter's: https://resume-deploy-spike-26t9pe7rk-peterkloss.vercel.app/Peter-Kloss-Resume.pdf
+```
+
+**What the runs show.**
+
+- **One header, two routes: the last matching route wins.** The worker files match the header policy route and the worker policy route. With the worker route last, they got the worker policy (runs 40581693149 and 40583006081); with it first, the header policy (control run 40582697904). Each time they got exactly one policy, never two joined by ", ". So the more specific route does not win; the order does. SPEC-deploy's sentence "The worker files therefore get one full policy, from the last matching route" holds on Vercel.
+- **Different headers from several routes add up.** Every response got the six headers from one route, its policy from another, and on `/assets/` and Workbox the cache rule from a third.
+- **One HSTS value, the spec's.** Vercel adds `strict-transport-security: max-age=63072000` on its own (research 12). With the route's header, every response had exactly `max-age=63072000; includeSubDomains`, so the route's value replaces Vercel's, not joins it.
+- **The headers reach function responses and the not-found page.** `/api/spike` got the six headers and the header policy, and kept its own `cache-control: no-store`. The not-found page got them from both routes that serve it: the last route (`/no-such-page`) and the route before the filesystem (`/__server`).
+- **The PDF** got the six headers and no policy, `content-type: application/pdf`, Vercel's default `cache-control: public, max-age=0, must-revalidate`, and `content-disposition: inline; filename="Peter-Kloss-Resume.pdf"`, byte for byte the committed file. Vercel adds `content-disposition: inline` to every static file it served here, with the file name (`/` got `inline` alone); `inline` lets a browser show the file instead of saving it.
+- **The cache rules** match SPEC-deploy's table: `/assets/` and `/workbox-<hash>.js` are immutable; the pages, `/sw.js` and the PDF keep Vercel's default.
+- **The redirect keeps the query.** The route's `Location` names only the path (`https://peterkloss.dev/$1`), and Vercel added the request's query: `/resume?x=1` and `/?a=1&b=two` went to the same path and query, and a path with no query got no `?`. This matches how Vercel's own `vercel.json` `redirects` work: `@vercel/routing-utils` 6.6.0 (`dist/superstatic.js`, `convertRedirects`) compiles each one to this same route form, `{ src, headers: { Location }, status }`, and adds no query for a redirect, and Vercel's docs say a redirect passes the query through (research 12). So the "If it fails" change, a route that adds the query itself, is not needed.
+- **Encoded characters.** The path `/a%20b/%C3%A9` reached `Location` unchanged. The query `q=%2F&r=a+b` arrived as `q=%2F&r=a%20b`: Vercel parses the query and writes it again, so a `+` becomes `%20`. Both mean a space in a form-encoded query, which is how URLSearchParams reads it.
+- **`/api/` is not redirected** on the production address: `/api/build-info.json` answered 200 with the commit. The routes match without regard to case, so `(?!api/)` also leaves `/API/...` alone; no run asked that.
+- **The 308 carries the header routes' headers.** The redirect route comes first and has no `continue`, but the 308 had the six headers and the header policy (control run and final run), and Vercel's default `cache-control: public, max-age=0, must-revalidate`. The header routes come after it. So on Vercel, the headers of the `continue` routes after the redirect route still reach the 308. SPEC-deploy names no cache rule for the redirect.
+- **The toolbar stays off.** In every Chrome load: no request to `vercel.live`, no toolbar element, and the document byte for byte the built file. A plain request without `x-vercel-skip-toolbar` also got the built file. With the team's production setting Off, Vercel injects nothing into the deployment URL's pages, with or without the header. No run could show the toolbar on: the project has no preview deployments (its Ignored Build Step), and an agent does not change the setting.
+- **The split policy works on the real deployment.** Chrome reported no policy violation on `/`, a deep dive and the not-found page, with the header policy and each page's tag. The planted controls each gave their violation (`img-src` for the image, `script-src-elem` for the inline script), so both policies are enforced there. The service worker took control of `/` and the deep dive, so its own requests (the precache) got through, with the bypass cookie.
+- **Seen, not judged.** On `/`, Chrome logged `TypeError: Invalid action variant` from the design system's button in `routes-DcKKjtoG.js` (the spike's `DsButton`, older than D3), and one 404. The log does not name the 404's address; the local test shows Chrome asking for `/favicon.ico`, which the spike has not. The not-found page logs its own 404. None is a policy violation.
+- **The WAF.** Each run sent about 9 requests to `/api/` paths: 1 from the wait step, 3 from check 2, 3 from check 3, 1 from check 4 and 1 from check 5. No run met a 429.
+
+**Check 10, Peter's check.** He opens the PDF on the deployment URL in Chrome, signed in to Vercel. A pass: Chrome's own PDF viewer shows both pages of the resume, with its toolbar (page count, zoom, download), and the page is neither blank nor a download. A blank page, a "blocked" page or a file saved to Downloads is a fail; the "If it fails" change is that the documents' headers change.
+
+**For D6** (nothing in the spec changes here):
+
+- Check 4: the header routes as SPEC-deploy writes them work. Copy "the last matching route wins" as seen, with the control. D18's `writeVercelConfig()` keeps the worker policy route after the header policy route, and `config.test.ts` checks that order.
+- Check 5: pass; the redirect route needs no query of its own. Record the `+` to `%20` change, and that the 308 carries the headers.
+- Check 11: pass, with the limit above (no run with the toolbar on).
+- Check 10: Peter's verdict, once he gives it.
+- Research 12 can add: Vercel sends `content-disposition: inline; filename="<name>"` with static files, and its default `cache-control` on a 308.
+- Not tested: whether one header name in two spellings (`Content-Security-Policy` in one route, `content-security-policy` in another) merges as one. The spike's routes spell every name in lower case, and D18 can do the same.
+
+**For D4 and D5.**
+
+- D4: the production address now answers 308 for every path outside `/api/`. Vercel Cron's `/api/cron/health` is under `/api/`, so the redirect leaves it alone.
+- D5: check 8 can post to `/api/chat` on the production address without meeting the redirect. Each run already sends about 9 `/api/` requests.
+
 ## Seen on the way
 
 - Each push deployed in about 20 to 30 seconds. Vercel's commit status reads "Vercel is deploying your app", then "Deployment has completed".
@@ -255,6 +352,7 @@ check 3 (not-found paths): pass: /no-such-page, /API/chat, /API/spike, /sources/
 ```sh
 bun ci
 bun run build              # writes .vercel/output/
+bun local-checks.ts        # checks 4, 5 and 11 against local servers; needs Chrome (or CHROME_PATH)
 ```
 
 `csp-test.ts` and `offline-test.ts` are the CSP probe's local tests; they still read `dist/client/`, the output folder before Nitro's Vercel preset.
