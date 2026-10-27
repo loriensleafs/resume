@@ -52,7 +52,7 @@ Run `bun run build` and `bun test` before every commit. Once `package.json` has 
 
 ## Releases and approvals
 
-- A push to `main` that changes a site file is a release. A site file is any tracked path not in `scripts/docs-only.txt`. Ask Peter before each release, and follow the `release` skill ([SPEC-deploy](spec/SPEC-deploy.md)).
+- A push to `main` that changes a site file is a release. A site file is any tracked path not in `scripts/docs-only.txt`. Ask Peter before each release, and follow the [release skill](.agents/skills/release/SKILL.md) ([SPEC-deploy](spec/SPEC-deploy.md)).
 - An approved knowledge source changes only after Peter approves the change in the question dialog; the change waits on a branch until then ([SPEC-knowledge](spec/SPEC-knowledge.md), row 130).
 - `bun run evals` costs money: run it only after Peter approves that run ([SPEC-chat](spec/SPEC-chat.md)).
 - Force-push, changing a repository's visibility, deploying by hand, and anything that costs money need Peter's approval each time. Agents never sign in to a dashboard and never buy anything ([SPEC-deploy](spec/SPEC-deploy.md)).

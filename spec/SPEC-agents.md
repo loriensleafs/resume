@@ -130,14 +130,14 @@ The four skills, by step:
 
 A change to an approved source follows the edit rule: it waits on a branch until Peter approves it.
 
-**`release`** (new; [SPEC-deploy](SPEC-deploy.md), "Releases"). Before the deploy module is built, the skill stops at step 1 and says so.
+**`release`** (new; [SPEC-deploy](SPEC-deploy.md), "Releases"). While `scripts/site-changed.sh` is missing, step 1 tells Peter that the deploy module is not built. The skill then runs steps 2, 3, 4 and 6, and step 3 lists every file the commits change ([plan](../tasks/plan.md), order rule 2).
 
-1. Find the site changes: `scripts/site-changed.sh origin/main HEAD`. Exit 0 means no site file changed: push without a release question. Done when the exit code is known.
+1. Find the site changes on `main`, after a fetch and a rebase onto `origin/main`: `scripts/site-changed.sh origin/main main`. Exit 0 means no site file changed: push without a release question. Every push needs Peter's approval: a release through step 3, any other push once, unless Peter asked for that push. Done when the exit code is known.
 2. Run `bun run build`, `bun run build:site` and `bun test`. Done when all pass.
-3. Ask Peter in the question tool, with the commits and the site files they change. Done when he approved this push, or declined it.
+3. Ask Peter in the question tool, with the commit to push, the commits and the site files they change. Done when he approved this push, or declined it.
 4. Push to `main`. Done when the push is on GitHub.
-5. Watch `ci / test`, `ci / audit` and the release check on the commit with `gh`. Done when all three passed, or one failed.
-6. Report: live, or which check failed and the push Peter got. On a failure, never promote or roll back by hand; point Peter to `docs/runbooks/rollback.md`.
+5. Watch `ci / test`, `ci / audit` and the release check on the commit with `gh`. Done when all three passed, one failed, or no release check ran.
+6. Report: live (the live commit from `/api/status` equals the pushed one), or which check failed and the limit alert Peter got. On a failure, never promote or roll back by hand; point Peter to `docs/runbooks/rollback.md`.
 
 **`update-mockups`** (new). Only a session with the Artifact tool can change the Design canvas; any other agent stops after step 1 and tells Peter.
 

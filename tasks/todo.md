@@ -24,7 +24,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 
 - [x] The test move: tests go to `__tests__/` folders beside the code they test ([decision 0025](../docs/decisions/0025-tests-beside-code.md), row 144). The existing test files and snapshots move with `git mv`; the specs, the plan and the task files name the new paths; `AGENTS.md`'s Code section names the rule; `bun test` runs the same 43 tests — blocked by none; Peter: approve the amended specs, plan and task files (approved 2026-10-27, row 145)
 - [x] [A1](modules/agents.md#a1-agentsmd-routes-by-module-and-carries-the-approval-rules) `AGENTS.md` routes by module and carries the approval rules — blocked by the test move
-- [ ] [A2](modules/agents.md#a2-the-release-repo-skill) The `release` repo skill — blocked by A1
+- [x] [A2](modules/agents.md#a2-the-release-repo-skill) The `release` repo skill — blocked by A1
 - [ ] [Checkpoint agents: before the first release](modules/agents.md#checkpoint-agents-before-the-first-release) — after A1, A2; Peter: read the new Modules and Releases and approvals sections before T1's push
 - [ ] [K1](modules/knowledge.md#k1-the-id-grammar-in-one-module) The id grammar in one module — blocked by none
 - [ ] [C1](modules/chat.md#c1-install-the-chats-packages-and-check-spec-chats-tanstack-ai-names) Install the chat's packages and check SPEC-chat's TanStack AI names — blocked by none; Peter: approve a SPEC-chat amendment, only if a TanStack AI name differs

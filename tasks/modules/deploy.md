@@ -416,6 +416,7 @@ Verify: manual at setup step 10: the first production deployment shows the relea
 Files: `.github/workflows/release-check.yml`, `docs/research/12-deploy-platform.md` (check 12's verdict)
 Size: M
 Needs Peter: setup steps 9 and 10 (Actions secrets; Deployment Checks with the status name its first run shows)
+Noticed (A2 review, 2026-10-27, read in the source of `vercel/repository-dispatch` `actions/status` at commit `bad8e8a`, not yet seen in a run): the status helper posts `failure` only when a step concluded `failure`, and `success` otherwise. A cancelled step, such as a job-level `timeout-minutes` on the 20-minute CI wait, would post `success`. End the wait with a failing step, and check this in the first run.
 
 ### D33: The GitHub health check
 
