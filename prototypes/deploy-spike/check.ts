@@ -865,13 +865,62 @@ async function run(): Promise<void> {
   if (failed) process.exit(1);
 }
 
+/**
+ * THROWAWAY BRANCH prototype/d3-preview only (D3 review): waits for this commit's preview deployment on the
+ * branch URL, then runs check 11 twice against it: with x-vercel-skip-toolbar on every request to the deployment,
+ * and without it. Vercel turns the toolbar on for previews by default, so the run without the header shows whether
+ * check 11 can go red, and the run with it whether the header keeps the toolbar off.
+ */
+async function preview(): Promise<void> {
+  const repo = env("GITHUB_REPOSITORY");
+  const sha = env("GITHUB_SHA");
+  const token = env("GITHUB_TOKEN");
+  const branch = protectedHost(env("SPIKE_BRANCH_HOST"), "SPIKE_BRANCH_HOST");
+  const deadline = Date.now() + RUN_MS;
+  const log = quietLog();
+  console.log(`waiting up to ${RUN_MS / 60_000} minutes for the preview of ${short(sha)}`);
+  const info = await pollUntil("github", deadline, async () => {
+    const status = await vercelStatus(repo, sha, token);
+    if (!status) return void log.say("vercel: no commit status yet");
+    if (status.state === "pending") return void log.say(`vercel: pending (${status.description})`);
+    if (status.state !== "success") {
+      console.log(`vercel: ${status.state} (${status.description}); see ${status.target_url}`);
+      process.exit(1);
+    }
+    log.say(`vercel: success (${status.description})`);
+    const { status: http, info } = await readBuildInfo(`https://${branch}/build-info.json`, withBypass(branch));
+    if (http !== 200) return void log.say(`branch URL ${branch}: ${httpNote(http)}`);
+    if (info?.commit !== sha) return void log.say(`branch URL ${branch}: serves ${short(info?.commit ?? null)}, waiting for ${short(sha)}`);
+    return info;
+  });
+  if (!info) {
+    console.log(`error: no preview of ${short(sha)} within ${RUN_MS / 60_000} minutes; last state: ${log.last}`);
+    process.exit(1);
+  }
+  const deployment = protectedHost(info.deploymentHost ?? "", "build-info deploymentHost");
+  console.log(`preview of ${short(sha)}: https://${deployment}, VERCEL_ENV ${info.vercelEnv}`);
+
+  for (const skipToolbar of [true, false]) {
+    const ctx = {
+      info,
+      deploymentFetch: (path: string, init?: RequestInit, options?: { skipToolbar?: boolean }) =>
+        fetch(`https://${deployment}${path}`, withBypass(deployment, init, options)),
+      chrome: (paths: string[]) => chromeVisits(`https://${deployment}`, paths, (first) => bypassHeaders(deployment, { setCookie: first, skipToolbar })),
+    } as unknown as Ctx;
+    const result = await toolbarOff.run(ctx).catch((error: Error) => ({ pass: false, detail: `error: ${error.message}` }));
+    const header = skipToolbar ? "with" : "without";
+    console.log(`check 11 (Vercel Toolbar), preview, ${header} x-vercel-skip-toolbar: ${result.pass ? "pass" : "FAIL"}: ${result.detail}`);
+  }
+}
+
 // Only as the entry point, so a local test can import chromeVisits.
 if (import.meta.main) {
   const command = process.argv[2];
   if (command === "wait") await wait();
   else if (command === "run") await run();
+  else if (command === "preview") await preview();
   else {
-    console.log("usage: bun check.ts wait | bun check.ts run");
+    console.log("usage: bun check.ts wait | bun check.ts run | bun check.ts preview");
     process.exit(2);
   }
 }

@@ -1,21 +1,19 @@
-# PROTOTYPE (deploy spike, tasks D1 to D5). This file lives on prototype/deploy-spike only and never reaches main.
-# Each push to the spike branch builds a protected production deployment on the throwaway Vercel project
-# (root folder prototypes/deploy-spike). This workflow waits for that commit's deployment and runs check.ts
-# against it. It prints verdicts, states and hosts only; the bypass secret stays in the environment.
-# The wait and the checks share one 15-minute bound (check.ts RUN_MS); the job timeout adds room for setup.
-# A newer push cancels this run. Rerun only the newest run.
-name: spike-check
+# THROWAWAY (deploy spike, D3 review). This file is the copy on the branch prototype/d3-preview only: it runs
+# check 11 against this branch's preview deployment, with and without x-vercel-skip-toolbar. vercel.json's
+# ignoreCommand "exit 1" overrides the project's Ignored Build Step, so this branch builds a protected preview.
+# It prints verdicts, states and hosts only; the bypass secret stays in the environment.
+name: spike-preview
 
 on:
   push:
-    branches: [prototype/deploy-spike]
+    branches: [prototype/d3-preview]
 
 permissions:
   contents: read
   statuses: read
 
 concurrency:
-  group: spike-check
+  group: spike-preview
   cancel-in-progress: true
 
 jobs:
@@ -26,11 +24,9 @@ jobs:
       run:
         working-directory: prototypes/deploy-spike
     env:
-      # The project's Git branch URL: <project>-git-<branch>-<team>.vercel.app (protected)
+      # This branch's Git branch URL: <project>-git-<branch>-<team>.vercel.app (protected)
       # https://vercel.com/docs/deployments/generated-urls#generated-from-git
-      SPIKE_BRANCH_HOST: resume-deploy-spike-git-prototype-deploy-spike-peterkloss.vercel.app
-      # The project's production address (public under Standard Protection); it never gets the bypass.
-      SPIKE_PRODUCTION_HOST: project-8ar0o.vercel.app
+      SPIKE_BRANCH_HOST: resume-deploy-spike-git-prototype-d3-preview-peterkloss.vercel.app
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -40,17 +36,8 @@ jobs:
         with:
           bun-version: 1.4.2
 
-      - name: Wait for this commit's deployment
-        id: deployment
-        run: bun check.ts wait
+      - name: Check 11 on this branch's preview, with and without x-vercel-skip-toolbar
+        run: bun check.ts preview
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-
-      - name: Run the spike checks
-        run: bun check.ts run
-        env:
-          DEPLOYMENT_HOST: ${{ steps.deployment.outputs.deployment }}
-          PRODUCTION_HOST: ${{ steps.deployment.outputs.production }}
-          RUN_DEADLINE: ${{ steps.deployment.outputs.deadline }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
