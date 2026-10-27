@@ -338,7 +338,7 @@ One module, `src/ops/`, behind a small interface. The routes build it from the e
 
 ```ts
 // Budget, Telemetry, QuestionLog, QuestionLogEntry and ChatTurnEvent are the chat module's types (SPEC-chat).
-// This module imports them as types and implements them.
+// This module imports the chat module's types and its in-memory versions, and implements the types.
 
 export type OpsEnv = {
   VERCEL_ENV?: string;          // the store and alerts are used only in "production"
@@ -346,9 +346,10 @@ export type OpsEnv = {
   KV_REST_API_TOKEN?: string;
   NTFY_TOPIC_URL?: string;      // https://ntfy.sh/<secret topic>
   ANTHROPIC_API_KEY?: string;   // only whether it is set is read, for status()
-  PREVIEW_LIMIT?: "day" | "month"; // outside production only: the in-memory budget refuses every turn with
-                                   // DAILY_LIMIT or SPEND_LIMIT, so a preview and the browser tests can show
-                                   // the "limit reached" state; ignored in production
+  PREVIEW_LIMIT?: string;       // "day" or "month", outside production only: the in-memory budget refuses every
+                                // turn with DAILY_LIMIT or SPEND_LIMIT, so a preview and the browser tests can
+                                // show the "limit reached" state; empty counts as unset, any other value throws;
+                                // ignored in production, whatever its value
 };
 
 export type Ops = {
@@ -374,7 +375,7 @@ export function createOpsReader(env: { KV_REST_API_URL: string; KV_REST_API_READ
 };
 ```
 
-- This module describes two route files, `src/site/routes/api.status.ts` and `src/site/routes/api.cron.health.ts`. SPEC-chat describes `api.chat.ts`, which builds `createOps(process.env)` and passes its `log`, `budget` and `telemetry` to `handleChat()` as `ChatDeps`. The route files are composition roots: they import both modules. This module imports only the chat module's types, and the chat module never imports this one.
+- This module describes two route files, `src/site/routes/api.status.ts` and `src/site/routes/api.cron.health.ts`. SPEC-chat describes `api.chat.ts`, which builds `createOps(process.env)` and passes its `log`, `budget` and `telemetry` to `handleChat()` as `ChatDeps`. The route files are composition roots: they import both modules. This module imports the chat module's types and its in-memory versions, and the chat module never imports this one.
 
 **Store calls.**
 
