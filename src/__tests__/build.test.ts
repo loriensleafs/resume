@@ -6,6 +6,7 @@ import { $ } from "bun";
 import { build, type BuiltVariant } from "../build";
 import { loadResume, type Resume } from "../content";
 import { holds, isMadeUpNumber, loadPrivateValues } from "../private-details";
+import { docxText, normalize, pdfText } from "./helpers/document-text";
 
 const REPO = `${import.meta.dir}/../..`;
 const FAKE_PHONE = "(555) 555-0100";
@@ -16,7 +17,6 @@ const PRIVATE_VALUES = PRIVATE.ok ? PRIVATE.values.filter((value) => !isMadeUpNu
 // A broken private.yaml is no reason to skip: the test runs and fails with the reason.
 const NOTHING_PRIVATE = PRIVATE.ok ? PRIVATE_VALUES.length === 0 : PRIVATE.missing;
 const tmp = `${Bun.env.TMPDIR ?? "/tmp"}/resume-test-${crypto.randomUUID()}`;
-const normalize = (s: string) => s.replace(/\s+/g, " ").trim();
 
 let pub: BuiltVariant;
 let priv: BuiltVariant;
@@ -35,18 +35,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await $`rm -rf ${tmp}`.quiet().nothrow();
 });
-
-const pdfText = async (pdf: string) => normalize(await $`pdftotext -raw ${pdf} -`.text());
-const docxText = async (docx: string) => {
-  const xml = await $`unzip -p ${docx} word/document.xml`.text();
-  return [...xml.matchAll(/<w:t(?: [^>]*)?>([^<]*)<\/w:t>/g)]
-    .map((m) => m[1]!)
-    .join(" ")
-    .replaceAll("&amp;", "&")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&quot;", '"');
-};
 
 describe("the PDF", () => {
   test("is US Letter, exactly 2 pages, and tagged", async () => {
