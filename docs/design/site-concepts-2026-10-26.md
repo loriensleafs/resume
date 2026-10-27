@@ -24,4 +24,17 @@ Proposals for how the site presents the chat, the resume and the deep dives. Non
 
 A+, with the job fit brief and the standalone pages. It keeps Peter's concept and his chat-first choice, the open resume serves the skimming recruiter, and a chat that opens and cites documents through tools is the strongest work sample for AI platform roles.
 
-The next step is mockups of the concepts Peter picks, on the "Resume site mockups" canvas.
+## Merged concept (proposed after the mockup review)
+
+All six concepts are mocked up on the "Concepts" page of the "Resume site mockups" canvas. A review of the rendered views, with the design-critique, Impeccable and UXKIN guidance, led to one merged concept on the "Merged" page:
+
+| Part | From | What it does |
+|---|---|---|
+| Chat beside the document panel | A+ | The chat leads; the resume is open from the start. |
+| Career timeline as the panel's header | E | Each role is a span at its true length. Selecting a role opens the resume at it and scopes the chat. Roles an answer cites light up. |
+| Numbered citations | A+ | Sources are numbered in the answer, and the cited resume line is highlighted. |
+| "Answers for" choices in the composer | D | Optional; no gate before the chat. |
+| Instant on-device matches while typing | C | Works offline; "Ask the chat" stays one tap away. |
+| "Ask about this" on resume lines | B | Opens a question scoped to that line. |
+
+Fixes from the review: the download control is secondary, not the loudest element; no small label above a heading; no grid of same-size cards; timeline spans read as data, not loading placeholders. Open question: the timeline shows the gap from 2012 to 2013 as empty space.
