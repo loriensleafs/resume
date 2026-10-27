@@ -52,15 +52,17 @@ const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // A .func folder also answers at its own path, and the filesystem phase finds it before any later route (run
 // 40570467882: /__server rendered TanStack's page). So every function folder that is not an API route's own path
-// gets the not-found page before the filesystem phase. A route's dest still reaches it.
+// gets the not-found page before the filesystem phase. A route's dest still reaches it. Nitro can write a .func
+// folder as a symlink to __server.func (its observability routes), so the scan follows symlinks.
 const functionPaths: string[] = [];
-for await (const file of new Glob("**/*.func/.vc-config.json").scan({ cwd: `${output}/functions`, dot: true })) {
+const funcs = new Glob("**/*.func/.vc-config.json").scan({ cwd: `${output}/functions`, dot: true, followSymlinks: true });
+for await (const file of funcs) {
   functionPaths.push(`/${file.slice(0, -".func/.vc-config.json".length)}`);
 }
 const hidden = functionPaths.filter((path) => !apiRoutes.some((route) => route.path === path)).sort();
 
-// An override serves each prerendered page at its clean address: "deep-dives/x/index.html" at "deep-dives/x".
-// The root index.html needs none.
+// SPEC-deploy gives each prerendered page an override for its clean address: "deep-dives/x/index.html" at
+// "deep-dives/x". Control run 40571589174 shows Vercel serves the file there without one too (README, check 2).
 const overrides: Record<string, { path: string }> = {};
 for await (const file of new Glob("**/index.html").scan({ cwd: `${output}/static` })) {
   if (file !== "index.html") overrides[file] = { path: file.slice(0, -"/index.html".length) };
