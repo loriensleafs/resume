@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Page not found, desktop</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+.m-dim{color:var(--ds-gray-900)}
+.m-links{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;border-top:1px solid var(--ds-gray-400)}
+.m-link{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:0 8px;border-bottom:1px solid var(--ds-gray-400);color:var(--ds-gray-1000);text-decoration:none}
+.m-link:hover{background:var(--ds-gray-100);color:var(--ds-gray-1000)}
+.m-link:focus-visible{outline:2px solid var(--ds-focus-color);outline-offset:2px;border-radius:6px}
+.m-link svg{flex:0 0 auto;color:var(--ds-gray-900)}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<header style="flex: 0 0 auto; display: flex; align-items: center; height: 64px; padding: 0 40px; border-bottom: 1px solid var(--ds-gray-400);">
+<a href="/" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ds-gray-1000);"><span style="display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 8px; background: var(--ds-blue-700); color: #fff; font-size: 15px; line-height: 1; font-weight: 600; white-space: nowrap;">Peter Kloss</span><span class="text-label-14 m-dim">Front-End Platform Engineer, Design Systems and AI Developer Tooling</span></a>
+</header>
+
+<main style="flex: 1 1 auto; padding: 120px 40px 40px; display: flex; flex-direction: column; gap: 16px;">
+<p class="text-label-13-mono m-dim" style="margin: 0;">404</p>
+<h1 class="text-heading-40" style="margin: 0;">Page not found</h1>
+<p class="text-copy-16 m-dim" style="margin: 0; max-width: 560px;">There is no page at this address. The link may be mistyped, or the page may have moved.</p>
+<nav aria-label="Where to go next" style="margin-top: 16px; max-width: 560px;">
+<ul class="m-links">
+<li><a href="/" class="m-link text-label-16">Ask the chat about Peter’s work<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" style="fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"></path></svg></a></li>
+<li><a href="/resume" class="m-link text-label-16">Read Peter’s resume<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" style="fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"></path></svg></a></li>
+</ul>
+</nav>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"appearance":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', this.props.appearance === 'dark' ? 'dark' : 'light');
+}
+componentDidUpdate() {
+document.documentElement.setAttribute('data-acme-appearance', this.props.appearance === 'dark' ? 'dark' : 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

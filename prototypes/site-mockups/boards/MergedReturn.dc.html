@@ -35,6 +35,9 @@ a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
 .m-src{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 10px;border-radius:8px;color:var(--ds-gray-1000);text-decoration:none}
 .m-src:hover{background:var(--ds-gray-100)}
 .m-num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:var(--ds-gray-200);font-family:var(--acme-font-mono);font-size:11px}
+.m-ans{margin:0}
+.m-ans .m-num{color:var(--ds-gray-1000);text-decoration:none;vertical-align:1px}
+.m-ans .m-num.m-act{background:var(--ds-blue-700);color:#fff}
 .m-note{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 12px;border-radius:10px;background:var(--ds-gray-100)}
 .m-li{position:relative;padding-left:18px}
 .m-li::before{content:"";position:absolute;left:2px;top:10px;width:6px;height:6px;border-radius:50%;background:var(--ds-gray-700)}
@@ -107,18 +110,18 @@ acme-toggle-tip.m-aud::part(close){display:none}
 <div style="display: flex; justify-content: flex-end; padding: 10px 24px 0;"><acme-button variant="secondary" size="small"><acme-add-icon slot="start"></acme-add-icon>New chat</acme-button></div>
 <div style="flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 8px 40px 12px; display: flex; flex-direction: column; justify-content: flex-end; gap: 20px;">
 <div class="m-msg m-msg-q"><p class="m-q text-copy-16">Is Peter open to remote work?</p><div class="m-acts" aria-hidden="true"></div></div>
-<article aria-label="Answer" class="m-msg"><div class="m-body"><div class="text-copy-16"><acme-markdown text="{{a1}}"></acme-markdown></div></div><div class="m-acts" aria-hidden="true"></div></article>
+<article aria-label="Answer" class="m-msg"><div class="m-body"><p class="m-ans text-copy-16">Yes. Peter is open to remote, hybrid or on-site roles in the Seattle area <a href="#" class="m-num" aria-label="Citation 1: Logistics, work arrangement">1</a>.</p></div><div class="m-acts" aria-hidden="true"></div></article>
 <div class="m-msg m-msg-q"><p class="m-q text-copy-16">What did Peter build for AI coding agents?</p><div class="m-acts" aria-hidden="true"></div></div>
 <article aria-label="Answer" class="m-msg">
 <div class="m-body">
-<div class="text-copy-16"><acme-markdown text="{{a2}}"></acme-markdown></div>
+<p class="m-ans text-copy-16">At Highspot, Peter led the organization-wide effort to build the polar-ui MCP server, the design system’s contract for AI coding agents. It became a standard part of every Cursor and Claude Code setup for front-end work, used by about 100 people <a href="#c2" class="m-num m-act" aria-label="Citation 1: Resume, Highspot, highlight 1">1</a>.</p>
+<p class="m-ans text-copy-16">He also designed and rolled out an agent workflow system for the platform team, built in TypeScript on Bun <a href="#c3" class="m-num" aria-label="Citation 2: Resume, Highspot, highlight 3">2</a>.</p>
 </div>
 <div class="m-acts" role="toolbar" aria-label="Answer actions"><acme-group size="tiny" variant="tertiary" gap="4px"><acme-copy-button value="At Highspot, Peter led the organization-wide effort to build the polar-ui MCP server." aria-label="Copy this answer"></acme-copy-button><acme-icon-button aria-label="Retry this answer"><acme-refresh-icon></acme-refresh-icon></acme-icon-button></acme-group></div>
 <acme-card variant="outline" size="small" aria-label="Citations" style="margin-top: 4px;"><acme-card-body>
 <div class="m-cites">
-<a href="#c1" class="m-src"><span class="m-num">1</span><acme-schedule-icon></acme-schedule-icon><span class="text-label-13">Logistics: work arrangement</span></a>
-<a href="#c2" class="m-src" style="background: var(--ds-blue-100);"><span class="m-num" style="background: var(--ds-blue-700); color: white;">2</span><acme-article-icon></acme-article-icon><span class="text-label-13">Resume: Highspot, highlight 1</span><span class="text-label-12" style="margin-left: auto; color: var(--ds-blue-900);">Shown in the resume</span></a>
-<a href="#c3" class="m-src"><span class="m-num">3</span><acme-article-icon></acme-article-icon><span class="text-label-13">Resume: Highspot, highlight 3</span><span class="text-label-12 m-dim" style="margin-left: auto;">Show in the resume</span></a>
+<a href="#c2" class="m-src" style="background: var(--ds-blue-100);"><span class="m-num" style="background: var(--ds-blue-700); color: white;">1</span><acme-article-icon></acme-article-icon><span class="text-label-13">Resume: Highspot, highlight 1</span><span class="text-label-12" style="margin-left: auto; color: var(--ds-blue-900);">Shown in the resume</span></a>
+<a href="#c3" class="m-src"><span class="m-num">2</span><acme-article-icon></acme-article-icon><span class="text-label-13">Resume: Highspot, highlight 3</span><span class="text-label-12 m-dim" style="margin-left: auto;">Show in the resume</span></a>
 </div>
 </acme-card-body></acme-card>
 </article>
@@ -132,7 +135,7 @@ acme-toggle-tip.m-aud::part(close){display:none}
 <acme-toggle-tip class="m-aud" side="top" align="start"><span slot="trigger" class="text-label-13" style="display: inline-flex; align-items: center; gap: 4px;"><span class="m-dim">Answers for:</span> Recruiter<acme-expand-more-icon></acme-expand-more-icon></span><div style="width: 412px; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 0;">
 <div><span class="text-copy-13 m-dim">Choose who you are, and answers lead with what matters to you. The facts are the same for everyone.</span></div>
 <acme-group attached="" size="small" variant="secondary" role="group" aria-label="Answers for"><acme-toggle-button pressed="">Recruiter</acme-toggle-button><acme-toggle-button>Manager</acme-toggle-button><acme-toggle-button>Engineer</acme-toggle-button><acme-toggle-button>Designer</acme-toggle-button><acme-toggle-button aria-label="Product manager">Product</acme-toggle-button></acme-group>
-<span class="text-copy-12 m-dim">Recruiters: titles, dates, scope and logistics first.</span>
+<span class="text-copy-12 m-dim">Recruiter: titles, dates, scope and logistics first.</span>
 </div></acme-toggle-tip>
 <span class="text-label-12 m-dim">Questions are kept anonymously to improve answers.</span>
 </div>
@@ -154,9 +157,9 @@ acme-toggle-tip.m-aud::part(close){display:none}
 </div>
 <p class="text-copy-13 m-dim" style="margin: -6px 0 4px;">Sr. Software Development Engineer, Polar UI design system team, Seattle, WA</p>
 <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; max-width: 76ch;">
-<li id="c2" class="m-li text-copy-14" style="background: var(--ds-blue-100); border-radius: 8px; box-shadow: 0 0 0 8px var(--ds-blue-100);">Led the organization-wide effort to build the polar-ui MCP server, the design system’s contract for AI coding agents, so agent-written UI follows the design system, including complex components such as the data table. It worked alongside the Figma MCP and became a standard part of every Cursor and Claude Code setup for front-end work, used by ~100 people across all application teams, design, and product. <span class="m-num" style="background: var(--ds-blue-700); color: white; vertical-align: 1px;">2</span></li>
+<li id="c2" class="m-li text-copy-14" style="background: var(--ds-blue-100); border-radius: 8px; box-shadow: 0 0 0 8px var(--ds-blue-100);">Led the organization-wide effort to build the polar-ui MCP server, the design system’s contract for AI coding agents, so agent-written UI follows the design system, including complex components such as the data table. It worked alongside the Figma MCP and became a standard part of every Cursor and Claude Code setup for front-end work, used by ~100 people across all application teams, design, and product. <span class="m-num" style="background: var(--ds-blue-700); color: white; vertical-align: 1px;">1</span></li>
 <li class="m-li text-copy-14">Introduced many of the team’s AI development standards: spec-driven development, shared skills and agents checked into the repo, agent context files (CLAUDE.md, AGENTS.md), and rules that keep agents on Polar UI components.</li>
-<li id="c3" class="m-li text-copy-14">Designed and rolled out an agent workflow system for the platform team, built in TypeScript on Bun: specialist agents and skills turn specs into dependency-mapped plans, where plans and tasks both carry dependencies, so up to 4 developers and their agents know which work is unblocked, claimed, or safe to run in parallel.</li>
+<li id="c3" class="m-li text-copy-14">Designed and rolled out an agent workflow system for the platform team, built in TypeScript on Bun: specialist agents and skills turn specs into dependency-mapped plans, where plans and tasks both carry dependencies, so up to 4 developers and their agents know which work is unblocked, claimed, or safe to run in parallel. <span class="m-num" style="vertical-align: 1px;">2</span></li>
 </ul>
 </article>
 </section>
@@ -173,9 +176,7 @@ document.documentElement.setAttribute('data-acme-appearance', this.props.appeara
 }
 renderVals() {
 return {
-appearance: this.props.appearance === 'dark' ? 'dark' : 'light',
-a1: "Yes. Peter is open to remote, hybrid or on-site roles in the Seattle area [[1]](#c1).",
-a2: "At Highspot, Peter led the organization-wide effort to build the polar-ui MCP server, the design system’s contract for AI coding agents. It became a standard part of every Cursor and Claude Code setup for front-end work, used by about 100 people [[2]](#c2).\n\nHe also designed and rolled out an agent workflow system for the platform team, built in TypeScript on Bun [[3]](#c3)."
+appearance: this.props.appearance === 'dark' ? 'dark' : 'light'
 };
 }
 }

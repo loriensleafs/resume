@@ -24,6 +24,8 @@ const boards: Board[] = [
   { file: "TimelineStates", slug: "career-timeline-states", modes: ["light", "dark"] },
   { file: "TimelineOneLine", slug: "career-timeline-options", modes: ["light"] },
   { file: "AppIcons", slug: "app-icon", modes: ["light"] },
+  { file: "NotFound", slug: "page-not-found", modes: ["light", "dark"] },
+  { file: "NotFoundPhone", slug: "phone-page-not-found", modes: ["light", "dark"] },
 ];
 
 const canvas = await Bun.file(`${projectDir}/canvas.json`).json();

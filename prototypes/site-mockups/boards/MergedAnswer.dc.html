@@ -47,6 +47,9 @@ a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
 .m-pass p{margin:4px 0 0}
 .m-on{background:var(--ds-blue-100)}
 .m-on .m-num{background:var(--ds-blue-700);color:#fff}
+.m-ans{margin:0}
+.m-ans .m-num{color:var(--ds-gray-1000);text-decoration:none;vertical-align:1px}
+.m-ans .m-num.m-act{background:var(--ds-blue-700);color:#fff}
 /* Design-system gap: Toggle Tip has no width setting, and five audiences need about 412 px. */
 acme-toggle-tip.m-aud::part(content){max-inline-size:none}
 /* Design-system gap: Toggle Tip always shows a Close button; a click outside or Escape is enough here. */
@@ -119,7 +122,7 @@ acme-toggle-tip.m-aud::part(close){display:none}
 <article aria-label="Answer" class="m-msg">
 <div class="m-body">
 <div class="m-sum"><acme-collapsible><acme-collapsible-trigger><span class="text-copy-16 m-dim">Read 1 source and checked 3 citations</span></acme-collapsible-trigger><acme-collapsible-content><span class="text-copy-14 m-dim">The steps</span></acme-collapsible-content></acme-collapsible></div>
-<div class="text-copy-16"><acme-markdown text="{{answer}}"></acme-markdown></div>
+<p class="m-ans text-copy-16">Peter audited the application, found what made the bundles so large, then wrote the roadmap for the refactor and led it <a href="#p-2" class="m-num m-act" aria-label="Citation 1: The FedNow bundle cut, What Peter did">1</a>. The initial bundle went from over 15 MB to under 1 MB without delaying FedNow’s launch <a href="#cite-2" class="m-num" aria-label="Citation 2: Resume, FedNow, highlight 2">2</a>, through code splitting, micro-frontends and tree-shakeable ES modules <a href="#p-3" class="m-num" aria-label="Citation 3: The FedNow bundle cut, How it worked">3</a>.</p>
 </div>
 <div class="m-acts" role="toolbar" aria-label="Answer actions"><acme-group size="tiny" variant="tertiary" gap="4px"><acme-copy-button value="Peter audited the application, found what made the bundles so large, then wrote the roadmap for the refactor and led it." aria-label="Copy this answer"></acme-copy-button><acme-icon-button aria-label="Retry this answer"><acme-refresh-icon></acme-refresh-icon></acme-icon-button></acme-group></div>
 <acme-card variant="outline" size="small" aria-label="Citations" style="margin-top: 4px;"><acme-card-body>
@@ -145,7 +148,7 @@ acme-toggle-tip.m-aud::part(close){display:none}
 <acme-toggle-tip class="m-aud" side="top" align="start"><span slot="trigger" class="text-label-13" style="display: inline-flex; align-items: center; gap: 4px;"><span class="m-dim">Answers for:</span> Manager<acme-expand-more-icon></acme-expand-more-icon></span><div style="width: 412px; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 0;">
 <div><span class="text-copy-13 m-dim">Choose who you are, and answers lead with what matters to you. The facts are the same for everyone.</span></div>
 <acme-group attached="" size="small" variant="secondary" role="group" aria-label="Answers for"><acme-toggle-button>Recruiter</acme-toggle-button><acme-toggle-button pressed="">Manager</acme-toggle-button><acme-toggle-button>Engineer</acme-toggle-button><acme-toggle-button>Designer</acme-toggle-button><acme-toggle-button aria-label="Product manager">Product</acme-toggle-button></acme-group>
-<span class="text-copy-12 m-dim">Managers: what Peter owned, with whom, and what came of it.</span>
+<span class="text-copy-12 m-dim">Manager: what Peter owned, with whom, and what came of it.</span>
 </div></acme-toggle-tip>
 <span class="text-label-12 m-dim">Questions are kept anonymously to improve answers.</span>
 </div>
@@ -185,8 +188,7 @@ document.documentElement.setAttribute('data-acme-appearance', this.props.appeara
 }
 renderVals() {
 return {
-appearance: this.props.appearance === 'dark' ? 'dark' : 'light',
-answer: "Peter audited the application, found what made the bundles so large, then wrote the roadmap for the refactor and led it [[1]](#p-2). The initial bundle went from over 15 MB to under 1 MB without delaying FedNow’s launch [[2]](#cite-2), through code splitting, micro-frontends and tree-shakeable ES modules [[3]](#p-3)."
+appearance: this.props.appearance === 'dark' ? 'dark' : 'light'
 };
 }
 }
