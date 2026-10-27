@@ -2,7 +2,9 @@
 
 Approved by Peter on 2026-10-27 (decision record row 127), with the amendments to other specs below. Peter's answers are rows 107 to 127 of the [decision record](../docs/design/interview-2026-10-26.md); the facts are in [research 12](../docs/research/12-deploy-platform.md); the static site with build-time data is [decision 0023](../docs/decisions/0023-static-site-build-time-data.md). Three adversarial reviews found 18, 16 and 39 issues. This version answers all of them, with the local checks that the third review asked for (row 126). What only a real Vercel deployment can settle is the plan's first task, the [deploy spike](#deploy-spike).
 
-Corrected on 2026-10-27 after the reviews of the other specs (decision record rows 128 to 136). Approved by Peter with the updated mockups on 2026-10-27 (decision record row 139); the scope label and the texts follow rows 137 and 138.
+Corrected on 2026-10-27 after the reviews of the other specs (decision record rows 128 to 136). Approved by Peter with the updated mockups on 2026-10-27 (decision record row 139); the scope label and the texts follow rows 137 and 138. Amended on 2026-10-27 after C1 (row 155): the error share and the `errorCode` list name `SERVER_ERROR`.
+
+Amended on 2026-10-27 for Peter's standing approval (decision record row 151): which pushes need him is in [AGENTS.md](../AGENTS.md), "Releases and approvals".
 
 ## Objective
 
@@ -117,7 +119,7 @@ README.md
 
 A small window remains: a site change pushed during step 5 can let the older deployment take the domains after the newer one. The GitHub health check then finds the live commit behind `main` and fails.
 
-Because a push of site changes is a release, agents ask Peter before pushing site changes to `main`. [AGENTS.md](../AGENTS.md) carries this rule and points to `scripts/docs-only.txt` ([SPEC-agents](SPEC-agents.md)).
+A push of site changes to `main` is a release. [AGENTS.md](../AGENTS.md), "Releases and approvals", says which pushes need Peter (row 151), sends every push to `main` through the `release` skill, and points to `scripts/docs-only.txt` ([SPEC-agents](SPEC-agents.md)).
 
 **Rollback.** Instant Rollback in the dashboard moves the domains back in seconds, and turns domain auto-assignment off. While it is off, passing deployments do not go live, and the GitHub health check reports the lag. After the fix's deployment passes its checks, Peter selects "Undo Rollback" and chooses that deployment. That makes it live and turns auto-assignment on again. `docs/runbooks/rollback.md` has the steps and ends with a check that the next release goes live without help.
 
@@ -338,7 +340,7 @@ One module, `src/ops/`, behind a small interface. The routes build it from the e
 
 ```ts
 // Budget, Telemetry, QuestionLog, QuestionLogEntry and ChatTurnEvent are the chat module's types (SPEC-chat).
-// This module imports them as types and implements them.
+// This module imports the chat module's types and its in-memory versions, and implements the types.
 
 export type OpsEnv = {
   VERCEL_ENV?: string;          // the store and alerts are used only in "production"
@@ -346,9 +348,11 @@ export type OpsEnv = {
   KV_REST_API_TOKEN?: string;
   NTFY_TOPIC_URL?: string;      // https://ntfy.sh/<secret topic>
   ANTHROPIC_API_KEY?: string;   // only whether it is set is read, for status()
-  PREVIEW_LIMIT?: "day" | "month"; // outside production only: the in-memory budget refuses every turn with
-                                   // DAILY_LIMIT or SPEND_LIMIT, so a preview and the browser tests can show
-                                   // the "limit reached" state; ignored in production
+  PREVIEW_LIMIT?: string;       // Outside production only. With "day", the in-memory budget refuses every turn
+                                // with DAILY_LIMIT. With "month", it refuses with SPEND_LIMIT. So a preview and
+                                // the browser tests can show the "limit reached" state. An empty value counts
+                                // as unset. Any other value throws, and the error shows at most 32 characters
+                                // of it. Production ignores this variable, whatever its value.
 };
 
 export type Ops = {
@@ -374,7 +378,8 @@ export function createOpsReader(env: { KV_REST_API_URL: string; KV_REST_API_READ
 };
 ```
 
-- This module describes two route files, `src/site/routes/api.status.ts` and `src/site/routes/api.cron.health.ts`. SPEC-chat describes `api.chat.ts`, which builds `createOps(process.env)` and passes its `log`, `budget` and `telemetry` to `handleChat()` as `ChatDeps`. The route files are composition roots: they import both modules. This module imports only the chat module's types, and the chat module never imports this one.
+- This module describes two route files, `src/site/routes/api.status.ts` and `src/site/routes/api.cron.health.ts`. SPEC-chat describes `api.chat.ts`, which builds `createOps(process.env)` and passes its `log`, `budget` and `telemetry` to `handleChat()` as `ChatDeps`. The route files are composition roots: they import both modules. This module imports the chat module's types and its in-memory versions, and the chat module never imports this one.
+- `createOps()` gives new, empty parts on each call. So each route file builds it once per function instance, at module scope, and every request of that instance uses the same `Ops`. The instance holds the in-memory log outside production; in production it holds the capped day and the once-a-day `storefail` push.
 
 **Store calls.**
 
@@ -476,7 +481,7 @@ The two health checks watch each other (row 122). Vercel Cron and GitHub's sched
 | GitHub health check: `.github/workflows/health.yml` | GitHub schedule, daily at 21:17 UTC, and by hand | It reads the live commit from `/api/status`, checks that it is an ancestor of `main`, and checks it out. Then it runs that commit's smoke check with `--browser --production --documents documents/` from outside Vercel. That `/api/status` shows a passing Vercel run less than 50 hours old. That `scripts/site-changed.sh <live commit> origin/main` exits 0, or that the newest site change on `main` is less than 2 hours old. At the end, pass or fail, it records that it ran | An ntfy push from the workflow, tried 3 times |
 
 - The GitHub check uses the live commit's documents and smoke check, so a release still in its checks never makes it fail.
-- The error share counts only turns that reached the model: `answered`, the refusals, `stopped` and `error`. A turn stopped by `max_tokens` (`errorCode: "MAX_TOKENS"`) does not count as an error there, because it is not an outage; the totals still show it. Rejected requests and limit refusals are not in the totals.
+- The error share counts only turns that reached the model: `answered`, the refusals, `stopped` and `error`. A turn stopped by `max_tokens` (`errorCode: "MAX_TOKENS"`) does not count as an error there, because it is not an outage; the totals still show it. A thrown run (`errorCode: "SERVER_ERROR"`, SPEC-chat row 155) counts as an error, because it is a fault in the server's own code. Rejected requests and limit refusals are not in the totals.
 - GitHub stops a schedule after 60 days with no repository activity; the Vercel job then reports that the GitHub check has not run. If Vercel itself is down, the GitHub check reports it. The runbook covers turning a schedule back on.
 
 ## CI
@@ -527,7 +532,7 @@ Peter does these steps once, in this order, so that the chat never runs in produ
 8. Vercel, Spend Management: a $20 budget with the webhook set to the ntfy topic URL. Check that the "Pause production deployment" switch is off. Vercel's docs say production pauses only when that switch is on; the third review read a changelog as saying it can start on, so the step checks it.
 9. GitHub, Actions secrets: the Actions rows of the table above.
 10. Vercel, Deployment Checks: require `ci / test`, `ci / audit` and the release check's status, by the name its first run shows. Check that domain auto-assignment is on.
-11. Vercel, Domains: add peterkloss.dev, www.peterkloss.dev, pkloss.dev and pwk.dev, all served by the project. An agent writes the project's `.vercel.app` address into `src/deploy/routes.ts`, with Peter's approval of that release.
+11. Vercel, Domains: add peterkloss.dev, www.peterkloss.dev, pkloss.dev and pwk.dev, all served by the project. An agent writes the project's `.vercel.app` address into `src/deploy/routes.ts`; its push is a release.
 12. Vercel, Environment Variables: add `ANTHROPIC_API_KEY` (Production, Secret). Then Redeploy the newest production deployment with "Use project's Ignore Build Step" unchecked. With the box checked, the ignore step sees no change and the redeploy does nothing.
 13. Check: `/api/status` reports everything configured; run both health checks by hand once; ask the live chat one question.
 
@@ -554,7 +559,7 @@ Peter does these steps once, in this order, so that the chat never runs in produ
 The plan's first task, before any production code. A local build cannot answer these questions; a throwaway deployment can.
 
 - **Setup.** Peter creates a second Vercel project in his Pro team from the branch `prototype/deploy-spike`, with no domains and no Anthropic key, and a pay-as-you-go Upstash database for it. The spike costs cents beyond the Pro plan.
-- **Approval.** Each push to that project deploys, so each one needs Peter's approval, like any outward action.
+- **Approval.** Each push to that project deploys. Its pushes follow [AGENTS.md](../AGENTS.md), "Releases and approvals" (row 151), and each runs the `release` skill's step 1 first.
 - **Throwaway.** The spike code stays on its branch (brain's prototype rules); its verdicts go into research 12 and, where they change a rule, into this spec. Peter removes the project afterwards.
 
 | # | Check | If it fails |
@@ -586,7 +591,7 @@ Approving this spec approves these amendments:
   4. Limits:
      - a refusal by `budget.reserve()` is an HTTP 200 stream with one `RUN_ERROR` event and the code `DAILY_LIMIT` or `SPEND_LIMIT`;
      - the handler finds `SPEND_LIMIT` from the Anthropic error's status and body, as above, and ends the stream with that code;
-     - `ChatTurnEvent.outcome` gains `limit`, and `errorCode` gains `DAILY_LIMIT`, `SPEND_LIMIT` and `MAX_TOKENS`;
+     - `ChatTurnEvent.outcome` gains `limit`, and `errorCode` gains `DAILY_LIMIT`, `SPEND_LIMIT` and `MAX_TOKENS` (SPEC-chat's row 155 later added `SERVER_ERROR`, for a thrown run);
      - the saved answer's outcome and `QuestionLogEntry.outcome` gain `limit`; a turn refused before the model call writes no question-log entry;
      - the views gain the "limit reached" state, and the question queue pauses on it.
   5. Usage:
@@ -614,7 +619,7 @@ Approving this spec approves these amendments:
   - `bun run documents` (`scripts/documents.ts`) writes the public documents to `documents/`, with `documents/inputs.sha256`; the document test above checks them. SPEC-content lists the script, the folder and the test, and defines the hash's inputs.
   - The line "`bun run build --public` (the website and CI use this)" changes: the website uses the committed `documents/`, and CI runs `bun run build` to check that the documents still build.
 - **SPEC-agents** (approved 2026-10-27, row 142) carries these into `AGENTS.md`:
-  - AGENTS.md: a push that changes a site file (a path not in `scripts/docs-only.txt`) is a release and needs Peter's approval.
+  - AGENTS.md: a push that changes a site file (a path not in `scripts/docs-only.txt`) is a release, and its "Releases and approvals" says which pushes need Peter (row 151).
   - AGENTS.md, Verify: `bun run build`, `bun run build:site` and `bun test` before every commit.
   - `bun run smoke`, `bun run documents` and the runbooks join the commands.
   - The edit-resume skill runs `bun run documents` and checks the committed PDF's page count.
@@ -771,8 +776,7 @@ The real platform is checked by the deploy spike, by the release check, by the t
   - treat a failed store or push call as a printed `ops_error`, never as a failed answer;
   - run `bun run build`, `bun run build:site` and `bun test` before a commit.
 - **Ask first:**
-  - pushing a change to a site file (a release), or changing `scripts/docs-only.txt`;
-  - each push to the deploy spike's project;
+  - changing `scripts/docs-only.txt`;
   - a change to a limit, the cap, the reservation, a size cap, a header, the policy, a route, a redirect, a WAF rule or a cache rule;
   - a new outside service, GitHub helper or package;
   - a change to the key layout or to what an alert says;
@@ -844,7 +848,7 @@ The real platform is checked by the deploy spike, by the release check, by the t
 53. As an attacker hammering the status route, I should hit its rate limit, and never reach the store more than once a minute per function instance.
 54. As an attacker who learns the ntfy topic, I should find no visitor data in the alerts.
 55. As a future agent, I want tests that name the broken header, route, alert rule, expiry, reservation or document, so that I fix the cause.
-56. As a future agent, I want the release rule in AGENTS.md and one list of docs-only paths, so that I know which pushes need Peter's approval.
+56. As a future agent, I want the release rule in AGENTS.md and one list of docs-only paths, so that I know which pushes are releases.
 
 ## Out of scope
 

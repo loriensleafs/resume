@@ -1,14 +1,16 @@
-// Assembles the chat's knowledge: resume entries, then approved deep dives, then
-// approved logistics answers. Every entry has a stable id the chat can cite.
+// Builds the chat's knowledge base in its two layers (SPEC-knowledge): the core, sent with every
+// question, and the approved sources, which the chat reads by id. The core holds the resume
+// entries, then the approved logistics answers, then one catalog entry per approved source, in
+// source-id order. Every entry has an id the chat can cite or read.
 
 import { z } from "zod";
 import { displayUrl, formatLocation, formatRange, formatTitle, loadResume, type Resume } from "../content";
-import { highlightId, isSlug, isSourceId, logisticsId, parseId, roleId, skillsId, SLUG_RULE, toSlug } from "./ids";
-import { KnowledgeError, parseDeepDive, SECTIONS, type DeepDive } from "./parse";
-
-export type Entry = { id: string; kind: "resume" | "deep-dive" | "logistics"; title: string; text: string };
+import { highlightId, isSlug, logisticsId, parseId, roleId, skillsId, SLUG_RULE, toSlug } from "./ids";
+import { KnowledgeError, parseSource } from "./parse";
+import type { Entry, Knowledge, Source } from "./types";
 
 const REPO = `${import.meta.dir}/../..`;
+const SOURCES = "knowledge/sources";
 
 const logisticsSchema = z.strictObject({
   topics: z.array(
@@ -40,25 +42,10 @@ function checkResumeSlugs(resume: Resume): void {
   });
 }
 
-export async function loadDeepDives(root: string): Promise<DeepDive[]> {
-  const dir = `${root}/knowledge/deep-dives`;
-  const files: string[] = [];
-  try {
-    for await (const f of new Bun.Glob("*.md").scan({ cwd: dir })) files.push(f);
-  } catch {
-    return []; // no deep dives yet
-  }
-  files.sort();
-  return Promise.all(files.map(async (f) => parseDeepDive(await Bun.file(`${dir}/${f}`).text(), `knowledge/deep-dives/${f}`)));
-}
-
-export async function buildKnowledge(options: { root?: string } = {}): Promise<Entry[]> {
-  const root = options.root ?? REPO;
-  const resume = await loadResume("public", root);
-  checkResumeSlugs(resume);
+/** The resume entries, in resume order: basics, each role with its highlights, the skills groups, education. */
+function resumeEntries(resume: Resume): Entry[] {
   const b = resume.basics;
   const entries: Entry[] = [];
-
   entries.push({
     id: "basics",
     kind: "resume",
@@ -78,40 +65,67 @@ export async function buildKnowledge(options: { root?: string } = {}): Promise<E
     entries.push({ id: skillsId(group.name), kind: "resume", title: `Skills: ${group.name}`, text: group.keywords.join(", ") });
   }
   entries.push({ id: "education", kind: "resume", title: "Education", text: resume.education.map((e) => e.institution).join("; ") });
+  return entries;
+}
 
-  const roles = new Map(resume.work.map((j) => [j.id, j]));
-  for (const dive of await loadDeepDives(root)) {
-    const file = `knowledge/deep-dives/${dive.id}.md`;
-    const role = roles.get(dive.role);
-    if (!role) throw new KnowledgeError(file, `role "${dive.role}" is not a work id in resume.yaml`);
-    for (const n of dive.highlights) {
-      if (n > role.highlights.length) throw new KnowledgeError(file, `role "${dive.role}" has no highlight ${n}`);
-    }
-    if (dive.status !== "approved") continue;
-    entries.push({
-      id: `deep:${dive.id}`,
-      kind: "deep-dive",
-      title: dive.title,
-      text: SECTIONS.map((s) => `${s}: ${dive.sections[s] || "Nothing listed."}`).join("\n"),
-    });
+/** The approved answers in knowledge/logistics.yaml, in file order; none when the file does not exist. */
+async function logisticsEntries(root: string): Promise<Entry[]> {
+  const file = Bun.file(`${root}/knowledge/logistics.yaml`);
+  if (!(await file.exists())) return [];
+  const parsed = logisticsSchema.safeParse(Bun.YAML.parse(await file.text()));
+  if (!parsed.success) throw new KnowledgeError("knowledge/logistics.yaml", `not valid:\n${z.prettifyError(parsed.error)}`);
+  return parsed.data.topics
+    .filter((t) => t.status === "approved")
+    .map((t) => ({ id: logisticsId(t.topic), kind: "logistics" as const, title: t.topic, text: t.answer!.trim() }));
+}
+
+/** Source-id order, by code unit: "alpha" comes before "alpha-beta", although "alpha-beta.md" comes before "alpha.md". */
+const bySourceId = (a: Source, b: Source) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+/**
+ * The approved sources in knowledge/sources/, in source-id order; none when the folder does not
+ * exist. Every file is parsed, so a draft's shape is checked too, and then a draft is left out.
+ */
+async function approvedSources(root: string): Promise<Source[]> {
+  const files: string[] = [];
+  try {
+    for await (const f of new Bun.Glob("*.md").scan({ cwd: `${root}/${SOURCES}` })) files.push(f);
+  } catch (e) {
+    if ((e as { code?: string }).code === "ENOENT") return [];
+    throw e;
   }
+  // Parsed one at a time in file-name order, so the same broken file is always the one reported.
+  files.sort();
+  const texts = await Promise.all(files.map((f) => Bun.file(`${root}/${SOURCES}/${f}`).text()));
+  return files
+    .map((f, i) => parseSource(texts[i]!, `${SOURCES}/${f}`))
+    .filter((parsed) => parsed.status === "approved")
+    .map((parsed) => parsed.source)
+    .sort(bySourceId);
+}
 
-  const logisticsFile = Bun.file(`${root}/knowledge/logistics.yaml`);
-  if (await logisticsFile.exists()) {
-    const parsed = logisticsSchema.safeParse(Bun.YAML.parse(await logisticsFile.text()));
-    if (!parsed.success) throw new KnowledgeError("knowledge/logistics.yaml", `not valid:\n${z.prettifyError(parsed.error)}`);
-    for (const t of parsed.data.topics) {
-      if (t.status === "approved") entries.push({ id: logisticsId(t.topic), kind: "logistics", title: t.topic, text: t.answer!.trim() });
-    }
-  }
+/** A source's catalog entry: its title, then its kind, its roles when it has any, and its summary. */
+function catalogEntry(source: Source): Entry {
+  const roles = source.roles.length ? `, roles ${source.roles.join(", ")}` : "";
+  return { id: source.id, kind: "catalog", title: source.title, text: `${source.kind}${roles}. ${source.summary}` };
+}
 
+/** Each core entry's id follows the id rules and is used once. */
+function checkIds(core: Entry[]): void {
   const seen = new Set<string>();
-  for (const e of entries) {
-    // "deep:" is the old contract's form until K3 makes each deep dive a catalog entry.
-    const follows = e.id.startsWith("deep:") ? isSourceId(e.id.slice("deep:".length)) : parseId(e.id) !== undefined;
-    if (!follows) throw new KnowledgeError("knowledge", `id "${e.id}" does not follow the id rules`);
+  for (const e of core) {
+    if (!parseId(e.id)) throw new KnowledgeError("knowledge", `id "${e.id}" does not follow the id rules`);
     if (seen.has(e.id)) throw new KnowledgeError("knowledge", `id "${e.id}" is used twice`);
     seen.add(e.id);
   }
-  return entries;
+}
+
+export async function buildKnowledge(options: { root?: string } = {}): Promise<Knowledge> {
+  const root = options.root ?? REPO;
+  const resume = await loadResume("public", root);
+  checkResumeSlugs(resume);
+  const sources = await approvedSources(root);
+  const core = [...resumeEntries(resume), ...(await logisticsEntries(root)), ...sources.map(catalogEntry)];
+  checkIds(core);
+  return { core, sources };
 }

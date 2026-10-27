@@ -24,7 +24,9 @@ basics:
 
 ## Edit the content
 
-Edit `resume.yaml`, then run `bun run build` and `bun test`. Every fact comes from Peter or his records; see [decision 0001](docs/decisions/0001-facts-from-records.md). AI agents use the [edit-resume skill](.agents/skills/edit-resume/SKILL.md).
+Edit `resume.yaml`, then run `bun run build`, `bun run documents` and `bun test`. Every fact comes from Peter or his records; see [decision 0001](docs/decisions/0001-facts-from-records.md). AI agents use the [edit-resume skill](.agents/skills/edit-resume/SKILL.md).
+
+`bun run documents` rebuilds the public documents in `documents/`, which the site serves, because the site's host has no Chrome to build them. Run it after every change to `resume.yaml`, to the build code (`src/content.ts`, `src/build.ts`, `src/print/`, `src/export/`) or to `fonts/`, and commit `documents/` in the same commit. When no input changed, it writes nothing. When you forget it, `bun test` fails and names the inputs that changed.
 
 ## Test
 
@@ -43,7 +45,8 @@ Only needed to change a weight or add characters. `bun run fonts` downloads Goog
 ```text
 resume.yaml      the resume content (JSON Resume shape)
 src/             schema, print template, Chrome printing, Word and text renderers, build()
-scripts/         bun run build, bun run fonts
+scripts/         bun run build, bun run documents, bun run fonts
+documents/       the committed public documents and their inputs hash
 fonts/           fixed-weight Google Sans Flex
 spec/            capability map and module specs
 tasks/           current plan and task list
@@ -56,9 +59,9 @@ AGENTS.md        instructions for every AI coding agent (CLAUDE.md imports it)
 
 ## Working with AI agents
 
-The repository carries its own agent context. An agent starts at [AGENTS.md](AGENTS.md); Claude Code reads it through [CLAUDE.md](CLAUDE.md), and Codex, Cursor, Copilot and Antigravity read it directly. The workflow follows Peter's brain plugin: specs in `spec/`, the plan in `tasks/`, decisions in `docs/decisions/`, research in `docs/research/`, current status in [docs/STATUS.md](docs/STATUS.md).
+The repository carries its own agent context. An agent starts at [AGENTS.md](AGENTS.md); Claude Code reads it through [CLAUDE.md](CLAUDE.md), Gemini CLI through [.gemini/settings.json](.gemini/settings.json), and Codex, Cursor, Copilot and Antigravity read it directly. The workflow follows Peter's brain plugin: specs in `spec/`, the plan in `tasks/`, decisions in `docs/decisions/`, research in `docs/research/`, current status in [docs/STATUS.md](docs/STATUS.md).
 
-Library skills load through TanStack Intent: `bun run intent list`, then `bun run intent load <package>#<skill>`. The design system's read-only documentation MCP server (`bun run design-system-mcp`) is configured for Codex (trusted projects), Cursor and VS Code.
+Library skills load through TanStack Intent: `bun run intent list`, then `bun run intent load <package>#<skill>`. The design system's read-only documentation MCP server (`bun run design-system-mcp`) is configured for Codex (trusted projects), Cursor, VS Code and Gemini CLI.
 
 For Claude Code, add two files at the repository root (an agent cannot write its own configuration):
 

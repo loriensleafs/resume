@@ -37,6 +37,7 @@ export const roleId = (role: string) => `role:${role}`;
 export const highlightId = (role: string, n: number) => `highlight:${role}.${n}`;
 export const skillsId = (groupName: string) => `skills:${toSlug(groupName)}`;
 export const logisticsId = (topic: string) => `logistics:${topic}`;
+export const passageId = (sourceId: string, n: number) => `${sourceId}.${n}`;
 
 /** Splits "<name>.<n>" at its last dot; undefined when the part after it is not a safe integer from 1. */
 function splitNumber(s: string): [string, number] | undefined {

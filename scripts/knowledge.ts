@@ -1,14 +1,22 @@
-// `bun run knowledge`: prints exactly what the chat will see, then its size.
+// `bun run knowledge`: prints the core exactly as the chat gets it with every question, then its
+// size against its budget. The core goes to standard output and the size to standard error, so
+// `bun run knowledge > core.txt` writes the core alone. A core at or over its budget exits with 1.
 
 import { buildKnowledge } from "../src/knowledge/build";
-import { checkBudget, KNOWLEDGE_BUDGET, renderKnowledge } from "../src/knowledge/render";
+import { CORE_CHARACTERS, renderCore } from "../src/knowledge/render";
+import type { Entry } from "../src/knowledge/types";
 
-const entries = await buildKnowledge();
-const text = renderKnowledge(entries);
-console.log(text);
-const count = (kind: string) => entries.filter((e) => e.kind === kind).length;
+const knowledge = await buildKnowledge();
+const core = renderCore(knowledge);
+await Bun.write(Bun.stdout, core);
+
+const count = (kind: Entry["kind"]) => knowledge.core.filter((e) => e.kind === kind).length;
+const formatCount = (n: number) => n.toLocaleString("en-US");
 console.error(
-  `${entries.length} entries (${count("resume")} resume, ${count("deep-dive")} deep dives, ${count("logistics")} logistics); ` +
-    `${text.length} of ${KNOWLEDGE_BUDGET} characters`,
+  `Core: ${knowledge.core.length} entries (${count("resume")} resume, ${count("logistics")} logistics, ${count("catalog")} catalog); ` +
+    `${formatCount(core.length)} of ${formatCount(CORE_CHARACTERS)} characters.`,
 );
-checkBudget(text);
+if (core.length >= CORE_CHARACTERS) {
+  console.error(`The core must stay under ${formatCount(CORE_CHARACTERS)} characters.`);
+  process.exitCode = 1;
+}

@@ -1,33 +1,23 @@
-// Renders knowledge entries as plain text for the chat's system prompt. Each entry
-// starts with its [id], which the chat cites.
+// Renders the knowledge base as the text the chat reads (SPEC-knowledge, Rendered text). Each
+// line of the core starts with the [id] the chat cites or reads.
 
-import type { Entry } from "./build";
+import type { Entry, Knowledge } from "./types";
 
-/** About 25,000 tokens at roughly 4 characters per token (SPEC-knowledge). */
-export const KNOWLEDGE_BUDGET = 100_000;
+/** The rendered core stays under this many characters: about 20,000 tokens at roughly 4 characters per token. */
+export const CORE_CHARACTERS = 80_000;
 
+/** The core's three parts, in this order, each under its heading. */
 const HEADINGS: Record<Entry["kind"], string> = {
   resume: "Resume",
-  "deep-dive": "Deep dives",
   logistics: "Job-search logistics",
+  catalog: "Catalog",
 };
 
-export function renderKnowledge(entries: Entry[]): string {
-  const out: string[] = [];
-  let kind: Entry["kind"] | undefined;
-  for (const e of entries) {
-    if (e.kind !== kind) {
-      if (kind) out.push("");
-      out.push(`# ${HEADINGS[e.kind]}`, "");
-      kind = e.kind;
-    }
-    out.push(e.kind === "deep-dive" ? `[${e.id}] ${e.title}\n${e.text}\n` : `[${e.id}] ${e.title}: ${e.text}`);
-  }
-  return out.join("\n").trimEnd() + "\n";
-}
-
-export function checkBudget(text: string): void {
-  if (text.length > KNOWLEDGE_BUDGET) {
-    throw new Error(`the knowledge text is ${text.length} characters; the budget is ${KNOWLEDGE_BUDGET}`);
-  }
+/** The core in its three parts, each heading printed even over a part with no entries; one `[<id>] <title>: <text>` line per entry. */
+export function renderCore(knowledge: Knowledge): string {
+  const parts = (Object.keys(HEADINGS) as Entry["kind"][]).map((kind) => {
+    const lines = knowledge.core.filter((e) => e.kind === kind).map((e) => `[${e.id}] ${e.title}: ${e.text}`);
+    return [`# ${HEADINGS[kind]}`, ...(lines.length ? ["", ...lines] : [])].join("\n");
+  });
+  return `${parts.join("\n\n")}\n`;
 }
