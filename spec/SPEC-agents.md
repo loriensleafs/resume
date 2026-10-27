@@ -99,7 +99,7 @@ Before you change a module, read its spec to the last line and the decisions it 
 
 The task that builds a module updates its row: the folders and the test command as built, and the state.
 
-**Verify** says: run `bun run build` and `bun test` before every commit; once the site module is built, also `bun run build:site` ([SPEC-deploy](SPEC-deploy.md)). The PDF stays exactly 2 pages. The tests need Google Chrome (or `CHROME_PATH`) and poppler.
+**Verify** says: run `bun run build` and `bun test` before every commit; once `package.json` has the `build:site` script (task D16), also `bun run build:site` ([SPEC-deploy](SPEC-deploy.md)). The PDF stays exactly 2 pages. The tests need Google Chrome (or `CHROME_PATH`) and poppler.
 
 **Releases and approvals** says, each rule with its spec:
 
@@ -175,7 +175,7 @@ Two seams (row 141).
 
 ## Boundaries
 
-- **Always:** keep each rule in its spec or decision, and point to it from `AGENTS.md`. Update a module's row when its task lands. Keep `AGENTS.md` at 120 lines or fewer. Use the glossary's words. Run `bun run build` and `bun test` (and `bun run build:site` once the site is built) before a commit.
+- **Always:** keep each rule in its spec or decision, and point to it from `AGENTS.md`. Update a module's row when its task lands. Keep `AGENTS.md` at 120 lines or fewer. Use the glossary's words. Run `bun run build` and `bun test` (and `bun run build:site` once `package.json` has it) before a commit.
 - **Ask first:** a new repo skill; a change to an approval rule in `AGENTS.md`; settings for a new agent; a new section in `AGENTS.md`.
 - **Never:** an agent writes `.mcp.json` or `.claude/settings.json`; Peter adds them. Never put raw interview answers, the redaction list, the phone number or an internal link in an agent file; they live in the private repo or in `private.yaml`.
 

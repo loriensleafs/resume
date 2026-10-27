@@ -15,7 +15,18 @@ Complete these steps before the requested work.
 
 Load `brain:using-brain` and pick the skill for the work. Before you put a decision or a permission to Peter, load `brain:ask-user-question`: one question per call, with your recommendation and its reason. Setup, wait-what, handoff, triage and wayfinder start from Peter's prompt; when one is needed, give him the command. [CLAUDE.md](CLAUDE.md) has the Claude spellings.
 
-Before you change an area, read its spec and the decisions that touch it ([index](docs/decisions/README.md)). Use the glossary's words.
+## Modules
+
+| Module | Spec | Folders | Tests | State |
+|---|---|---|---|---|
+| content | [SPEC-content](spec/SPEC-content.md) | `resume.yaml`, `src/content.ts`, `src/build.ts`, `src/print/`, `src/export/`, `documents/` | `bun test src/__tests__ scripts/__tests__/documents` | built; T1 to T4 add its amendments |
+| knowledge | [SPEC-knowledge](spec/SPEC-knowledge.md) | `knowledge/`, `src/knowledge/` | `bun test src/knowledge` | first version built; K1 to K13 build the two layers |
+| site | [SPEC-site](spec/SPEC-site.md) | `src/site/`, `public/` | `bun test src/site` | spec approved |
+| chat | [SPEC-chat](spec/SPEC-chat.md) | `src/chat/`, `evals/` | `bun test src/chat` | spec approved |
+| deploy | [SPEC-deploy](spec/SPEC-deploy.md) | `src/deploy/`, `src/ops/`, `scripts/build-site.ts`, `.github/` | `bun test src/ops src/deploy scripts/__tests__/docs-only scripts/__tests__/smoke` | spec approved |
+| agents | [SPEC-agents](spec/SPEC-agents.md) | the agent files | `bun test ./__tests__` | being built (A1 to A8) |
+
+Before you change a module, read its spec to the last line and the decisions it links ([index](docs/decisions/README.md)). Use the glossary's words.
 
 ## Facts
 
@@ -37,12 +48,17 @@ Write all tooling in Bun and TypeScript, with Bun's APIs ([decision 0004](docs/d
 
 ## Verify
 
-Run `bun run build` and `bun test` before every commit. The PDF stays exactly 2 pages. The tests need Google Chrome (or `CHROME_PATH`) and poppler (`pdftotext`, `pdffonts`).
+Run `bun run build` and `bun test` before every commit. Once `package.json` has the `build:site` script (task D16), also run `bun run build:site` ([SPEC-deploy](spec/SPEC-deploy.md)). The PDF stays exactly 2 pages. The tests need Google Chrome (or `CHROME_PATH`) and poppler (`pdftotext`, `pdffonts`).
+
+## Releases and approvals
+
+- A push to `main` that changes a site file is a release. A site file is any tracked path not in `scripts/docs-only.txt`. Ask Peter before each release, and follow the `release` skill ([SPEC-deploy](spec/SPEC-deploy.md)).
+- An approved knowledge source changes only after Peter approves the change in the question dialog; the change waits on a branch until then ([SPEC-knowledge](spec/SPEC-knowledge.md), row 130).
+- `bun run evals` costs money: run it only after Peter approves that run ([SPEC-chat](spec/SPEC-chat.md)).
+- Force-push, changing a repository's visibility, deploying by hand, and anything that costs money need Peter's approval each time. Agents never sign in to a dashboard and never buy anything ([SPEC-deploy](spec/SPEC-deploy.md)).
 
 ## Task end
 
 1. Tick the task's acceptance in [tasks/todo.md](tasks/todo.md). Update the spec when its facts change. Put research in its note and a decision in its record.
 2. Rewrite [status](docs/STATUS.md): the next action, anything red, and what waits on Peter, with the exact command when the next step is his.
 3. Record what is committed, pushed or waiting for approval. Stage files by name.
-
-Outward actions need Peter's approval each time: force-push, changing repository visibility, deploying, and anything that costs money.

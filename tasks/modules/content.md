@@ -55,7 +55,7 @@ Notes: keep the `pdftotext` and Word-text helpers inside the test file. A shared
 Delivers: `AGENTS.md`, the capability map and STATUS show content as built with its amendments. A fresh session told only "continue" names the next task's spec.
 Blocked by: T1, T3, A1
 Acceptance:
-- In `AGENTS.md`, the content row of the Modules table lists the folders as built (`resume.yaml`, `src/content.ts`, `src/build.ts`, `documents/`), `bun test src/__tests__ scripts/__tests__/documents`, and the state "built". In `spec/README.md`, the content row says built (SPEC-agents, Code Style: "The task that builds a module updates its row").
+- In `AGENTS.md`, the content row of the Modules table lists the folders as built (`resume.yaml`, `src/content.ts`, `src/build.ts`, `src/print/`, `src/export/`, `documents/`), `bun test src/__tests__ scripts/__tests__/documents`, and the state "built". In `spec/README.md`, the content row says built (SPEC-agents, Code Style: "The task that builds a module updates its row").
 - The fresh-session check passes, and its result is in `docs/STATUS.md`. A sub-agent in a fresh clone is told only "continue", and Peter reads the result. It reports the phase, the last step, the next step, anything red and the pending decisions in 5 lines or fewer, and it names the next task's spec (SPEC-agents, Testing Strategy 2).
 - Research 12 records the fixed-date verdict from "Settled before the tasks".
 Verify: `bun test`; the fresh-session check (a sub-agent in a fresh clone)
