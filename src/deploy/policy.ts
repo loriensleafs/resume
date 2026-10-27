@@ -29,8 +29,12 @@ function hashSource(text: string): string {
 // a page that does not match is refused, never guessed at.
 /** HTML's whitespace. `\s` also matches characters, such as a no-break space, that the tree builder does not skip. */
 const SPACE = "[\\t\\n\\f\\r ]";
-/** A comment ends at the first --> or --!>. "<!-->" and "<!--->" end at once, so a start with them is refused. */
-const COMMENT = "<!--(?!-?>)[\\s\\S]*?--!?>";
+/**
+ * A comment ends at the first --> or --!>. Its text may not hold either, so each comment has one end, and a failing
+ * match cannot try each later end in turn (k comments would give 2^k tries). "<!-->" and "<!--->" end at once, so a
+ * start with them is refused.
+ */
+const COMMENT = "<!--(?!-?>)(?:(?!--!?>)[\\s\\S])*--!?>";
 const SKIPPED = `(?:${SPACE}|${COMMENT})*`;
 /** An attribute with a plain name and a quoted or plain value. A quote or "<" in a name or plain value fails. */
 const ATTRIBUTE = `${SPACE}+[a-z_:][-a-z0-9_:.]*(?:${SPACE}*=${SPACE}*(?:"[^"]*"|'[^']*'|[^\\t\\n\\f\\r "'=<>\`]+))?`;

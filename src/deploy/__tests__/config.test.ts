@@ -147,6 +147,22 @@ describe("addPolicyTags()", () => {
     await expect(addPolicyTags(dir)).rejects.toThrow(`${dir}/index.html must have only`);
   });
 
+  // A comment rule that may end at any later "-->" gives k comments about 2^k ways to split, so this page once took
+  // hours to refuse (D16 security review). The bound only has to tell a linear check from that, with room for a slow
+  // CI runner.
+  test("refuses a page with 40 comments and then a script before <head>, in under 500 ms", async () => {
+    const dir = await staticFolder("many-comments", {
+      "index.html": `${"<!--a-->".repeat(40)}<script>var inline = 1;</script><html><head></head></html>`,
+    });
+
+    const started = performance.now();
+    await expect(addPolicyTags(dir)).rejects.toThrow(`${dir}/index.html must have only`);
+    const elapsed = performance.now() - started;
+
+    console.log(`40 comments refused in ${elapsed.toFixed(1)} ms`);
+    expect(elapsed).toBeLessThan(500);
+  });
+
   test("accepts a doctype, whitespace, comments and <html> before <head>, and puts the tag right after <head>", async () => {
     const start = "<!-- built -->\n<!DOCTYPE html>\n<!-- page -->\n<HTML lang=\"en\" class='a b'>\n  <head data-x=y>";
     const page = `${start}<title>Home</title></head><body><script>var inline = 1;</script></body></HTML>`;
