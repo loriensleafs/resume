@@ -97,7 +97,7 @@ Needs Peter: approval of each spec change (a route, header, runtime or WAF rule 
 Delivers: Every push and pull request runs the workflow `ci` with the jobs `test`, `audit` and `audit-all`, and Peter sees their results on GitHub.
 Blocked by: none
 Acceptance:
-- Job `test` on `ubuntu-24.04`: `actions/checkout`, `oven-sh/setup-bun` with `bun-version: 1.4.2`, `poppler-utils`, `bun ci`, `bun run build`, then `bun test` with `CHROME_PATH=/usr/bin/google-chrome`, and it passes (D16 adds `bun run build:site`).
+- Job `test` on `ubuntu-24.04`: `actions/checkout`, `oven-sh/setup-bun` with `bun-version: 1.4.4`, `poppler-utils`, `bun ci`, `bun run build`, then `bun test` with `CHROME_PATH=/usr/bin/google-chrome`, and it passes (D16 adds `bun run build:site`).
 - Job `audit` runs `bun audit --prod --audit-level=high`; job `audit-all` runs `bun audit --audit-level=high` and is not a required check.
 - Every helper is pinned to an exact commit, and the workflow grants only the permissions it needs (row 120).
 Verify: push the branch; `gh run watch`; `gh run view <run id> --json jobs` shows `test`, `audit` and `audit-all`.

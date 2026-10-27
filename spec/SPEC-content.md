@@ -96,7 +96,7 @@ A content edit changes the snapshots. Run `bun test --update-snapshots` and revi
 
 ## Boundaries
 
-- **Always:** take every fact from Peter or his records. Run `bun run build`, `bun run build:site` and `bun test` before a commit. Commit a change to `resume.yaml` together with the documents `bun run documents` rebuilt. Keep the PDF at 2 pages.
+- **Always:** take every fact from Peter or his records. Run `bun run typecheck`, `bun run build`, `bun run build:site` and `bun test` before a commit. Commit a change to `resume.yaml` together with the documents `bun run documents` rebuilt. Keep the PDF at 2 pages.
 - **Ask first:** adding a dependency; changing fonts, colors or layout; changing the shape of `resume.yaml`.
 - **Never:** put the phone number or other private details in a tracked file or a public output. Invent, round up or upgrade a fact. Add Node or Python tooling. Commit `dist/`.
 

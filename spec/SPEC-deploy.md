@@ -620,7 +620,7 @@ Approving this spec approves these amendments:
   - The line "`bun run build --public` (the website and CI use this)" changes: the website uses the committed `documents/`, and CI runs `bun run build` to check that the documents still build.
 - **SPEC-agents** (approved 2026-10-27, row 142) carries these into `AGENTS.md`:
   - AGENTS.md: a push that changes a site file (a path not in `scripts/docs-only.txt`) is a release, and its "Releases and approvals" says which pushes need Peter (row 151).
-  - AGENTS.md, Verify: `bun run build`, `bun run build:site` and `bun test` before every commit.
+  - AGENTS.md, Verify: `bun run typecheck`, `bun run build`, `bun run build:site` and `bun test` before every commit.
   - `bun run smoke`, `bun run documents` and the runbooks join the commands.
   - The edit-resume skill runs `bun run documents` and checks the committed PDF's page count.
 
@@ -774,7 +774,7 @@ The real platform is checked by the deploy spike, by the release check, by the t
   - keep previews and local runs on the fake model and the in-memory store, by code;
   - commit a resume change together with its rebuilt documents;
   - treat a failed store or push call as a printed `ops_error`, never as a failed answer;
-  - run `bun run build`, `bun run build:site` and `bun test` before a commit.
+  - run `bun run typecheck`, `bun run build`, `bun run build:site` and `bun test` before a commit.
 - **Ask first:**
   - changing `scripts/docs-only.txt`;
   - a change to a limit, the cap, the reservation, a size cap, a header, the policy, a route, a redirect, a WAF rule or a cache rule;

@@ -17,5 +17,5 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true
   },
-  "include": ["src", "scripts", "__tests__", "evals", "*.ts"]
+  "include": ["src", "scripts", "__tests__", "evals", ".agents/skills", "*.ts"]
 }

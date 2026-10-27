@@ -319,7 +319,7 @@ Peter approved this contract on 2026-10-27 ([decision record](../docs/design/int
 
 ## Boundaries
 
-- **Always:** take every fact from `resume.yaml` and `publicKnowledge(knowledge)`. Build to the approved mockups. Keep every page readable without JavaScript. Use the glossary's words and SPEC-knowledge's ids. Run `bun run build`, `bun run build:site` and `bun test` before a commit.
+- **Always:** take every fact from `resume.yaml` and `publicKnowledge(knowledge)`. Build to the approved mockups. Keep every page readable without JavaScript. Use the glossary's words and SPEC-knowledge's ids. Run `bun run typecheck`, `bun run build`, `bun run build:site` and `bun test` before a commit.
 - **Ask first:** a dependency not named in this spec; a change from the approved mockups; the wording of the suggested questions; a change to the workspace contract, because the chat module depends on it; any request to a third party (fonts, analytics, scripts).
 - **Never:** put private details in any output, or a source's `Not public` text in any file under `.vercel/output/static/`. Add a list of sources to browse. Store anything that identifies a visitor on a server (the chat's anonymous question log is [decision 0020](../docs/decisions/0020-anonymous-question-log.md)). Render a design-system part's shadow DOM on the server; the prerender writes only its tag and light-DOM content. Run a page or a server function at request time. Add Node or Python tooling. Commit `dist/` or `.vercel/`.
 
