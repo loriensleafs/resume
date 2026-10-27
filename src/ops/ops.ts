@@ -44,14 +44,19 @@ export function createOps(env: OpsEnv, io: { now?: () => Date } = {}): Ops {
   if (env.VERCEL_ENV !== "production") {
     return inMemoryOps(now, previewRefusal(env.PREVIEW_LIMIT));
   }
-  // The store-backed parts (SPEC-deploy, "Store calls") are not built yet. Until they are,
-  // production gets the in-memory parts too, with a budget that allows every turn.
+  // The interim: the store-backed parts (SPEC-deploy, "Store calls") are not built yet. Until D10,
+  // D11 and D12 replace the log, the budget and the telemetry, production gets the in-memory parts
+  // with a budget that allows every turn. A missing or failing store keeps answers working, and
+  // Anthropic's monthly spend limit stays the backstop (SPEC-deploy, "The store fails").
   return inMemoryOps(now);
 }
 
 function inMemoryOps(now: () => Date, refusal?: "DAILY_LIMIT" | "SPEND_LIMIT"): Ops {
   return { log: inMemoryQuestionLog(now), budget: inMemoryBudget(refusal), telemetry: inMemoryTelemetry() };
 }
+
+/** The most characters of an unknown PREVIEW_LIMIT that the error shows, in case a secret went into it by mistake. */
+const shownCharacters = 32;
 
 /** The code the budget refuses every turn with outside production, from PREVIEW_LIMIT. */
 function previewRefusal(previewLimit: string | undefined): "DAILY_LIMIT" | "SPEND_LIMIT" | undefined {
@@ -63,9 +68,13 @@ function previewRefusal(previewLimit: string | undefined): "DAILY_LIMIT" | "SPEN
       return "DAILY_LIMIT";
     case "month":
       return "SPEND_LIMIT";
-    default:
-      throw new Error(
-        `PREVIEW_LIMIT is ${JSON.stringify(previewLimit)}; outside production it must be "day", "month" or unset.`,
-      );
+    default: {
+      const characters = [...previewLimit];
+      const shown =
+        characters.length > shownCharacters
+          ? `${JSON.stringify(characters.slice(0, shownCharacters).join(""))} (cut to ${shownCharacters} characters)`
+          : JSON.stringify(previewLimit);
+      throw new Error(`PREVIEW_LIMIT is ${shown}; outside production it must be "day", "month" or unset.`);
+    }
   }
 }

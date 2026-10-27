@@ -3,11 +3,41 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { questionLogContract } from "../../chat/server/__tests__/question-log-contract";
+import type { QuestionLogEntry } from "../../chat/server/question-log";
+import type { ChatTurnEvent } from "../../chat/server/telemetry";
 import { createOps } from "../ops";
 import { startFakeUpstash, type FakeUpstash } from "./fake-upstash";
 
 /** 2026-10-27 at noon UTC, the day the specs write their examples for. */
 const noon = () => new Date("2026-10-27T12:00:00.000Z");
+
+/** The question-log entry of an answered turn. */
+const answeredEntry: QuestionLogEntry = {
+  id: "entry-1",
+  date: "2026-10-27",
+  question: "How did FedNow's bundle get under 1 MB?",
+  read: ["fednow-bundle-size"],
+  citations: ["fednow-bundle-size.2"],
+  removed: 0,
+  outcome: "answered",
+};
+
+/** The chat_turn event of the same answered turn. */
+const answeredTurn: ChatTurnEvent = {
+  event: "chat_turn",
+  outcome: "answered",
+  reads: 1,
+  citations: 1,
+  removed: 0,
+  modelCalls: 2,
+  inputTokens: 1_200,
+  cachedInputTokens: 9_000,
+  cacheWriteTokens: 300,
+  cacheWrite1hTokens: 0,
+  outputTokens: 450,
+  durationMs: 8_400,
+  errorCode: null,
+};
 
 questionLogContract("createOps() outside production", (now) => createOps({ VERCEL_ENV: "preview" }, { now }).log);
 
@@ -41,28 +71,29 @@ describe("createOps() outside production", () => {
       'PREVIEW_LIMIT is "daily"; outside production it must be "day", "month" or unset.',
     );
   });
+
+  test("the error shows at most 32 characters of an unknown PREVIEW_LIMIT", () => {
+    const pasted = `${"k".repeat(32)}-the-rest-of-a-pasted-secret`;
+
+    expect(() => createOps({ VERCEL_ENV: "preview", PREVIEW_LIMIT: pasted })).toThrow(
+      `PREVIEW_LIMIT is "${"k".repeat(32)}" (cut to 32 characters); outside production it must be "day", "month" or unset.`,
+    );
+  });
 });
 
 describe("createOps() in production", () => {
-  let upstash: FakeUpstash;
-  beforeEach(() => {
-    upstash = startFakeUpstash();
-  });
-  afterEach(async () => {
-    await upstash.stop();
-  });
+  test("with no store or alert variables, a whole turn still works", async () => {
+    const ops = createOps({ VERCEL_ENV: "production" }, { now: noon });
 
-  test.each(["day", "month", "daily"])("ignores PREVIEW_LIMIT=%s: the budget allows the turn", async (previewLimit) => {
-    const ops = createOps(
-      { VERCEL_ENV: "production", KV_REST_API_URL: upstash.url, KV_REST_API_TOKEN: "test", PREVIEW_LIMIT: previewLimit },
-      { now: noon },
-    );
+    const ticket = await ops.budget.reserve();
+    if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
 
-    expect(await ops.budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) });
+    await expect(ops.log.append(answeredEntry)).resolves.toBeUndefined();
+    await expect(ops.telemetry.record(answeredTurn, ticket.reservation)).resolves.toBeUndefined();
   });
 });
 
-describe("guards", () => {
+describe("createOps() with the store and alert variables set", () => {
   let upstash: FakeUpstash;
   beforeEach(() => {
     upstash = startFakeUpstash();
@@ -71,52 +102,31 @@ describe("guards", () => {
     await upstash.stop();
   });
 
-  test.each(["preview", "development", undefined])(
-    "with VERCEL_ENV %p and the store and alert variables set, a whole turn calls no server",
-    async (vercelEnv) => {
-      // The store and alert variables point at the in-test server, so a store call or a push would show there.
-      const ops = createOps(
-        {
-          VERCEL_ENV: vercelEnv,
-          KV_REST_API_URL: upstash.url,
-          KV_REST_API_TOKEN: "test",
-          NTFY_TOPIC_URL: `${upstash.url}/topic`,
-          ANTHROPIC_API_KEY: "test",
-        },
-        { now: noon },
-      );
+  /** The variables production has, each pointing at the in-test server, so a store call or a push shows there. */
+  const storeAndAlerts = () => ({
+    KV_REST_API_URL: upstash.url,
+    KV_REST_API_TOKEN: "test",
+    NTFY_TOPIC_URL: `${upstash.url}/topic`,
+    ANTHROPIC_API_KEY: "test",
+  });
 
-      const ticket = await ops.budget.reserve();
-      await ops.log.append({
-        id: "entry-1",
-        date: "2026-10-27",
-        question: "How did FedNow's bundle get under 1 MB?",
-        read: ["fednow-bundle-size"],
-        citations: ["fednow-bundle-size.2"],
-        removed: 0,
-        outcome: "answered",
-      });
-      await ops.telemetry.record(
-        {
-          event: "chat_turn",
-          outcome: "answered",
-          reads: 1,
-          citations: 1,
-          removed: 0,
-          modelCalls: 2,
-          inputTokens: 1_200,
-          cachedInputTokens: 9_000,
-          cacheWriteTokens: 300,
-          cacheWrite1hTokens: 0,
-          outputTokens: 450,
-          durationMs: 8_400,
-          errorCode: null,
-        },
-        ticket.ok ? ticket.reservation : undefined,
-      );
-      await ops.log.list(7);
+  test.each(["day", "month", "daily"])("in production, PREVIEW_LIMIT=%s is ignored: the budget allows the turn", async (previewLimit) => {
+    // Nothing calls the server yet: production still has its in-memory interim (ops.ts). The
+    // variables are here so that this test runs on the store-backed path once D11 builds it.
+    const ops = createOps({ VERCEL_ENV: "production", PREVIEW_LIMIT: previewLimit, ...storeAndAlerts() }, { now: noon });
 
-      expect(upstash.requests).toEqual([]);
-    },
-  );
+    expect(await ops.budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) });
+  });
+
+  test.each(["preview", "development", undefined])("with VERCEL_ENV %p, a whole turn calls no server", async (vercelEnv) => {
+    const ops = createOps({ VERCEL_ENV: vercelEnv, ...storeAndAlerts() }, { now: noon });
+
+    const ticket = await ops.budget.reserve();
+    if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
+    await ops.log.append(answeredEntry);
+    await ops.telemetry.record(answeredTurn, ticket.reservation);
+    await ops.log.list(7);
+
+    expect(upstash.requests).toEqual([]);
+  });
 });
