@@ -6,6 +6,7 @@
 // 3. replaces the `routes` Nitro wrote in .vercel/output/config.json with SPEC-deploy's list ("Routes"), keeps
 //    Nitro's other fields, and adds `overrides` for the prerendered pages and the cron. One route is new to the
 //    spec's list: function folders that no API route names get the not-found page (check 3, run 40570467882).
+//    D4 adds a second cron on the same path, a few minutes after the build (probeCron, check 6).
 // Checks 2 and 3 test what Vercel does with this file; checks 4, 5 and 11 (D3) test the redirect, the headers and
 // the policy tags. The spike has one host redirect, for its own .vercel.app address: the other hosts have no
 // domains on this project, so no request can reach them.
@@ -66,8 +67,8 @@ export const SPIKE_PATH = "/api/spike";
 
 /**
  * The API routes (SPEC-deploy step 4): each path and the function it runs in. /api/spike is the chat's twin (its
- * own function); /api/cron/health goes to __server, as SPEC-deploy's /api/status and /api/cron/health do. D4 adds
- * the health route's handler.
+ * own function); /api/cron/health goes to __server, as SPEC-deploy's /api/status and /api/cron/health do. Its
+ * handler is src/site/routes/api.cron.health.ts (D4).
  */
 export const API_ROUTES = [
   { path: SPIKE_PATH, fn: "/api/spike" },
@@ -85,6 +86,21 @@ export const QUERY_ROUTES = [
 
 /** SPEC-deploy's cron. */
 export const CRON = { path: "/api/cron/health", schedule: "17 15 * * *" } as const;
+
+/** How long after the build the probe cron runs: the deployment is ready and the checks have started by then. */
+export const PROBE_LEAD_MS = 4 * 60_000;
+
+/**
+ * Check 6 (D4): a second cron on SPEC-deploy's path, daily like SPEC-deploy's, at the first whole minute at least
+ * PROBE_LEAD_MS after `builtAt` (UTC), so a run sees Vercel Cron call the route without waiting for 15:17 UTC.
+ * Several crons may share a path, and each call names its schedule in x-vercel-cron-schedule
+ * (https://vercel.com/docs/cron-jobs/manage-cron-jobs#reading-the-cron-schedule-header). On Pro a cron runs within
+ * the minute it names (same page, "Cron jobs accuracy"). When the probe falls on 15:17, SPEC-deploy's cron is the probe.
+ */
+export function probeCron(builtAt: Date): { path: string; schedule: string } {
+  const at = new Date(Math.ceil((builtAt.getTime() + PROBE_LEAD_MS) / 60_000) * 60_000);
+  return { path: CRON.path, schedule: `${at.getUTCMinutes()} ${at.getUTCHours()} * * *` };
+}
 
 const NOT_FOUND_PAGE = `<!doctype html>
 <html lang="en">
@@ -209,7 +225,9 @@ async function main(): Promise<void> {
     { src: "^/(.*)$", dest: "/404.html", status: 404 },
   ];
 
-  const written = { ...config, overrides, routes, crons: [{ ...CRON }] };
+  const probe = probeCron(new Date());
+  const crons = probe.schedule === CRON.schedule ? [{ ...CRON }] : [{ ...CRON }, probe];
+  const written = { ...config, overrides, routes, crons };
   await Bun.write(configPath, JSON.stringify(written, null, 2) + "\n");
   console.log(
     `post-build: 404.html; policy tags in ${tagged.join(", ")}; ${routes.length} routes; function folders sent to 404.html: ${hidden.join(", ")}; overrides for ${Object.values(overrides).map((o) => `/${o.path}`).join(", ")}; ` +

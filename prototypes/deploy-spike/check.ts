@@ -11,6 +11,9 @@
 // Checks 4, 5 and 11 (D3) test its headers, its host redirect and the Vercel Toolbar; check 11 drives the runner's
 // Chrome through the DevTools protocol (chromeVisits below), so the spike adds no package. Check 10 is Peter's, by
 // hand; the run prints the PDF's address for it.
+// Checks 9, 7 and 6 (D4) ask the store and Vercel Cron. The store calls run in the function on the deployment, which
+// holds the KV_* variables (api.spike.ts, `mode=`); the run sees booleans, numbers, hosts and error words only.
+// Check 6 runs last, because it waits for the probe cron that post-build.ts sets a few minutes after the build.
 // It prints states, hosts and verdicts only. Rerun only the newest run: an older one waits for a commit that the
 // branch URL no longer serves.
 
@@ -57,6 +60,7 @@ type BuildInfo = {
   workbox: string[]; // the workbox-<hash>.js files
   asset: string | null; // one file in assets/
   crons: { path: string; schedule: string }[];
+  builtAt: string; // when build-info.ts ran, the build's last step
 };
 
 type Report = Record<string, boolean | string | number | null>;
@@ -75,8 +79,8 @@ export type Ctx = {
   productionFetch(path: string, init?: RequestInit): Promise<Response>;
   /** A flat JSON object that a spike function on the deployment reports: booleans, hosts, times, no tokens. */
   report(path: string): Promise<Report>;
-  /** Calls attempt every 10 s until it returns a value, or until maxMs or the run's deadline passes. */
-  poll<T>(label: string, maxMs: number, attempt: () => Promise<T | undefined>): Promise<T | undefined>;
+  /** Calls attempt every `everyMs` (10 s) until it returns a value, or until maxMs or the run's deadline passes. */
+  poll<T>(label: string, maxMs: number, attempt: () => Promise<T | undefined>, everyMs?: number): Promise<T | undefined>;
   /**
    * Loads each path on the deployment in Chrome, each in a fresh browser context. Only requests to the deployment
    * get the bypass and x-vercel-skip-toolbar; the first also asks for the bypass cookie, so the service worker's own
@@ -400,7 +404,272 @@ const toolbarOff: Check = {
   },
 };
 
-export const CHECKS: Check[] = [buildBun, postBuildRoutes, notFound, headerMerge, hostRedirect, toolbarOff];
+const seconds = (ms: number) => `${ms >= 0 ? "+" : ""}${(ms / 1000).toFixed(1)} s`;
+const word = (value: unknown) => (value === null || value === undefined ? "" : ` ${value}`);
+/** A store reply that refused the command: an HTTP status other than 200, or an error word. */
+const refused = (status: unknown, error: unknown) => status !== 200 || (error !== null && error !== undefined);
+
+/**
+ * Check 9: what the Upstash tokens can run. The function on the deployment runs the commands (api.spike.ts,
+ * mode=store) on fresh spike:tokens:<nonce>:* keys that expire in 10 minutes, and deletes them at the end:
+ * - the standard token's /multi-exec writes a list, a hash and a sorted set (ZADD GT), each with EXPIREAT;
+ * - the reservation's transaction: INCRBY 900000 (the $0.90), EXPIREAT, GET of the spend-limit marker, and PTTL;
+ * - the read-only token runs LRANGE, HGETALL, ZRANGE and GET, one by one and as a /pipeline, and must read back what
+ *   was written; its /multi-exec and SCAN are recorded;
+ * - controls: the read-only token's SET and EXPIREAT must be refused, with no key made and the expiry unchanged;
+ * - the take-back: DECRBY returns the total to 0 and keeps the expiry.
+ */
+const storeTokens: Check = {
+  check: 9,
+  name: "Upstash tokens",
+  ifFails: "the reader or the transaction changes",
+  async run({ report }) {
+    const r = await report(`${SPIKE_PATH}?mode=store`);
+    const problems: string[] = [];
+    const need = (ok: boolean, what: string) => void (ok || problems.push(what));
+    const status = (prefix: string) => `HTTP ${r[`${prefix}.status`]}${word(r[`${prefix}.error`])}`;
+
+    need(r["config.url"] === true && r["config.token"] === true && r["config.readOnlyToken"] === true,
+      `the function lacks a store variable: KV_REST_API_URL ${r["config.url"]}, KV_REST_API_TOKEN ${r["config.token"]}, KV_REST_API_READ_ONLY_TOKEN ${r["config.readOnlyToken"]}`);
+    need(r["write.ok"] === true && r["write.expireat"] === true, `the writes' /multi-exec (RPUSH, HINCRBY, ZADD GT, each with EXPIREAT): ${status("write")}`);
+    const ttl = Number(r["reserve.ttlMs"]);
+    const reserveOk = r["reserve.ok"] === true && r["reserve.total"] === 900_000 && r["reserve.expireat"] === 1 && r["reserve.limitMarker"] === "none" && ttl > 0 && ttl <= 600_000;
+    need(reserveOk, `the reservation's /multi-exec (INCRBY, EXPIREAT, GET, PTTL): ${status("reserve")}, total ${r["reserve.total"]}, EXPIREAT ${r["reserve.expireat"]}, PTTL ${r["reserve.ttlMs"]}`);
+    need(r["takeBack.total"] === 0 && r["takeBack.ttlKept"] === true, `the take-back's /multi-exec (DECRBY, PTTL): ${status("takeBack")}, total ${r["takeBack.total"]}`);
+    const reads = ["lrange", "hgetall", "zrange", "get"];
+    for (const name of reads) need(r[`ro.${name}.same`] === true, `the read-only token's ${name.toUpperCase()}: ${status(`ro.${name}`)}, not what was written`);
+    need(r["ro.pipeline.same"] === true, `the read-only token's /pipeline of the four reads: ${status("ro.pipeline")}`);
+    need(refused(r["ro.set.status"], r["ro.set.error"]) && r["ro.set.keyExists"] === 0, `the read-only token's SET was not refused: ${status("ro.set")}, key made ${r["ro.set.keyExists"]}`);
+    need(refused(r["ro.expireat.status"], r["ro.expireat.error"]) && r["ro.expireat.ttlKept"] === true, `the read-only token's EXPIREAT was not refused: ${status("ro.expireat")}`);
+
+    const seen = [
+      `the function has KV_REST_API_URL ${r["config.url"]}, KV_REST_API_TOKEN ${r["config.token"]}, KV_REST_API_READ_ONLY_TOKEN ${r["config.readOnlyToken"]}`,
+      `standard token, /multi-exec of RPUSH, HINCRBY and ZADD GT, each with EXPIREAT: ${r["write.ok"] ? "ok" : status("write")}, EXPIREAT answered 1 for each: ${r["write.expireat"]}, ZADD GT kept the higher score: ${r["write.zaddGt"]}`,
+      `the reservation, /multi-exec of INCRBY 900000, EXPIREAT, GET of the spend-limit marker and PTTL: ${r["reserve.ok"] ? "ok" : status("reserve")}, total ${r["reserve.total"]}, EXPIREAT ${r["reserve.expireat"]}, marker ${r["reserve.limitMarker"]}, PTTL ${r["reserve.ttlMs"]} ms`,
+      `the take-back, /multi-exec of DECRBY and PTTL: total ${r["takeBack.total"]}, expiry kept ${r["takeBack.ttlKept"]}`,
+      `read-only token: ${reads.map((n) => `${n.toUpperCase()} ${r[`ro.${n}.same`] ? "ok" : status(`ro.${n}`)}`).join(", ")}; as /pipeline ${r["ro.pipeline.same"] ? "ok" : status("ro.pipeline")}; as /multi-exec ${r["ro.multiExec.same"] ? "ok" : status("ro.multiExec")}`,
+      `read-only SET: ${status("ro.set")}, key made ${r["ro.set.keyExists"]}; read-only EXPIREAT: ${status("ro.expireat")}, expiry unchanged ${r["ro.expireat.ttlKept"]}; read-only SCAN: ${status("ro.scan")}`,
+      `cleanup: DEL removed ${r["cleanup.deleted"]} keys`,
+    ];
+    return { pass: problems.length === 0, detail: problems.length ? `${problems.join("; ")}; seen: ${seen.join("; ")}` : seen.join("; ") };
+  },
+};
+
+/** Reads server-sent events until `stopAfter` events (then returns, for the caller to abort), the end, or `ms`. */
+async function readEvents(res: Response, stopAfter: number | null, ms: number): Promise<{ events: number; done: boolean; error: string | null }> {
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let events = 0;
+  const until = Date.now() + ms;
+  try {
+    while (Date.now() < until) {
+      const next = await withTimeout(reader.read(), Math.max(1, until - Date.now()), "the stream sent nothing");
+      if (next.done) break;
+      text += decoder.decode(next.value, { stream: true });
+      const parts = text.split("\n\n");
+      text = parts.pop()!;
+      for (const part of parts) {
+        if (!part.startsWith("data:")) continue;
+        if (part.includes('"done":true')) return { events, done: true, error: null };
+        events++;
+        if (stopAfter !== null && events >= stopAfter) return { events, done: false, error: null };
+      }
+    }
+    return { events, done: false, error: Date.now() >= until ? "time limit" : null };
+  } catch (error) {
+    return { events, done: false, error: (error as Error).message };
+  }
+}
+
+/** Check 7's quiet time: no request of the run reaches the function between one stream and the next, or the report. */
+const IDLE_MS = 15_000;
+
+/**
+ * Check 7: store writes after the last chunk finish when the visitor stops a streamed turn. SPEC-deploy's turn writes
+ * log.append() and telemetry.record() after the last chunk (a stand-in in api.spike.ts, mode=stream, kind=turn:
+ * the second write comes 2 s after the first). Four streams, each followed by 15 s with no request to the function,
+ * so that nothing but the stream itself keeps the function running:
+ * 1. the stopped turn: the run reads 3 events, then aborts its fetch, as the browser's Stop does;
+ * 2. the full turn (control): the run reads to the end, so its writes land while it is connected;
+ * 3. after the end, no waitUntil (recorded): the function ends the stream, then writes 2 s later;
+ * 4. after the end, with Vercel's waitUntil as Nitro hands it on the request (recorded): the same inside it.
+ * Then the run reads each marker's age from the store (PTTL, the store's own clock), so it knows when each write
+ * landed against its own times, about ±1 s. A write that lands only after the next request reached the function
+ * would mean the function was frozen until then; the pass rule asks for the stopped turn's writes before that.
+ */
+const storeAfterStop: Check = {
+  check: 7,
+  name: "store writes after Stop",
+  ifFails: "use Vercel's waitUntil from @vercel/functions, a new package for Peter's approval",
+  async run({ deploymentFetch, report }) {
+    const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()] as const;
+    const path = (kind: string, id: string) => `${SPIKE_PATH}?mode=stream&kind=${kind}&id=${id}`;
+    const at: Record<string, number> = {};
+    const open = async (kind: string, id: string, init?: RequestInit) => {
+      const res = await deploymentFetch(path(kind, id), init);
+      if (res.status !== 200 || !res.headers.get("content-type")?.startsWith("text/event-stream")) {
+        throw new Error(`${kind} answered HTTP ${res.status} (${res.headers.get("content-type")}), not an event stream`);
+      }
+      return res;
+    };
+
+    // 1. The stopped turn.
+    const stopper = new AbortController();
+    at.stopSent = Date.now();
+    const stopRead = await readEvents(await open("turn", ids[0], { signal: stopper.signal }), 3, 10_000);
+    at.stop = Date.now();
+    stopper.abort();
+    await sleep(IDLE_MS);
+    // 2. The full turn.
+    at.fullSent = Date.now();
+    const fullRead = await readEvents(await open("turn", ids[1]), null, 30_000);
+    at.fullEnd = Date.now();
+    await sleep(IDLE_MS);
+    // 3. and 4. Writes after the stream's end.
+    at.closeSent = Date.now();
+    const closeRead = await readEvents(await open("after-close", ids[2]), null, 10_000);
+    at.closeEnd = Date.now();
+    await sleep(IDLE_MS);
+    at.waitSent = Date.now();
+    const waitRead = await readEvents(await open("after-close-wait", ids[3]), null, 10_000);
+    at.waitEnd = Date.now();
+    await sleep(IDLE_MS);
+
+    const read = async () => ({ sent: Date.now(), r: await report(`${SPIKE_PATH}?mode=report-stream&ids=${ids.join(",")}`) });
+    const first = await read();
+    // When a write landed, on the run's clock: the report's time less the marker's age. null: not in the store.
+    const landed = (rep: { sent: number; r: Report }, s: number, marker: string) => {
+      const age = rep.r[`s${s}.${marker}.ageMs`];
+      return typeof age === "number" ? rep.sent - age : null;
+    };
+    const rel = (t: number | null, from: number) => (t === null ? "not in the store" : seconds(t - from));
+
+    const problems: string[] = [];
+    const seen: string[] = [];
+    const r = first.r;
+    if (r["read.status"] !== 200) problems.push(`the report could not read the store: HTTP ${r["read.status"]}${word(r["read.error"])}`);
+
+    // The stopped turn: both writes, the second 2 s after the first, before the next request reached the function.
+    const [start0, append0, record0] = ["start", "append", "record"].map((m) => landed(first, 0, m));
+    const ended0 = r["s0.append.ended"];
+    if (start0 === null) problems.push("the stopped turn's write before the stream is not in the store");
+    if (append0 === null || record0 === null) problems.push(`the stopped turn's writes after the last chunk: append ${rel(append0, at.stop!)}, record ${rel(record0, at.stop!)}`);
+    else {
+      const gap = record0 - append0;
+      if (gap < 1_500 || gap > 6_000) problems.push(`the stopped turn's record landed ${seconds(gap)} after its append, not about 2 s: the function was held`);
+      if (record0 > at.fullSent! - 1_000) problems.push(`the stopped turn's record landed ${rel(record0, at.stop!)} after the stop, when the next request had reached the function`);
+    }
+    if (stopRead.events < 3 || stopRead.error) problems.push(`the stopped turn sent ${stopRead.events} events before the stop${stopRead.error ? ` (${stopRead.error})` : ""}`);
+    const sawStop = ended0 === "abort" || ended0 === "cancel" || ended0 === "enqueue";
+    seen.push(
+      `stopped turn: the run read ${stopRead.events} events and stopped ${seconds(at.stop! - at.stopSent!)} after its request; ` +
+        (sawStop
+          ? `the function saw the stop as "${ended0}" after ${r["s0.append.chunks"]} chunks (request.signal aborted: ${r["s0.append.signalAborted"]})`
+          : `the function did not see the stop: it ended "${ended0 ?? "unknown"}" after ${r["s0.append.chunks"] ?? "?"} chunks`) +
+        `; its writes landed, from the stop: before the stream ${rel(start0, at.stop!)}, append ${rel(append0, at.stop!)}, record ${rel(record0, at.stop!)}; the next request came at ${seconds(at.fullSent! - at.stop!)}`,
+    );
+
+    // The full turn (control): the done event comes after both writes, so both must land before the stream's end.
+    const [append1, record1] = ["append", "record"].map((m) => landed(first, 1, m));
+    if (!fullRead.done || append1 === null || record1 === null || record1 > at.fullEnd! + 1_000 || r["s1.record.ended"] !== "end") {
+      problems.push(`the full turn (control): done event ${fullRead.done}${fullRead.error ? ` (${fullRead.error})` : ""}, append ${rel(append1, at.fullEnd!)}, record ${rel(record1, at.fullEnd!)}, ended "${r["s1.record.ended"]}"`);
+    }
+    seen.push(`full turn (control): ${fullRead.events} events and the done event ${fullRead.done}, append ${rel(append1, at.fullEnd!)} and record ${rel(record1, at.fullEnd!)} from the end`);
+
+    // Writes after the stream's end, recorded.
+    seen.push(`a write 2 s after the stream's end, no waitUntil: ${rel(landed(first, 2, "afterClose"), at.closeEnd!)} from the end (${closeRead.events} events)`);
+    seen.push(
+      `the same inside request.waitUntil (on the request: ${r["s3.start.waitUntil"]}, registered: ${r["s3.afterClose.registered"] ?? "unknown"}): ` +
+        `${rel(landed(first, 3, "afterClose"), at.waitEnd!)} from the end (${waitRead.events} events)`,
+    );
+
+    // A write missing at the first read: read once more, to see whether it lands only once a request reaches the function.
+    const missing = [[0, "append"], [0, "record"], [2, "afterClose"], [3, "afterClose"]].filter(([s, m]) => landed(first, s as number, m as string) === null);
+    if (missing.length) {
+      await sleep(10_000);
+      const second = await read();
+      seen.push(
+        `a second read ${seconds(second.sent - first.sent)} after the first: ` +
+          missing.map(([s, m]) => `s${s} ${m} ${rel(landed(second, s as number, m as string), first.sent)} from the first read`).join(", "),
+      );
+    }
+    return { pass: problems.length === 0, detail: problems.length ? `${problems.join("; ")}; seen: ${seen.join("; ")}` : seen.join("; ") };
+  },
+};
+
+/** The next time a daily "M H * * *" schedule runs, from one minute before `from` on (UTC). */
+function dailyDue(schedule: string, from: Date): number | null {
+  const m = /^(\d{1,2}) (\d{1,2}) \* \* \*$/.exec(schedule);
+  if (!m) return null;
+  const due = Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate(), Number(m[2]), Number(m[1]));
+  return due < from.getTime() - 60_000 ? due + 24 * 3600_000 : due;
+}
+const clock = (t: number) => new Date(t).toISOString().slice(11, 19);
+
+/**
+ * Check 6: Vercel Cron reaches /api/cron/health under Standard Protection, and which host it calls. post-build.ts
+ * writes SPEC-deploy's cron and a probe on the same path a few minutes after the build; api.cron.health.ts records
+ * each call in the store. The check:
+ * 1. sends one plain GET to /api/cron/health on the production address, without the bypass: it must reach __server
+ *    through the route after the filesystem phase, and be recorded (as a call without Vercel Cron's user agent);
+ * 2. waits until 30 s after the probe's minute, then reads the record every 30 s for up to 3 minutes. Vercel Cron's
+ *    call must name the probe's schedule and reach __server at /api/cron/health. The line names the host the call
+ *    reached, whether that host is a protected one, and whether it carried CRON_SECRET.
+ */
+const cronCall: Check = {
+  check: 6,
+  name: "Vercel Cron",
+  ifFails: "the health job's host rule changes",
+  async run({ info, productionFetch, report, poll, deadline }) {
+    const probe = info.crons.find((c) => c.path === CRON.path && c.schedule !== CRON.schedule) ?? info.crons.find((c) => c.path === CRON.path);
+    const due = probe ? dailyDue(probe.schedule, new Date(info.builtAt)) : null;
+    if (!probe || due === null) return { pass: false, detail: `config.json has no daily probe cron on ${CRON.path}: ${JSON.stringify(info.crons)}` };
+    const problems: string[] = [];
+    const seen: string[] = [];
+
+    // 1. The route after the filesystem, from a caller with no bypass.
+    const plain = await productionFetch(CRON.path);
+    const body = (await plain.json().catch(() => null)) as { recorded?: boolean; function?: string; error?: string } | null;
+    const reached = plain.status === 200 && body?.recorded === true && body.function === "/__server";
+    if (!reached) problems.push(`a plain GET of ${CRON.path} on the production address answered HTTP ${plain.status} ${JSON.stringify(body)}, not 200 from /__server with the call recorded`);
+    seen.push(`a plain GET of ${CRON.path} on the production address, without the bypass: HTTP ${plain.status}, function ${body?.function ?? "none"}, recorded ${body?.recorded ?? false}`);
+
+    // 2. Vercel Cron's call of the probe.
+    const query = `${SPIKE_PATH}?mode=report-cron&schedule=${encodeURIComponent(probe.schedule)}&spec=${encodeURIComponent(CRON.schedule)}`;
+    const wake = Math.min(due + 30_000, deadline - 60_000);
+    if (wake > Date.now()) await sleep(wake - Date.now());
+    const r = (await poll("cron", Math.max(0, due + 3 * 60_000 - Date.now()), async () => {
+      const r = await report(query);
+      return Number(r["probe.calls"]) > 0 ? r : undefined;
+    }, 30_000)) ?? (await report(query));
+
+    if (r["read.status"] !== 200) problems.push(`the report could not read the store: HTTP ${r["read.status"]}${word(r["read.error"])}`);
+    const called = Number(r["probe.calls"]) > 0;
+    if (!called) {
+      problems.push(`no call of the probe "${probe.schedule}" (due ${clock(due)} UTC) reached ${CRON.path} by ${clock(Date.now())} UTC`);
+    } else {
+      if (r["probe.function"] !== "/__server" || r["probe.path"] !== CRON.path) problems.push(`the probe's call reached ${r["probe.function"]} at ${r["probe.path"]}, not /__server at ${CRON.path}`);
+      if (r["probe.thisCommit"] !== true) problems.push(`the probe's call reached commit ${r["probe.commit"]}, not this deployment's`);
+      const host = String(r["probe.host"]);
+      const late = Date.parse(String(r["probe.at"])) - due;
+      seen.push(
+        `Vercel Cron called the probe "${probe.schedule}" (due ${clock(due)} UTC) at ${String(r["probe.at"]).slice(11, 19)} UTC (${seconds(late)}), ${r["probe.calls"]} calls in all; ` +
+          `host ${host} (${PROTECTED_HOST.test(host) ? "a protected host" : PUBLIC_HOST.test(host) ? "not a protected host" : "another host"}), ` +
+          `x-forwarded-host ${r["probe.forwardedHost"]}, URL host ${r["probe.urlHost"]}; ${r["probe.function"]} at ${r["probe.path"]}, VERCEL_ENV ${r["probe.vercelEnv"]}, region ${r["probe.region"]}, ` +
+          `this commit ${r["probe.thisCommit"]}; authorization ${r["probe.authorization"]}, CRON_SECRET set ${r["probe.cronSecretSet"]}`,
+      );
+    }
+    seen.push(
+      `in the record (7 days): SPEC-deploy's "${CRON.schedule}" ${r["spec.calls"]} calls${r["spec.at"] ? ` (last ${r["spec.at"]}, host ${r["spec.host"]}, commit ${r["spec.commit"]})` : ""}; ` +
+        `earlier probes ${r["cronOther.calls"]}; calls without Vercel Cron's user agent ${r["plain.calls"]}${r["plain.host"] ? ` (last host ${r["plain.host"]}, function ${r["plain.function"]})` : ""}`,
+    );
+    return { pass: problems.length === 0, detail: problems.length ? `${problems.join("; ")}; seen: ${seen.join("; ")}` : seen.join("; ") };
+  },
+};
+
+// Check 6 runs last: it waits for the probe cron. Checks 9 and 7 come before check 11's Chrome loads.
+export const CHECKS: Check[] = [buildBun, postBuildRoutes, notFound, headerMerge, hostRedirect, storeTokens, storeAfterStop, toolbarOff, cronCall];
 
 // ---- Chrome through the DevTools protocol ----------------------------------------------------------------------
 
@@ -733,7 +1002,7 @@ function quietLog() {
   };
 }
 
-async function pollUntil<T>(label: string, until: number, attempt: () => Promise<T | undefined>) {
+async function pollUntil<T>(label: string, until: number, attempt: () => Promise<T | undefined>, everyMs = POLL_MS) {
   const log = quietLog();
   while (Date.now() < until) {
     const value = await attempt().catch((error: Error) => {
@@ -741,7 +1010,7 @@ async function pollUntil<T>(label: string, until: number, attempt: () => Promise
       return undefined;
     });
     if (value !== undefined) return value;
-    await sleep(Math.min(POLL_MS, Math.max(0, until - Date.now())));
+    await sleep(Math.min(everyMs, Math.max(0, until - Date.now())));
   }
   return undefined;
 }
@@ -840,15 +1109,16 @@ async function run(): Promise<void> {
     productionFetch: (path, init) => fetch(`https://${production}${path}`, withoutBypass(init)),
     async report(path) {
       const res = await fetch(`https://${deployment}${path}`, withBypass(deployment));
-      if (res.status !== 200) throw new Error(`${path} answered ${httpNote(res.status)}`);
-      const body = (await res.json()) as unknown;
+      const body = (await res.json().catch(() => null)) as unknown;
       const flat =
         body !== null && typeof body === "object" && !Array.isArray(body) &&
         Object.values(body).every((v) => v === null || ["boolean", "string", "number"].includes(typeof v));
+      // A spike function's refusal is a flat object of hosts and error words (api.spike.ts), so it is shown.
+      if (res.status !== 200) throw new Error(`${path} answered ${httpNote(res.status)}${flat ? ` ${JSON.stringify(body)}` : ""}`);
       if (!flat) throw new Error(`${path} did not answer a flat JSON object`);
       return body as Report;
     },
-    poll: (label, maxMs, attempt) => pollUntil(label, Math.min(Date.now() + maxMs, deadline), attempt),
+    poll: (label, maxMs, attempt, everyMs) => pollUntil(label, Math.min(Date.now() + maxMs, deadline), attempt, everyMs),
     chrome: (paths) => chromeVisits(`https://${deployment}`, paths, (first) => bypassHeaders(deployment, { setCookie: first })),
   };
 

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiSpikeRouteImport } from './routes/api.spike'
 import { Route as DeepDivesIdRouteImport } from './routes/deep-dives/$id'
+import { Route as ApiCronHealthRouteImport } from './routes/api.cron.health'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +29,44 @@ const DeepDivesIdRoute = DeepDivesIdRouteImport.update({
   path: '/deep-dives/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCronHealthRoute = ApiCronHealthRouteImport.update({
+  id: '/api/cron/health',
+  path: '/api/cron/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/spike': typeof ApiSpikeRoute
   '/deep-dives/$id': typeof DeepDivesIdRoute
+  '/api/cron/health': typeof ApiCronHealthRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/spike': typeof ApiSpikeRoute
   '/deep-dives/$id': typeof DeepDivesIdRoute
+  '/api/cron/health': typeof ApiCronHealthRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/spike': typeof ApiSpikeRoute
   '/deep-dives/$id': typeof DeepDivesIdRoute
+  '/api/cron/health': typeof ApiCronHealthRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/spike' | '/deep-dives/$id'
+  fullPaths: '/' | '/api/spike' | '/deep-dives/$id' | '/api/cron/health'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/spike' | '/deep-dives/$id'
-  id: '__root__' | '/' | '/api/spike' | '/deep-dives/$id'
+  to: '/' | '/api/spike' | '/deep-dives/$id' | '/api/cron/health'
+  id: '__root__' | '/' | '/api/spike' | '/deep-dives/$id' | '/api/cron/health'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiSpikeRoute: typeof ApiSpikeRoute
   DeepDivesIdRoute: typeof DeepDivesIdRoute
+  ApiCronHealthRoute: typeof ApiCronHealthRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeepDivesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron/health': {
+      id: '/api/cron/health'
+      path: '/api/cron/health'
+      fullPath: '/api/cron/health'
+      preLoaderRoute: typeof ApiCronHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiSpikeRoute: ApiSpikeRoute,
   DeepDivesIdRoute: DeepDivesIdRoute,
+  ApiCronHealthRoute: ApiCronHealthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
