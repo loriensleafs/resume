@@ -47,4 +47,4 @@ Updated 2026-10-27, during the second `/brain:build auto` session. This file is 
 
 ## Fresh-session checks
 
-- **Content lands (T4), 2026-10-27:** pending; the result goes here.
+- **Content lands (T4), 2026-10-27: passed.** A sub-agent in a fresh worktree of `2fe8f97`, told "continue" and to stop after its report (a conductor decision, in [build decisions](design/build-decisions.md)), reported in five lines: the phase (build, the second `/brain:build auto` run); the last step (T4 and K4, with both checkpoints); the next step (K9, after K5, naming SPEC-knowledge, which it read); nothing red; and what waits on Peter. Two of its notes came from the harness's copy of `AGENTS.md` taken at the session's start, before A9 and T4, not from the files on `main`. Its two real notes are fixed: K9's line says it runs after K5, and `.gitignore` matches a linked `node_modules`. Peter reads this result.

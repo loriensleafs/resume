@@ -63,7 +63,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [K6](modules/knowledge.md#k6-rendered-sources-and-the-passage-id-snapshot) Rendered sources and the passage-id snapshot — blocked by K3 (runs after K5: same files)
 - [ ] [K7](modules/knowledge.md#k7-readpassages-reads-approved-sources-by-id) `readPassages()` reads approved sources by id — blocked by K6
 - [ ] [K8](modules/knowledge.md#k8-readlimits-bound-every-read) `readLimits` bound every read — blocked by K7
-- [ ] [K9](modules/knowledge.md#k9-publicknowledge-leaves-out-every-not-public-section) `publicKnowledge()` leaves out every `Not public` section — blocked by K3
+- [ ] [K9](modules/knowledge.md#k9-publicknowledge-leaves-out-every-not-public-section) `publicKnowledge()` leaves out every `Not public` section — blocked by K3 (runs after K5: same files)
 - [ ] [K10](modules/knowledge.md#k10-bun-run-knowledge---draft-shows-a-draft-as-the-chat-will-read-it) `bun run knowledge --draft` shows a draft as the chat will read it — blocked by K5, K6
 - [ ] [Checkpoint knowledge: contract complete](modules/knowledge.md#checkpoint-knowledge-contract-complete) — after K5 to K10; Peter: review before the moves
 - [ ] [A7](modules/agents.md#a7-the-write-source-repo-skill) The `write-source` repo skill — blocked by A2, K10

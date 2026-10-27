@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 dist/
 # The site's build output: Nitro's Vercel output (SPEC-site, Boundaries).
 .vercel/
