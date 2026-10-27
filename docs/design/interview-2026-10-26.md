@@ -73,6 +73,11 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 61 | (Peter, 2026-10-27) Question actions | Hovering a question shows how long ago it was sent, then Retry, Edit and Copy icon buttons. Drawn: Edit puts the question back in the input; on an earlier question, Retry and Edit replace that answer and the ones after it; on phones, a tap shows the row |
 | 62 | (Peter, 2026-10-27) Answer steps | While the chat works, its steps show one by one, not expandable yet; the current step has a spinner and a moving highlight over its text. After the answer, the steps stay above it as one closed line that opens, and steps with details open on their own. Drawn steps: finding the source, reading it (its passages), checking the citations |
 | 63 | (Peter, 2026-10-27) Artifact cards in the chat | Peter was unsure whether cards like Claude's artifact cards fit this site. Advice given: the citation list already does that job for sources; the one case that fits is the resume file when a visitor asks for it. Open |
+| 64 | (Peter, 2026-10-27) Action buttons | Retry, Edit and Copy sit in one design-system icon button group, close together |
+| 65 | (Peter, 2026-10-27) Opened steps | Like Claude's: a bordered box, one row per step with dividers, no indent; each row opens on its own. The summary line above it has its indicator right after the text |
+| 66 | (Peter, 2026-10-27) Answer actions | Under each answer, on hover: Copy and Retry, then how long ago. The latest answer always shows Copy and Retry. Drawn: its time shows on hover |
+| 67 | (Peter, 2026-10-27) Long questions | A question past a length shows truncated, with the design system's Show more. Drawn: four lines, fading out |
+| 68 | (Peter, 2026-10-27) Scroll to the latest | Away from the bottom of a long conversation, a floating round icon button with a shadow and a down arrow sits just above the input, moves with a growing input, and scrolls to the bottom when selected |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
