@@ -211,3 +211,11 @@ _Avoid_: notification, page, alarm
 **Decision record**:
 The dated record of the product questions put to Peter and his answers, one numbered row per decision, in `docs/design/interview-<date>.md`. A row number names one decision, as in "row 131".
 _Avoid_: "interview" alone (an interview is a source), interview notes, transcript
+
+**Agent files**:
+What a coding agent reads to work on this project: the shared instructions, each agent's own entry file and settings, and the repo skills. They are not site files.
+_Avoid_: rules files, prompts, agent config
+
+**Repo skill**:
+A written procedure that any coding agent follows step by step for one recurring job, such as editing the resume or making a release. It lives with the project, so every agent runs the job the same way.
+_Avoid_: plugin, command, workflow (the brain workflow is the whole method)
