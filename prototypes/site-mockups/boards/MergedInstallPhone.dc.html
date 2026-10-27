@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Merged concept on a phone: the install offer</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+.m-dim{color:var(--ds-gray-900)}
+.m-q{margin:0;align-self:flex-end;max-width:85%;padding:10px 14px;border-radius:16px 16px 4px 16px;background:var(--ds-gray-100)}
+.m-num{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:4px;background:var(--ds-gray-200);color:var(--ds-gray-1000);font-family:var(--acme-font-mono);font-size:11px;text-decoration:none;vertical-align:1px}
+.m-msg{display:flex;flex-direction:column;gap:4px;margin:0}
+.m-msg-q{align-items:flex-end}
+.m-acts{display:flex;align-items:center;gap:8px;min-height:32px;margin-left:-6px}
+.m-msg-q .m-acts{margin-left:0;margin-right:-6px}
+.m-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px}
+.m-list li{display:flex;align-items:center;gap:12px}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<acme-app-bar size="small" aria-label="Site">
+<acme-app-bar-start><a href="#" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ds-gray-1000);"><span style="display: inline-flex; align-items: center; height: 26px; padding: 0 9px; border-radius: 7px; background: var(--ds-blue-700); color: #fff; font-size: 14px; line-height: 1; font-weight: 600; white-space: nowrap;">Peter Kloss</span></a></acme-app-bar-start>
+</acme-app-bar>
+
+<main style="flex: 1 1 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 20px;">
+<div class="m-msg m-msg-q"><p class="m-q text-copy-15">Is Peter open to remote work?</p><div class="m-acts" aria-hidden="true"></div></div>
+<article class="m-msg" aria-label="Answer"><p class="text-copy-15" style="margin: 0;">Yes. Peter is open to remote, hybrid or on-site roles in the Seattle area <a href="#c1" class="m-num" aria-label="Citation 1">1</a>.</p><div class="m-acts" aria-hidden="true"></div></article>
+<div class="m-msg m-msg-q"><p class="m-q text-copy-15">How did FedNow’s bundle get under 1 MB?</p><div class="m-acts" aria-hidden="true"></div></div>
+<article class="m-msg" aria-label="Answer"><p class="text-copy-15" style="margin: 0;">Peter audited the application, found what made the bundles so large, then wrote the roadmap for the refactor and led it <a href="#c2" class="m-num" aria-label="Citation 2">2</a>.</p><div class="m-acts" role="toolbar" aria-label="Answer actions"><acme-group size="small" variant="tertiary" gap="4px"><acme-copy-button value="Peter audited the application, found what made the bundles so large, then wrote the roadmap for the refactor and led it." aria-label="Copy this answer"></acme-copy-button><acme-icon-button aria-label="Retry this answer"><acme-refresh-icon></acme-refresh-icon></acme-icon-button></acme-group></div></article>
+</main>
+
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(0, 0, 0, 0.32);"></div>
+
+<dialog open aria-labelledby="in-title" style="position: absolute; left: 0; right: 0; top: auto; bottom: 0; margin: 0; width: 100%; max-width: none; box-sizing: border-box; padding: 8px 20px 20px; border: 0; border-radius: 20px 20px 0 0; background: var(--ds-background-100); color: var(--ds-gray-1000); box-shadow: var(--ds-shadow-menu); display: flex; flex-direction: column; gap: 18px;">
+<span aria-hidden="true" style="align-self: center; width: 40px; height: 4px; border-radius: 2px; background: var(--ds-gray-400);"></span>
+<div style="display: flex; align-items: center; gap: 14px;">
+<svg width="56" height="56" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" style="fill: var(--ds-blue-700);"></rect><text x="256" y="262" text-anchor="middle" dominant-baseline="central" style="fill: #fff; font-family: var(--acme-font-sans); font-weight: 700; font-size: 220px; letter-spacing: -6px;">PK</text></svg>
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<h2 id="in-title" class="text-heading-20" style="margin: 0;">Install Peter Kloss</h2>
+<span class="text-label-13 m-dim">peterkloss.dev</span>
+</div>
+</div>
+<ul class="m-list">
+<li><acme-open-in-full-icon></acme-open-in-full-icon><span class="text-copy-14">Opens on its own, without the browser around it</span></li>
+<li><acme-history-icon></acme-history-icon><span class="text-copy-14">Picks up your conversation where you left off</span></li>
+<li><acme-wifi-off-icon></acme-wifi-off-icon><span class="text-copy-14">Keeps the resume and your conversation readable offline</span></li>
+</ul>
+<div style="display: flex; gap: 8px;">
+<acme-button variant="tertiary" style="flex: 1 1 0;">Not now</acme-button>
+<acme-button style="flex: 1 1 0;">Install</acme-button>
+</div>
+</dialog>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"appearance":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', this.props.appearance === 'dark' ? 'dark' : 'light');
+}
+componentDidUpdate() {
+document.documentElement.setAttribute('data-acme-appearance', this.props.appearance === 'dark' ? 'dark' : 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

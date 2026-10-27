@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Concepts A and A+ on a phone</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+.m-dim{color:var(--ds-gray-900)}
+.m-q{margin:0;align-self:flex-end;max-width:85%;padding:10px 14px;border-radius:16px 16px 4px 16px;background:var(--ds-gray-100)}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<acme-app-bar size="small" aria-label="Site">
+<acme-app-bar-start>
+<acme-button variant="tertiary" size="small" shape="square" aria-label="Documents and conversations"><acme-menu-icon></acme-menu-icon></acme-button>
+</acme-app-bar-start>
+<acme-app-bar-content><span class="text-label-14" style="font-weight: 600;">Peter Kloss</span></acme-app-bar-content>
+<acme-app-bar-end>
+<acme-button variant="tertiary" size="small" shape="square" aria-label="New conversation"><acme-add-icon></acme-add-icon></acme-button>
+</acme-app-bar-end>
+</acme-app-bar>
+
+<main style="flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 20px 16px; display: flex; flex-direction: column; gap: 12px;">
+<p class="m-q text-copy-14">How did FedNow’s bundle get under 1 MB?</p>
+<article aria-label="Answer" style="display: flex; flex-direction: column; gap: 10px;">
+<div class="m-dim" style="display: flex; align-items: center; gap: 8px;"><acme-auto-awesome-icon></acme-auto-awesome-icon><span class="text-label-13">Answer</span></div>
+<acme-markdown text="{{answer}}" class="text-copy-14"></acme-markdown>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; box-shadow: var(--ds-shadow-border); text-decoration: none; color: var(--ds-gray-1000);">
+<acme-icon-tile><acme-description-icon></acme-description-icon></acme-icon-tile>
+<span style="display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0;"><span class="text-label-14" style="font-weight: 600;">Cutting FedNow’s initial bundle</span><span class="text-label-12 m-dim">Deep dive. Tap to open full screen.</span></span>
+<acme-open-in-full-icon></acme-open-in-full-icon>
+</a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; box-shadow: var(--ds-shadow-border); text-decoration: none; color: var(--ds-gray-1000);">
+<acme-icon-tile><acme-article-icon></acme-article-icon></acme-icon-tile>
+<span style="display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0;"><span class="text-label-14" style="font-weight: 600;">Resume: FedNow, highlight 2</span><span class="text-label-12 m-dim">Opens the resume at this line</span></span>
+<acme-open-in-full-icon></acme-open-in-full-icon>
+</a>
+</article>
+</main>
+
+<form style="margin: 0 12px 12px; display: flex; align-items: flex-end; gap: 8px; padding: 8px; border-radius: 16px; box-shadow: var(--ds-shadow-border-medium);">
+<div style="flex: 1 1 auto; min-width: 0;"><acme-textarea aria-label="Your question" placeholder="Ask, or say “open the resume”" rows="1" auto-resize="" resize="none"></acme-textarea></div>
+<acme-button type="submit" shape="circle" aria-label="Send question"><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button>
+</form>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'light');
+}
+renderVals() {
+return {
+answer: "Peter audited the applications and found what made the bundles so large, then wrote the roadmap for the refactor and led it.\n\nThe initial bundle went from over 15 MB to under 1 MB through code splitting and lazy loading, micro-frontends, a new build setup, fewer heavy dependencies, and shared packages rebuilt as tree-shakeable ES modules. A Git plugin flagged oversized modules, so the size stayed under control."
+};
+}
+}
+</script>
+</body>
+</html>

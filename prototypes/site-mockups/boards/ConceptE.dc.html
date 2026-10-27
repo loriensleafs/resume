@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Concept E: career timeline</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+.m-dim{color:var(--ds-gray-900)}
+.m-seg{position:absolute;top:0;height:28px;box-sizing:border-box;border:0;border-left:2px solid var(--ds-background-100);border-right:2px solid var(--ds-background-100);border-radius:8px;background:var(--ds-gray-300);cursor:pointer;padding:0}
+.m-lab{position:absolute;font-size:12px;line-height:16px;white-space:nowrap;color:var(--ds-gray-900)}
+.m-year{position:absolute;font-size:12px;color:var(--ds-gray-900);font-variant-numeric:tabular-nums}
+.m-li{position:relative;padding-left:16px}
+.m-li::before{content:"";position:absolute;left:2px;top:9px;width:5px;height:5px;border-radius:50%;background:var(--ds-gray-700)}
+.m-chip{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:12px;box-shadow:var(--ds-shadow-border);background:var(--ds-background-100);color:var(--ds-gray-1000);text-decoration:none}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<acme-app-bar aria-label="Site">
+<acme-app-bar-start>
+<a href="#" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ds-gray-1000);"><acme-avatar initials="PK" size="small"></acme-avatar><span class="text-label-14" style="font-weight: 600;">Peter Kloss</span></a>
+</acme-app-bar-start>
+<acme-app-bar-end>
+<div style="display: flex; gap: 8px; align-items: center;">
+<a href="#" class="text-label-14" style="text-decoration: none;">Full resume</a>
+<acme-theme-switcher value="light"></acme-theme-switcher>
+</div>
+</acme-app-bar-end>
+</acme-app-bar>
+
+<section aria-label="Career timeline" style="padding: 32px 64px 0; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between;">
+<h1 class="text-heading-24" style="margin: 0;">Peter’s career, 2009 to 2026</h1>
+<span class="text-label-13 m-dim">Select a role to read it and ask about it</span>
+</div>
+<div style="position: relative; height: 112px;">
+<div style="position: absolute; left: 0; right: 0; top: 0; height: 28px;">
+<button class="m-seg" aria-label="Brigham and Women’s Hospital, 2009 to 2012" style="left: 0%; width: 17.0%;"></button>
+<button class="m-seg" aria-label="Six Red Marbles, 2013 to 2015" style="left: 22.6%; width: 11.3%;"></button>
+<button class="m-seg" aria-label="Harvard Business School, 2015 to 2016" style="left: 34.0%; width: 5.7%;"></button>
+<button class="m-seg" aria-label="Jack Morton Worldwide, 2016 to 2017" style="left: 39.6%; width: 5.7%;"></button>
+<button class="m-seg" aria-label="Sheridan PubFactory, 2017 to 2019" style="left: 45.3%; width: 11.3%;"></button>
+<button class="m-seg" aria-label="LinkSquares, 2019 to 2020" style="left: 56.6%; width: 5.7%;"></button>
+<button class="m-seg" aria-label="Pippin Title, 2020 to 2021" style="left: 62.2%; width: 5.7%;"></button>
+<button class="m-seg" aria-label="FedNow, 2021 to 2024, selected" aria-pressed="true" style="left: 67.9%; width: 17.0%; background: var(--ds-blue-700);"></button>
+<button class="m-seg" aria-label="Highspot, Dec 2024 to Aug 2026" style="left: 90.1%; width: 9.9%;"></button>
+</div>
+<span class="m-lab" style="left: 0%; top: 36px;">Brigham and Women’s</span>
+<span class="m-lab" style="left: 22.6%; top: 36px;">Six Red Marbles</span>
+<span class="m-lab" style="left: 34.0%; top: 56px;">HBS</span>
+<span class="m-lab" style="left: 39.6%; top: 36px;">Jack Morton</span>
+<span class="m-lab" style="left: 45.3%; top: 56px;">Sheridan</span>
+<span class="m-lab" style="left: 56.6%; top: 36px;">LinkSquares</span>
+<span class="m-lab" style="left: 62.2%; top: 56px;">Pippin</span>
+<span class="m-lab" style="left: 67.9%; top: 36px; color: var(--ds-blue-900); font-weight: 600;">FedNow</span>
+<span class="m-lab" style="left: 90.1%; top: 56px;">Highspot</span>
+<span class="m-year" style="left: 0%; top: 90px;">2009</span>
+<span class="m-year" style="left: 17.0%; top: 90px;">2012</span>
+<span class="m-year" style="left: 34.0%; top: 90px;">2015</span>
+<span class="m-year" style="left: 50.9%; top: 90px;">2018</span>
+<span class="m-year" style="left: 67.9%; top: 90px;">2021</span>
+<span class="m-year" style="left: 84.9%; top: 90px;">2024</span>
+</div>
+</section>
+
+<div style="flex: 1 1 auto; min-height: 0; display: flex; gap: 32px; padding: 8px 64px 32px; box-sizing: border-box;">
+<article aria-labelledby="role-title" style="flex: 1 1 auto; min-width: 0; overflow: hidden; display: flex; flex-direction: column; gap: 12px; padding: 28px 32px; border-radius: 12px; box-shadow: var(--ds-shadow-border);">
+<div style="display: flex; justify-content: space-between; gap: 16px; align-items: baseline;">
+<h2 id="role-title" class="text-heading-20" style="margin: 0;">Federal Reserve Bank of Boston (FedNow)</h2>
+<span class="text-label-14 m-dim" style="font-variant-numeric: tabular-nums;">2021 – 2024</span>
+</div>
+<p class="text-copy-14 m-dim" style="margin: -4px 0 4px;">Lead Front-End Engineer, promoted from Sr. UI Front End Developer, Boston, MA</p>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px;">
+<li class="m-li text-copy-14">Led front-end architecture across FedNow applications, aligning Product, UX, back-end, QA and security teams on one consistent, scalable approach.</li>
+<li class="m-li text-copy-14">Cut initial bundle size from over 15 MB to under 1 MB across multiple applications without delaying FedNow’s launch, through code splitting and lazy loading, micro-frontends, a new build setup, fewer heavy dependencies, and design system and shared packages rebuilt as tree-shakeable ES modules.</li>
+<li class="m-li text-copy-14">Built and maintained the FedNow design system and shared npm packages, used by FedNow’s internal and external applications and its internal platform tools.</li>
+<li class="m-li text-copy-14">Wrote front-end standards adopted by 5+ teams, which reduced code review issues, and built a testing harness that raised test coverage across the organization.</li>
+<li class="m-li text-copy-14">Mentored 20+ developers one-on-one and ran weekly office hours open to every development team.</li>
+</ul>
+<div style="display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 8px;">
+<a href="#" class="text-label-14" style="display: inline-flex; align-items: center; gap: 6px; min-height: 36px; text-decoration: none;"><acme-description-icon></acme-description-icon>FedNow’s front-end architecture</a>
+<a href="#" class="text-label-14" style="display: inline-flex; align-items: center; gap: 6px; min-height: 36px; text-decoration: none;"><acme-description-icon></acme-description-icon>The bundle cut</a>
+<a href="#" class="text-label-14" style="display: inline-flex; align-items: center; gap: 6px; min-height: 36px; text-decoration: none;"><acme-description-icon></acme-description-icon>The FedNow design system</a>
+<a href="#" class="text-label-14" style="display: inline-flex; align-items: center; gap: 6px; min-height: 36px; text-decoration: none;"><acme-description-icon></acme-description-icon>Standards and mentoring</a>
+</div>
+</article>
+
+<aside aria-label="Chat about this role" style="flex: 0 0 440px; display: flex; flex-direction: column; gap: 14px; padding: 20px; border-radius: 12px; background: var(--ds-background-200); box-shadow: var(--ds-shadow-border);">
+<div style="display: flex; align-items: center; justify-content: space-between;">
+<span class="text-label-14" style="font-weight: 600;">Ask about this role</span>
+<acme-badge size="small" variant="blue">About: FedNow</acme-badge>
+</div>
+<p class="text-copy-14 m-dim" style="margin: 0;">Questions here use the FedNow role and its four deep dives first.</p>
+<div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start;">
+<a href="#" class="m-chip text-label-14">How did the bundle get under 1 MB?</a>
+<a href="#" class="m-chip text-label-14">What did the FedNow design system include?</a>
+<a href="#" class="m-chip text-label-14">How did Peter align so many teams?</a>
+</div>
+<form style="margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 14px; background: var(--ds-background-100); box-shadow: var(--ds-shadow-border-medium);">
+<acme-textarea aria-label="Your question about FedNow" placeholder="Ask about FedNow" rows="1" auto-resize="" resize="none"></acme-textarea>
+<div style="display: flex; justify-content: flex-end;"><acme-button type="submit" shape="circle" size="small" aria-label="Send question"><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></div>
+</form>
+</aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

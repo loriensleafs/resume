@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>App icon</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+.m-dim{color:var(--ds-gray-900)}
+.m-ground{display:flex;align-items:center;gap:20px;padding:20px 24px;border-radius:12px}
+.m-light{background:var(--ds-background-200)}
+.m-dark{background:#111111;color:#f2f2f2}
+.m-cap{display:flex;flex-direction:column;align-items:center;gap:8px}
+</style>
+</helmet>
+<div style="width: 1440px; height: 440px; box-sizing: border-box; padding: 44px 64px; display: flex; flex-direction: column; gap: 32px; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<svg width="0" height="0" aria-hidden="true" style="position: absolute;">
+<defs>
+<clipPath id="clip-sq"><rect width="512" height="512" rx="112"></rect></clipPath>
+<clipPath id="clip-circ"><circle cx="256" cy="256" r="256"></circle></clipPath>
+<symbol id="icon-pk" viewBox="0 0 512 512">
+<rect width="512" height="512" style="fill: var(--ds-blue-700);"></rect>
+<text x="256" y="262" text-anchor="middle" dominant-baseline="central" style="fill: #fff; font-family: var(--acme-font-sans); font-weight: 700; font-size: 220px; letter-spacing: -6px;">PK</text>
+</symbol>
+</defs>
+</svg>
+
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 class="text-heading-32" style="margin: 0;">App icon</h1>
+<p class="text-copy-14 m-dim" style="margin: 0;">“PK” in capitals, Google Sans Flex Bold, white on the site’s blue. The installed app’s icon on phones and computers.</p>
+</div>
+
+<div style="display: flex; align-items: flex-end; gap: 40px;">
+<figure class="m-cap" style="margin: 0;"><svg width="192" height="192" viewBox="0 0 512 512" role="img" aria-label="The app icon as a rounded square"><g clip-path="url(#clip-sq)"><use href="#icon-pk"></use></g></svg><figcaption class="text-label-12 m-dim">Rounded square, 192 px</figcaption></figure>
+<figure class="m-cap" style="margin: 0;"><svg width="128" height="128" viewBox="0 0 512 512" role="img" aria-label="The app icon cut to a circle"><g clip-path="url(#clip-circ)"><use href="#icon-pk"></use></g></svg><figcaption class="text-label-12 m-dim">Circle, as Android cuts it</figcaption></figure>
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<div class="m-ground m-light"><svg width="48" height="48" viewBox="0 0 512 512" aria-hidden="true"><g clip-path="url(#clip-sq)"><use href="#icon-pk"></use></g></svg><svg width="32" height="32" viewBox="0 0 512 512" aria-hidden="true"><g clip-path="url(#clip-sq)"><use href="#icon-pk"></use></g></svg><svg width="16" height="16" viewBox="0 0 512 512" aria-hidden="true"><g clip-path="url(#clip-sq)"><use href="#icon-pk"></use></g></svg><span class="text-label-13 m-dim">48, 32 and 16 px on a light ground</span></div>
+<div class="m-ground m-dark"><svg width="48" height="48" viewBox="0 0 512 512" aria-hidden="true"><g clip-path="url(#clip-sq)"><use href="#icon-pk"></use></g></svg><svg width="32" height="32" viewBox="0 0 512 512" aria-hidden="true"><g clip-path="url(#clip-sq)"><use href="#icon-pk"></use></g></svg><svg width="16" height="16" viewBox="0 0 512 512" aria-hidden="true"><g clip-path="url(#clip-sq)"><use href="#icon-pk"></use></g></svg><span class="text-label-13">On a dark ground</span></div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":440}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

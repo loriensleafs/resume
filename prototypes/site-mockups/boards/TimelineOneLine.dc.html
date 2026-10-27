@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Career timeline on one line: options</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+.m-dim{color:var(--ds-gray-900)}
+.m-row{display:flex;gap:40px;align-items:flex-start;padding:24px 0;border-bottom:1px solid var(--ds-gray-400)}
+.m-cap{flex:0 0 300px;display:flex;flex-direction:column;gap:4px}
+.m-track{position:relative;flex:0 0 800px;width:800px}
+.m-axis{position:absolute;left:0;right:0;top:5px;height:1px;background:var(--ds-gray-400)}
+.m-seg{position:absolute;top:2px;height:8px;border:0;padding:0;border-radius:4px;background:var(--ds-gray-700);cursor:pointer}
+.m-sel{background:var(--ds-blue-700)}
+.m-year{position:absolute;font-family:var(--acme-font-mono);font-size:11px;line-height:16px;color:var(--ds-gray-900);font-variant-numeric:tabular-nums}
+.a-lab{position:absolute;top:0;font-size:11px;line-height:16px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ds-gray-1000)}
+.b-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:6px;width:800px}
+.b-cell{display:flex;flex-direction:column;gap:6px;min-width:0;padding:0;border:0;background:none;color:var(--ds-gray-1000);font:inherit;text-align:left;cursor:pointer}
+.b-name{font-size:11px;line-height:16px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b-bar{height:8px;border-radius:4px;background:var(--ds-gray-700)}
+.b-years{font-family:var(--acme-font-mono);font-size:11px;line-height:16px;color:var(--ds-gray-900);font-variant-numeric:tabular-nums;white-space:nowrap}
+.c-bar{position:absolute;top:0;height:22px;box-sizing:border-box;padding:0 6px;border:0;border-radius:6px;background:var(--ds-gray-200);color:var(--ds-gray-1000);font-family:var(--acme-font-sans);font-size:11px;line-height:22px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;cursor:pointer}
+.c-sel{background:var(--ds-blue-700);color:#fff}
+</style>
+</helmet>
+<div style="width: 1440px; height: 860px; box-sizing: border-box; padding: 40px 64px; display: flex; flex-direction: column; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+<h1 class="text-heading-24" style="margin: 0 0 6px;">Career timeline on one line</h1>
+<p class="text-copy-14 m-dim" style="margin: 0 0 8px;">Ways to put every role on one line, at the panel’s real width (800 px). FedNow is selected in each. Peter chose option E, a full-width band under the app bar, on 2026-10-27; every Merged board now uses it, and phones scroll it sideways as in D.</p>
+
+<div class="m-row">
+<div class="m-cap"><span class="text-label-14" style="font-weight: 600;">A. True length, names clipped</span><span class="text-copy-13 m-dim">Each span keeps its true length. A name longer than its span is cut short; the full name shows on hover, focus or selection.</span></div>
+<div class="m-track" role="group" aria-label="Roles, 2009 to 2026" style="height: 58px;">
+<span class="a-lab" style="left: 0.15%; max-width: 16.7%;">Brigham and Women’s</span>
+<span class="a-lab" style="left: 22.75%; max-width: 11%;">Six Red Marbles</span>
+<span class="a-lab" style="left: 34.15%; max-width: 5.35%;">HBS</span>
+<span class="a-lab" style="left: 39.75%; max-width: 5.35%;">Jack Morton</span>
+<span class="a-lab" style="left: 45.45%; max-width: 11%;">Sheridan</span>
+<span class="a-lab" style="left: 56.75%; max-width: 5.35%;">LinkSquares</span>
+<span class="a-lab" style="left: 62.45%; max-width: 5.35%;">Pippin</span>
+<span class="a-lab" style="left: 68.05%; max-width: 16.7%; color: var(--ds-blue-900); font-weight: 600;">FedNow</span>
+<span class="a-lab" style="left: 90.25%; max-width: 9.6%;">Highspot</span>
+<div style="position: absolute; left: 0; right: 0; top: 22px; height: 12px;">
+<span class="m-axis" aria-hidden="true"></span>
+<button class="m-seg" aria-label="Brigham and Women’s Hospital, 2009 to 2012" style="left: 0.15%; width: 16.7%;"></button>
+<button class="m-seg" aria-label="Six Red Marbles, 2013 to 2015" style="left: 22.75%; width: 11%;"></button>
+<button class="m-seg" aria-label="Harvard Business School, 2015 to 2016" style="left: 34.15%; width: 5.35%;"></button>
+<button class="m-seg" aria-label="Jack Morton Worldwide, 2016 to 2017" style="left: 39.75%; width: 5.35%;"></button>
+<button class="m-seg" aria-label="Sheridan PubFactory, 2017 to 2019" style="left: 45.45%; width: 11%;"></button>
+<button class="m-seg" aria-label="LinkSquares, 2019 to 2020" style="left: 56.75%; width: 5.35%;"></button>
+<button class="m-seg" aria-label="Pippin Title, 2020 to 2021" style="left: 62.45%; width: 5.35%;"></button>
+<button class="m-seg m-sel" aria-label="FedNow, 2021 to 2024, selected" aria-pressed="true" style="left: 68.05%; width: 16.7%;"></button>
+<button class="m-seg" aria-label="Highspot, Dec 2024 to Aug 2026" style="left: 90.25%; width: 9.6%;"></button>
+</div>
+<div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 40px; height: 16px;">
+<span class="m-year" style="left: 0%;">2009</span><span class="m-year" style="left: 17%;">2012</span><span class="m-year" style="left: 34%;">2015</span><span class="m-year" style="left: 50.9%;">2018</span><span class="m-year" style="left: 67.9%;">2021</span><span class="m-year" style="right: 0;">2026</span>
+</div>
+</div>
+</div>
+
+<div class="m-row">
+<div class="m-cap"><span class="text-label-14" style="font-weight: 600;">B. Equal widths, every name</span><span class="text-copy-13 m-dim">Every role gets the same width, so every name fits; Brigham and Women’s shortens to Brigham. The years under each name carry the length.</span></div>
+<div class="b-grid" role="group" aria-label="Roles, 2009 to 2026">
+<button class="b-cell" aria-label="Brigham and Women’s Hospital, 2009 to 2012"><span class="b-name">Brigham</span><span class="b-bar"></span><span class="b-years">2009–12</span></button>
+<button class="b-cell" aria-label="Six Red Marbles, 2013 to 2015"><span class="b-name">Six Red Marbles</span><span class="b-bar"></span><span class="b-years">2013–15</span></button>
+<button class="b-cell" aria-label="Harvard Business School, 2015 to 2016"><span class="b-name">HBS</span><span class="b-bar"></span><span class="b-years">2015–16</span></button>
+<button class="b-cell" aria-label="Jack Morton Worldwide, 2016 to 2017"><span class="b-name">Jack Morton</span><span class="b-bar"></span><span class="b-years">2016–17</span></button>
+<button class="b-cell" aria-label="Sheridan PubFactory, 2017 to 2019"><span class="b-name">Sheridan</span><span class="b-bar"></span><span class="b-years">2017–19</span></button>
+<button class="b-cell" aria-label="LinkSquares, 2019 to 2020"><span class="b-name">LinkSquares</span><span class="b-bar"></span><span class="b-years">2019–20</span></button>
+<button class="b-cell" aria-label="Pippin Title, 2020 to 2021"><span class="b-name">Pippin</span><span class="b-bar"></span><span class="b-years">2020–21</span></button>
+<button class="b-cell" aria-label="FedNow, 2021 to 2024, selected" aria-pressed="true"><span class="b-name" style="color: var(--ds-blue-900); font-weight: 600;">FedNow</span><span class="b-bar" style="background: var(--ds-blue-700);"></span><span class="b-years">2021–24</span></button>
+<button class="b-cell" aria-label="Highspot, Dec 2024 to Aug 2026"><span class="b-name">Highspot</span><span class="b-bar"></span><span class="b-years">2024–26</span></button>
+</div>
+</div>
+
+<div class="m-row">
+<div class="m-cap"><span class="text-label-14" style="font-weight: 600;">C. Names inside the spans</span><span class="text-copy-13 m-dim">Names sit inside true-length bars, so names and bars share one line. The narrowest roles are cut short until hovered or selected.</span></div>
+<div class="m-track" role="group" aria-label="Roles, 2009 to 2026" style="height: 46px;">
+<button class="c-bar" aria-label="Brigham and Women’s Hospital, 2009 to 2012" style="left: 0.15%; width: 16.7%;">Brigham and Women’s</button>
+<button class="c-bar" aria-label="Six Red Marbles, 2013 to 2015" style="left: 22.75%; width: 11%;">Six Red Marbles</button>
+<button class="c-bar" aria-label="Harvard Business School, 2015 to 2016" style="left: 34.15%; width: 5.35%;">HBS</button>
+<button class="c-bar" aria-label="Jack Morton Worldwide, 2016 to 2017" style="left: 39.75%; width: 5.35%;">Jack Morton</button>
+<button class="c-bar" aria-label="Sheridan PubFactory, 2017 to 2019" style="left: 45.45%; width: 11%;">Sheridan</button>
+<button class="c-bar" aria-label="LinkSquares, 2019 to 2020" style="left: 56.75%; width: 5.35%;">LinkSquares</button>
+<button class="c-bar" aria-label="Pippin Title, 2020 to 2021" style="left: 62.45%; width: 5.35%;">Pippin</button>
+<button class="c-bar c-sel" aria-label="FedNow, 2021 to 2024, selected" aria-pressed="true" style="left: 68.05%; width: 16.7%;">FedNow</button>
+<button class="c-bar" aria-label="Highspot, Dec 2024 to Aug 2026" style="left: 90.25%; width: 9.6%;">Highspot</button>
+<div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 28px; height: 16px;">
+<span class="m-year" style="left: 0%;">2009</span><span class="m-year" style="left: 17%;">2012</span><span class="m-year" style="left: 34%;">2015</span><span class="m-year" style="left: 50.9%;">2018</span><span class="m-year" style="left: 67.9%;">2021</span><span class="m-year" style="right: 0;">2026</span>
+</div>
+</div>
+</div>
+
+<div class="m-row">
+<div class="m-cap"><span class="text-label-14" style="font-weight: 600;">D. True length, wider, scrolls</span><span class="text-copy-13 m-dim">A larger scale, about 85 px a year, fits every name at its true length. The timeline scrolls sideways and opens at the latest roles; the earliest are a scroll away.</span></div>
+<div role="group" aria-label="Roles, 2009 to 2026, scrolls sideways" style="position: relative; flex: 0 0 800px; width: 800px; height: 58px; overflow: hidden;">
+<div style="position: absolute; top: 0; left: -700px; width: 1500px; height: 58px;">
+<span class="a-lab" style="left: 0.15%; max-width: 16.7%;">Brigham and Women’s</span>
+<span class="a-lab" style="left: 22.75%; max-width: 11%;">Six Red Marbles</span>
+<span class="a-lab" style="left: 34.15%; max-width: 5.35%;">HBS</span>
+<span class="a-lab" style="left: 39.75%; max-width: 5.35%;">Jack Morton</span>
+<span class="a-lab" style="left: 45.45%; max-width: 11%;">Sheridan</span>
+<span class="a-lab" style="left: 56.75%; max-width: 5.35%;">LinkSquares</span>
+<span class="a-lab" style="left: 62.45%; max-width: 5.35%;">Pippin</span>
+<span class="a-lab" style="left: 68.05%; max-width: 16.7%; color: var(--ds-blue-900); font-weight: 600;">FedNow</span>
+<span class="a-lab" style="left: 90.25%; max-width: 9.6%;">Highspot</span>
+<div style="position: absolute; left: 0; right: 0; top: 22px; height: 12px;">
+<span class="m-axis" aria-hidden="true"></span>
+<button class="m-seg" aria-label="Brigham and Women’s Hospital, 2009 to 2012" style="left: 0.15%; width: 16.7%;"></button>
+<button class="m-seg" aria-label="Six Red Marbles, 2013 to 2015" style="left: 22.75%; width: 11%;"></button>
+<button class="m-seg" aria-label="Harvard Business School, 2015 to 2016" style="left: 34.15%; width: 5.35%;"></button>
+<button class="m-seg" aria-label="Jack Morton Worldwide, 2016 to 2017" style="left: 39.75%; width: 5.35%;"></button>
+<button class="m-seg" aria-label="Sheridan PubFactory, 2017 to 2019" style="left: 45.45%; width: 11%;"></button>
+<button class="m-seg" aria-label="LinkSquares, 2019 to 2020" style="left: 56.75%; width: 5.35%;"></button>
+<button class="m-seg" aria-label="Pippin Title, 2020 to 2021" style="left: 62.45%; width: 5.35%;"></button>
+<button class="m-seg m-sel" aria-label="FedNow, 2021 to 2024, selected" aria-pressed="true" style="left: 68.05%; width: 16.7%;"></button>
+<button class="m-seg" aria-label="Highspot, Dec 2024 to Aug 2026" style="left: 90.25%; width: 9.6%;"></button>
+</div>
+<div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 40px; height: 16px;">
+<span class="m-year" style="left: 5.66%;">2010</span><span class="m-year" style="left: 16.98%;">2012</span><span class="m-year" style="left: 28.3%;">2014</span><span class="m-year" style="left: 39.6%;">2016</span><span class="m-year" style="left: 50.9%;">2018</span><span class="m-year" style="left: 62.3%;">2020</span><span class="m-year" style="left: 73.6%;">2022</span><span class="m-year" style="left: 84.9%;">2024</span><span class="m-year" style="right: 0;">2026</span>
+</div>
+</div>
+<div aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: 64px; background: linear-gradient(to right, var(--ds-background-100) 40%, transparent);"></div>
+<acme-button variant="secondary" size="tiny" shape="circle" aria-label="Scroll to earlier roles" style="position: absolute; left: 0; top: 17px;"><acme-chevron-right-icon style="transform: rotate(180deg);"></acme-chevron-right-icon></acme-button>
+</div>
+</div>
+
+<div class="m-row" style="border-bottom: 0;">
+<div class="m-cap"><span class="text-label-14" style="font-weight: 600;">F. Earlier roles grouped</span><span class="text-copy-13 m-dim">The three roles the resume already lists as earlier roles (2009–2016) share one span, with a break mark. The last ten years keep their true length, and every name fits without scrolling.</span></div>
+<div class="m-track" role="group" aria-label="Roles, 2009 to 2026" style="height: 58px;">
+<span class="a-lab" style="left: 0; max-width: 88px;">Earlier roles</span>
+<span class="a-lab" style="left: 104px; max-width: 64px;">Jack Morton</span>
+<span class="a-lab" style="left: 169px; max-width: 127px;">Sheridan</span>
+<span class="a-lab" style="left: 299px; max-width: 64px;">LinkSquares</span>
+<span class="a-lab" style="left: 364px; max-width: 62px;">Pippin</span>
+<span class="a-lab" style="left: 429px; max-width: 193px; color: var(--ds-blue-900); font-weight: 600;">FedNow</span>
+<span class="a-lab" style="left: 686px; max-width: 114px;">Highspot</span>
+<div style="position: absolute; left: 0; right: 0; top: 22px; height: 12px;">
+<span class="m-axis" aria-hidden="true"></span>
+<button class="m-seg" aria-label="Earlier roles: Brigham and Women’s Hospital, Six Red Marbles and Harvard Business School, 2009 to 2016" style="left: 0; width: 86px;"></button>
+<svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" style="position: absolute; left: 89px; top: 0;"><path d="M2 11 L6 1 M6 11 L10 1" style="stroke: var(--ds-gray-900); stroke-width: 1.5; fill: none;"></path></svg>
+<button class="m-seg" aria-label="Jack Morton Worldwide, 2016 to 2017" style="left: 104px; width: 62px;"></button>
+<button class="m-seg" aria-label="Sheridan PubFactory, 2017 to 2019" style="left: 169px; width: 127px;"></button>
+<button class="m-seg" aria-label="LinkSquares, 2019 to 2020" style="left: 299px; width: 62px;"></button>
+<button class="m-seg" aria-label="Pippin Title, 2020 to 2021" style="left: 364px; width: 62px;"></button>
+<button class="m-seg m-sel" aria-label="FedNow, 2021 to 2024, selected" aria-pressed="true" style="left: 429px; width: 193px;"></button>
+<button class="m-seg" aria-label="Highspot, Dec 2024 to Aug 2026" style="left: 686px; width: 114px;"></button>
+</div>
+<div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 40px; height: 16px;">
+<span class="m-year" style="left: 0;">2009–16</span><span class="m-year" style="left: 234px;">2018</span><span class="m-year" style="left: 365px;">2020</span><span class="m-year" style="left: 495px;">2022</span><span class="m-year" style="left: 626px;">2024</span><span class="m-year" style="right: 0;">2026</span>
+</div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":860}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

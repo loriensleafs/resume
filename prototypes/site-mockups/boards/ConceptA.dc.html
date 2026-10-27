@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Concept A: chat workspace, chat only</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+.m-dim{color:var(--ds-gray-900)}
+.m-nav{display:flex;align-items:center;gap:10px;min-height:36px;padding:0 10px;border-radius:8px;color:var(--ds-gray-1000);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-chip{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:999px;box-shadow:var(--ds-shadow-border);background:var(--ds-background-100);color:var(--ds-gray-1000);text-decoration:none}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; overflow: hidden; display: flex; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<nav aria-label="Conversations and documents" style="flex: 0 0 280px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; padding: 16px 12px; background: var(--ds-background-200); border-right: 1px solid var(--ds-gray-400);">
+<a href="#" style="display: flex; align-items: center; gap: 10px; padding: 4px 10px; text-decoration: none; color: var(--ds-gray-1000);"><acme-avatar initials="PK" size="small"></acme-avatar><span class="text-label-14" style="font-weight: 600;">Peter Kloss</span></a>
+<acme-button variant="secondary" full-width=""><acme-add-icon slot="start"></acme-add-icon>New conversation</acme-button>
+
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<span class="text-label-12 m-dim" style="padding: 0 10px 6px;">Documents</span>
+<a href="#" class="m-nav text-label-14"><acme-article-icon></acme-article-icon>Resume</a>
+<a href="#" class="m-nav text-label-14"><acme-description-icon></acme-description-icon>The polar-ui MCP server</a>
+<a href="#" class="m-nav text-label-14"><acme-description-icon></acme-description-icon>The agent workflow system</a>
+<a href="#" class="m-nav text-label-14"><acme-description-icon></acme-description-icon>The AI development standards</a>
+<a href="#" class="m-nav text-label-14"><acme-description-icon></acme-description-icon>The streaming Markdown component</a>
+<a href="#" class="m-nav text-label-14"><acme-description-icon></acme-description-icon>The Polar UI data table</a>
+<a href="#" class="m-nav text-label-14"><acme-description-icon></acme-description-icon>FedNow’s front-end architecture</a>
+<a href="#" class="m-nav text-label-14"><acme-description-icon></acme-description-icon>FedNow’s bundle cut</a>
+<a href="#" class="m-nav text-label-14"><acme-description-icon></acme-description-icon>The FedNow design system</a>
+<a href="#" class="m-nav text-label-14"><acme-description-icon></acme-description-icon>FedNow standards and mentoring</a>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<span class="text-label-12 m-dim" style="padding: 0 10px 6px;">Your conversations, on this device</span>
+<a href="#" class="m-nav text-label-14"><acme-history-icon></acme-history-icon>Is Peter open to remote work?</a>
+<a href="#" class="m-nav text-label-14"><acme-history-icon></acme-history-icon>What did Peter build for AI agents?</a>
+</div>
+
+<div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 0 10px;">
+<acme-theme-switcher value="light"></acme-theme-switcher>
+<span class="text-label-12 m-dim">Download: <a href="#">PDF</a>, <a href="#">Word</a>, <a href="#">Text</a></span>
+</div>
+</nav>
+
+<main style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px; box-sizing: border-box;">
+<div style="width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: 20px; align-items: center; text-align: center;">
+<h1 class="text-heading-40" style="margin: 0;">Ask about Peter’s work.</h1>
+<p class="text-copy-16 m-dim" style="margin: 0; max-width: 56ch;">Answers come from his resume and the documents on the left, which he wrote and approved. Ask the chat to open any of them beside the conversation.</p>
+<form style="width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 12px; margin-top: 8px; border-radius: 16px; box-shadow: var(--ds-shadow-border-medium); text-align: left;">
+<acme-textarea aria-label="Your question" placeholder="Ask about a project, a role or a skill, or say “open the resume”" rows="2" auto-resize="" resize="none"></acme-textarea>
+<div style="display: flex; align-items: center; justify-content: space-between;">
+<span class="text-label-13 m-dim">Press <acme-kbd>Enter</acme-kbd> to send</span>
+<acme-button type="submit" shape="circle" aria-label="Send question"><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button>
+</div>
+</form>
+<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;">
+<a href="#" class="m-chip text-label-14">Open the resume</a>
+<a href="#" class="m-chip text-label-14">What did Peter build for AI coding agents?</a>
+<a href="#" class="m-chip text-label-14">How did FedNow’s bundle get under 1 MB?</a>
+<a href="#" class="m-chip text-label-14">Is Peter open to remote work?</a>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

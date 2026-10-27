@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Merged concept on a phone: a role selected</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+.m-field{position:relative}
+.m-field acme-textarea::part(textarea){padding-inline-end:48px}
+.m-send{position:absolute;right:5px;bottom:5px;display:flex}
+.m-field-chip{border:1px solid var(--ds-gray-700);border-radius:6px;background:var(--ds-background-100);padding-top:6px}
+.m-field-chip:focus-within{box-shadow:var(--ds-focus-ring)}
+.m-field-chip acme-textarea::part(root){border:0;background:transparent;box-shadow:none}
+.m-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 6px}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+.m-dim{color:var(--ds-gray-900)}
+.m-sugg{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:0 4px;border-bottom:1px solid var(--ds-gray-400);color:var(--ds-gray-1000);text-decoration:none}
+.p-lab{position:absolute;top:0;font-size:11px;line-height:16px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ds-gray-1000)}
+.p-axis{position:absolute;left:0;right:0;top:25px;height:1px;background:var(--ds-gray-400)}
+.p-bar{position:absolute;top:22px;height:8px;border-radius:4px;background:var(--ds-gray-700);opacity:.45}
+.p-sel{background:var(--ds-blue-700);opacity:1}
+.p-year{position:absolute;top:36px;font-family:var(--acme-font-mono);font-size:11px;line-height:16px;color:var(--ds-gray-900);font-variant-numeric:tabular-nums}
+.p-hit{position:absolute;top:0;height:44px;border:0;padding:0;background:transparent;cursor:pointer}
+.p-hit:focus-visible{outline:2px solid var(--ds-focus-color);outline-offset:-2px;border-radius:6px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<acme-app-bar size="small" aria-label="Site">
+<acme-app-bar-start><a href="#" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ds-gray-1000);"><span style="display: inline-flex; align-items: center; height: 26px; padding: 0 9px; border-radius: 7px; background: var(--ds-blue-700); color: #fff; font-size: 14px; line-height: 1; font-weight: 600; white-space: nowrap;">Peter Kloss</span></a></acme-app-bar-start>
+<acme-app-bar-end>
+<acme-menu>
+<acme-menu-trigger slot="trigger" size="small" variant="tertiary" aria-label="Download the resume"><acme-download-icon></acme-download-icon></acme-menu-trigger>
+<acme-menu-content aria-label="Download the resume"><acme-menu-item value="pdf">PDF</acme-menu-item><acme-menu-item value="docx">Word</acme-menu-item><acme-menu-item value="txt">Plain text</acme-menu-item></acme-menu-content>
+</acme-menu>
+</acme-app-bar-end>
+</acme-app-bar>
+
+<div role="group" aria-labelledby="career-h" style="flex: 0 0 auto; padding: 10px 0 6px; display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid var(--ds-gray-400);">
+<div style="display: flex; align-items: baseline; justify-content: space-between; padding: 0 16px;"><h2 id="career-h" class="text-label-13" style="margin: 0; font-weight: 600;">Career timeline</h2></div>
+<div style="position: relative; height: 54px; overflow: hidden;">
+<div style="position: absolute; top: 0; left: -790px; width: 1240px; height: 54px;">
+<div aria-hidden="true">
+<span class="p-lab" style="left: 0.15%; max-width: 16.7%;">Brigham and Women’s</span>
+<span class="p-lab" style="left: 22.75%; max-width: 11%;">Six Red Marbles</span>
+<span class="p-lab" style="left: 34.15%; max-width: 5.35%;">HBS</span>
+<span class="p-lab" style="left: 39.75%; max-width: 5.35%;">Jack Morton</span>
+<span class="p-lab" style="left: 45.45%; max-width: 11%;">Sheridan</span>
+<span class="p-lab" style="left: 56.75%; max-width: 5.35%;">LinkSquares</span>
+<span class="p-lab" style="left: 62.45%; max-width: 5.35%;">Pippin</span>
+<span class="p-lab" style="left: 68.05%; max-width: 16.7%; color: var(--ds-blue-900); font-weight: 600;">FedNow</span>
+<span class="p-lab" style="left: 90.25%; max-width: 9.6%;">Highspot</span>
+<span class="p-axis"></span>
+<span class="p-bar" style="left: 0.15%; width: 16.7%;"></span>
+<span class="p-bar" style="left: 22.75%; width: 11%;"></span>
+<span class="p-bar" style="left: 34.15%; width: 5.35%;"></span>
+<span class="p-bar" style="left: 39.75%; width: 5.35%;"></span>
+<span class="p-bar" style="left: 45.45%; width: 11%;"></span>
+<span class="p-bar" style="left: 56.75%; width: 5.35%;"></span>
+<span class="p-bar" style="left: 62.45%; width: 5.35%;"></span>
+<span class="p-bar p-sel" style="left: 68.05%; width: 16.7%;"></span>
+<span class="p-bar" style="left: 90.25%; width: 9.6%;"></span>
+<span class="p-year" style="left: 5.66%;">2010</span><span class="p-year" style="left: 16.98%;">2012</span><span class="p-year" style="left: 28.3%;">2014</span><span class="p-year" style="left: 39.6%;">2016</span><span class="p-year" style="left: 50.9%;">2018</span><span class="p-year" style="left: 62.3%;">2020</span><span class="p-year" style="left: 73.6%;">2022</span><span class="p-year" style="left: 84.9%;">2024</span><span class="p-year" style="right: 0;">2026</span>
+</div>
+<button class="p-hit" aria-label="Brigham and Women’s Hospital, UX Engineer, 2009 to 2012" style="left: 0.15%; width: 16.7%;"></button>
+<button class="p-hit" aria-label="Six Red Marbles, Software Engineer, 2013 to 2015" style="left: 22.75%; width: 11%;"></button>
+<button class="p-hit" aria-label="Harvard Business School, Front-End Engineer, 2015 to 2016" style="left: 34.15%; width: 5.35%;"></button>
+<button class="p-hit" aria-label="Jack Morton Worldwide, Senior Front-End Engineer, 2016 to 2017" style="left: 39.75%; width: 5.35%;"></button>
+<button class="p-hit" aria-label="Sheridan PubFactory, Senior Front-End Engineer, 2017 to 2019" style="left: 45.45%; width: 11%;"></button>
+<button class="p-hit" aria-label="LinkSquares, Senior Front-End Engineer, 2019 to 2020" style="left: 56.75%; width: 5.35%;"></button>
+<button class="p-hit" aria-label="Pippin Title, Senior Front-End Engineer, 2020 to 2021" style="left: 62.45%; width: 5.35%;"></button>
+<button class="p-hit" aria-label="FedNow, Lead Front-End Engineer, 2021 to 2024, selected" aria-pressed="true" style="left: 68.05%; width: 16.7%;"></button>
+<button class="p-hit" aria-label="Highspot, Sr. Software Development Engineer, Dec 2024 to Aug 2026" style="left: 90.25%; width: 9.6%;"></button>
+</div>
+<div aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: 40px; background: linear-gradient(to right, var(--ds-background-100) 30%, transparent);"></div>
+<div aria-hidden="true" style="position: absolute; right: 0; top: 0; bottom: 0; width: 40px; background: linear-gradient(to left, var(--ds-background-100) 30%, transparent);"></div>
+</div>
+</div>
+
+<main style="flex: 1 1 auto; min-height: 0; padding: 24px 16px 8px; display: flex; flex-direction: column; gap: 12px;">
+<h1 class="text-heading-32" style="margin: 0;">Ask about FedNow.</h1>
+<p class="text-copy-14 m-dim" style="margin: 0;">Lead Front-End Engineer at the Federal Reserve Bank of Boston, 2021 – 2024, on FedNow, the Federal Reserve’s instant payment service.</p>
+<acme-button variant="secondary" style="align-self: flex-start;"><acme-article-icon slot="start"></acme-article-icon>Read FedNow in the resume</acme-button>
+<nav aria-label="Suggested questions about FedNow" style="display: flex; flex-direction: column; margin-top: 4px;">
+<a href="#" class="m-sugg text-label-14">How did FedNow’s bundle get under 1 MB?<acme-arrow-forward-icon></acme-arrow-forward-icon></a>
+<a href="#" class="m-sugg text-label-14">What did Peter build for FedNow’s design system?<acme-arrow-forward-icon></acme-arrow-forward-icon></a>
+<a href="#" class="m-sugg text-label-14" style="border-bottom: 0;">How did Peter mentor other developers?<acme-arrow-forward-icon></acme-arrow-forward-icon></a>
+</nav>
+</main>
+
+<form style="margin: 0 12px 12px; display: flex; flex-direction: column; gap: 8px;">
+<div class="m-field m-field-chip">
+<div class="m-chips"><span class="text-label-12" style="display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px 2px 10px; border-radius: 999px; background: var(--ds-blue-100); color: var(--ds-blue-900);">Asking about FedNow, 2021 – 2024<acme-button variant="tertiary" size="tiny" shape="circle" aria-label="Ask about all roles"><acme-close-icon></acme-close-icon></acme-button></span></div>
+<acme-textarea aria-label="Your question" placeholder="Ask about FedNow" rows="1" auto-resize="" resize="none"></acme-textarea>
+<span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question"><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span>
+</div>
+</form>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"appearance":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', this.props.appearance === 'dark' ? 'dark' : 'light');
+}
+componentDidUpdate() {
+document.documentElement.setAttribute('data-acme-appearance', this.props.appearance === 'dark' ? 'dark' : 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

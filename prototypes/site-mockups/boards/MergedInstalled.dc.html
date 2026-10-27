@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Merged concept: the installed app in its own window</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-200)}
+.m-field{position:relative}
+.m-field acme-textarea::part(textarea){padding-inline-end:48px}
+.m-send{position:absolute;right:5px;bottom:5px;display:flex}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+.m-dim{color:var(--ds-gray-900)}
+.m-seg{position:absolute;top:2px;height:8px;border:0;padding:0;border-radius:4px;background:var(--ds-gray-700);cursor:pointer}
+.m-seg:hover{background:var(--ds-gray-1000)}
+.m-seg:focus-visible{outline:2px solid var(--ds-focus-color);outline-offset:3px}
+.m-axis{position:absolute;left:0;right:0;top:5px;height:1px;background:var(--ds-gray-400)}
+.m-lab{position:absolute;top:0;font-size:12px;line-height:16px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ds-gray-1000)}
+.m-year{position:absolute;top:0;font-family:var(--acme-font-mono);font-size:11px;line-height:16px;color:var(--ds-gray-900);font-variant-numeric:tabular-nums}
+.m-sugg{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:0 4px;border-bottom:1px solid var(--ds-gray-400);color:var(--ds-gray-1000);text-decoration:none}
+.m-li{position:relative;padding-left:18px}
+.m-li::before{content:"";position:absolute;left:2px;top:10px;width:6px;height:6px;border-radius:50%;background:var(--ds-gray-700)}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; border-radius: 12px; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans); box-shadow: var(--ds-shadow-border-medium);">
+
+<div aria-hidden="true" style="flex: 0 0 36px; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: var(--ds-background-200); border-bottom: 1px solid var(--ds-gray-400);">
+<svg width="16" height="16" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" style="fill: var(--ds-blue-700);"></rect><text x="256" y="262" text-anchor="middle" dominant-baseline="central" style="fill: #fff; font-family: var(--acme-font-sans); font-weight: 700; font-size: 220px; letter-spacing: -6px;">PK</text></svg>
+<span class="text-label-13">Peter Kloss</span>
+</div>
+
+<acme-app-bar aria-label="Site">
+<acme-app-bar-start>
+<a href="#" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ds-gray-1000);"><span style="display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 8px; background: var(--ds-blue-700); color: #fff; font-size: 15px; line-height: 1; font-weight: 600; white-space: nowrap;">Peter Kloss</span><span class="text-label-14 m-dim">Front-End Platform Engineer, Design Systems and AI Developer Tooling</span></a>
+</acme-app-bar-start>
+<acme-app-bar-content style="flex: 1 1 auto;"></acme-app-bar-content>
+<acme-app-bar-end style="margin-left: auto;">
+<div style="display: flex; gap: 8px; align-items: center; justify-content: flex-end;">
+<acme-menu>
+<acme-menu-trigger slot="trigger" size="small" variant="secondary"><acme-download-icon slot="start"></acme-download-icon>Resume</acme-menu-trigger>
+<acme-menu-content aria-label="Download the resume"><acme-menu-item value="pdf">PDF</acme-menu-item><acme-menu-item value="docx">Word</acme-menu-item><acme-menu-item value="txt">Plain text</acme-menu-item></acme-menu-content>
+</acme-menu>
+<acme-theme-switcher value="{{appearance}}"></acme-theme-switcher>
+</div>
+</acme-app-bar-end>
+</acme-app-bar>
+
+<div role="group" aria-labelledby="career-h" style="flex: 0 0 auto; padding: 10px 32px 8px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--ds-gray-400);">
+<div style="display: flex; align-items: baseline; gap: 12px;"><h2 id="career-h" class="text-label-13" style="margin: 0; font-weight: 600;">Career timeline</h2><span class="text-label-12 m-dim">Select a role to read it and scope the chat</span></div>
+<div style="position: relative; height: 58px;">
+<span class="m-lab" style="left: 0.15%; max-width: 16.7%;">Brigham and Women’s</span>
+<span class="m-lab" style="left: 22.75%; max-width: 11%;">Six Red Marbles</span>
+<span class="m-lab" style="left: 34.15%; max-width: 5.35%;">HBS</span>
+<span class="m-lab" style="left: 39.75%; max-width: 5.35%;">Jack Morton</span>
+<span class="m-lab" style="left: 45.45%; max-width: 11%;">Sheridan</span>
+<span class="m-lab" style="left: 56.75%; max-width: 5.35%;">LinkSquares</span>
+<span class="m-lab" style="left: 62.45%; max-width: 5.35%;">Pippin</span>
+<span class="m-lab" style="left: 68.05%; max-width: 16.7%;">FedNow</span>
+<span class="m-lab" style="left: 90.25%; max-width: 9.6%;">Highspot</span>
+<div style="position: absolute; left: 0; right: 0; top: 22px; height: 12px;">
+<span class="m-axis" aria-hidden="true"></span>
+<button class="m-seg" aria-label="Brigham and Women’s Hospital, UX Engineer, 2009 to 2012" style="left: 0.15%; width: 16.7%;"></button>
+<button class="m-seg" aria-label="Six Red Marbles, Software Engineer, 2013 to 2015" style="left: 22.75%; width: 11%;"></button>
+<button class="m-seg" aria-label="Harvard Business School, Front-End Engineer, 2015 to 2016" style="left: 34.15%; width: 5.35%;"></button>
+<button class="m-seg" aria-label="Jack Morton Worldwide, Senior Front-End Engineer, 2016 to 2017" style="left: 39.75%; width: 5.35%;"></button>
+<button class="m-seg" aria-label="Sheridan PubFactory, Senior Front-End Engineer, 2017 to 2019" style="left: 45.45%; width: 11%;"></button>
+<button class="m-seg" aria-label="LinkSquares, Senior Front-End Engineer, 2019 to 2020" style="left: 56.75%; width: 5.35%;"></button>
+<button class="m-seg" aria-label="Pippin Title, Senior Front-End Engineer, 2020 to 2021" style="left: 62.45%; width: 5.35%;"></button>
+<button class="m-seg" aria-label="FedNow, Lead Front-End Engineer, 2021 to 2024" style="left: 68.05%; width: 16.7%;"></button>
+<button class="m-seg" aria-label="Highspot, Sr. Software Development Engineer, Dec 2024 to Aug 2026" style="left: 90.25%; width: 9.6%;"></button>
+</div>
+<div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 40px; height: 16px;">
+<span class="m-year" style="left: 0%;">2009</span>
+<span class="m-year" style="left: 11.3%;">2011</span>
+<span class="m-year" style="left: 22.6%;">2013</span>
+<span class="m-year" style="left: 34%;">2015</span>
+<span class="m-year" style="left: 45.3%;">2017</span>
+<span class="m-year" style="left: 56.6%;">2019</span>
+<span class="m-year" style="left: 67.9%;">2021</span>
+<span class="m-year" style="left: 79.2%;">2023</span>
+<span class="m-year" style="right: 0;">2026</span>
+</div>
+</div>
+</div>
+
+<div style="flex: 1 1 auto; min-height: 0; display: flex;">
+
+<section aria-labelledby="ask" style="flex: 0 0 500px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 16px; padding: 24px 40px; border-right: 1px solid var(--ds-gray-400);">
+<h1 id="ask" class="text-heading-32" style="margin: 0;">Ask about Peter’s work.</h1>
+<p class="text-copy-15 m-dim" style="margin: 0;">Answers come only from his resume and the sources behind it, in his own words, and show where each fact comes from.</p>
+<form style="display: flex; flex-direction: column; gap: 10px;">
+<div class="m-field">
+<acme-textarea aria-label="Your question" placeholder="Ask about a project, a role or a skill" rows="1" auto-resize="" resize="none"></acme-textarea>
+<span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question" disabled=""><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span>
+</div>
+<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;">
+<span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span>
+<acme-button variant="secondary" size="small" shape="pill">Recruiter</acme-button>
+<acme-button variant="secondary" size="small" shape="pill">Hiring manager</acme-button>
+<acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button>
+</div>
+</form>
+<nav aria-label="Suggested questions" style="display: flex; flex-direction: column;">
+<a href="#" class="m-sugg text-label-14">What did Peter build for AI coding agents?<acme-arrow-forward-icon></acme-arrow-forward-icon></a>
+<a href="#" class="m-sugg text-label-14" style="border-bottom: 0;">What does Peter think makes a design system succeed?<acme-arrow-forward-icon></acme-arrow-forward-icon></a>
+</nav>
+</section>
+
+<section aria-label="Resume and sources" style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; background: var(--ds-background-200);">
+<div style="padding: 8px 32px; border-bottom: 1px solid var(--ds-gray-400); background: var(--ds-background-100);">
+<acme-tabs value="resume" aria-label="Open views">
+<acme-tab value="resume"><acme-article-icon slot="start"></acme-article-icon>Resume</acme-tab>
+</acme-tabs>
+</div>
+
+<article aria-label="Resume" style="flex: 1 1 auto; min-height: 0; overflow: hidden; margin: 16px; padding: 24px 36px; border-radius: 12px; background: var(--ds-background-100); box-shadow: var(--ds-shadow-border); display: flex; flex-direction: column; gap: 14px;">
+<p class="text-copy-14" style="margin: 0; max-width: 72ch;">Front-end platform engineer with 15+ years building what product teams build on: design systems, shared packages and monorepo tooling. At Highspot, led the organization-wide MCP server that gives AI coding agents the design system’s contract, used by ~100 people, and built the platform team’s agent workflow system. Before that, led front-end architecture for FedNow, the Federal Reserve’s instant payment service.</p>
+<div style="display: flex; justify-content: space-between; gap: 16px; align-items: baseline; margin-top: 4px;">
+<h3 class="text-heading-16" style="margin: 0;">Highspot</h3>
+<span class="text-label-13 m-dim" style="font-variant-numeric: tabular-nums;">Dec 2024 – Aug 2026</span>
+</div>
+<p class="text-copy-13 m-dim" style="margin: -8px 0 0;">Sr. Software Development Engineer, Polar UI design system team, Seattle, WA</p>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; max-width: 76ch;">
+<li class="m-li text-copy-14">Led the organization-wide effort to build the polar-ui MCP server, the design system’s contract for AI coding agents, so agent-written UI follows the design system, including complex components such as the data table.</li>
+</ul>
+</article>
+</section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"appearance":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', this.props.appearance === 'dark' ? 'dark' : 'light');
+}
+componentDidUpdate() {
+document.documentElement.setAttribute('data-acme-appearance', this.props.appearance === 'dark' ? 'dark' : 'light');
+}
+renderVals() {
+return { appearance: this.props.appearance === 'dark' ? 'dark' : 'light' };
+}
+}
+</script>
+</body>
+</html>

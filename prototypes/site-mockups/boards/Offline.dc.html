@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Peter Kloss: offline on a phone</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<acme-app-bar size="small" aria-label="Site">
+<acme-app-bar-start>
+<a href="#" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ds-gray-1000);">
+<acme-avatar initials="PK" size="small"></acme-avatar>
+<span class="text-label-14" style="font-weight: 600;">Peter Kloss</span>
+</a>
+</acme-app-bar-start>
+<acme-app-bar-end>
+<acme-menu>
+<acme-menu-trigger slot="trigger" size="small" aria-label="Download the resume"><acme-download-icon></acme-download-icon></acme-menu-trigger>
+<acme-menu-content aria-label="Download the resume">
+<acme-menu-item value="pdf" href="#">PDF</acme-menu-item>
+<acme-menu-item value="docx" href="#">Word</acme-menu-item>
+<acme-menu-item value="txt" href="#">Plain text</acme-menu-item>
+</acme-menu-content>
+</acme-menu>
+</acme-app-bar-end>
+</acme-app-bar>
+
+<acme-banner variant="warning" size="small" heading="You are offline">
+<acme-cloud-off-icon slot="start"></acme-cloud-off-icon>
+Your past answers stay here. A new question sends when you reconnect.
+</acme-banner>
+
+<main style="flex: 1 1 auto; min-height: 0; box-sizing: border-box; padding: 24px 16px; display: flex; flex-direction: column; gap: 24px; overflow: hidden;">
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<p class="text-copy-14" style="margin: 0; align-self: flex-end; max-width: 85%; padding: 10px 14px; border-radius: 16px 16px 4px 16px; background: var(--ds-gray-100);">Is Peter open to remote work?</p>
+<article aria-label="Answer" style="display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; align-items: center; gap: 8px; color: var(--ds-gray-900);"><acme-auto-awesome-icon></acme-auto-awesome-icon><span class="text-label-13">Answer, saved on this device</span></div>
+<p class="text-copy-14" style="margin: 0;">Peter is open to remote, hybrid or on-site roles in the Seattle area. He is based in Redmond, Washington, and would consider relocating for the right role.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<a href="#" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; border-radius: 10px; box-shadow: var(--ds-shadow-border); color: var(--ds-gray-1000); text-decoration: none;"><acme-info-icon></acme-info-icon><span class="text-label-13">Work arrangement</span></a>
+<a href="#" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; border-radius: 10px; box-shadow: var(--ds-shadow-border); color: var(--ds-gray-1000); text-decoration: none;"><acme-info-icon></acme-info-icon><span class="text-label-13">Location</span></a>
+</div>
+</article>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-end;">
+<p class="text-copy-14" style="margin: 0; max-width: 85%; padding: 10px 14px; border-radius: 16px 16px 4px 16px; background: var(--ds-gray-100); color: var(--ds-gray-900);">How did FedNow’s bundle get under 1 MB?</p>
+<div style="display: flex; align-items: center; gap: 8px;">
+<acme-status value="queued" label="Queued, sends when you reconnect" variant="warning"></acme-status>
+<acme-button variant="tertiary" size="small">Remove</acme-button>
+</div>
+</div>
+
+<a href="#" class="text-label-14" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; align-self: flex-start; text-decoration: none;"><acme-article-icon></acme-article-icon>Read the resume while offline</a>
+</main>
+
+<form style="box-sizing: border-box; display: flex; align-items: flex-end; gap: 8px; margin: 0 16px 16px; padding: 8px; border-radius: 16px; box-shadow: var(--ds-shadow-border-medium);">
+<div style="flex: 1 1 auto; min-width: 0;"><acme-textarea aria-label="Your question" placeholder="Ask now, it sends when you reconnect" rows="1" auto-resize="" resize="none"></acme-textarea></div>
+<acme-button type="submit" shape="circle" aria-label="Queue question"><acme-schedule-icon></acme-schedule-icon></acme-button>
+</form>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

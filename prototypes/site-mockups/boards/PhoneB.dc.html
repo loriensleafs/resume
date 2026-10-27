@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Concept B on a phone</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+.m-dim{color:var(--ds-gray-900)}
+.m-li{position:relative;padding-left:16px;display:flex;flex-direction:column;gap:2px}
+.m-li::before{content:"";position:absolute;left:0;top:9px;width:5px;height:5px;border-radius:50%;background:var(--ds-gray-700)}
+.m-ask{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;min-height:44px;color:var(--ds-gray-900);text-decoration:none}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<acme-app-bar size="small" aria-label="Site">
+<acme-app-bar-start><a href="#" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ds-gray-1000);"><acme-avatar initials="PK" size="small"></acme-avatar><span class="text-label-14" style="font-weight: 600;">Peter Kloss</span></a></acme-app-bar-start>
+<acme-app-bar-end><acme-button variant="tertiary" size="small" shape="square" aria-label="Download the resume"><acme-download-icon></acme-download-icon></acme-button></acme-app-bar-end>
+</acme-app-bar>
+
+<main style="flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 28px 16px 120px; display: flex; flex-direction: column; gap: 16px;">
+<header style="display: flex; flex-direction: column; gap: 4px;">
+<h1 class="text-heading-32" style="margin: 0;">Peter Kloss</h1>
+<p class="text-copy-14 m-dim" style="margin: 0;">Front-End Platform Engineer, Design Systems and AI Developer Tooling</p>
+</header>
+<p class="text-copy-14" style="margin: 0;">Front-end platform engineer with 15+ years building what product teams build on: design systems, shared packages and monorepo tooling.</p>
+<section aria-labelledby="hs" style="display: flex; flex-direction: column; gap: 8px;">
+<h2 id="hs" class="text-heading-20" style="margin: 0;">Highspot</h2>
+<p class="text-label-13 m-dim" style="margin: 0;">Sr. Software Development Engineer, Dec 2024 – Aug 2026</p>
+<ul style="margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px;">
+<li class="m-li"><span class="text-copy-14">Led the organization-wide effort to build the polar-ui MCP server, the design system’s contract for AI coding agents, used by ~100 people across all application teams, design, and product.</span><a href="#" class="m-ask text-label-13"><acme-chat-bubble-icon></acme-chat-bubble-icon>Ask about this</a></li>
+<li class="m-li"><span class="text-copy-14">Introduced many of the team’s AI development standards: spec-driven development, shared skills and agents checked into the repo, agent context files (CLAUDE.md, AGENTS.md).</span><a href="#" class="m-ask text-label-13"><acme-chat-bubble-icon></acme-chat-bubble-icon>Ask about this</a></li>
+</ul>
+</section>
+</main>
+
+<div style="position: absolute; left: 16px; right: 16px; bottom: 20px; display: flex; justify-content: center;">
+<a href="#" class="text-button-16" style="display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 22px; border-radius: 999px; background: var(--ds-gray-1000); color: var(--ds-background-100); text-decoration: none; box-shadow: var(--ds-shadow-2xl);"><acme-chat-bubble-icon></acme-chat-bubble-icon>Ask about Peter’s work</a>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

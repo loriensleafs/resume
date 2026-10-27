@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Peter Kloss: home on a phone</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+</style>
+</helmet>
+<div style="width: 390px; height: 2700px; box-sizing: border-box; overflow: hidden; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<acme-app-bar size="small" aria-label="Site">
+<acme-app-bar-start>
+<a href="#" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ds-gray-1000);">
+<acme-avatar initials="PK" size="small"></acme-avatar>
+<span class="text-label-14" style="font-weight: 600;">Peter Kloss</span>
+</a>
+</acme-app-bar-start>
+<acme-app-bar-end>
+<acme-menu>
+<acme-menu-trigger slot="trigger" size="small" aria-label="Download the resume"><acme-download-icon></acme-download-icon></acme-menu-trigger>
+<acme-menu-content aria-label="Download the resume">
+<acme-menu-item value="pdf" href="#">PDF</acme-menu-item>
+<acme-menu-item value="docx" href="#">Word</acme-menu-item>
+<acme-menu-item value="txt" href="#">Plain text</acme-menu-item>
+</acme-menu-content>
+</acme-menu>
+</acme-app-bar-end>
+</acme-app-bar>
+
+<main>
+<section aria-labelledby="ask-heading" style="box-sizing: border-box; padding: 48px 16px 40px; display: flex; flex-direction: column; gap: 16px;">
+<p class="text-label-13" style="margin: 0; color: var(--ds-gray-900);">Front-End Platform Engineer, Design Systems and AI Developer Tooling</p>
+<h1 id="ask-heading" class="text-heading-40" style="margin: 0;">Ask about Peter’s work.</h1>
+<p class="text-copy-16" style="margin: 0; color: var(--ds-gray-900);">Answers come only from his resume, nine deep dives and four job-search answers that Peter approved. Every answer names its sources.</p>
+<form style="box-sizing: border-box; display: flex; align-items: flex-end; gap: 8px; padding: 8px; margin-top: 8px; border-radius: 16px; box-shadow: var(--ds-shadow-border-medium);">
+<div style="flex: 1 1 auto; min-width: 0;"><acme-textarea aria-label="Your question" placeholder="Ask about a project, a role or a skill" rows="2" auto-resize="" resize="none"></acme-textarea></div>
+<acme-button type="submit" shape="circle" aria-label="Send question"><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button>
+</form>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<a href="#" class="text-label-14" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 12px; box-shadow: var(--ds-shadow-border); color: var(--ds-gray-1000); text-decoration: none;">What did Peter build for AI coding agents?<acme-north-east-icon></acme-north-east-icon></a>
+<a href="#" class="text-label-14" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 12px; box-shadow: var(--ds-shadow-border); color: var(--ds-gray-1000); text-decoration: none;">Is Peter open to remote work?<acme-north-east-icon></acme-north-east-icon></a>
+<a href="#" class="text-label-14" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 12px; box-shadow: var(--ds-shadow-border); color: var(--ds-gray-1000); text-decoration: none;">How did FedNow’s bundle get under 1 MB?<acme-north-east-icon></acme-north-east-icon></a>
+</div>
+</section>
+
+<section aria-labelledby="experience-heading" style="box-sizing: border-box; padding: 40px 16px; border-top: 1px solid var(--ds-gray-400); display: flex; flex-direction: column; gap: 20px;">
+<h2 id="experience-heading" class="text-heading-24" style="margin: 0;">Experience</h2>
+<p class="text-copy-16" style="margin: 0; color: var(--ds-gray-900);">Front-end platform engineer with 15+ years building what product teams build on: design systems, shared packages and monorepo tooling. At Highspot, led the organization-wide MCP server that gives AI coding agents the design system’s contract, used by ~100 people, and built the platform team’s agent workflow system. Before that, led front-end architecture for FedNow, the Federal Reserve’s instant payment service.</p>
+
+<acme-card as="article" variant="outline">
+<acme-card-body>
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<h3 class="text-heading-20" style="margin: 0;">Highspot</h3>
+<p class="text-copy-14" style="margin: 0; color: var(--ds-gray-900);">Sr. Software Development Engineer, Polar UI design system team</p>
+<p class="text-label-13" style="margin: 0; color: var(--ds-gray-900); font-variant-numeric: tabular-nums;">Dec 2024 – Aug 2026, Seattle, WA</p>
+</div>
+<ul style="margin: 16px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 16px;">
+<li style="position: relative; padding-left: 16px; display: flex; flex-direction: column; gap: 6px;">
+<span aria-hidden="true" style="position: absolute; left: 0; top: 9px; width: 5px; height: 5px; border-radius: 50%; background: var(--ds-gray-700);"></span>
+<span class="text-copy-14">Led the organization-wide effort to build the polar-ui MCP server, the design system’s contract for AI coding agents, so agent-written UI follows the design system, including complex components such as the data table. It worked alongside the Figma MCP and became a standard part of every Cursor and Claude Code setup for front-end work, used by ~100 people across all application teams, design, and product.</span>
+<a href="#" class="text-label-14" style="display: inline-flex; align-items: center; gap: 4px; min-height: 44px; text-decoration: none; font-weight: 500;">Deep dive: the polar-ui MCP server<acme-arrow-forward-icon></acme-arrow-forward-icon></a>
+</li>
+<li style="position: relative; padding-left: 16px; display: flex; flex-direction: column; gap: 6px;">
+<span aria-hidden="true" style="position: absolute; left: 0; top: 9px; width: 5px; height: 5px; border-radius: 50%; background: var(--ds-gray-700);"></span>
+<span class="text-copy-14">Introduced many of the team’s AI development standards: spec-driven development, shared skills and agents checked into the repo, agent context files (CLAUDE.md, AGENTS.md), and rules that keep agents on Polar UI components.</span>
+<a href="#" class="text-label-14" style="display: inline-flex; align-items: center; gap: 4px; min-height: 44px; text-decoration: none; font-weight: 500;">Deep dive: the AI development standards<acme-arrow-forward-icon></acme-arrow-forward-icon></a>
+</li>
+<li style="position: relative; padding-left: 16px; display: flex; flex-direction: column; gap: 6px;">
+<span aria-hidden="true" style="position: absolute; left: 0; top: 9px; width: 5px; height: 5px; border-radius: 50%; background: var(--ds-gray-700);"></span>
+<span class="text-copy-14">Designed and rolled out an agent workflow system for the platform team, built in TypeScript on Bun: specialist agents and skills turn specs into dependency-mapped plans, where plans and tasks both carry dependencies, so up to 4 developers and their agents know which work is unblocked, claimed, or safe to run in parallel.</span>
+<a href="#" class="text-label-14" style="display: inline-flex; align-items: center; gap: 4px; min-height: 44px; text-decoration: none; font-weight: 500;">Deep dive: the agent workflow system<acme-arrow-forward-icon></acme-arrow-forward-icon></a>
+</li>
+<li style="position: relative; padding-left: 16px; display: flex; flex-direction: column; gap: 6px;">
+<span aria-hidden="true" style="position: absolute; left: 0; top: 9px; width: 5px; height: 5px; border-radius: 50%; background: var(--ds-gray-700);"></span>
+<span class="text-copy-14">Used that system to build two major components: a streaming Markdown component, and a TanStack-based data table, built after an AG Grid Enterprise license was blocked and defined by 21 specs and 189 requirement documents.</span>
+</li>
+<li style="position: relative; padding-left: 16px; display: flex; flex-direction: column; gap: 6px;">
+<span aria-hidden="true" style="position: absolute; left: 0; top: 9px; width: 5px; height: 5px; border-radius: 50%; background: var(--ds-gray-700);"></span>
+<span class="text-copy-14">Built accessible React and TypeScript components (WCAG, ARIA) from Figma designs and design tokens, with end-to-end tests in TestCafe and Playwright and visual regression tests.</span>
+</li>
+</ul>
+</acme-card-body>
+</acme-card>
+
+<acme-card as="article" variant="outline">
+<acme-card-body>
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<h3 class="text-heading-20" style="margin: 0;">Federal Reserve Bank of Boston (FedNow)</h3>
+<p class="text-copy-14" style="margin: 0; color: var(--ds-gray-900);">Lead Front-End Engineer, promoted from Sr. UI Front End Developer</p>
+<p class="text-label-13" style="margin: 0; color: var(--ds-gray-900); font-variant-numeric: tabular-nums;">2021 – 2024, Boston, MA</p>
+</div>
+<ul style="margin: 16px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 16px;">
+<li style="position: relative; padding-left: 16px; display: flex; flex-direction: column; gap: 6px;">
+<span aria-hidden="true" style="position: absolute; left: 0; top: 9px; width: 5px; height: 5px; border-radius: 50%; background: var(--ds-gray-700);"></span>
+<span class="text-copy-14">Led front-end architecture across FedNow applications, aligning Product, UX, back-end, QA and security teams on one consistent, scalable approach.</span>
+<a href="#" class="text-label-14" style="display: inline-flex; align-items: center; gap: 4px; min-height: 44px; text-decoration: none; font-weight: 500;">Deep dive: FedNow’s front-end architecture<acme-arrow-forward-icon></acme-arrow-forward-icon></a>
+</li>
+<li style="position: relative; padding-left: 16px; display: flex; flex-direction: column; gap: 6px;">
+<span aria-hidden="true" style="position: absolute; left: 0; top: 9px; width: 5px; height: 5px; border-radius: 50%; background: var(--ds-gray-700);"></span>
+<span class="text-copy-14">Cut initial bundle size from over 15 MB to under 1 MB across multiple applications without delaying FedNow’s launch, through code splitting and lazy loading, micro-frontends, a new build setup, fewer heavy dependencies, and design system and shared packages rebuilt as tree-shakeable ES modules. A Git plugin flagged oversized modules for further splitting.</span>
+<a href="#" class="text-label-14" style="display: inline-flex; align-items: center; gap: 4px; min-height: 44px; text-decoration: none; font-weight: 500;">Deep dive: the bundle cut<acme-arrow-forward-icon></acme-arrow-forward-icon></a>
+</li>
+</ul>
+</acme-card-body>
+</acme-card>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":2700}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

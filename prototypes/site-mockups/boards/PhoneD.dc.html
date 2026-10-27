@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Concept D on a phone</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+.m-dim{color:var(--ds-gray-900)}
+.m-choice{display:flex;align-items:center;gap:12px;min-height:56px;padding:0 16px;border-radius:14px;box-shadow:var(--ds-shadow-border);background:var(--ds-background-100);color:var(--ds-gray-1000);text-decoration:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<acme-app-bar size="small" aria-label="Site">
+<acme-app-bar-start><a href="#" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ds-gray-1000);"><acme-avatar initials="PK" size="small"></acme-avatar><span class="text-label-14" style="font-weight: 600;">Peter Kloss</span></a></acme-app-bar-start>
+<acme-app-bar-end><a href="#" class="text-label-14" style="text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Resume</a></acme-app-bar-end>
+</acme-app-bar>
+
+<main style="flex: 1 1 auto; padding: 48px 16px 24px; display: flex; flex-direction: column; gap: 16px;">
+<h1 class="text-heading-32" style="margin: 0;">Ask about Peter’s work.</h1>
+<p class="text-copy-16" style="margin: 0;">Who is asking? The answers change their focus and depth to fit.</p>
+<div role="group" aria-label="Who is asking" style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+<a href="#" class="m-choice"><acme-person-icon></acme-person-icon><span style="display: flex; flex-direction: column;"><span class="text-label-16">Recruiter</span><span class="text-label-13 m-dim">Roles, dates, location, availability</span></span></a>
+<a href="#" class="m-choice"><acme-groups-icon></acme-groups-icon><span style="display: flex; flex-direction: column;"><span class="text-label-16">Hiring manager</span><span class="text-label-13 m-dim">Scope, impact, how he works with teams</span></span></a>
+<a href="#" class="m-choice"><acme-engineering-icon></acme-engineering-icon><span style="display: flex; flex-direction: column;"><span class="text-label-16">Engineer</span><span class="text-label-13 m-dim">Architecture, tools, technical detail</span></span></a>
+</div>
+<a href="#" class="text-label-14" style="align-self: center; min-height: 44px; display: inline-flex; align-items: center; text-decoration: none;">Skip and ask anything</a>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

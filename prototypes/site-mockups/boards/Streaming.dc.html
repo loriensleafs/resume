@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Peter Kloss: answer streaming, dark</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+</style>
+</helmet>
+<acme-theme appearance="dark">
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; overflow: hidden; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<acme-app-bar aria-label="Site">
+<acme-app-bar-start>
+<a href="#" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ds-gray-1000);">
+<acme-avatar initials="PK" size="small"></acme-avatar>
+<span class="text-label-14" style="font-weight: 600;">Peter Kloss</span>
+</a>
+</acme-app-bar-start>
+<acme-app-bar-content>
+<nav aria-label="Sections" style="display: flex; gap: 24px; padding-left: 24px;">
+<a href="#" class="text-label-14" style="color: var(--ds-gray-900); text-decoration: none;">Experience</a>
+<a href="#" class="text-label-14" style="color: var(--ds-gray-900); text-decoration: none;">Deep dives</a>
+<a href="#" class="text-label-14" style="color: var(--ds-gray-900); text-decoration: none;">Skills</a>
+</nav>
+</acme-app-bar-content>
+<acme-app-bar-end>
+<div style="display: flex; gap: 8px; align-items: center;">
+<acme-theme-switcher value="dark"></acme-theme-switcher>
+<acme-menu>
+<acme-menu-trigger slot="trigger" size="small">Resume<acme-keyboard-arrow-down-icon slot="end"></acme-keyboard-arrow-down-icon></acme-menu-trigger>
+<acme-menu-content aria-label="Download the resume">
+<acme-menu-item value="pdf" href="#">PDF</acme-menu-item>
+<acme-menu-item value="docx" href="#">Word</acme-menu-item>
+<acme-menu-item value="txt" href="#">Plain text</acme-menu-item>
+</acme-menu-content>
+</acme-menu>
+</div>
+</acme-app-bar-end>
+</acme-app-bar>
+
+<main style="box-sizing: border-box; max-width: 800px; margin: 0 auto; padding: 56px 24px; display: flex; flex-direction: column; gap: 32px;">
+<h1 class="text-heading-20" style="margin: 0;">Ask about Peter’s work</h1>
+
+<div style="display: flex; flex-direction: column; gap: 16px;">
+<p class="text-copy-16" style="margin: 0; align-self: flex-end; max-width: 80%; padding: 12px 16px; border-radius: 16px 16px 4px 16px; background: var(--ds-gray-100);">How did FedNow’s bundle get under 1 MB?</p>
+<article aria-label="Answer, still arriving" aria-busy="true" style="display: flex; flex-direction: column; gap: 14px;">
+<div style="display: flex; align-items: center; gap: 8px; color: var(--ds-gray-900);"><acme-spinner size="small"></acme-spinner><span class="text-label-13">Writing the answer</span></div>
+<acme-markdown text="{{partial}}" class="text-copy-16"></acme-markdown>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<span class="text-label-12" style="color: var(--ds-gray-900);">Sources so far</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<a href="#" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 10px; box-shadow: var(--ds-shadow-border); color: var(--ds-gray-1000); text-decoration: none;"><acme-description-icon></acme-description-icon><span class="text-label-13">Deep dive: the bundle cut</span><span class="text-label-12-mono" style="color: var(--ds-gray-900);">deep:fednow-bundle-size</span></a>
+</div>
+</div>
+</article>
+</div>
+
+<form style="box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 16px; background: var(--ds-background-200); box-shadow: var(--ds-shadow-border-medium);">
+<acme-textarea aria-label="Your question" placeholder="Ask a follow-up question" rows="1" auto-resize="" resize="none"></acme-textarea>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+<span class="text-label-13" style="color: var(--ds-gray-900);">Answers come from Peter’s approved knowledge file. Check the sources.</span>
+<acme-button variant="secondary" size="small"><acme-stop-circle-icon slot="start"></acme-stop-circle-icon>Stop</acme-button>
+</div>
+</form>
+</main>
+</div>
+</acme-theme>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'dark');
+}
+renderVals() {
+return {
+partial: "Peter did the initial audit of the application and found what made the bundles so large. He wrote the complete roadmap for the architecture refactor: every npm package to build, how each would be used and the patterns behind them.\n\nThe bundle came down through code splitting and lazy loading, micro-frontends, a new build setup, fewer heavy dependencies, and the design system and shared packages rebuilt as tree-shakeable ES modules instead of"
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Concept E on a phone</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+.m-dim{color:var(--ds-gray-900)}
+.m-h{margin:0;font-size:16px;line-height:24px;font-weight:600}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<acme-app-bar size="small" aria-label="Site">
+<acme-app-bar-start><a href="#" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ds-gray-1000);"><acme-avatar initials="PK" size="small"></acme-avatar><span class="text-label-14" style="font-weight: 600;">Peter Kloss</span></a></acme-app-bar-start>
+<acme-app-bar-end><a href="#" class="text-label-14" style="text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Full resume</a></acme-app-bar-end>
+</acme-app-bar>
+
+<main style="flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 24px 16px; display: flex; flex-direction: column; gap: 16px;">
+<h1 class="text-heading-24" style="margin: 0;">Peter’s career</h1>
+<acme-timeline aria-label="Roles, newest first">
+<acme-timeline-item>
+<time slot="date" class="text-label-13 m-dim">Dec 2024 – Aug 2026</time>
+<h2 slot="heading" class="m-h">Highspot</h2>
+<span slot="description" class="text-copy-14 m-dim">Sr. Software Development Engineer, Polar UI design system team</span>
+</acme-timeline-item>
+<acme-timeline-item>
+<time slot="date" class="text-label-13" style="color: var(--ds-blue-900);">2021 – 2024</time>
+<h2 slot="heading" class="m-h">Federal Reserve Bank of Boston (FedNow)</h2>
+<div slot="description" style="display: flex; flex-direction: column; gap: 10px;">
+<span class="text-copy-14 m-dim">Lead Front-End Engineer, promoted from Sr. UI Front End Developer</span>
+<span class="text-copy-14">Led front-end architecture across FedNow applications, cut the initial bundle from over 15 MB to under 1 MB, and built the design system and shared npm packages.</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<acme-button size="small"><acme-chat-bubble-icon slot="start"></acme-chat-bubble-icon>Ask about FedNow</acme-button>
+<acme-button size="small" variant="secondary">4 deep dives</acme-button>
+</div>
+</div>
+</acme-timeline-item>
+<acme-timeline-item>
+<time slot="date" class="text-label-13 m-dim">2020 – 2021</time>
+<h2 slot="heading" class="m-h">Pippin Title</h2>
+<span slot="description" class="text-copy-14 m-dim">Senior Front-End Engineer</span>
+</acme-timeline-item>
+<acme-timeline-item>
+<time slot="date" class="text-label-13 m-dim">2019 – 2020</time>
+<h2 slot="heading" class="m-h">LinkSquares</h2>
+<span slot="description" class="text-copy-14 m-dim">Senior Front-End Engineer</span>
+</acme-timeline-item>
+<acme-timeline-item>
+<time slot="date" class="text-label-13 m-dim">2017 – 2019</time>
+<h2 slot="heading" class="m-h">Sheridan PubFactory</h2>
+<span slot="description" class="text-copy-14 m-dim">Senior Front-End Engineer</span>
+</acme-timeline-item>
+</acme-timeline>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

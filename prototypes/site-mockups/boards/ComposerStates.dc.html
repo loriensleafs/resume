@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chat input: send button states</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+.m-dim{color:var(--ds-gray-900)}
+.m-state{display:flex;flex-direction:column;gap:10px}
+.m-cap{display:flex;flex-direction:column;gap:2px}
+.m-form{display:flex;flex-direction:column;gap:10px}
+.m-field{position:relative}
+.m-field acme-textarea::part(textarea){padding-inline-end:48px}
+.m-status{display:flex;align-items:center;gap:8px;min-height:24px}
+.m-q{margin:0;align-self:flex-end;max-width:85%;padding:10px 14px;border-radius:16px 16px 4px 16px;background:var(--ds-gray-100)}
+.m-busy{position:relative;display:inline-flex;flex:0 0 auto}
+.m-send{position:absolute;right:5px;bottom:5px;display:flex}
+.m-ring{position:absolute;left:0;top:0;width:100%;height:100%;animation:m-spin 1.4s linear infinite;pointer-events:none}
+.m-ring circle{fill:none;stroke:var(--ds-blue-700);stroke-width:3;stroke-linecap:round;animation:m-dash 1.4s ease-in-out infinite}
+acme-alert::part(root){align-items:flex-start}
+acme-alert::part(close),acme-alert::part(actions){margin-block:-6px}
+@keyframes m-spin{to{transform:rotate(360deg)}}
+@keyframes m-dash{0%{stroke-dasharray:1 200;stroke-dashoffset:0}50%{stroke-dasharray:100 200;stroke-dashoffset:-40}100%{stroke-dasharray:100 200;stroke-dashoffset:-143}}
+@media (prefers-reduced-motion: reduce){.m-ring,.m-ring circle{animation-duration:4s}}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1240px; box-sizing: border-box; padding: 40px 64px; display: flex; flex-direction: column; gap: 24px; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 class="text-heading-24" style="margin: 0;">Chat input: send button states</h1>
+<p class="text-copy-14 m-dim" style="margin: 0;">The send button sits inside the input, at its right end, with no box around the two; “Answers for” stays underneath. Each input is drawn at the chat column’s width.</p>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 64px; row-gap: 32px; max-width: 1180px;">
+
+<section class="m-state" aria-labelledby="s1">
+<div class="m-cap"><h2 id="s1" class="text-label-14" style="margin: 0; font-weight: 600;">1. Empty</h2><span class="text-copy-13 m-dim">Send is off until there is a question.</span></div>
+<form class="m-form">
+<div class="m-field"><acme-textarea aria-label="Your question" placeholder="Ask about a project, a role or a skill" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question" disabled=""><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span></div>
+<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;"><span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span><acme-button variant="secondary" size="small" shape="pill">Recruiter</acme-button><acme-button variant="secondary" size="small" shape="pill">Hiring manager</acme-button><acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button></div>
+</form>
+</section>
+
+<section class="m-state" aria-labelledby="s2">
+<div class="m-cap"><h2 id="s2" class="text-label-14" style="margin: 0; font-weight: 600;">2. Ready</h2><span class="text-copy-13 m-dim">A question is typed; Send is on. Enter sends, Shift+Enter adds a line.</span></div>
+<form class="m-form">
+<div class="m-field"><acme-textarea aria-label="Your question" value="How did FedNow’s bundle get under 1 MB?" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question"><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span></div>
+<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;"><span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span><acme-button variant="secondary" size="small" shape="pill">Recruiter</acme-button><acme-button size="small" shape="pill" aria-pressed="true">Hiring manager</acme-button><acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button></div>
+</form>
+</section>
+
+<section class="m-state" aria-labelledby="s3">
+<div class="m-cap"><h2 id="s3" class="text-label-14" style="margin: 0; font-weight: 600;">3. Answering</h2><span class="text-copy-13 m-dim">While the answer streams in, Send becomes Stop: a plain square, with a progress ring turning on the button’s border. The next question can be typed.</span></div>
+<div class="m-status" role="status"><span class="text-label-13 m-dim">Answering, reading the FedNow bundle cut</span></div>
+<form class="m-form">
+<div class="m-field"><acme-textarea aria-label="Your question" placeholder="Ask a follow-up" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-busy m-send"><acme-button type="button" variant="secondary" size="small" shape="circle" aria-label="Stop the answer"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect width="12" height="12" rx="2" style="fill: currentColor;"></rect></svg></acme-button><svg class="m-ring" viewBox="0 0 50 50" aria-hidden="true"><circle cx="25" cy="25" r="23.5"></circle></svg></span></div>
+<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;"><span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span><acme-button variant="secondary" size="small" shape="pill">Recruiter</acme-button><acme-button size="small" shape="pill" aria-pressed="true">Hiring manager</acme-button><acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button></div>
+</form>
+</section>
+
+<section class="m-state" aria-labelledby="s4">
+<div class="m-cap"><h2 id="s4" class="text-label-14" style="margin: 0; font-weight: 600;">4. Answering, a question waiting</h2><span class="text-copy-13 m-dim">Enter during an answer queues the new question. It waits above the input with a clock and sends when the answer finishes. × removes it. In an empty input, the Up arrow key brings it back into the input and off the queue.</span></div>
+<div class="m-status" role="status"><span class="text-label-13 m-dim">Answering, reading the FedNow bundle cut</span></div>
+<acme-alert dismissible="" role="status"><acme-schedule-icon slot="start"></acme-schedule-icon>“Did Peter use micro-frontends there?” It sends when this answer finishes.</acme-alert>
+<form class="m-form">
+<div class="m-field"><acme-textarea aria-label="Your question" placeholder="Ask a follow-up" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-busy m-send"><acme-button type="button" variant="secondary" size="small" shape="circle" aria-label="Stop the answer"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect width="12" height="12" rx="2" style="fill: currentColor;"></rect></svg></acme-button><svg class="m-ring" viewBox="0 0 50 50" aria-hidden="true"><circle cx="25" cy="25" r="23.5"></circle></svg></span></div>
+<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;"><span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span><acme-button variant="secondary" size="small" shape="pill">Recruiter</acme-button><acme-button size="small" shape="pill" aria-pressed="true">Hiring manager</acme-button><acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button></div>
+</form>
+</section>
+
+<section class="m-state" aria-labelledby="s5">
+<div class="m-cap"><h2 id="s5" class="text-label-14" style="margin: 0; font-weight: 600;">5. Stopped</h2><span class="text-copy-13 m-dim">The visitor stopped the answer. What arrived stays, marked as stopped; Send is back.</span></div>
+<div class="m-status"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect width="12" height="12" rx="2" style="fill: var(--ds-gray-900);"></rect></svg><span class="text-label-13 m-dim">Answer stopped.</span></div>
+<form class="m-form">
+<div class="m-field"><acme-textarea aria-label="Your question" placeholder="Ask a follow-up" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question" disabled=""><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span></div>
+<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;"><span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span><acme-button variant="secondary" size="small" shape="pill">Recruiter</acme-button><acme-button size="small" shape="pill" aria-pressed="true">Hiring manager</acme-button><acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button></div>
+</form>
+</section>
+
+<section class="m-state" aria-labelledby="s6">
+<div class="m-cap"><h2 id="s6" class="text-label-14" style="margin: 0; font-weight: 600;">6. Offline</h2><span class="text-copy-13 m-dim">Send becomes Queue. A queued question waits above the input with a clock and sends when the connection returns. × removes it; in an empty input, the Up arrow key brings it back.</span></div>
+<acme-alert dismissible="" role="status"><acme-schedule-icon slot="start"></acme-schedule-icon>“What did Peter lead at Highspot?” It sends when you’re back online.</acme-alert>
+<form class="m-form">
+<div class="m-field"><acme-textarea aria-label="Your question" value="Is Peter open to remote work?" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-send"><acme-button type="submit" size="small" variant="secondary" shape="circle" aria-label="Queue question, you are offline"><acme-cloud-off-icon></acme-cloud-off-icon></acme-button></span></div>
+<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;"><span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span><acme-button size="small" shape="pill" aria-pressed="true">Recruiter</acme-button><acme-button variant="secondary" size="small" shape="pill">Hiring manager</acme-button><acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button></div>
+</form>
+</section>
+
+<section class="m-state" aria-labelledby="s7">
+<div class="m-cap"><h2 id="s7" class="text-label-14" style="margin: 0; font-weight: 600;">7. Error</h2><span class="text-copy-13 m-dim">The question stays where it was asked, and the error takes the answer’s place. Try again resends it; Edit question puts it back in the input. The input stays free for a new question.</span></div>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<p class="m-q text-copy-14">What did Peter lead at FedNow?</p>
+<acme-alert variant="error" heading="The answer didn’t arrive." role="alert"><acme-button slot="actions" variant="secondary" size="small">Try again</acme-button><acme-button slot="actions" variant="tertiary" size="small">Edit question</acme-button></acme-alert>
+</div>
+<form class="m-form">
+<div class="m-field"><acme-textarea aria-label="Your question" placeholder="Ask a follow-up" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question" disabled=""><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span></div>
+<div role="group" aria-label="Tailor answers for" style="display: flex; align-items: center; gap: 4px;"><span class="text-label-13 m-dim" style="margin-right: 4px;">Answers for</span><acme-button variant="secondary" size="small" shape="pill">Recruiter</acme-button><acme-button size="small" shape="pill" aria-pressed="true">Hiring manager</acme-button><acme-button variant="secondary" size="small" shape="pill">Engineer</acme-button></div>
+</form>
+</section>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"appearance":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', this.props.appearance === 'dark' ? 'dark' : 'light');
+}
+componentDidUpdate() {
+document.documentElement.setAttribute('data-acme-appearance', this.props.appearance === 'dark' ? 'dark' : 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

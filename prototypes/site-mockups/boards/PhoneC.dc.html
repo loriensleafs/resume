@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Concept C on a phone</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+.m-dim{color:var(--ds-gray-900)}
+.m-row{display:flex;flex-direction:column;gap:2px;padding:10px 4px;border-bottom:1px solid var(--ds-gray-400);color:var(--ds-gray-1000);text-decoration:none}
+mark{background:var(--ds-blue-200);color:inherit;border-radius:3px;padding:0 2px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+<div style="display: flex; align-items: center; justify-content: space-between;">
+<a href="#" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ds-gray-1000);"><acme-avatar initials="PK" size="small"></acme-avatar><span class="text-label-14" style="font-weight: 600;">Peter Kloss</span></a>
+<a href="#" class="text-label-14" style="text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Resume</a>
+</div>
+<acme-search value="design system" aria-label="Search the resume or ask a question" placeholder="Search, or ask a question"></acme-search>
+<a href="#" style="display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 12px; border-radius: 12px; background: var(--ds-gray-100); color: var(--ds-gray-1000); text-decoration: none;"><acme-auto-awesome-icon></acme-auto-awesome-icon><span class="text-label-14">Ask: “What has Peter done with design systems?”</span></a>
+<span class="text-label-12 m-dim" style="margin-top: 4px;">Resume, 5 matches</span>
+<div style="display: flex; flex-direction: column;">
+<a href="#" class="m-row"><span class="text-label-13 m-dim">Highspot</span><span class="text-copy-14">…the <mark>design system</mark>’s contract for AI coding agents…</span></a>
+<a href="#" class="m-row"><span class="text-label-13 m-dim">FedNow</span><span class="text-copy-14">Built and maintained the FedNow <mark>design system</mark> and shared npm packages…</span></a>
+<a href="#" class="m-row"><span class="text-label-13 m-dim">Pippin Title</span><span class="text-copy-14">Architected and documented a <mark>design system</mark> on Chakra UI…</span></a>
+<a href="#" class="m-row"><span class="text-label-13 m-dim">LinkSquares</span><span class="text-copy-14">Built a Storybook-documented <mark>design system</mark>…</span></a>
+</div>
+<span class="text-label-12 m-dim" style="margin-top: 4px;">Deep dives, 2 matches</span>
+<div style="display: flex; flex-direction: column;">
+<a href="#" class="m-row"><span class="text-label-13 m-dim">FedNow</span><span class="text-copy-14">The FedNow <mark>design system</mark> and shared npm packages</span></a>
+</div>
+<span class="text-label-12 m-dim" style="margin-top: auto; text-align: center;">Search works offline. Asking needs a connection.</span>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

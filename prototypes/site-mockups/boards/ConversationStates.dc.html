@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Conversation: messages and answer steps</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+.m-dim{color:var(--ds-gray-900)}
+.m-col{display:flex;flex-direction:column;gap:44px;min-width:0}
+.m-state{display:flex;flex-direction:column;gap:14px}
+.m-cap{display:flex;flex-direction:column;gap:2px}
+.m-thread{display:flex;flex-direction:column;gap:20px}
+.m-msg{display:flex;flex-direction:column;gap:4px;margin:0}
+.m-msg-q{align-items:flex-end}
+.m-q{margin:0;max-width:85%;padding:12px 16px;border-radius:16px 16px 4px 16px;background:var(--ds-gray-100)}
+.m-body{display:flex;flex-direction:column;gap:12px}
+.m-acts{display:flex;align-items:center;gap:8px;min-height:28px}
+.m-num{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:4px;background:var(--ds-gray-200);color:var(--ds-gray-1000);font-family:var(--acme-font-mono);font-size:11px;text-decoration:none;vertical-align:1px}
+.m-ans{margin:0}
+.m-trunc{max-height:96px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
+.m-q acme-show-more{margin:4px 0 0 -10px}
+.m-sum{--acme-disclosure-trigger-padding:2px 0;--acme-disclosure-content-padding:10px 0 0}
+.m-box{border:1px solid var(--ds-gray-400);border-radius:12px;overflow:hidden}
+.m-box > *{display:block}
+.m-box > * + *{border-top:1px solid var(--ds-gray-400)}
+.m-box acme-collapsible{--acme-disclosure-trigger-padding:10px 16px;--acme-disclosure-content-padding:0 16px 12px}
+.m-sum acme-collapsible-trigger::part(label),.m-box acme-collapsible-trigger::part(label){flex:0 1 auto}
+.m-sum acme-collapsible-trigger::part(trigger),.m-box acme-collapsible-trigger::part(trigger){justify-content:flex-start;gap:6px}
+.m-sum > acme-collapsible > acme-collapsible-trigger::part(trigger){min-block-size:28px}
+.m-cites{display:flex;flex-direction:column;gap:2px}
+.m-src{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 10px;border-radius:8px;color:var(--ds-gray-1000);text-decoration:none}
+.m-row{display:flex;align-items:center;gap:10px;padding:10px 16px}
+.m-lines{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.m-lines li{display:flex;align-items:center;gap:8px}
+.m-shimmer{color:transparent;background:linear-gradient(90deg,var(--ds-gray-900) 0%,var(--ds-gray-900) 35%,color-mix(in srgb,var(--ds-gray-900) 25%,var(--ds-background-100)) 50%,var(--ds-gray-900) 65%,var(--ds-gray-900) 100%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;animation:m-shine 1.6s linear infinite}
+@keyframes m-shine{from{background-position:100% 0}to{background-position:0 0}}
+@media (prefers-reduced-motion: reduce){.m-shimmer{animation:none;color:var(--ds-gray-900);background:none}}
+.m-frames{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.m-frame{display:flex;flex-direction:column;gap:6px}
+.m-win{height:300px;display:flex;flex-direction:column;border-radius:12px;box-shadow:var(--ds-shadow-border);overflow:hidden;background:var(--ds-background-100)}
+.m-msgs{flex:1 1 auto;min-height:0;overflow:hidden;padding:12px 14px 60px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px}
+.m-foot{position:relative;padding:0 10px 10px}
+.m-jump{position:absolute;left:50%;bottom:calc(100% + 12px);transform:translateX(-50%);display:flex;border-radius:999px;box-shadow:var(--ds-shadow-medium)}
+.m-field{position:relative}
+.m-field acme-textarea::part(textarea){padding-inline-end:48px}
+.m-send{position:absolute;right:5px;bottom:5px;display:flex}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1800px; box-sizing: border-box; padding: 40px 64px; display: flex; flex-direction: column; gap: 24px; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 class="text-heading-24" style="margin: 0;">Conversation: messages and answer steps</h1>
+<p class="text-copy-14 m-dim" style="margin: 0;">Each column is drawn at the chat column’s width. Every message keeps a 28 px row under it for its actions, shown or not, and messages are 20 px apart, so the space between a question and its answer matches the space between an answer and the next question. Questions and answers use the same text size.</p>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 64px; max-width: 1180px; align-items: start;">
+
+<div class="m-col">
+
+<section class="m-state" aria-labelledby="c1">
+<div class="m-cap"><h2 id="c1" class="text-label-14" style="margin: 0; font-weight: 600;">1. A question, hovered</h2><span class="text-copy-13 m-dim">Hovering a question shows when it was sent, then Retry, Edit and Copy as one group. Retry asks it again; Edit puts it back in the input; Copy copies its text. On an earlier question, Retry and Edit replace that answer and the ones after it. On phones, tapping a question shows the row.</span></div>
+<div class="m-thread">
+<div class="m-msg m-msg-q">
+<p class="m-q text-copy-16">How did FedNow’s bundle get under 1 MB?</p>
+<div class="m-acts" role="toolbar" aria-label="Question actions">
+<span class="text-label-12 m-dim"><acme-relative-time date="{{sentAt}}"></acme-relative-time></span>
+<acme-group size="tiny" variant="tertiary" gap="4px">
+<acme-icon-button aria-label="Retry this question"><acme-refresh-icon></acme-refresh-icon></acme-icon-button>
+<acme-icon-button aria-label="Edit this question"><acme-edit-icon></acme-edit-icon></acme-icon-button>
+<acme-copy-button value="How did FedNow’s bundle get under 1 MB?" aria-label="Copy this question"></acme-copy-button>
+</acme-group>
+</div>
+</div>
+<article class="m-msg" aria-label="Answer">
+<div class="m-body">
+<div class="m-sum"><acme-collapsible><acme-collapsible-trigger><span class="text-copy-16 m-dim">Read 1 source and checked 3 citations</span></acme-collapsible-trigger><acme-collapsible-content><span class="text-copy-14 m-dim">The steps</span></acme-collapsible-content></acme-collapsible></div>
+<p class="m-ans text-copy-16">Peter audited the application, found what made the bundles so large, then wrote the roadmap for the refactor and led it <a href="#" class="m-num" aria-label="Citation 1">1</a>.</p>
+</div>
+<div class="m-acts" role="toolbar" aria-label="Answer actions">
+<acme-group size="tiny" variant="tertiary" gap="4px">
+<acme-copy-button value="Peter audited the application, found what made the bundles so large, then wrote the roadmap for the refactor and led it." aria-label="Copy this answer"></acme-copy-button>
+<acme-icon-button aria-label="Retry this answer"><acme-refresh-icon></acme-refresh-icon></acme-icon-button>
+</acme-group>
+</div>
+</article>
+</div>
+</section>
+
+<section class="m-state" aria-labelledby="c2">
+<div class="m-cap"><h2 id="c2" class="text-label-14" style="margin: 0; font-weight: 600;">2. A long question</h2><span class="text-copy-13 m-dim">A question longer than four lines shows its first four, fading out, and Show more. Show less folds it again.</span></div>
+<div class="m-thread">
+<div class="m-msg m-msg-q">
+<div class="m-q text-copy-16"><div id="long-q" class="m-trunc">I’m hiring for a staff front-end platform role. Our design system serves about forty product teams, and we are moving it to web components while adding an MCP server so AI coding agents follow it. What has Peter done that matches this, and how did he know whether teams adopted the work?</div><acme-show-more variant="tertiary" size="small" aria-controls="long-q">Show more</acme-show-more></div>
+<div class="m-acts" aria-hidden="true"></div>
+</div>
+</div>
+</section>
+
+<section class="m-state" aria-labelledby="c3">
+<div class="m-cap"><h2 id="c3" class="text-label-14" style="margin: 0; font-weight: 600;">3. Answer actions: an earlier answer hovered, the latest answer</h2><span class="text-copy-13 m-dim">Under each answer: Copy and Retry as one group, then when it was written. An earlier answer shows the row on hover. The latest answer always shows Copy and Retry; its time shows on hover. Retry asks the question again and replaces the answer.</span></div>
+<div class="m-thread">
+<div class="m-msg m-msg-q"><p class="m-q text-copy-16">Is Peter open to remote work?</p><div class="m-acts" aria-hidden="true"></div></div>
+<article class="m-msg" aria-label="Answer">
+<div class="m-body"><p class="m-ans text-copy-16">Yes. Peter is open to remote, hybrid or on-site roles in the Seattle area <a href="#" class="m-num" aria-label="Citation 1">1</a>.</p></div>
+<div class="m-acts" role="toolbar" aria-label="Answer actions">
+<acme-group size="tiny" variant="tertiary" gap="4px">
+<acme-copy-button value="Yes. Peter is open to remote, hybrid or on-site roles in the Seattle area." aria-label="Copy this answer"></acme-copy-button>
+<acme-icon-button aria-label="Retry this answer"><acme-refresh-icon></acme-refresh-icon></acme-icon-button>
+</acme-group>
+<span class="text-label-12 m-dim"><acme-relative-time date="{{answeredAt}}"></acme-relative-time></span>
+</div>
+</article>
+<div class="m-msg m-msg-q"><p class="m-q text-copy-16">What did Peter build for AI coding agents?</p><div class="m-acts" aria-hidden="true"></div></div>
+<article class="m-msg" aria-label="Answer">
+<div class="m-body"><p class="m-ans text-copy-16">At Highspot, Peter led the organization-wide effort to build the polar-ui MCP server, the design system’s contract for AI coding agents <a href="#" class="m-num" aria-label="Citation 2">2</a>.</p></div>
+<div class="m-acts" role="toolbar" aria-label="Answer actions">
+<acme-group size="tiny" variant="tertiary" gap="4px">
+<acme-copy-button value="At Highspot, Peter led the organization-wide effort to build the polar-ui MCP server, the design system’s contract for AI coding agents." aria-label="Copy this answer"></acme-copy-button>
+<acme-icon-button aria-label="Retry this answer"><acme-refresh-icon></acme-refresh-icon></acme-icon-button>
+</acme-group>
+</div>
+</article>
+</div>
+</section>
+
+<section class="m-state" aria-labelledby="c4">
+<div class="m-cap"><h2 id="c4" class="text-label-14" style="margin: 0; font-weight: 600;">4. Scrolled up in a long conversation</h2><span class="text-copy-13 m-dim">Away from the bottom, a round button with a down arrow floats 12 px above the input and moves up when the input grows. Selecting it scrolls to the latest message.</span></div>
+<div class="m-frames">
+<div class="m-frame">
+<span class="text-label-12 m-dim">One-line input</span>
+<div class="m-win">
+<div class="m-msgs"><p class="m-ans text-copy-14">The bundle came down through code splitting and lazy loading, micro-frontends, a new build setup, fewer heavy dependencies, and the design system rebuilt as tree-shakeable ES modules.</p><p class="m-q text-copy-14" style="align-self: flex-end;">How did the Git plugin work?</p></div>
+<div class="m-foot">
+<span class="m-jump"><acme-icon-button variant="secondary" shape="circle" aria-label="Scroll to the latest message"><acme-arrow-downward-icon></acme-arrow-downward-icon></acme-icon-button></span>
+<div class="m-field"><acme-textarea aria-label="Your question" placeholder="Ask a follow-up" rows="1" auto-resize="" resize="none"></acme-textarea><span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question" disabled=""><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span></div>
+</div>
+</div>
+</div>
+<div class="m-frame">
+<span class="text-label-12 m-dim">Three-line input</span>
+<div class="m-win">
+<div class="m-msgs"><p class="m-ans text-copy-14">The bundle came down through code splitting and lazy loading, micro-frontends, a new build setup, fewer heavy dependencies, and the design system rebuilt as tree-shakeable ES modules.</p><p class="m-q text-copy-14" style="align-self: flex-end;">How did the Git plugin work?</p></div>
+<div class="m-foot">
+<span class="m-jump"><acme-icon-button variant="secondary" shape="circle" aria-label="Scroll to the latest message"><acme-arrow-downward-icon></acme-arrow-downward-icon></acme-icon-button></span>
+<div class="m-field"><acme-textarea aria-label="Your question" value="Which packages did the design system ship, and which teams used them first? Did any team stay on the old setup?" rows="3" auto-resize="" resize="none"></acme-textarea><span class="m-send"><acme-button type="submit" size="small" shape="circle" aria-label="Send question"><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button></span></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+</div>
+
+<div class="m-col">
+
+<section class="m-state" aria-labelledby="c5">
+<div class="m-cap"><h2 id="c5" class="text-label-14" style="margin: 0; font-weight: 600;">5. Steps while answering</h2><span class="text-copy-13 m-dim">While the chat works, each step appears in a box as it happens. The current step has a spinner and a moving highlight over its text. The steps cannot be opened until the answer is done.</span></div>
+<div class="m-thread">
+<div class="m-msg m-msg-q"><p class="m-q text-copy-16">How did FedNow’s bundle get under 1 MB?</p><div class="m-acts" aria-hidden="true"></div></div>
+<article class="m-msg" aria-label="Answer, in progress">
+<div class="m-box" role="status" aria-live="polite" aria-label="Answer steps">
+<div class="m-row"><span class="text-copy-14 m-dim">Found 1 source about FedNow’s bundle</span></div>
+<div class="m-row"><acme-spinner size="small"></acme-spinner><span class="text-copy-14 m-shimmer">Reading the FedNow bundle cut</span></div>
+</div>
+</article>
+</div>
+</section>
+
+<section class="m-state" aria-labelledby="c6">
+<div class="m-cap"><h2 id="c6" class="text-label-14" style="margin: 0; font-weight: 600;">6. Steps when the answer is done</h2><span class="text-copy-13 m-dim">The box folds into one line above the answer. Selecting the line opens it again. Under the answer come Copy and Retry, then its citations in an outlined card.</span></div>
+<div class="m-thread">
+<div class="m-msg m-msg-q"><p class="m-q text-copy-16">How did FedNow’s bundle get under 1 MB?</p><div class="m-acts" aria-hidden="true"></div></div>
+<article class="m-msg" aria-label="Answer">
+<div class="m-body">
+<div class="m-sum"><acme-collapsible><acme-collapsible-trigger><span class="text-copy-16 m-dim">Read 1 source and checked 3 citations</span></acme-collapsible-trigger><acme-collapsible-content><span class="text-copy-14 m-dim">The steps</span></acme-collapsible-content></acme-collapsible></div>
+<p class="m-ans text-copy-16">Peter audited the application, found what made the bundles so large, then wrote the roadmap for the refactor and led it <a href="#" class="m-num" aria-label="Citation 1">1</a>.</p>
+</div>
+<div class="m-acts" role="toolbar" aria-label="Answer actions">
+<acme-group size="tiny" variant="tertiary" gap="4px">
+<acme-copy-button value="Peter audited the application, found what made the bundles so large, then wrote the roadmap for the refactor and led it." aria-label="Copy this answer"></acme-copy-button>
+<acme-icon-button aria-label="Retry this answer"><acme-refresh-icon></acme-refresh-icon></acme-icon-button>
+</acme-group>
+</div>
+<acme-card variant="outline" size="small" aria-label="Citations" style="margin-top: 4px;"><acme-card-body>
+<div class="m-cites">
+<a href="#" class="m-src"><span class="m-num">1</span><acme-description-icon></acme-description-icon><span class="text-label-13">The FedNow bundle cut: What Peter did</span><span class="text-label-12 m-dim" style="margin-left: auto;">Open beside the chat</span></a>
+<a href="#" class="m-src"><span class="m-num">2</span><acme-article-icon></acme-article-icon><span class="text-label-13">Resume: FedNow, highlight 2</span><span class="text-label-12 m-dim" style="margin-left: auto;">Show in the resume</span></a>
+<a href="#" class="m-src"><span class="m-num">3</span><acme-description-icon></acme-description-icon><span class="text-label-13">The FedNow bundle cut: How it worked</span><span class="text-label-12 m-dim" style="margin-left: auto;">Open beside the chat</span></a>
+</div>
+</acme-card-body></acme-card>
+</article>
+</div>
+</section>
+
+<section class="m-state" aria-labelledby="c7">
+<div class="m-cap"><h2 id="c7" class="text-label-14" style="margin: 0; font-weight: 600;">7. Steps opened</h2><span class="text-copy-13 m-dim">The steps sit in a bordered box, one row each, with dividers and no indent. Each row opens on its own to show its details.</span></div>
+<div class="m-thread">
+<div class="m-msg m-msg-q"><p class="m-q text-copy-16">How did FedNow’s bundle get under 1 MB?</p><div class="m-acts" aria-hidden="true"></div></div>
+<article class="m-msg" aria-label="Answer">
+<div class="m-body">
+<div class="m-sum"><acme-collapsible expanded="">
+<acme-collapsible-trigger><span class="text-copy-16 m-dim">Read 1 source and checked 3 citations</span></acme-collapsible-trigger>
+<acme-collapsible-content>
+<div class="m-box" aria-label="Answer steps">
+<acme-collapsible>
+<acme-collapsible-trigger><span class="text-copy-14">Found 1 source about FedNow’s bundle</span></acme-collapsible-trigger>
+<acme-collapsible-content><span class="text-copy-14 m-dim">From the source list: Cutting FedNow’s initial bundle from over 15 MB to under 1 MB.</span></acme-collapsible-content>
+</acme-collapsible>
+<acme-collapsible expanded="">
+<acme-collapsible-trigger><span class="text-copy-14">Read the FedNow bundle cut, 3 passages</span></acme-collapsible-trigger>
+<acme-collapsible-content>
+<ol class="m-lines">
+<li><span class="m-num">1</span><span class="text-copy-14 m-dim">Problem</span></li>
+<li><span class="m-num">2</span><span class="text-copy-14 m-dim">What Peter did</span></li>
+<li><span class="m-num">3</span><span class="text-copy-14 m-dim">How it worked</span></li>
+</ol>
+</acme-collapsible-content>
+</acme-collapsible>
+<acme-collapsible expanded="">
+<acme-collapsible-trigger><span class="text-copy-14">Checked 3 citations</span></acme-collapsible-trigger>
+<acme-collapsible-content><span class="text-copy-14 m-dim">Each citation points to a passage the chat read or to the resume.</span></acme-collapsible-content>
+</acme-collapsible>
+</div>
+</acme-collapsible-content>
+</acme-collapsible></div>
+<p class="m-ans text-copy-16">Peter audited the application, found what made the bundles so large, then wrote the roadmap for the refactor and led it <a href="#" class="m-num" aria-label="Citation 1">1</a>.</p>
+</div>
+<div class="m-acts" role="toolbar" aria-label="Answer actions">
+<acme-group size="tiny" variant="tertiary" gap="4px">
+<acme-copy-button value="Peter audited the application, found what made the bundles so large, then wrote the roadmap for the refactor and led it." aria-label="Copy this answer"></acme-copy-button>
+<acme-icon-button aria-label="Retry this answer"><acme-refresh-icon></acme-refresh-icon></acme-icon-button>
+</acme-group>
+</div>
+</article>
+</div>
+</section>
+
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"appearance":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":1440,"height":1800}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', this.props.appearance === 'dark' ? 'dark' : 'light');
+}
+componentDidUpdate() {
+document.documentElement.setAttribute('data-acme-appearance', this.props.appearance === 'dark' ? 'dark' : 'light');
+}
+renderVals() {
+return { sentAt: Date.now() - 10 * 60 * 1000, answeredAt: Date.now() - 25 * 60 * 1000 };
+}
+}
+</script>
+</body>
+</html>

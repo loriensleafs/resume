@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Concept A+: chat workspace with the resume open</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+.m-q{margin:0;align-self:flex-end;max-width:80%;padding:12px 16px;border-radius:16px 16px 4px 16px;background:var(--ds-gray-100)}
+.m-src{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 12px;border-radius:10px;box-shadow:var(--ds-shadow-border);color:var(--ds-gray-1000);text-decoration:none}
+.m-dim{color:var(--ds-gray-900)}
+.m-li{position:relative;padding-left:18px}
+.m-li::before{content:"";position:absolute;left:2px;top:10px;width:6px;height:6px;border-radius:50%;background:var(--ds-gray-700)}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<acme-app-bar aria-label="Site">
+<acme-app-bar-start>
+<a href="#" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ds-gray-1000);"><acme-avatar initials="PK" size="small"></acme-avatar><span class="text-label-14" style="font-weight: 600;">Peter Kloss</span></a>
+</acme-app-bar-start>
+<acme-app-bar-end>
+<div style="display: flex; gap: 8px; align-items: center;">
+<acme-button variant="secondary" size="small"><acme-add-icon slot="start"></acme-add-icon>New conversation</acme-button>
+<acme-theme-switcher value="light"></acme-theme-switcher>
+</div>
+</acme-app-bar-end>
+</acme-app-bar>
+
+<div style="flex: 1 1 auto; min-height: 0; display: flex;">
+
+<section aria-label="Conversation" style="flex: 0 0 600px; box-sizing: border-box; display: flex; flex-direction: column; border-right: 1px solid var(--ds-gray-400);">
+<div style="flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 32px 32px 16px; display: flex; flex-direction: column; gap: 16px;">
+<p class="m-q text-copy-16">What did Peter build for AI coding agents?</p>
+<article aria-label="Answer" style="display: flex; flex-direction: column; gap: 12px;">
+<div class="m-dim" style="display: flex; align-items: center; gap: 8px;"><acme-auto-awesome-icon></acme-auto-awesome-icon><span class="text-label-13">Answer</span></div>
+<acme-markdown text="{{answer}}" class="text-copy-16"></acme-markdown>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<a href="#cited" class="m-src" style="box-shadow: 0 0 0 2px var(--ds-blue-700);"><acme-article-icon></acme-article-icon><span class="text-label-13">Resume: Highspot, highlight 1</span></a>
+<a href="#" class="m-src"><acme-description-icon></acme-description-icon><span class="text-label-13">Open deep dive: the polar-ui MCP server</span></a>
+</div>
+</article>
+</div>
+<form style="margin: 0 24px 24px; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 16px; box-shadow: var(--ds-shadow-border-medium);">
+<div style="display: flex; align-items: center; gap: 6px;"><acme-badge size="small" variant="blue">Viewing: Resume</acme-badge></div>
+<acme-textarea aria-label="Your question" placeholder="Ask about the resume or anything in it" rows="1" auto-resize="" resize="none"></acme-textarea>
+<div style="display: flex; align-items: center; justify-content: space-between;">
+<span class="text-label-13 m-dim">Answers name their sources</span>
+<acme-button type="submit" shape="circle" aria-label="Send question"><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button>
+</div>
+</form>
+</section>
+
+<section aria-label="Open documents" style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; background: var(--ds-background-200);">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--ds-gray-400);">
+<acme-tabs value="resume" aria-label="Open documents">
+<acme-tab value="resume"><acme-article-icon slot="start"></acme-article-icon>Resume</acme-tab>
+<acme-tab value="mcp"><acme-description-icon slot="start"></acme-description-icon>Deep dive: polar-ui MCP server</acme-tab>
+</acme-tabs>
+<div style="display: flex; gap: 4px;">
+<acme-menu>
+<acme-menu-trigger slot="trigger" size="small"><acme-download-icon slot="start"></acme-download-icon>Download</acme-menu-trigger>
+<acme-menu-content aria-label="Download the resume"><acme-menu-item value="pdf">PDF</acme-menu-item><acme-menu-item value="docx">Word</acme-menu-item><acme-menu-item value="txt">Plain text</acme-menu-item></acme-menu-content>
+</acme-menu>
+<acme-button variant="tertiary" size="small" shape="square" aria-label="Close the document panel"><acme-close-icon></acme-close-icon></acme-button>
+</div>
+</div>
+<article aria-label="Resume" style="flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 40px 56px; display: flex; flex-direction: column; gap: 20px; background: var(--ds-background-100); margin: 16px; border-radius: 12px; box-shadow: var(--ds-shadow-border);">
+<header style="display: flex; flex-direction: column; gap: 6px;">
+<h1 class="text-heading-32" style="margin: 0;">Peter Kloss</h1>
+<p class="text-copy-16 m-dim" style="margin: 0;">Front-End Platform Engineer, Design Systems and AI Developer Tooling</p>
+<p class="text-label-13 m-dim" style="margin: 0;">Redmond, WA  |  pkloss@gmail.com  |  LinkedIn  |  GitHub</p>
+</header>
+<p class="text-copy-14" style="margin: 0;">Front-end platform engineer with 15+ years building what product teams build on: design systems, shared packages and monorepo tooling. At Highspot, led the organization-wide MCP server that gives AI coding agents the design system’s contract, used by ~100 people, and built the platform team’s agent workflow system. Before that, led front-end architecture for FedNow, the Federal Reserve’s instant payment service.</p>
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; justify-content: space-between; gap: 16px; align-items: baseline;">
+<h2 class="text-heading-16" style="margin: 0;">Highspot</h2>
+<span class="text-label-13 m-dim" style="font-variant-numeric: tabular-nums;">Dec 2024 – Aug 2026</span>
+</div>
+<p class="text-copy-13 m-dim" style="margin: -6px 0 0;">Sr. Software Development Engineer, Polar UI design system team, Seattle, WA</p>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px;">
+<li id="cited" class="m-li text-copy-14" style="background: var(--ds-blue-100); border-radius: 8px; box-shadow: 0 0 0 6px var(--ds-blue-100);">Led the organization-wide effort to build the polar-ui MCP server, the design system’s contract for AI coding agents, so agent-written UI follows the design system, including complex components such as the data table. It worked alongside the Figma MCP and became a standard part of every Cursor and Claude Code setup for front-end work, used by ~100 people across all application teams, design, and product.</li>
+<li class="m-li text-copy-14">Introduced many of the team’s AI development standards: spec-driven development, shared skills and agents checked into the repo, agent context files (CLAUDE.md, AGENTS.md), and rules that keep agents on Polar UI components.</li>
+<li class="m-li text-copy-14">Designed and rolled out an agent workflow system for the platform team, built in TypeScript on Bun: specialist agents and skills turn specs into dependency-mapped plans, where plans and tasks both carry dependencies, so up to 4 developers and their agents know which work is unblocked, claimed, or safe to run in parallel.</li>
+<li class="m-li text-copy-14">Used that system to build two major components: a streaming Markdown component, and a TanStack-based data table, built after an AG Grid Enterprise license was blocked and defined by 21 specs and 189 requirement documents.</li>
+</ul>
+</div>
+</article>
+</section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'light');
+}
+renderVals() {
+return {
+answer: "Peter led the organization-wide effort to build the **polar-ui MCP server**, the design system’s contract for AI coding agents at Highspot. It gave agents each component’s API, usage rules and working examples, and it worked alongside the official Figma MCP.\n\nIt became a standard part of every Cursor and Claude Code setup for front-end work, used by about 100 people across all application teams, design and product. The highlighted line in the resume is where this comes from."
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Peter Kloss: answers</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: var(--ds-background-100); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<acme-app-bar placement="sticky" aria-label="Site">
+<acme-app-bar-start>
+<a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ds-gray-1000);">
+<acme-avatar initials="PK" size="small"></acme-avatar>
+<span class="text-label-14" style="font-weight: 600;">Peter Kloss</span>
+</a>
+</acme-app-bar-start>
+<acme-app-bar-content>
+<nav aria-label="Sections" style="display: flex; gap: 24px; flex-wrap: wrap; padding-left: 24px;">
+<a href="Main.dc.html" class="text-label-14" style="color: var(--ds-gray-900); text-decoration: none;">Experience</a>
+<a href="Main.dc.html" class="text-label-14" style="color: var(--ds-gray-900); text-decoration: none;">Deep dives</a>
+<a href="Main.dc.html" class="text-label-14" style="color: var(--ds-gray-900); text-decoration: none;">Skills</a>
+</nav>
+</acme-app-bar-content>
+<acme-app-bar-end>
+<div style="display: flex; gap: 8px; align-items: center;">
+<acme-theme-switcher value="light"></acme-theme-switcher>
+<acme-menu>
+<acme-menu-trigger slot="trigger" size="small">Resume<acme-keyboard-arrow-down-icon slot="end"></acme-keyboard-arrow-down-icon></acme-menu-trigger>
+<acme-menu-content aria-label="Download the resume">
+<acme-menu-item value="pdf" href="#">PDF</acme-menu-item>
+<acme-menu-item value="docx" href="#">Word</acme-menu-item>
+<acme-menu-item value="txt" href="#">Plain text</acme-menu-item>
+</acme-menu-content>
+</acme-menu>
+</div>
+</acme-app-bar-end>
+</acme-app-bar>
+
+<main>
+<section aria-label="Conversation" style="box-sizing: border-box; max-width: 800px; margin: 0 auto; padding: 48px 24px 32px; display: flex; flex-direction: column; gap: 32px;">
+
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+<h1 class="text-heading-20" style="margin: 0;">Ask about Peter’s work</h1>
+<acme-button variant="secondary" size="small"><acme-chat-bubble-icon slot="start"></acme-chat-bubble-icon>New conversation</acme-button>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 16px;">
+<p class="text-copy-16" style="margin: 0; align-self: flex-end; max-width: 80%; padding: 12px 16px; border-radius: 16px 16px 4px 16px; background: var(--ds-gray-100);">What did Peter build for AI coding agents?</p>
+<article aria-label="Answer" style="display: flex; flex-direction: column; gap: 14px;">
+<div style="display: flex; align-items: center; gap: 8px; color: var(--ds-gray-900);"><acme-auto-awesome-icon></acme-auto-awesome-icon><span class="text-label-13">Answer</span></div>
+<acme-markdown text="{{answerMcp}}" class="text-copy-16"></acme-markdown>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<span class="text-label-12" style="color: var(--ds-gray-900);">Sources</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<a href="Main.dc.html" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 10px; box-shadow: var(--ds-shadow-border); color: var(--ds-gray-1000); text-decoration: none;"><acme-article-icon></acme-article-icon><span class="text-label-13">Highspot, highlight 1</span><span class="text-label-12-mono" style="color: var(--ds-gray-900);">highlight:highspot.1</span></a>
+<a href="DeepDive.dc.html" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 10px; box-shadow: var(--ds-shadow-border); color: var(--ds-gray-1000); text-decoration: none;"><acme-description-icon></acme-description-icon><span class="text-label-13">Deep dive: the polar-ui MCP server</span><span class="text-label-12-mono" style="color: var(--ds-gray-900);">deep:highspot-mcp-server</span></a>
+<a href="Main.dc.html" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 10px; box-shadow: var(--ds-shadow-border); color: var(--ds-gray-1000); text-decoration: none;"><acme-article-icon></acme-article-icon><span class="text-label-13">Highspot, highlight 3</span><span class="text-label-12-mono" style="color: var(--ds-gray-900);">highlight:highspot.3</span></a>
+</div>
+</div>
+</article>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 16px;">
+<p class="text-copy-16" style="margin: 0; align-self: flex-end; max-width: 80%; padding: 12px 16px; border-radius: 16px 16px 4px 16px; background: var(--ds-gray-100);">Is Peter open to remote work?</p>
+<article aria-label="Answer" style="display: flex; flex-direction: column; gap: 14px;">
+<div style="display: flex; align-items: center; gap: 8px; color: var(--ds-gray-900);"><acme-auto-awesome-icon></acme-auto-awesome-icon><span class="text-label-13">Answer</span></div>
+<acme-markdown text="{{answerRemote}}" class="text-copy-16"></acme-markdown>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<span class="text-label-12" style="color: var(--ds-gray-900);">Sources</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<a href="Main.dc.html" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 10px; box-shadow: var(--ds-shadow-border); color: var(--ds-gray-1000); text-decoration: none;"><acme-info-icon></acme-info-icon><span class="text-label-13">Work arrangement</span><span class="text-label-12-mono" style="color: var(--ds-gray-900);">logistics:work-arrangement</span></a>
+<a href="Main.dc.html" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 10px; box-shadow: var(--ds-shadow-border); color: var(--ds-gray-1000); text-decoration: none;"><acme-info-icon></acme-info-icon><span class="text-label-13">Location</span><span class="text-label-12-mono" style="color: var(--ds-gray-900);">logistics:location</span></a>
+</div>
+</div>
+</article>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 16px;">
+<p class="text-copy-16" style="margin: 0; align-self: flex-end; max-width: 80%; padding: 12px 16px; border-radius: 16px 16px 4px 16px; background: var(--ds-gray-100);">What salary is Peter looking for?</p>
+<article aria-label="Answer outside the chat’s scope" style="display: flex; flex-direction: column; gap: 14px;">
+<div style="display: flex; align-items: center; gap: 8px; color: var(--ds-gray-900);"><acme-lock-icon></acme-lock-icon><span class="text-label-13">Outside what the chat answers</span></div>
+<acme-markdown text="{{answerRefusal}}" class="text-copy-16"></acme-markdown>
+</article>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<span class="text-label-12" style="color: var(--ds-gray-900);">Ask next</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<a href="DeepDive.dc.html" class="text-label-14" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; box-shadow: var(--ds-shadow-border); color: var(--ds-gray-1000); text-decoration: none;">How did the MCP server stay up to date?</a>
+<a href="Main.dc.html" class="text-label-14" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; box-shadow: var(--ds-shadow-border); color: var(--ds-gray-1000); text-decoration: none;">When can Peter start?</a>
+<a href="Main.dc.html" class="text-label-14" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; box-shadow: var(--ds-shadow-border); color: var(--ds-gray-1000); text-decoration: none;">What did Peter do at FedNow?</a>
+</div>
+</div>
+
+<form style="position: sticky; bottom: 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 16px; background: var(--ds-background-100); box-shadow: var(--ds-shadow-border-medium);">
+<acme-textarea aria-label="Your question" placeholder="Ask a follow-up question" rows="1" auto-resize="" resize="none"></acme-textarea>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+<span class="text-label-13" style="color: var(--ds-gray-900);">Answers come from Peter’s approved knowledge file. Check the sources.</span>
+<acme-button type="submit" shape="circle" aria-label="Send question"><acme-arrow-upward-icon></acme-arrow-upward-icon></acme-button>
+</div>
+</form>
+</section>
+
+<section aria-labelledby="experience-heading" style="box-sizing: border-box; max-width: 1120px; margin: 0 auto; padding: 64px 24px; border-top: 1px solid var(--ds-gray-400); display: flex; flex-wrap: wrap; gap: 24px 64px; align-items: flex-start;">
+<h2 id="experience-heading" class="text-heading-32" style="margin: 0; flex: 1 1 240px;">Experience</h2>
+<p class="text-copy-18" style="margin: 0; flex: 999 1 520px; color: var(--ds-gray-900);">Front-end platform engineer with 15+ years building what product teams build on: design systems, shared packages and monorepo tooling.</p>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1700}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'light');
+}
+renderVals() {
+return {
+answerMcp: "Peter led the organization-wide effort to build the **polar-ui MCP server**, the design system’s contract for AI coding agents at Highspot.\n\n- It gave agents each component’s API (props, variants and types), usage rules, and working examples.\n- It worked alongside the official Figma MCP: agents picked up designs through the Figma MCP, then used the polar-ui MCP to build them.\n- It became a standard part of every Cursor and Claude Code setup for front-end work, used by about 100 people across all application teams, design and product.\n\nHe also designed and rolled out an agent workflow system for the platform team, built in TypeScript on Bun.",
+answerRemote: "Peter is open to remote, hybrid or on-site roles in the Seattle area. He is based in Redmond, Washington, and would consider relocating for the right role.",
+answerRefusal: "I answer questions about Peter’s work, projects, skills and job-search logistics. For salary, please email Peter at [pkloss@gmail.com](mailto:pkloss@gmail.com)."
+};
+}
+}
+</script>
+</body>
+</html>

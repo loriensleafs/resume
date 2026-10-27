@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Concept C: search first</title>
+<script src="./support.js"></script>
+<script src="acme/design-system.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&amp;family=Google+Sans+Code:wght@400..700&amp;display=swap">
+<style>
+body{margin:0;background:var(--ds-background-100)}
+a{color:var(--ds-blue-900)}a:hover{color:var(--ds-blue-1000)}
+.m-dim{color:var(--ds-gray-900)}
+.m-row{display:flex;gap:16px;align-items:flex-start;padding:10px 12px;border-radius:8px;color:var(--ds-gray-1000);text-decoration:none}
+.m-row-label{flex:0 0 150px}
+mark{background:var(--ds-blue-200);color:inherit;border-radius:3px;padding:0 2px}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; background: var(--ds-background-200); color: var(--ds-gray-1000); font-family: var(--acme-font-sans);">
+
+<header style="display: flex; justify-content: space-between; align-items: center; padding: 16px 32px;">
+<a href="#" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ds-gray-1000);"><acme-avatar initials="PK" size="small"></acme-avatar><span class="text-label-14" style="font-weight: 600;">Peter Kloss</span></a>
+<div style="display: flex; gap: 8px; align-items: center;">
+<a href="#" class="text-label-14" style="text-decoration: none;">Resume</a>
+<acme-theme-switcher value="light"></acme-theme-switcher>
+</div>
+</header>
+
+<main style="flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; padding: 72px 32px 0; box-sizing: border-box;">
+<div style="width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: 16px;">
+<h1 class="text-heading-32" style="margin: 0; text-align: center;">Search or ask about Peter’s work</h1>
+<p class="text-copy-14 m-dim" style="margin: 0 0 8px; text-align: center;">Front-End Platform Engineer, Design Systems and AI Developer Tooling, Redmond, WA</p>
+
+<div style="display: flex; flex-direction: column; border-radius: 16px; background: var(--ds-background-100); box-shadow: var(--ds-shadow-border-large);">
+<div style="padding: 12px;"><acme-search size="large" value="design system" aria-label="Search the resume or ask a question" placeholder="Search the resume, or ask a question"></acme-search></div>
+<div style="border-top: 1px solid var(--ds-gray-400); padding: 8px; display: flex; flex-direction: column; gap: 4px;">
+
+<a href="#" class="m-row" style="background: var(--ds-gray-100); align-items: center;">
+<acme-auto-awesome-icon></acme-auto-awesome-icon>
+<span class="text-label-14" style="flex: 1 1 auto;">Ask the chat: “What has Peter done with design systems?”</span>
+<acme-kbd>Enter</acme-kbd>
+</a>
+
+<span class="text-label-12 m-dim" style="padding: 10px 12px 2px;">Resume, 5 matches</span>
+<ul style="margin: 0; padding: 0; list-style: none;">
+<li><a href="#" class="m-row"><span class="m-row-label text-label-14">Highspot</span><span class="text-copy-14">…build the polar-ui MCP server, the <mark>design system</mark>’s contract for AI coding agents, so agent-written UI follows the <mark>design system</mark>…</span></a></li>
+<li><a href="#" class="m-row"><span class="m-row-label text-label-14">FedNow</span><span class="text-copy-14">Built and maintained the FedNow <mark>design system</mark> and shared npm packages, used by FedNow’s internal and external applications…</span></a></li>
+<li><a href="#" class="m-row"><span class="m-row-label text-label-14">Pippin Title</span><span class="text-copy-14">Architected and documented a <mark>design system</mark> on Chakra UI and Styled System.</span></a></li>
+<li><a href="#" class="m-row"><span class="m-row-label text-label-14">LinkSquares</span><span class="text-copy-14">Built a Storybook-documented <mark>design system</mark> that let the product move to a new look incrementally.</span></a></li>
+<li><a href="#" class="m-row"><span class="m-row-label text-label-14">Sheridan PubFactory</span><span class="text-copy-14">Built a themeable <mark>design system</mark> and dynamic templates that let publishing customers create their own themes…</span></a></li>
+</ul>
+
+<span class="text-label-12 m-dim" style="padding: 10px 12px 2px;">Deep dives, 2 matches</span>
+<ul style="margin: 0; padding: 0; list-style: none;">
+<li><a href="#" class="m-row"><span class="m-row-label text-label-14">FedNow</span><span class="text-copy-14">The FedNow <mark>design system</mark> and shared npm packages</span></a></li>
+<li><a href="#" class="m-row"><span class="m-row-label text-label-14">Highspot</span><span class="text-copy-14">The polar-ui MCP server, the <mark>design system</mark>’s contract for AI coding agents</span></a></li>
+</ul>
+</div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--ds-gray-400);">
+<span class="text-label-12 m-dim">Search runs on this device and works offline. Asking needs a connection.</span>
+<span class="text-label-12 m-dim"><acme-kbd>↑</acme-kbd> <acme-kbd>↓</acme-kbd> to move</span>
+</div>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+componentDidMount() {
+document.documentElement.setAttribute('data-acme-appearance', 'light');
+}
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
