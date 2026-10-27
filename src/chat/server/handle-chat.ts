@@ -12,11 +12,12 @@ import {
   type UIMessage,
 } from "@tanstack/ai";
 import type { Knowledge } from "../../knowledge/types";
-import { createFinishTurn } from "./finish-turn";
+import { finishTurn } from "./finish-turn";
 import { citationMarkers } from "./markers";
 import { systemPrompt } from "./prompt";
 import type { Budget, QuestionLog, Telemetry } from "./question-log";
-import { NO_MODEL_CALL, turnUsage } from "./telemetry";
+import { turnUsage } from "./telemetry";
+import { startTurn } from "./turn";
 import { wireError } from "./wire";
 
 export type ChatDeps = {
@@ -53,30 +54,24 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
   // At the day's cap or the month's limit, the answer is the limit stream, and the model is not called.
   // The browser reads no body of a response that is not 200, so the refusal is a 200 stream (The request, "Limits").
   const reserved = await deps.budget.reserve();
-  const finishTurn = createFinishTurn(deps, { question, startedAt, reservation: reserved.ok ? reserved.reservation : undefined });
+  const turn = startTurn({ question, startedAt, reservation: reserved.ok ? reserved.reservation : undefined });
   if (!reserved.ok) {
-    await finishTurn({ outcome: "limit", errorCode: reserved.errorCode, reads: 0, read: [], citations: [], removed: 0, usage: NO_MODEL_CALL });
+    await finishTurn(deps, turn, { outcome: "limit", errorCode: reserved.errorCode });
     return toServerSentEventsResponse(only(wireError(reserved.errorCode)));
   }
 
-  const markers = citationMarkers(deps.knowledge);
-  const usage = turnUsage();
   const stream = chat({
     adapter: deps.adapter,
     threadId: params.threadId,
     systemPrompts: [systemPrompt(deps.knowledge)],
     messages: params.messages,
     middleware: [
-      markers.middleware,
-      usage.middleware,
+      citationMarkers(deps.knowledge, turn),
+      turnUsage(turn),
       {
         name: "finish-turn",
         // The terminal hook: the run awaits the deferred writes before the stream ends (One turn, step 9).
-        // The turn reads nothing until C5 adds read_sources.
-        onFinish: (ctx) =>
-          ctx.defer(
-            finishTurn({ outcome: "answered", errorCode: null, reads: 0, read: [], ...markers.citations(), usage: usage.sum() }),
-          ),
+        onFinish: (ctx) => ctx.defer(finishTurn(deps, turn, { outcome: "answered", errorCode: null })),
       },
     ],
   });

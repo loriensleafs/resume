@@ -5,6 +5,7 @@
 
 import type { ChatMiddleware } from "@tanstack/ai";
 import type { QuestionLogEntry } from "./question-log";
+import type { Turn } from "./turn";
 
 export type ChatTurnEvent = {
   event: "chat_turn";
@@ -22,52 +23,30 @@ export type ChatTurnEvent = {
   errorCode: string | null;  // the model API's code, "DEADLINE", "MAX_TOKENS", "SERVER_ERROR", "DAILY_LIMIT" or "SPEND_LIMIT"; never a message or stack trace
 };
 
-/** A turn's model calls and token counts, as its chat_turn event carries them. */
-export type TurnUsage = Pick<
-  ChatTurnEvent,
-  "modelCalls" | "inputTokens" | "cachedInputTokens" | "cacheWriteTokens" | "cacheWrite1hTokens" | "outputTokens"
->;
-
-/** A turn with no model call. The counts are null, because no model call finished. */
-export const NO_MODEL_CALL: TurnUsage = {
-  modelCalls: 0,
-  inputTokens: null,
-  cachedInputTokens: null,
-  cacheWriteTokens: null,
-  cacheWrite1hTokens: null,
-  outputTokens: null,
-};
-
-type Counts = Omit<TurnUsage, "modelCalls">;
-
 /**
- * The usage middleware for one turn, and the turn's usage so far. TanStack AI calls `onUsage` once
- * for each model call that finishes, so the sum covers the finished calls only, and the counts stay
- * null until one finishes. The five counts follow SPEC-deploy's mapping: the adapter's
- * `promptTokens` holds the uncached input, the cache reads and the cache writes together.
+ * The usage middleware for one turn: it writes the turn's model calls and token counts. TanStack AI
+ * calls `onUsage` once for each model call that finishes, so the sum covers the finished calls only,
+ * and the counts stay null until one finishes. The five counts follow SPEC-deploy's mapping: the
+ * adapter's `promptTokens` holds the uncached input, the cache reads and the cache writes together.
  */
-export function turnUsage(): { middleware: ChatMiddleware; sum(): TurnUsage } {
-  let modelCalls = 0;
-  let sum: { [K in keyof Counts]: number } | undefined;
+export function turnUsage(turn: Turn): ChatMiddleware {
   return {
-    middleware: {
-      name: "turn-usage",
-      onIteration: () => {
-        modelCalls++;
-      },
-      onUsage: (_ctx, usage) => {
-        const cached = usage.promptTokensDetails?.cachedTokens ?? 0;
-        const writes = usage.promptTokensDetails?.cacheWriteTokens ?? 0;
-        const writes1h = usage.promptTokensDetails?.cacheWrite1hTokens ?? 0;
-        sum = {
-          inputTokens: (sum?.inputTokens ?? 0) + usage.promptTokens - cached - writes,
-          cachedInputTokens: (sum?.cachedInputTokens ?? 0) + cached,
-          cacheWriteTokens: (sum?.cacheWriteTokens ?? 0) + writes,
-          cacheWrite1hTokens: (sum?.cacheWrite1hTokens ?? 0) + writes1h,
-          outputTokens: (sum?.outputTokens ?? 0) + usage.completionTokens,
-        };
-      },
+    name: "turn-usage",
+    onIteration: () => {
+      turn.modelCalls++;
     },
-    sum: () => ({ ...NO_MODEL_CALL, ...sum, modelCalls }),
+    onUsage: (_ctx, usage) => {
+      const cached = usage.promptTokensDetails?.cachedTokens ?? 0;
+      const writes = usage.promptTokensDetails?.cacheWriteTokens ?? 0;
+      const writes1h = usage.promptTokensDetails?.cacheWrite1hTokens ?? 0;
+      const sum = turn.tokens;
+      turn.tokens = {
+        inputTokens: (sum?.inputTokens ?? 0) + usage.promptTokens - cached - writes,
+        cachedInputTokens: (sum?.cachedInputTokens ?? 0) + cached,
+        cacheWriteTokens: (sum?.cacheWriteTokens ?? 0) + writes,
+        cacheWrite1hTokens: (sum?.cacheWrite1hTokens ?? 0) + writes1h,
+        outputTokens: (sum?.outputTokens ?? 0) + usage.completionTokens,
+      };
+    },
   };
 }
