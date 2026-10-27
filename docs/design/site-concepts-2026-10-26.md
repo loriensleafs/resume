@@ -38,3 +38,20 @@ All six concepts are mocked up on the "Concepts" page of the "Resume site mockup
 | "Ask about this" on resume lines | B | Opens a question scoped to that line. |
 
 Fixes from the review: the download control is secondary, not the loudest element; no small label above a heading; no grid of same-size cards; timeline spans read as data, not loading placeholders. Open question: the timeline shows the gap from 2012 to 2013 as empty space.
+
+## Merged concept, updated 2026-10-27
+
+The "Merged" page now follows decisions 0015 to 0019:
+
+| Board | What it shows |
+|---|---|
+| Merged: first view | The intro says answers come from the resume and the sources behind it; "Install app" in the app bar; a suggested question about Peter's opinions |
+| Merged: after a question, source open | "Read 1 source" above the answer; citations name passages; the panel shows the source with the cited passage marked and "Ask about this passage"; "Start over" in the app bar |
+| Merged: phone, source from a citation | The cited passage in a sheet over the conversation |
+| Merged: phone, install offer | An install sheet after a few questions: opens on its own, keeps the conversation, readable offline |
+| Merged: phone, Start over | The confirmation: it deletes the conversation, the open source and the visitor's choices from this device |
+| Merged: returning visitor, session restored | A notice that the conversation from an earlier day is restored and saved only in this browser |
+| Merged: installed app, its own window | The app without browser controls, with its icon and name in the title bar |
+| App icon options | A. PK monogram, B. career timeline spans, C. chat bubble, D. pwk; each as a rounded square, a circle, and at 48 and 32 px |
+
+The install sheet and the window use option A as a stand-in until Peter picks an icon.
