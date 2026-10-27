@@ -1,13 +1,15 @@
 // Parses one source file (SPEC-knowledge, Sources): YAML front matter, then "## " sections.
-// Every section is a numbered passage except the last, Not public.
+// Every section is a numbered passage except the last, Not public. The parser checks the shape
+// only, for a draft and an approved source alike; the build checks an approved source's other
+// rules (checkSource() in build.ts).
 
 import { z } from "zod";
 import { parseId, passageId } from "./ids";
 
-/** A broken rule in a knowledge file: the message starts with the file, then names the field. */
+/** One or more broken rules in a knowledge file: the message gives each on a new line, starting with the file, then naming the field. */
 export class KnowledgeError extends Error {
-  constructor(file: string, detail: string) {
-    super(`${file}: ${detail}`);
+  constructor(file: string, ...details: string[]) {
+    super(details.map((detail) => `${file}: ${detail}`).join("\n"));
   }
 }
 
@@ -41,15 +43,12 @@ const NOT_PUBLIC = "Not public";
 const LIKE_NOT_PUBLIC = /^\s*#+\s*not\s+public\b/i;
 /** The end of an interview heading whose answer goes on from the passage before it. */
 const CONTINUED = " (continued)";
-/** In an approved source (SPEC-knowledge, Objective; Sources, "Summary"). */
-const PASSAGE_CHARACTERS = 3000;
-const SUMMARY_CHARACTERS = 200;
 
 /**
  * Every line break Unicode knows (UAX #14's mandatory breaks), not only "\n": a YAML string can
  * hold any of them through an escape, and YAML 1.2 keeps a raw U+2028 inside a plain value.
  */
-const LINE_BREAK = /\r\n|[\n\v\f\r\x85\u{2028}\u{2029}]/u;
+export const LINE_BREAK = /\r\n|[\n\v\f\r\x85\u{2028}\u{2029}]/u;
 /** A title, a role id and a summary each print on one line of the core, so none holds a line break. */
 const ONE_LINE = "must be one line, with no line break";
 const oneLine = (s: string) => !LINE_BREAK.test(s);
@@ -58,7 +57,7 @@ const nonEmpty = z.string().trim().min(1);
 
 // The shape of the front matter, for a draft and an approved source alike. The build checks
 // the rest once a source is approved (Drafts and approval): the source id's grammar, whether
-// its roles and highlights exist in resume.yaml, and its links.
+// its roles and highlights exist in resume.yaml, its summary, its links and its passages.
 const sourceFrontMatter = z
   .strictObject({
     id: z.string().min(1),
@@ -151,24 +150,10 @@ function checkSections(kind: Source["kind"], headings: string[], file: string): 
   });
 }
 
-/** Each rule of an approved source's sizes that `source` breaks. A draft meets them only once approved. */
-function approvalProblems(source: Source): string[] {
-  const problems: string[] = [];
-  const lines = source.summary.split(LINE_BREAK).length;
-  if (lines > 1 || source.summary.length < 1 || source.summary.length > SUMMARY_CHARACTERS) {
-    problems.push(
-      `summary must be one line of 1 to ${SUMMARY_CHARACTERS} characters; it has ${source.summary.length} characters on ${lines} line${lines === 1 ? "" : "s"}`,
-    );
-  }
-  for (const p of source.passages) {
-    if (p.text.length > PASSAGE_CHARACTERS) {
-      problems.push(`passage ${p.id} ("${p.heading}") has ${p.text.length} characters; an approved passage holds at most ${PASSAGE_CHARACTERS}`);
-    }
-  }
-  return problems;
-}
-
-/** One source file as a source with numbered passages; stops with the file and the field on a broken shape. */
+/**
+ * One source file as a source with numbered passages; stops with the file and the field on a
+ * broken shape. It checks only the shape, so an approved source can still break a rule of approval.
+ */
 export function parseSource(text: string, file: string): SourceFile {
   // One line ending first, so a stray carriage return never hides a heading in the text above it.
   const match = text.replace(/\r\n?/g, "\n").match(/^---\n([\s\S]*?)\n---(?:\n([\s\S]*))?$/);
@@ -194,11 +179,5 @@ export function parseSource(text: string, file: string): SourceFile {
   checkSections(front.kind, sections.map((s) => s.heading), file);
   // checkSections() leaves Not public as the last section, so every section before it is a passage.
   const passages = sections.slice(0, -1).map((s, i) => ({ id: passageId(front.id, i + 1), heading: s.heading, text: s.text }));
-  const source: Source = { ...front, notPublic: sections.at(-1)!.text, passages };
-
-  if (status === "approved") {
-    const problems = approvalProblems(source);
-    if (problems.length) throw new KnowledgeError(file, `an approved source breaks these rules:\n${problems.map((p) => `- ${p}`).join("\n")}`);
-  }
-  return { status, source };
+  return { status, source: { ...front, notPublic: sections.at(-1)!.text, passages } };
 }

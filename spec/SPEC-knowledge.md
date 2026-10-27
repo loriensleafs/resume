@@ -81,7 +81,7 @@ source: Interview with Peter, 2026-10-26
 - **Highlights:** deep dives only. Each is a highlight id from the core, such as `highlight:fednow.1`, for a highlight the deep dive explains.
 - **Summary:** one line, at most 200 characters, written from the source and approved with it. The catalog shows it, so the chat can choose what to read.
 - **Links:** exact public URLs, for side projects. Each is an absolute `https://` URL with no user name or password; the build stops on any other form. The rendered source lists them, so the chat can give them. An answer renders a link only for `https://peterkloss.dev/…`, `https://github.com/loriensleafs/…`, `https://github.com/acmelabs-15/…`, `mailto:` with Peter's email and the exact URLs in approved sources' `links` ([SPEC-chat](SPEC-chat.md)).
-- **Not public:** the last section of every source; it may be empty. It names kinds of material only, never the material itself: for example internal code, customer names, security details, colleague names, internal links, or figures an employer has not made public. It holds no URL and no email address. It tells the chat what to decline to describe. The chat receives it with a read, on the server only, and never cites it: it has no passage id.
+- **Not public:** the last section of every source; it may be empty. It names kinds of material only, never the material itself: for example internal code, customer names, security details, colleague names, internal links, or figures an employer has not made public. It holds no URL, no IP address and no email address. It tells the chat what to decline to describe. The chat receives it with a read, on the server only, and never cites it: it has no passage id.
 
 **Drafts and approval.**
 
@@ -195,6 +195,9 @@ export function logisticsId(topic: string): string;          // "logistics:<topi
 export function passageId(sourceId: string, n: number): string; // "<source id>.<n>"
 /** How a slug is written, for error messages. */
 export const SLUG_RULE: string;
+/** How a source id and a passage id are written, for error messages. */
+export const SOURCE_ID_RULE: string;
+export const PASSAGE_ID_RULE: string;
 ```
 
 `parseId()` gives the form only. Whether an id names an entry or a passage that exists is for the caller to check against the built knowledge, with a `Map` or `Object.hasOwn()`: a slug such as `constructor` is also a property of every object.
@@ -270,7 +273,7 @@ Roles: <role ids>. Highlights: <highlight ids>. Links: <links>.
    - `previewDraft()`: it names each rule a fixture draft breaks, and its text equals what `renderSource()` gives once the draft is approved.
 
    The rendered core and one rendered source have snapshots. A third snapshot lists every approved source's passage ids with their headings. A new passage adds lines at the end of its source's list; a reviewer accepts no other change to that snapshot (append-only).
-2. **Unit tests on the source parser:** front matter for both kinds, highlight ids, deep-dive section order, interview passages, a "(continued)" heading only directly after the heading it continues, `Not public` last, passage size, and missing or unknown sections.
+2. **Unit tests on the source parser:** front matter for both kinds, highlight ids, deep-dive section order, interview passages, a "(continued)" heading only directly after the heading it continues, `Not public` last, and missing or unknown sections. The parser checks the shape only, for a draft and an approved source alike; the build checks the other rules of an approved source, passage size among them, so seam 1 tests them.
 3. **Unit tests on the id grammar** (`src/knowledge/__tests__/ids.test.ts`): `parseId()` on a table of ids, each with the form it gives or with none. The table holds every form at its length limits, numbers from 1 with no leading zero and none past `Number.MAX_SAFE_INTEGER`, and forms the build never makes, such as `basics.1`, `highlight:acme.0`, `role:acme:two` and an empty id. The id builders give ids that `parseId()` reads back. The site and the chat call `parseId()` with ids from the model and from browsers, and seam 1 never reaches the paths that reject an id.
 
 No test can check three rules: that `Not public` names kinds only, that headings follow Peter's wording rule, and the edit rule. Peter checks them at approval, with the redaction list and the passage-id snapshot in front of him.

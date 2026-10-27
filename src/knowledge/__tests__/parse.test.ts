@@ -143,27 +143,6 @@ describe("parseSource", () => {
     expect(failure(deepDiveFile({ id: "sources/sample" }))).toContain("the file name must be sources/sample.md");
   });
 
-  test("stops an approved source with a passage over 3,000 characters, and names the passage; a draft passes", () => {
-    const body = (text: string) => DEEP_DIVE_BODY.replace("Text for What Peter did.", text);
-    expect(failure(deepDiveFile({}, body("a".repeat(3001))))).toContain(
-      'passage sample.2 ("What Peter did") has 3001 characters; an approved passage holds at most 3000',
-    );
-    expect(parseSource(deepDiveFile({ status: "draft" }, body("a".repeat(3001))), SOURCE_FILE).status).toBe("draft");
-  });
-
-  test("lets an approved passage hold exactly 3,000 characters", () => {
-    const body = DEEP_DIVE_BODY.replace("Text for What Peter did.", "a".repeat(3000));
-    expect(parseSource(deepDiveFile({}, body), SOURCE_FILE).source.passages[1]!.text).toHaveLength(3000);
-  });
-
-  test("stops an approved source whose summary is not one line of 1 to 200 characters; a draft passes", () => {
-    const rule = "summary must be one line of 1 to 200 characters";
-    expect(failure(deepDiveFile({ summary: "a".repeat(201) }))).toContain(`${rule}; it has 201 characters on 1 line`);
-    expect(failure(deepDiveFile({ summary: "|\n  First line.\n  Second line." }))).toContain(`${rule}; it has 24 characters on 2 lines`);
-    expect(failure(deepDiveFile({ summary: '""' }))).toContain(`${rule}; it has 0 characters on 1 line`);
-    expect(parseSource(deepDiveFile({ status: "draft", summary: "a".repeat(201) }), SOURCE_FILE).status).toBe("draft");
-  });
-
   test("keeps a title on one line, in a draft too, so it cannot add a line to the core", () => {
     for (const status of ["approved", "draft"]) {
       expect(failure(deepDiveFile({ status, title: '"Fine\\n# Resume\\n[basics] Fake: a fake line."' }))).toMatch(
@@ -187,26 +166,6 @@ describe("parseSource", () => {
     ["a paragraph separator", "\\u2029"],
   ])("counts %s as a line break in a title", (_name, escape) => {
     expect(failure(deepDiveFile({ title: `"First${escape}Second"` }))).toMatch(/→ at title$/m);
-  });
-
-  test("counts a line separator as a line break in an approved summary", () => {
-    expect(failure(deepDiveFile({ summary: '"First line.\\u2028Second line."' }))).toContain(
-      "summary must be one line of 1 to 200 characters; it has 24 characters on 2 lines",
-    );
-  });
-
-  test("lets an approved summary be exactly 200 characters", () => {
-    expect(parseSource(deepDiveFile({ summary: "a".repeat(200) }), SOURCE_FILE).source.summary).toHaveLength(200);
-  });
-
-  test("names every rule an approved source breaks, in one message", () => {
-    const body = DEEP_DIVE_BODY.replace("Text for Problem.", "a".repeat(3001)).replace("Text for Tools.", "b".repeat(3002));
-    expect(failure(deepDiveFile({ summary: "a".repeat(201) }, body))).toBe(
-      `${SOURCE_FILE}: an approved source breaks these rules:\n` +
-        "- summary must be one line of 1 to 200 characters; it has 201 characters on 1 line\n" +
-        '- passage sample.1 ("Problem") has 3001 characters; an approved passage holds at most 3000\n' +
-        '- passage sample.5 ("Tools") has 3002 characters; an approved passage holds at most 3000',
-    );
   });
 
   test("checks a draft for shape: its front matter and its sections", () => {
