@@ -1,0 +1,6 @@
+{
+  "context": { "fileName": ["AGENTS.md"] },
+  "mcpServers": {
+    "acme-design-system": { "command": "bun", "args": ["run", "--silent", "design-system-mcp"] }
+  }
+}

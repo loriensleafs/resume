@@ -28,6 +28,17 @@ async function frontMatter(path: string): Promise<{ name?: unknown; description?
   return Bun.YAML.parse(text.slice(4, end)) ?? {};
 }
 
+// The fenced JSON block that follows the line `label` in a Markdown file.
+function jsonBlockAfter(markdown: string, label: string) {
+  const lines = markdown.split("\n");
+  const at = lines.indexOf(label);
+  if (at < 0) throw new Error(`no line ${label}`);
+  const open = lines.findIndex((line, i) => i > at && line === "```json");
+  const close = lines.findIndex((line, i) => open >= 0 && i > open && line === "```");
+  if (close < 0) throw new Error(`no JSON block after the line ${label}`);
+  return JSON.parse(lines.slice(open + 1, close).join("\n"));
+}
+
 describe("the agent files", () => {
   test("CLAUDE.md starts with the AGENTS.md import", async () => {
     expect((await read("CLAUDE.md")).split("\n")[0]).toBe("@AGENTS.md");
@@ -83,5 +94,43 @@ describe("the repo skills", () => {
       expect((await $`readlink ${LINKS}/${name}`.nothrow().text()).trim()).toBe(`../../.agents/skills/${name}`);
       expect(await exists(`${LINKS}/${name}/SKILL.md`)).toBe(true);
     });
+  });
+});
+
+// SPEC-agents, Settings: every agent's project settings start the docs server with this one command.
+const DOCS_SERVER = "acme-design-system";
+const DOCS_SERVER_COMMAND = { command: "bun", args: ["run", "--silent", "design-system-mcp"] };
+type ServerEntry = { command?: unknown; args?: unknown } | undefined;
+type CodexConfig = { mcp_servers?: Record<string, ServerEntry> };
+const docsServerEntries: [string, () => Promise<ServerEntry>][] = [
+  [".codex/config.toml", async () => (Bun.TOML.parse(await read(".codex/config.toml")) as CodexConfig).mcp_servers?.[DOCS_SERVER]],
+  [".cursor/mcp.json", async () => JSON.parse(await read(".cursor/mcp.json")).mcpServers?.[DOCS_SERVER]],
+  [".vscode/mcp.json", async () => JSON.parse(await read(".vscode/mcp.json")).servers?.[DOCS_SERVER]],
+  [".gemini/settings.json", async () => JSON.parse(await read(".gemini/settings.json")).mcpServers?.[DOCS_SERVER]],
+  // Peter adds .mcp.json for Claude Code from the README block (SPEC-agents, Boundaries); the test only reads it.
+  [".mcp.json", async () => JSON.parse(await read(".mcp.json")).mcpServers?.[DOCS_SERVER]],
+  // `.mcp.json` is the README line just before the block Peter copies.
+  ["README's .mcp.json block", async () => jsonBlockAfter(await read("README.md"), "`.mcp.json`").mcpServers?.[DOCS_SERVER]],
+];
+
+describe("the docs server settings", () => {
+  const command = [DOCS_SERVER_COMMAND.command, ...DOCS_SERVER_COMMAND.args].join(" ");
+  test.each(docsServerEntries)(`%s starts ${DOCS_SERVER} with ${command}`, async (_, serverEntry) => {
+    const entry = await serverEntry();
+    expect({ command: entry?.command, args: entry?.args }).toEqual(DOCS_SERVER_COMMAND);
+  });
+
+  test("package.json has the design-system-mcp script", async () => {
+    const { scripts } = JSON.parse(await read("package.json"));
+    expect(typeof scripts?.["design-system-mcp"]).toBe("string");
+  });
+});
+
+describe("Gemini CLI's settings", () => {
+  test(".gemini/settings.json names AGENTS.md as its only context file", async () => {
+    const { context } = JSON.parse(await read(".gemini/settings.json"));
+    // context.fileName is a string or a list of strings: https://geminicli.com/docs/reference/configuration/#context
+    // Only AGENTS.md: a second entry could load a file from outside the repository.
+    expect([context?.fileName].flat()).toEqual(["AGENTS.md"]);
   });
 });
