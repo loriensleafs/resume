@@ -177,9 +177,9 @@ Acceptance:
 - A push first claims `alert:<kind>:<period>` with `SET NX` and a 10-minute expiry; after a failed push a later event pushes again; after a success the marker lasts to the end of its period.
 - No push body holds question text.
 Verify: `bun test src/ops`
-Files: `src/ops/alerts.ts`, `src/ops/ops.ts`, `src/ops/upstash.ts`, `src/ops/__tests__/fake-ntfy.ts`, `src/ops/__tests__/ops.test.ts`
+Files: `src/ops/alerts.ts`, `src/ops/ops.ts`, `src/ops/upstash.ts`, `src/ops/__tests__/fake-ntfy.ts`, `src/ops/__tests__/ops.test.ts`, `docs/design/wording-drafts.md` (D13's row)
 Size: M
-Needs Peter: approval of the `daycap` push text (the spec writes only the `spend75` and `release` texts)
+Needs Peter: approval of the `daycap` push text (the spec writes only the `spend75` and `release` texts), in the list before D37 (row 153). The task finishes on the draft, and D13's row in `docs/design/wording-drafts.md` holds it.
 
 ### D14: The monthly limit pauses the chat, and one probe an hour
 
@@ -190,9 +190,9 @@ Acceptance:
 - A probe that reaches the model deletes `limit:spend`; a probe that meets the limit resets its time.
 - One `spendlimit` push that day.
 Verify: `bun test src/ops`
-Files: `src/ops/ops.ts`, `src/ops/upstash.ts`, `src/ops/__tests__/ops.test.ts`
+Files: `src/ops/ops.ts`, `src/ops/upstash.ts`, `src/ops/__tests__/ops.test.ts`, `docs/design/wording-drafts.md` (D14's row)
 Size: S
-Needs Peter: approval of the `spendlimit` push text
+Needs Peter: approval of the `spendlimit` push text, in the list before D37 (row 153). The task finishes on the draft, and D14's row in `docs/design/wording-drafts.md` holds it.
 
 ### D15: A failing or slow store never breaks an answer
 
@@ -202,9 +202,9 @@ Acceptance:
 - With the Upstash server returning 500: `reserve()` allows the turn, `record()` and `append()` resolve, an `ops_error` line is printed, and the instance pushes `storefail` once that day.
 - With the Upstash server holding every response: `reserve()` allows the turn within about 1 s and `record()` resolves within about 2 s; a push stops after 3 s ("Store calls").
 Verify: `bun test src/ops`
-Files: `src/ops/ops.ts`, `src/ops/upstash.ts`, `src/ops/alerts.ts`, `src/ops/__tests__/fake-upstash.ts`, `src/ops/__tests__/ops.test.ts`
+Files: `src/ops/ops.ts`, `src/ops/upstash.ts`, `src/ops/alerts.ts`, `src/ops/__tests__/fake-upstash.ts`, `src/ops/__tests__/ops.test.ts`, `docs/design/wording-drafts.md` (D15's row)
 Size: M
-Needs Peter: approval of the `storefail` push text
+Needs Peter: approval of the `storefail` push text, in the list before D37 (row 153). The task finishes on the draft, and D15's row in `docs/design/wording-drafts.md` holds it.
 
 ### D16: The build script writes pages with their policy tags
 
@@ -315,9 +315,9 @@ Acceptance:
 - Against the preview and the fake Upstash, the job fails and names the error share for a day of 10 turns with 3 errors; a day with 3 `MAX_TOKENS` turns and no other error passes; a GitHub run 50 hours old or older fails it, and one 30 hours old passes.
 - On a failure, one `health` push a day, tried 3 times; each run is saved in `health:vercel`.
 Verify: `bun test scripts/__tests__/smoke.test.ts`; `bun test src/ops`
-Files: `src/site/routes/api.cron.health.ts`, `src/ops/smoke.ts`, `scripts/__tests__/smoke.test.ts`, `src/ops/__tests__/fake-upstash.ts`
+Files: `src/site/routes/api.cron.health.ts`, `src/ops/smoke.ts`, `scripts/__tests__/smoke.test.ts`, `src/ops/__tests__/fake-upstash.ts`, `docs/design/wording-drafts.md` (D24's row)
 Size: M
-Needs Peter: approval of the `health` push text
+Needs Peter: approval of the `health` push text, in the list before D37 (row 153). The task finishes on the draft, and D24's row in `docs/design/wording-drafts.md` holds it.
 
 ### D25: The smoke check compares the served documents
 
@@ -371,7 +371,7 @@ Needs Peter: the read-only token in his `.secrets/local.env`, for the manual che
 ### D29: The reservation covers the worst-case turn
 
 Delivers: `limits.ts` holds the worked worst-case turn, measured from the real system prompt and core, and a test fails if it reaches the $0.90 reservation.
-Blocked by: D11, C15 (the approved system prompt in `src/chat/server/prompt.ts`), K3 (`renderCore()`)
+Blocked by: D11, C15 (the drafted system prompt in `src/chat/server/prompt.ts`; row 153), K3 (`renderCore()`)
 Acceptance:
 - The worked worst case (6 model calls of 8,000 output tokens at effort `medium`, the first call's cache write of the whole prompt and the later calls' cache reads, the writes of 3 reads of 24,000 characters) uses the measured size of the system prompt and the core, and costs less than the reservation.
 Verify: `bun test src/ops`
@@ -468,7 +468,7 @@ Needs Peter: review and approval
 ### D37: Setup step 11: the `.vercel.app` address, the first release
 
 Delivers: The project's `.vercel.app` address redirects to peterkloss.dev, and this first release goes live only after its three checks pass.
-Blocked by: D17, D32, D33, D34, A2 (the `release` repo skill); Peter: setup steps 1 to 11 (the domains bought, ntfy, the Anthropic workspaces, Vercel Pro and the import, the toolbar and protection, Upstash, the WAF rules, the spend budget, the Actions secrets, Deployment Checks, the domains added)
+Blocked by: D17, D32, D33, D34, A2 (the `release` repo skill); Peter: his approval of the wording drafts in `docs/design/wording-drafts.md` (row 153); Peter: setup steps 1 to 11 (the domains bought, ntfy, the Anthropic workspaces, Vercel Pro and the import, the toolbar and protection, Upstash, the WAF rules, the spend budget, the Actions secrets, Deployment Checks, the domains added)
 Acceptance:
 - `src/deploy/routes.ts` holds the project's `.vercel.app` address, and the config test checks that its route redirects with 308 and leaves `/api/` alone.
 - Under Peter's standing approval (row 151), the push goes live on peterkloss.dev only after `ci / test`, `ci / audit` and the release check pass.

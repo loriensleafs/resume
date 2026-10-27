@@ -11,11 +11,21 @@ All six module specs are approved ([capability map](../spec/README.md)). This pl
 - A task ends with AGENTS.md's Task end: tick its line in todo.md, rewrite STATUS, stage files by name.
 - The **fresh-session check** (SPEC-agents, Testing Strategy 2) closes each module's landing. A sub-agent in a fresh clone is told only "continue". It reports the phase, the last step, the next step, anything red and the pending decisions in 5 lines or fewer, and names the next task's spec. Peter reads the result; STATUS records it.
 
+## Running the plan
+
+The conductor runs the tasks with `/brain:build auto`, in up to 3 lanes (rows 149 and 150). The run stops for Peter only:
+
+- when a task needs something only he can set up: a key, a secret, an account, a paid service, or a check in his own browser, such as D3's PDF check (row 152);
+- for source work: the knowledge interviews (task 13), and any change to an approved source, such as K11 to K13's moves with their summaries (row 152);
+- when a review finds something critical that needs his decision (row 154).
+
+At a stop, the running lanes finish, and no new task starts until he answers. The conductor decides everything else and lists it in STATUS. Each other review finding that the conductor decides goes into [build-decisions.md](../docs/design/build-decisions.md), which Peter goes over with the conductor at the end of the run (row 154). Wording is drafted, not asked: each wording task writes its draft into its own rows of [wording-drafts.md](../docs/design/wording-drafts.md), and Peter approves the list in one sitting before D37 (row 153). Each wording task names that file in its Files line, as a record that does not count toward the task's size. Git merges edits to neighbouring rows as a conflict, so two wording tasks never build in parallel lanes.
+
 ## Phases
 
 **Phase 0, ready now.** First the test move (row 144, [decision 0025](../docs/decisions/0025-tests-beside-code.md)): the tests go to `__tests__/` folders beside the code they test, and the specs and task files name the new paths. Then A1 puts the Modules table and the approval rules in `AGENTS.md` (not a release); then A2 writes the `release` skill. K1 (the id grammar), C1 (the chat's packages and the TanStack AI names), C2 (the question log contracts), S1 (the TanStack Start app) and D7 (CI) have no blockers. The spike D1 to D6 starts when Peter has set it up. Checkpoints: agents: before the first release; chat: contracts; deploy: the spike.
 
-**Phase 1, foundations.** Knowledge K2 to K13: the source parser, the core with its catalog, the reads, `publicKnowledge()`, the draft preview and the three moves. Content T1 to T4: the short labels and the committed documents. The chat handler C3 to C15 at seam 1, ending with Peter's approval of the system prompt. The site's build output S2 to S8, with deploy's build script D16 and `createOps()` D9. Agents A3 to A8, and task 13 (the interviews) once A7 exists. Checkpoints: agents: checks complete; content: lands; knowledge: old contract gone, contract complete, lands; agents: lands; deploy: createOps ready; chat: the handler; site: the build output.
+**Phase 1, foundations.** Knowledge K2 to K13: the source parser, the core with its catalog, the reads, `publicKnowledge()`, the draft preview and the three moves. Content T1 to T4: the short labels and the committed documents. The chat handler C3 to C15 at seam 1, ending with the drafted system prompt (row 153). The site's build output S2 to S8, with deploy's build script D16 and `createOps()` D9. Agents A3 to A8, and task 13 (the interviews) once A7 exists. Checkpoints: agents: checks complete; content: lands; knowledge: old contract gone, contract complete, lands; agents: lands; deploy: createOps ready; chat: the handler; site: the build output.
 
 **Phase 2, the workspace and the chat column.** After the spike: the build settings D8, the routes and headers D17 and D18, and the question log in Upstash D10. The wide workspace S9 to S22: the preview and the browser test, the career timeline, the first view, the head script, the theme, the workspace contract, source pages, saved views and downloads. The chat's build and route C16 and C17, the preview's API routes S31, the functions D20, and the smoke check's first part D21 and D25. The chat column C18 to C30: the first answer, the input, the saved conversation, the chips, "Answers for", Markdown answers, citations, the answer steps and the message actions. Checkpoints: site: the wide workspace; deploy: the Vercel output; chat: the first answer; chat: the answer views.
 
@@ -23,7 +33,7 @@ All six module specs are approved ([capability map](../spec/README.md)). This pl
 
 **Phase 4, everything wired together.** The effects of the chat's calls on the workspace S32 to S36: citations, sheets, the restore, New chat and the install offer. The evals C40 and Peter's first run C41. The status route, the Vercel health job, the production checks, `bun run questions` and the spend runbooks D23, D24, D27, D28 and D35. The docs-only list D30 and D31. Checkpoints: site: lands; chat: lands; deploy: the smoke check.
 
-**Phase 5, launch.** The release check D32, the GitHub health check D33, the setup list D34 and the runbooks D36; Peter's setup steps 1 to 11, the domains among them; the first release D37; step 12 and production's checks D38. Checkpoints: deploy: the workflows; deploy: setup list and runbooks; agents: the first release follows the release skill; deploy: lands.
+**Phase 5, launch.** The release check D32, the GitHub health check D33, the setup list D34 and the runbooks D36; Peter's setup steps 1 to 11, the domains among them; his one review of the wording drafts (row 153); the first release D37; step 12 and production's checks D38; at the very end, his review of the build decisions (row 154). Checkpoints: deploy: the workflows; deploy: setup list and runbooks; agents: the first release follows the release skill; deploy: lands.
 
 ## Order rules across modules
 
@@ -53,16 +63,16 @@ Each item names the task it blocks; todo.md shows them as "Peter:".
 5. Done 2026-10-27: the three WAF rules on the throwaway project: D5.
 6. Each spec change the spike's verdicts need: D6.
 7. Deleting the throwaway project and its Upstash database: D32.
-8. The nine `x-short` labels, with a curly or straight apostrophe in "Brigham and Women’s": T1, and through it S10.
-9. The nine summaries, three per move, with the moved files: K11, K12 and K13, and through them C17.
-10. The interviews, and the kind line for interview sources before the first interview source is approved: task 13.
+8. A draft that Peter approves in the list before D37 (row 153): the nine `x-short` labels, with a curly or straight apostrophe in "Brigham and Women’s" (T1).
+9. The nine summaries, three per move, with the moved files: K11, K12 and K13, and through them C17. The run stops for these (row 152).
+10. The interviews, and the kind line for interview sources before the first interview source is approved: task 13. The run stops for these (row 152).
 11. A SPEC-chat amendment, only if a TanStack AI name differs: C1.
-12. The system prompt, the five audience lines and the two refusal wordings: C15, and through it C40 and D29.
-13. The font format, WOFF2 with an encoder package he approves or WOFF: S7, and through it S26.
-14. The overall suggested questions' wording (S11) and each role's (S15, and through it C18).
-15. The "Answers for" popover's wording and the anonymous-log line's wording: C22. The decision record approves neither text (row 84 approved the line's place, row 139 the boards); Peter may count row 139.
+12. A draft that Peter approves in the list before D37 (row 153): the system prompt, the five audience lines and the two refusal wordings (C15).
+13. A draft that Peter approves in the list before D37 (row 153): the font format (S7). S7 drafts WOFF, which needs no new package; WOFF2 needs his approval of an encoder package first (AGENTS.md, Code).
+14. A draft that Peter approves in the list before D37 (row 153): the overall suggested questions' wording (S11) and each role's (S15).
+15. A draft that Peter approves in the list before D37 (row 153): the "Answers for" popover's wording and the anonymous-log line's wording (C22). The decision record approves neither text (row 84 approved the line's place, row 139 the boards); Peter may count row 139.
 16. The `resume-evals` workspace and key ($5 limit) in `.secrets/local.env`, each eval run, and the review of its answers: C41.
-17. The push texts for the limit alerts: `daycap` (D13), `spendlimit` (D14), `storefail` (D15) and `health` (D24).
+17. A draft that Peter approves in the list before D37 (row 153): the push texts for the limit alerts, `daycap` (D13), `spendlimit` (D14), `storefail` (D15) and `health` (D24).
 18. A decision only if the worst-case turn reaches the $0.90 reservation: D29.
 19. The read-only token in `.secrets/local.env`, for the manual check of `bun run questions`: D28.
 20. Review and approval of the setup list and the runbooks: D34, D35 and D36.
@@ -73,6 +83,8 @@ Each item names the task it blocks; todo.md shows them as "Peter:".
 25. Done 2026-10-27: Peter's standing approval covers every push, releases included (row 151), so no checkpoint and no task waits on a push approval.
 26. The reviews the checkpoints ask for: the new `AGENTS.md` sections before T1's push; knowledge: old contract gone and contract complete; chat: the first answer and the answer views (suggested); deploy: the workflows.
 27. Reading each fresh-session check's result, at each module's landing.
+28. The wording drafts in [wording-drafts.md](../docs/design/wording-drafts.md), approved in one sitting: D37 (row 153).
+29. Going over [build-decisions.md](../docs/design/build-decisions.md) with the conductor, at the end of the run (row 154).
 
 ## Risks
 
@@ -85,7 +97,7 @@ Each item names the task it blocks; todo.md shows them as "Peter:".
 | Vercel does not behave as SPEC-deploy assumes: the Bun runtime, post-build routes, header merging, the redirect's query string, Cron under protection, store writes after Stop, the WAF's path match, the Upstash tokens, the PDF viewer, the toolbar | The spike checks each on a throwaway project before a task builds on it; a failed check's change goes into the spec with Peter's approval (D6) |
 | Phase 2 waits on the spike, through D17 and S9 | Phase 1 needs no spike; the spike's setup is Peter's first item |
 | The spike project's deployments set off the release check once it is on `main` | Peter deletes the spike project before D32 |
-| Peter's answers hold up later work: the labels (S10), the moves (C17), the suggested questions (C18), the system prompt (C40) | Each question goes to Peter as soon as its task is reached; the rest of the frontier keeps moving |
+| Peter's answers hold up later work: the moves (C17) and the interviews (task 13) | Each question goes to Peter as soon as its task is reached; the rest of the frontier keeps moving. Wording no longer holds up work: it is drafted, and Peter reviews the drafts once before D37 (row 153) |
 | `docx` and Chrome cannot write a fixed date, so each document build differs byte for byte | The inputs hash decides when `bun run documents` rebuilds (T2); T4 records the verdict |
 
 ## Open items

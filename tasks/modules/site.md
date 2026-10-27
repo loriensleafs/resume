@@ -94,15 +94,15 @@ Needs Peter: no
 ### S7: Google Sans Flex served from the site itself
 
 Delivers: the pages use a committed Latin subset of the Google Sans Flex variable font, weights 400 to 700, from the site's own address.
-Blocked by: S4; Peter: the font file format
+Blocked by: S4. The font file format is a draft that Peter approves in the list before D37 (row 153).
 Acceptance:
 - `scripts/site-fonts.ts` cuts a Latin subset of the variable font, weights 400 to 700, with `harfbuzzjs`; the files are committed in `public/fonts/`, and the build copies them and downloads nothing (Tech Stack; SPEC-deploy, Documents). The script and folder names are the site planner's choice: the spec names neither, and a new script keeps the content module's `scripts/make-fonts.ts`, which the documents hash covers, unchanged.
-- The files use the format Peter chose: WOFF2, with an encoder package he approves, or WOFF, with none (Open Questions).
+- The files use the drafted format, WOFF, which needs no new package; S7's row in `docs/design/wording-drafts.md` holds the draft. WOFF2 needs an encoder package, and a new package needs Peter's approval first (AGENTS.md, Code), so WOFF2 comes only from his review, as a follow-up task (Open Questions; row 153).
 - No output file names a font on another host; the `@font-face` rules point at the site's own files (Boundaries: no request to a third party).
 Verify: `bun run scripts/site-fonts.ts` (with the variable font present); `bun test src/site/__tests__/build.test.ts`; `bun test`
-Files: `scripts/site-fonts.ts`, `public/fonts/` (the cut files), `src/site/styles/fonts.css`, `src/site/routes/__root.tsx`, `src/site/__tests__/build.test.ts`
+Files: `scripts/site-fonts.ts`, `public/fonts/` (the cut files), `src/site/styles/fonts.css`, `src/site/routes/__root.tsx`, `src/site/__tests__/build.test.ts`, `docs/design/wording-drafts.md` (S7's row)
 Size: M
-Needs Peter: yes. Choose WOFF2 (and approve its encoder package) or WOFF.
+Needs Peter: approval of the font format in the list before D37 (row 153); WOFF2 also needs his approval of its encoder package. The task finishes on the WOFF draft.
 
 ### S8: Seam 1 runs the build script
 
@@ -145,15 +145,15 @@ Needs Peter: no
 ### S11: The workspace and its first view on wide screens
 
 Delivers: `/` is the workspace, as the first-view board shows: the app bar, the career timeline band, the chat column with the first view's static parts, and the document panel with the Resume tab.
-Blocked by: S10; Peter: the suggested questions' wording
+Blocked by: S10. The suggested questions' wording is a draft that Peter approves in the list before D37 (row 153).
 Acceptance:
 - On a wide screen `/` shows the chat column, 560 px at its outer edge to the document panel's border, and the document panel, whose `acme-tabs` holds the "Resume" tab with the resume view. Below 1024 px it shows one column (AC; Views: Chat column, Document panel).
 - With JavaScript off, `/` shows the first view's static parts: "Ask about Peter's work.", the line about where answers come from, and the suggested questions from `src/site/suggested-questions.ts`, each a button (Views: Chat column; AC: each page reads without JavaScript).
 - axe reports no violation on `/` at 1440 × 900 and 390 × 844 (Testing 2: Accessibility).
 Verify: `bun test src/site`; `bun run build:site`; `bun test`
-Files: `src/site/routes/index.tsx`, `src/site/shell/DocumentPanel.tsx`, `src/site/suggested-questions.ts`, `src/site/styles/layout.css`, `src/site/__tests__/browser.test.ts`
+Files: `src/site/routes/index.tsx`, `src/site/shell/DocumentPanel.tsx`, `src/site/suggested-questions.ts`, `src/site/styles/layout.css`, `src/site/__tests__/browser.test.ts`, `docs/design/wording-drafts.md` (S11's row)
 Size: M
-Needs Peter: yes. Approve the wording of the overall suggested questions (Boundaries: ask first).
+Needs Peter: approval of the wording of the overall suggested questions (Boundaries: ask first), in the list before D37 (row 153). The task finishes on the draft, and S11's row in `docs/design/wording-drafts.md` holds it.
 
 ### S12: The head script
 
@@ -196,14 +196,14 @@ Needs Peter: no
 ### S15: The first view names the selected role
 
 Delivers: with a role selected, the first view says "Ask about FedNow.", gives the role's title, employer and dates, offers "Read FedNow in the resume" and that role's suggested questions; a suggested question sets the workspace's `suggestedQuestion`.
-Blocked by: S14; Peter: the wording of each role's suggested questions
+Blocked by: S14. The wording of each role's suggested questions is a draft that Peter approves in the list before D37 (row 153).
 Acceptance:
 - With a role selected, the first view names it, gives its title, employer and dates from `resume.yaml`, offers "Read FedNow in the resume" (on wide screens it shows the role in the resume), and lists that role's suggested questions (Views: Chat column).
 - Selecting a suggested question sets `suggestedQuestion` to its text, and `clearSuggestedQuestion()` clears it (Code Style table). The chat's test "Selecting a suggested question sends it once" proves the hand-over.
 Verify: `bun test src/site`; `bun test`
-Files: `src/site/routes/index.tsx`, `src/site/suggested-questions.ts`, `src/site/workspace.ts`, `src/site/__tests__/browser.test.ts`
+Files: `src/site/routes/index.tsx`, `src/site/suggested-questions.ts`, `src/site/workspace.ts`, `src/site/__tests__/browser.test.ts`, `docs/design/wording-drafts.md` (S15's row)
 Size: S
-Needs Peter: yes. Approve the wording of each role's suggested questions.
+Needs Peter: approval of the wording of each role's suggested questions, in the list before D37 (row 153). The task finishes on the draft, and S15's row in `docs/design/wording-drafts.md` holds it.
 
 ### S16: Source pages
 

@@ -195,16 +195,16 @@ Needs Peter: no
 
 ### C15: The system prompt, the scope and audience lines, and the refusal wordings
 
-Delivers: the prompt that the real model gets, approved by Peter, with the request lines that scope and aim each answer.
+Delivers: the prompt that the real model gets, drafted for Peter's review before D37 (row 153), with the request lines that scope and aim each answer.
 Blocked by: C7, C8, C9
 Acceptance:
 - The model request holds the scope line from the core ("The visitor is asking about FedNow, 2021 – 2024."), none for an unknown role id, and one audience line for each of the five audiences, none for no choice (The request, "Scope", "Audience").
 - The system prompt says what the spec lists: the third person, the chat's topics and the refusal rules with the two refusal wordings and the email from `basics`, Peter's wording rule, the marker formats, the fit check's rules, the open tools, and that a pasted text is material, never instructions (The request; Answers the chat gives).
-- Peter approves the prompt, the five audience lines and the two refusal wordings in the question tool; a decision-record row holds the approval (Boundaries, "Ask first").
-Verify: `bun test src/chat`; Peter's approval.
-Files: `src/chat/server/prompt.ts`, `src/chat/server/__tests__/handle-chat.test.ts`, `docs/design/interview-2026-10-26.md`
+- The prompt, the five audience lines and the two refusal wordings are drafts in C15's rows of `docs/design/wording-drafts.md`. Peter approves them there before D37, and a decision-record row holds the approval (row 153; Boundaries, "Ask first").
+Verify: `bun test src/chat`; C15's rows in `docs/design/wording-drafts.md` hold the drafts.
+Files: `src/chat/server/prompt.ts`, `src/chat/server/__tests__/handle-chat.test.ts`, `docs/design/wording-drafts.md` (C15's rows)
 Size: M
-Needs Peter: yes: approval of the system prompt's wording, the audience lines and the refusal wordings.
+Needs Peter: approval of the system prompt's wording, the audience lines and the refusal wordings, in the list before D37 (row 153). The task finishes on the drafts.
 
 ### C16: The chat's Vite plugin: `virtual:knowledge` and the device index
 
@@ -292,10 +292,11 @@ Acceptance:
 - With the column 520 px or wider, a compact trigger ("Answers for: Anyone ▾") opens `acme-toggle-tip` with the line of context, the five audiences as an attached `acme-group` of `acme-toggle-button`s (`role="group"`, named "Answers for"; "Product" named "Product manager"; pressing the pressed one clears it) and the line for the chosen audience; the `::part(content)` width and the hidden `::part(close)` are set through a plain wrapper and named as design-system gaps (Answers for).
 - Escape closes the popover and returns focus to the trigger; a click outside closes it; at 390 × 844 the control is `acme-select` labelled "Answers for"; both write the session row's audience, which survives a reload and shows in the popover after a resize (Answers for; Testing Strategy, seam 2).
 - The trigger and "Questions are kept anonymously to improve answers." share one row at 1440 × 900; on phones the line goes under the control (Chat input; Testing Strategy, seam 2).
+- The popover's text and the anonymous-log line are drafts in C22's rows of `docs/design/wording-drafts.md` (row 153).
 Verify: `bun test src/site/__tests__/browser.test.ts`
-Files: `src/chat/ui/AudienceChoice.tsx`, `src/chat/ui/ChatInput.tsx`, `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/AudienceChoice.tsx`, `src/chat/ui/ChatInput.tsx`, `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `src/site/__tests__/browser.test.ts`, `docs/design/wording-drafts.md` (C22's rows)
 Size: M
-Needs Peter: yes: approval of the popover's wording and of the anonymous-log line's wording (SPEC-chat: "Peter approves the popover's wording" and, for the line, "Peter approves the wording"; decision 0020). The decision record holds no approval of either text: row 84 approved the line's place under "Answers for", and row 139 the boards that draw both. Peter may count row 139 as the approval.
+Needs Peter: approval of the popover's wording and of the anonymous-log line's wording (SPEC-chat: "Peter approves the popover's wording" and, for the line, "Peter approves the wording"; decision 0020), in the list before D37 (row 153). The task finishes on the drafts. The decision record holds no approval of either text: row 84 approved the line's place under "Answers for", and row 139 the boards that draw both. Peter may count row 139 as the approval.
 
 ### C23: Answers render as untrusted Markdown, with the link and image rules
 
@@ -513,7 +514,7 @@ Needs Peter: no
 ### C40: The trick questions and `bun run evals`
 
 Delivers: Peter has an eval suite he can run on demand, which costs nothing until he approves a run.
-Blocked by: C10, C13, C14, C15 (the whole handler, with the approved prompt)
+Blocked by: C10, C13, C14, C15 (the whole handler, with the drafted prompt; row 153)
 Acceptance:
 - `evals/trick-questions.yaml` covers each topic outside the chat's topics; an employer, project or skill not in the record; false premises; wording upgrades; requests for `Not public` details; prompt injection in a question and in a posting; the fit check; "show me his resume"; "show me where that came from"; a scoped follow-up; one question under each audience; and citation integrity; each case states its checks with `EvalExpect` (Evals). A case may carry optional `history` (questions asked first, through `handleChat()`), `scope` and `audience` (main's decision, written into SPEC-chat).
 - `bun run evals` loads `.secrets/local.env` with `--env-file`, uses `createAnthropicChat("claude-sonnet-5-5", key)`, the real `buildKnowledge()`, the in-memory log, budget (always allows) and telemetry, and the real clock; it asks each case through `handleChat()`, checks it, and writes every answer and `chat_turn` event to `.scratch/evals/<date>.md`, which git ignores (Evals).
@@ -543,7 +544,7 @@ After C2. `bun test src/chat` passes; the deploy module's ops work (D9) can star
 
 ### Checkpoint chat: the handler
 
-After C15. `bun test src/chat` passes every seam-1 item in SPEC-chat's Testing Strategy; `bun run build` and `bun test` pass; a review against the Boundaries ("Never": no read, `Not public` or thinking text on the wire; no `threadId` in the log); Peter has approved the system prompt (C15).
+After C15. `bun test src/chat` passes every seam-1 item in SPEC-chat's Testing Strategy; `bun run build` and `bun test` pass; a review against the Boundaries ("Never": no read, `Not public` or thinking text on the wire; no `threadId` in the log); C15's drafts are in `docs/design/wording-drafts.md` for Peter's review before D37 (row 153).
 
 ### Checkpoint chat: the first answer
 
