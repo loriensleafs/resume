@@ -18,7 +18,7 @@
 // - mode=report-stream&ids=<uuid>,... (check 7): each marker's age in ms (from PTTL, the store's own clock) and the
 //   facts the turn wrote into it, so check.ts can tell when each write landed.
 // - mode=report-cron&schedule=<probe>&spec=<schedule> (check 6): what spike:cron:calls holds about the calls that
-//   reached /api/cron/health.
+//   reached /api/cron/health. `schedule` is left out when the build wrote no probe cron (post-build.ts PROBE_CRON).
 import { createFileRoute } from '@tanstack/react-router'
 import {
   allOk,
@@ -112,19 +112,44 @@ async function storeCheck(): Promise<Flat> {
   out['ro.multiExec.same'] = allOk(roMulti, 2) && same(result(roMulti, 0), reads[0]![2]) && same(result(roMulti, 1), reads[3]![2])
 
   // 4. Controls: the read-only token must not write. A refused SET leaves no key; a refused EXPIREAT leaves the
-  //    expiry as step 1 set it. SCAN is a read that Upstash's docs say the read-only token cannot run.
+  //    expiry as step 1 set it.
   const roSet = await command('readOnly', ['SET', key('ro'), 'x', 'EX', 60])
   out['ro.set.status'] = roSet.status
   out['ro.set.error'] = replyError(roSet, 0)
   const roExpire = await command('readOnly', ['EXPIREAT', key('qlog'), expireAt + 3600])
   out['ro.expireat.status'] = roExpire.status
   out['ro.expireat.error'] = replyError(roExpire, 0)
+  // D4 review: a write through /pipeline, a DEL of a key step 1 made, and a script that writes must be refused too.
+  const roPipeSet = await pipeline('readOnly', [['SET', key('roPipe'), 'x', 'EX', 60]])
+  out['ro.pipelineSet.status'] = roPipeSet.status
+  out['ro.pipelineSet.error'] = replyError(roPipeSet, 0)
+  const roDel = await command('readOnly', ['DEL', key('qlog')])
+  out['ro.del.status'] = roDel.status
+  out['ro.del.error'] = replyError(roDel, 0)
+  const roEval = await command('readOnly', ['EVAL', "return redis.call('SET', KEYS[1], 'x')", 1, key('roEval')])
+  out['ro.eval.status'] = roEval.status
+  out['ro.eval.error'] = replyError(roEval, 0)
+  // Recorded: SCAN and KEYS, the two reads that Upstash's docs say the read-only token cannot run. Both match
+  // this run's keys only, and the run sees the status, never a key name.
   const roScan = await command('readOnly', ['SCAN', 0, 'MATCH', `spike:tokens:${nonce}:*`, 'COUNT', 10])
   out['ro.scan.status'] = roScan.status
   out['ro.scan.error'] = replyError(roScan, 0)
-  const after = await pipeline('standard', [['EXISTS', key('ro')], ['PTTL', key('qlog')]])
+  const roKeys = await command('readOnly', ['KEYS', `spike:tokens:${nonce}:*`])
+  out['ro.keys.status'] = roKeys.status
+  out['ro.keys.error'] = replyError(roKeys, 0)
+  const after = await pipeline('standard', [
+    ['EXISTS', key('ro')],
+    ['PTTL', key('qlog')],
+    ['EXISTS', key('roPipe')],
+    ['EXISTS', key('qlog')],
+    ['EXISTS', key('roEval')],
+  ])
+  const qlogTtl = result(after, 1)
   out['ro.set.keyExists'] = (result(after, 0) as number | undefined) ?? null
-  out['ro.expireat.ttlKept'] = typeof result(after, 1) === 'number' && (result(after, 1) as number) <= 600_000
+  out['ro.expireat.ttlKept'] = typeof qlogTtl === 'number' && qlogTtl > 0 && qlogTtl <= 600_000
+  out['ro.pipelineSet.keyExists'] = (result(after, 2) as number | undefined) ?? null
+  out['ro.del.keyKept'] = result(after, 3) === 1
+  out['ro.eval.keyExists'] = (result(after, 4) as number | undefined) ?? null
 
   // 5. The take-back (step 2 of the daily cap): the total returns to 0 and keeps its expiry.
   const takeBack = await multiExec('standard', [['DECRBY', key('qcost'), 900_000], ['PTTL', key('qcost')]])
@@ -133,7 +158,7 @@ async function storeCheck(): Promise<Flat> {
   out['takeBack.ttlKept'] = typeof result(takeBack, 1) === 'number' && (result(takeBack, 1) as number) > 0
 
   // 6. Clean up: the keys would expire in 10 minutes anyway.
-  const names = ['qlog', 'qstats', 'qslow', 'qcost', 'limit', 'ro']
+  const names = ['qlog', 'qstats', 'qslow', 'qcost', 'limit', 'ro', 'roPipe', 'roEval']
   const cleanup = await command('standard', ['DEL', ...names.map(key)])
   out['cleanup.deleted'] = (result(cleanup, 0) as number | undefined) ?? null
   return out
@@ -243,8 +268,8 @@ async function streamReport(ids: string[]): Promise<Flat> {
   return out
 }
 
-/** Check 6's report: the calls in spike:cron:calls (newest first), grouped by who sent them. */
-async function cronReport(probe: string, spec: string): Promise<Flat> {
+/** Check 6's report: the calls in spike:cron:calls (newest first), grouped by who sent them. No probe: no probe group. */
+async function cronReport(probe: string | null, spec: string): Promise<Flat> {
   const commit = process.env.VERCEL_GIT_COMMIT_SHA ?? null
   const read = await command('standard', ['LRANGE', CRON_CALLS_KEY, 0, -1])
   const entries = ((result(read, 0) as string[] | undefined) ?? []).flatMap((line) => {
@@ -256,7 +281,7 @@ async function cronReport(probe: string, spec: string): Promise<Flat> {
   })
   const out: Flat = { ...outcome('read', read), calls: entries.length, cronSecretSet: Boolean(process.env.CRON_SECRET) }
   const groups: [string, (e: Flat) => boolean][] = [
-    ['probe', (e) => e.cronAgent === true && e.schedule === probe],
+    ['probe', (e) => probe !== null && e.cronAgent === true && e.schedule === probe],
     ['spec', (e) => e.cronAgent === true && e.schedule === spec],
     ['cronOther', (e) => e.cronAgent === true && e.schedule !== probe && e.schedule !== spec],
     ['plain', (e) => e.cronAgent !== true],
@@ -303,9 +328,9 @@ export const Route = createFileRoute('/api/spike')({
           if (ids.length >= 1 && ids.length <= 6 && ids.every((id) => UUID.test(id))) return json(await streamReport(ids))
         }
         if (mode === 'report-cron') {
-          const probe = url.searchParams.get('schedule') ?? ''
+          const probe = url.searchParams.get('schedule') // absent when the build wrote no probe cron
           const spec = url.searchParams.get('spec') ?? ''
-          if (SCHEDULE.test(probe) && SCHEDULE.test(spec)) return json(await cronReport(probe, spec))
+          if ((probe === null || SCHEDULE.test(probe)) && SCHEDULE.test(spec)) return json(await cronReport(probe, spec))
         }
         return json({ error: 'bad_request' }, 400)
       },

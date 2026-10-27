@@ -6,7 +6,8 @@
 // 3. replaces the `routes` Nitro wrote in .vercel/output/config.json with SPEC-deploy's list ("Routes"), keeps
 //    Nitro's other fields, and adds `overrides` for the prerendered pages and the cron. One route is new to the
 //    spec's list: function folders that no API route names get the not-found page (check 3, run 40570467882).
-//    D4 adds a second cron on the same path, a few minutes after the build (probeCron, check 6).
+//    D4 adds a second cron on the same path, a few minutes after the build (probeCron, check 6), when PROBE_CRON
+//    is on; it is off since the D4 review.
 // Checks 2 and 3 test what Vercel does with this file; checks 4, 5 and 11 (D3) test the redirect, the headers and
 // the policy tags. The spike has one host redirect, for its own .vercel.app address: the other hosts have no
 // domains on this project, so no request can reach them.
@@ -87,6 +88,14 @@ export const QUERY_ROUTES = [
 
 /** SPEC-deploy's cron. */
 export const CRON = { path: "/api/cron/health", schedule: "17 15 * * *" } as const;
+
+/**
+ * Whether the build writes the probe cron (check 6). Off since the D4 review: check 6 passed with it in runs
+ * 40589291781 and 40591039392, and with it every run waits about 5 minutes for the call. The switch lives here,
+ * because Vercel's build writes config.json and never sees the workflow's environment; check 6 follows the build
+ * (build-info.json's crons): no probe cron, no wait. Set it to true to watch a live call again.
+ */
+export const PROBE_CRON = false;
 
 /** How long after the build the probe cron runs: the deployment is ready and the checks have started by then. */
 export const PROBE_LEAD_MS = 4 * 60_000;
@@ -227,7 +236,7 @@ async function main(): Promise<void> {
   ];
 
   const probe = probeCron(new Date());
-  const crons = probe.schedule === CRON.schedule ? [{ ...CRON }] : [{ ...CRON }, probe];
+  const crons = PROBE_CRON && probe.schedule !== CRON.schedule ? [{ ...CRON }, probe] : [{ ...CRON }];
   const written = { ...config, overrides, routes, crons };
   await Bun.write(configPath, JSON.stringify(written, null, 2) + "\n");
   console.log(

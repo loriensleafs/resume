@@ -13,7 +13,8 @@
 // hand; the run prints the PDF's address for it.
 // Checks 9, 7 and 6 (D4) ask the store and Vercel Cron. The store calls run in the function on the deployment, which
 // holds the KV_* variables (api.spike.ts, `mode=`); the run sees booleans, numbers, hosts and error words only.
-// Check 6 runs last, because it waits for the probe cron that post-build.ts sets a few minutes after the build.
+// Check 6 runs last: when post-build.ts writes its probe cron (PROBE_CRON, off since the D4 review), it waits for
+// the call a few minutes after the build; otherwise it reads the cron's record once.
 // It prints states, hosts and verdicts only. Rerun only the newest run: an older one waits for a commit that the
 // branch URL no longer serves.
 
@@ -416,7 +417,8 @@ const refused = (status: unknown, error: unknown) => status !== 200 || (error !=
  * - the reservation's transaction: INCRBY 900000 (the $0.90), EXPIREAT, GET of the spend-limit marker, and PTTL;
  * - the read-only token runs LRANGE, HGETALL, ZRANGE and GET, one by one and as a /pipeline, and must read back what
  *   was written; its /multi-exec and SCAN are recorded;
- * - controls: the read-only token's SET and EXPIREAT must be refused, with no key made and the expiry unchanged;
+ * - controls: the read-only token's SET, EXPIREAT, SET through /pipeline, DEL and EVAL of a SET must be refused,
+ *   with no key made, no key deleted and the expiry unchanged; its SCAN and KEYS are recorded;
  * - the take-back: DECRBY returns the total to 0 and keeps the expiry.
  */
 const storeTokens: Check = {
@@ -441,6 +443,9 @@ const storeTokens: Check = {
     need(r["ro.pipeline.same"] === true, `the read-only token's /pipeline of the four reads: ${status("ro.pipeline")}`);
     need(refused(r["ro.set.status"], r["ro.set.error"]) && r["ro.set.keyExists"] === 0, `the read-only token's SET was not refused: ${status("ro.set")}, key made ${r["ro.set.keyExists"]}`);
     need(refused(r["ro.expireat.status"], r["ro.expireat.error"]) && r["ro.expireat.ttlKept"] === true, `the read-only token's EXPIREAT was not refused: ${status("ro.expireat")}`);
+    need(refused(r["ro.pipelineSet.status"], r["ro.pipelineSet.error"]) && r["ro.pipelineSet.keyExists"] === 0, `the read-only token's SET through /pipeline was not refused: ${status("ro.pipelineSet")}, key made ${r["ro.pipelineSet.keyExists"]}`);
+    need(refused(r["ro.del.status"], r["ro.del.error"]) && r["ro.del.keyKept"] === true, `the read-only token's DEL was not refused: ${status("ro.del")}, key kept ${r["ro.del.keyKept"]}`);
+    need(refused(r["ro.eval.status"], r["ro.eval.error"]) && r["ro.eval.keyExists"] === 0, `the read-only token's EVAL of a write was not refused: ${status("ro.eval")}, key made ${r["ro.eval.keyExists"]}`);
 
     const seen = [
       `the function has KV_REST_API_URL ${r["config.url"]}, KV_REST_API_TOKEN ${r["config.token"]}, KV_REST_API_READ_ONLY_TOKEN ${r["config.readOnlyToken"]}`,
@@ -448,7 +453,9 @@ const storeTokens: Check = {
       `the reservation, /multi-exec of INCRBY 900000, EXPIREAT, GET of the spend-limit marker and PTTL: ${r["reserve.ok"] ? "ok" : status("reserve")}, total ${r["reserve.total"]}, EXPIREAT ${r["reserve.expireat"]}, marker ${r["reserve.limitMarker"]}, PTTL ${r["reserve.ttlMs"]} ms`,
       `the take-back, /multi-exec of DECRBY and PTTL: total ${r["takeBack.total"]}, expiry kept ${r["takeBack.ttlKept"]}`,
       `read-only token: ${reads.map((n) => `${n.toUpperCase()} ${r[`ro.${n}.same`] ? "ok" : status(`ro.${n}`)}`).join(", ")}; as /pipeline ${r["ro.pipeline.same"] ? "ok" : status("ro.pipeline")}; as /multi-exec ${r["ro.multiExec.same"] ? "ok" : status("ro.multiExec")}`,
-      `read-only SET: ${status("ro.set")}, key made ${r["ro.set.keyExists"]}; read-only EXPIREAT: ${status("ro.expireat")}, expiry unchanged ${r["ro.expireat.ttlKept"]}; read-only SCAN: ${status("ro.scan")}`,
+      `read-only SET: ${status("ro.set")}, key made ${r["ro.set.keyExists"]}; read-only EXPIREAT: ${status("ro.expireat")}, expiry unchanged ${r["ro.expireat.ttlKept"]}; ` +
+        `read-only SET through /pipeline: ${status("ro.pipelineSet")}, key made ${r["ro.pipelineSet.keyExists"]}; read-only DEL: ${status("ro.del")}, key kept ${r["ro.del.keyKept"]}; ` +
+        `read-only EVAL of a SET: ${status("ro.eval")}, key made ${r["ro.eval.keyExists"]}; read-only SCAN: ${status("ro.scan")}; read-only KEYS: ${status("ro.keys")}`,
       `cleanup: DEL removed ${r["cleanup.deleted"]} keys`,
     ];
     return { pass: problems.length === 0, detail: problems.length ? `${problems.join("; ")}; seen: ${seen.join("; ")}` : seen.join("; ") };
@@ -622,24 +629,24 @@ const clock = (t: number) => new Date(t).toISOString().slice(11, 19);
  * 2. waits until 30 s after the probe's minute, then reads the record every 30 s for up to 3 minutes. Vercel Cron's
  *    call must name the probe's schedule and reach __server at /api/cron/health. The line names the host the call
  *    reached, whether that host is a protected one, and whether it carried CRON_SECRET.
+ * Part 2 runs only when the build wrote the probe cron (post-build.ts PROBE_CRON, off since the D4 review); without
+ * it, one read of the record replaces the wait (cronRecordOnly).
  */
 const cronCall: Check = {
   check: 6,
   name: "Vercel Cron",
   ifFails: "the health job's host rule changes",
   async run({ info, productionFetch, report, poll, deadline }) {
-    const probe = info.crons.find((c) => c.path === CRON.path && c.schedule !== CRON.schedule) ?? info.crons.find((c) => c.path === CRON.path);
-    const due = probe ? dailyDue(probe.schedule, new Date(info.builtAt)) : null;
-    if (!probe || due === null) return { pass: false, detail: `config.json has no daily probe cron on ${CRON.path}: ${JSON.stringify(info.crons)}` };
     const problems: string[] = [];
     const seen: string[] = [];
+    if (!info.crons.some((c) => c.path === CRON.path && c.schedule === CRON.schedule)) problems.push(`config.json has no cron ${CRON.path} "${CRON.schedule}"`);
+    const probe = info.crons.find((c) => c.path === CRON.path && c.schedule !== CRON.schedule);
+    if (!probe) return cronRecordOnly({ productionFetch, report }, problems, seen);
+    const due = dailyDue(probe.schedule, new Date(info.builtAt));
+    if (due === null) return { pass: false, detail: `the probe cron "${probe.schedule}" is not a daily schedule` };
 
     // 1. The route after the filesystem, from a caller with no bypass.
-    const plain = await productionFetch(CRON.path);
-    const body = (await plain.json().catch(() => null)) as { recorded?: boolean; function?: string; error?: string } | null;
-    const reached = plain.status === 200 && body?.recorded === true && body.function === "/__server";
-    if (!reached) problems.push(`a plain GET of ${CRON.path} on the production address answered HTTP ${plain.status} ${JSON.stringify(body)}, not 200 from /__server with the call recorded`);
-    seen.push(`a plain GET of ${CRON.path} on the production address, without the bypass: HTTP ${plain.status}, function ${body?.function ?? "none"}, recorded ${body?.recorded ?? false}`);
+    await plainCronRequest(productionFetch, problems, seen);
 
     // 2. Vercel Cron's call of the probe.
     const query = `${SPIKE_PATH}?mode=report-cron&schedule=${encodeURIComponent(probe.schedule)}&spec=${encodeURIComponent(CRON.schedule)}`;
@@ -666,15 +673,45 @@ const cronCall: Check = {
           `this commit ${r["probe.thisCommit"]}; authorization ${r["probe.authorization"]}, CRON_SECRET set ${r["probe.cronSecretSet"]}`,
       );
     }
-    seen.push(
-      `in the record (7 days): SPEC-deploy's "${CRON.schedule}" ${r["spec.calls"]} calls${r["spec.at"] ? ` (last ${r["spec.at"]}, host ${r["spec.host"]}, commit ${r["spec.commit"]})` : ""}; ` +
-        `earlier probes ${r["cronOther.calls"]}; calls without Vercel Cron's user agent ${r["plain.calls"]}${r["plain.host"] ? ` (last host ${r["plain.host"]}, function ${r["plain.function"]})` : ""}`,
-    );
+    seen.push(cronRecordLine(r));
     return { pass: problems.length === 0, detail: problems.length ? `${problems.join("; ")}; seen: ${seen.join("; ")}` : seen.join("; ") };
   },
 };
 
-// Check 6 runs last: it waits for the probe cron. Checks 9 and 7 come before check 11's Chrome loads.
+/** Check 6, part 1: a plain GET of the cron's path on the production address, with no bypass, reaches __server. */
+async function plainCronRequest(productionFetch: Ctx["productionFetch"], problems: string[], seen: string[]): Promise<void> {
+  const plain = await productionFetch(CRON.path);
+  const body = (await plain.json().catch(() => null)) as { recorded?: boolean; function?: string; error?: string } | null;
+  const reached = plain.status === 200 && body?.recorded === true && body.function === "/__server";
+  if (!reached) problems.push(`a plain GET of ${CRON.path} on the production address answered HTTP ${plain.status} ${JSON.stringify(body)}, not 200 from /__server with the call recorded`);
+  seen.push(`a plain GET of ${CRON.path} on the production address, without the bypass: HTTP ${plain.status}, function ${body?.function ?? "none"}, recorded ${body?.recorded ?? false}`);
+}
+
+/** What spike:cron:calls holds (7 days): SPEC-deploy's calls, earlier probes' calls, and calls from anyone else. */
+const cronRecordLine = (r: Report) =>
+  `in the record (7 days): SPEC-deploy's "${CRON.schedule}" ${r["spec.calls"]} calls${r["spec.at"] ? ` (last ${r["spec.at"]}, host ${r["spec.host"]}, commit ${r["spec.commit"]})` : ""}; ` +
+  `probes of earlier builds ${r["cronOther.calls"]}${r["cronOther.at"] ? ` (last ${r["cronOther.at"]}, "${r["cronOther.schedule"]}", host ${r["cronOther.host"]})` : ""}; ` +
+  `calls without Vercel Cron's user agent ${r["plain.calls"]}${r["plain.host"] ? ` (last host ${r["plain.host"]}, function ${r["plain.function"]})` : ""}`;
+
+/**
+ * Check 6 without the probe cron (post-build.ts PROBE_CRON off, the default since the D4 review): no wait. The
+ * plain request must reach __server and be recorded, and the record must be readable; its line shows whether
+ * SPEC-deploy's 15:17 UTC call has come. The live call was seen in runs 40589291781 and 40591039392.
+ */
+async function cronRecordOnly(
+  { productionFetch, report }: Pick<Ctx, "productionFetch" | "report">,
+  problems: string[],
+  seen: string[],
+): Promise<{ pass: boolean; detail: string }> {
+  seen.push("no probe cron in this build (post-build.ts PROBE_CRON is off), so no wait for a live call");
+  await plainCronRequest(productionFetch, problems, seen);
+  const r = await report(`${SPIKE_PATH}?mode=report-cron&spec=${encodeURIComponent(CRON.schedule)}`);
+  if (r["read.status"] !== 200) problems.push(`the report could not read the store: HTTP ${r["read.status"]}${word(r["read.error"])}`);
+  seen.push(cronRecordLine(r));
+  return { pass: problems.length === 0, detail: problems.length ? `${problems.join("; ")}; seen: ${seen.join("; ")}` : seen.join("; ") };
+}
+
+// Check 6 runs last: with the probe cron on, it waits for its call. Checks 9 and 7 come before check 11's Chrome loads.
 export const CHECKS: Check[] = [buildBun, postBuildRoutes, notFound, headerMerge, hostRedirect, storeTokens, storeAfterStop, toolbarOff, cronCall];
 
 // ---- Chrome through the DevTools protocol ----------------------------------------------------------------------
