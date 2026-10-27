@@ -32,10 +32,10 @@ The approved mockups are the reference for every view. The image index names eac
 
 **Document panel.** Right of the chat column, with design-system tabs: "Resume", and "Source: <title>" while a source is open. The source tab has a × in the tab to close it; at most one source tab is open, and a new source replaces it. The panel notes which citation opened the source ("Opened from citation 1").
 
-- **Resume view:** the lead, each role with its highlights, the earlier roles, skills and education, from `resume.yaml`. Each highlight carries its knowledge id. A cited highlight is tinted and shows its citation number. Hovering or focusing a highlight shows "Ask about this".
+- **Resume view:** the lead, each role with its highlights, the earlier roles, skills and education, from `resume.yaml`. Each highlight carries its knowledge id. A cited highlight is tinted and shows its citation number. Hovering or focusing a highlight shows "Ask about this". A ⋯ icon button ("More actions") at the view's top-right corner opens a menu: PDF, Word, Text. Each item downloads that public document. The menu appears wherever the resume view does: the Resume tab, the phone resume sheet and `/resume` (Peter, [interview record](../docs/design/interview-2026-10-26.md) row 81; the mockups do not show it yet).
 - **Source view:** the title, a line naming its kind and approval ("Deep dive, written from Peter's answers and approved by him. FedNow, 2021 – 2024. 5 passages."), and the numbered passages. The marked passage is tinted, scrolled into view and shows "Ask about this passage".
 
-**Phone sheets.** A source opens as a bottom sheet over the conversation with the cited passage first ("Source for citation 1", "Ask about this passage", "All passages"). The resume opens as a full-height sheet at the selected role ("Read FedNow in the resume").
+**Phone sheets.** A source opens as a bottom sheet over the conversation with the cited passage first ("Source for citation 1", "Ask about this passage", "All passages"). The resume opens as a full-height sheet at the selected role ("Read FedNow in the resume"), or at its top when the chat opens it.
 
 **Install offer.** "Install app" in the app bar appears only when the browser offers installation (`beforeinstallprompt`) and the site is not already running as an app. On phones, after the visitor's third answer, a sheet offers the app once ("Install Peter Kloss": opens on its own, picks up the conversation, readable offline; "Not now" and "Install"). "Not now" hides it for 30 days. Where the browser has no install prompt (Safari on iPhone), the sheet's button shows the steps to add the site to the home screen.
 
@@ -141,6 +141,8 @@ export type Workspace = {
   setScope(scope: Scope): void;
   /** A passage id opens its source beside the chat with the passage marked; a resume entry id shows it in the resume. */
   openCitation(id: string, citationNumber: number): void;
+  /** The whole resume at its top: the Resume tab on wide screens, the full-height sheet on phones (row 81). */
+  openResume(): void;
   /** The latest answer's citations: their roles light up on the timeline and their highlights in the resume. */
   setCited(ids: string[]): void;
   /** "Ask about this" on a resume highlight or a passage; the chat takes the request and clears it. */
@@ -174,6 +176,7 @@ export function useWorkspace(): Workspace;
    - With 4× CPU slowdown and a slow 4G network: the largest content paint on `/` and `/resume` is under 2.5 s, and layout shift is under 0.1.
    - Selecting a role on the timeline shows it in the resume and sets the scope. `/?source=<id>&passage=<n>` opens the source with the passage marked. A reload restores the tab, the source, the passage and the scope.
    - The dark theme survives a reload, set on the page before its first paint.
+   - The resume view's ⋯ menu lists PDF, Word and Text, and each item fetches its document with a success status.
    - After one visit, with the network off, `/`, `/resume`, a source page and the PDF load with no page errors, and a design-system part is upgraded.
    - The service worker controls the page and the manifest is linked, so Chromium can install the site.
 
@@ -181,7 +184,7 @@ export function useWorkspace(): Workspace;
 
 - **Always:** take every fact from `resume.yaml` and `buildKnowledge()`. Build to the approved mockups. Keep every page readable without JavaScript. Use the glossary's words and SPEC-knowledge's ids. Run `bun run build`, `bun run build:site` and `bun test` before a commit.
 - **Ask first:** a dependency not named in this spec; a change from the approved mockups; the wording of the suggested questions; a change to the workspace contract, because the chat module depends on it; any request to a third party (fonts, analytics, scripts).
-- **Never:** put private details or a source's `Not public` text in any output. Add a list of sources to browse. Store anything about the visitor on a server. Server-render design-system parts. Add Node or Python tooling. Commit `dist/`.
+- **Never:** put private details or a source's `Not public` text in any output. Add a list of sources to browse. Store anything that identifies a visitor on a server (the chat's anonymous question log is [decision 0020](../docs/decisions/0020-anonymous-question-log.md)). Server-render design-system parts. Add Node or Python tooling. Commit `dist/`.
 
 ## User Stories
 
@@ -198,7 +201,7 @@ export function useWorkspace(): Workspace;
 11. As a visitor on a phone, I want to swipe the timeline, so that earlier roles stay reachable on a narrow screen.
 12. As a returning visitor, I want the site to reopen the source and role I left, so that I continue where I stopped.
 13. As a visitor in a private window, I want the site to work as a first visit, so that blocked storage never breaks it.
-14. As a visitor, I want to download the resume as PDF, Word or text, so that I can file it in my own system.
+14. As a visitor, I want to download the resume as PDF, Word or text from the resume itself, so that I can file it in my own system.
 15. As a visitor, I want light, dark or my system's theme, so that the site is comfortable to read.
 16. As a visitor who chose dark, I want no white flash on load, so that the choice feels kept.
 17. As a frequent visitor, I want to install the site as an app, so that it opens on its own from my home screen or dock.
@@ -216,9 +219,10 @@ export function useWorkspace(): Workspace;
 29. As the chat module, I want one workspace contract, so that I can scope questions, open citations and reset views without knowing the site's insides.
 30. As Peter, I want every page built from `resume.yaml` and the approved sources, so that the site never drifts from my documents.
 31. As Peter, I want private details and `Not public` text kept out of every output, so that nothing leaks through the site.
-32. As Peter, I want no visitor data on a server, so that the site respects visitors' privacy.
+32. As Peter, I want nothing that identifies a visitor on a server, so that the site respects visitors' privacy.
 33. As Peter, I want no third-party requests, so that the site works offline and leaks no visits.
 34. As a future agent, I want the build-output and browser tests to name what broke, so that I fix the cause.
+35. As the chat module, I want to open the whole resume beside the chat, so that a visitor who asks for the resume reads it at once.
 
 ## Out of scope
 

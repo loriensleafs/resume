@@ -88,10 +88,12 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 76 | (Peter, 2026-10-27) Specs before building? | All remaining specs first (site, chat, deploy, agents), then one rewritten plan; task 11 waits. Peter: "I feel like we should get all the specs, I think, done before the plans." The interviews can run at any time |
 | 77 | Should each source also get its own page (decision 0015's open choice)? | Pages for the resume and every approved source, at `/resume` and `/sources/<id>`, readable without JavaScript, with no list of sources. The recommendation was this option |
 | 78 | Approve SPEC-site.md? | Approved, with the calls named in the question: the chat column's contents belong to SPEC-chat behind one workspace contract; saved views in IndexedDB through TanStack DB, the theme kept apart; one column below 1024 px with sheets, one source tab at a time; the install offer's rules; self-hosted fonts and no third-party requests; no update prompt; suggested questions in one file that Peter approves; the named dependencies |
+| 79 | Should the chat keep a record of the questions visitors ask? | Keep an anonymous log: question text, the answer's citations, and a refusal or error flag, with no identity ([decision 0020](../decisions/0020-anonymous-question-log.md)). The recommendation was this option |
+| 80 | When a visitor pastes a job description, should the chat check it against Peter's record? | Peter first answered "/wait-what": the question had no example. Asked again with a concrete example: yes, add the fit check. The recommendation was this option. SPEC-chat defines it |
+| 81 | When a visitor asks for the resume itself, what does the answer show? | First "Show the resume card" (the recommendation). Then Peter: "Or should it return the resume? So the person can read it. So instead of displaying like a part of the resume from the timeline, displays the whole thing. With, I don't know, three dot action button in the top right hand corner or something for them to download it." Settled: the chat opens the whole resume beside the chat (the Resume tab at its top; on phones the full-height resume sheet), and the answer holds a short line and a card that opens it again. The resume view gets a ⋯ menu with PDF, Word and Text wherever it appears. The recommendation was this option |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
 ## Still open
 
-- The site's visual design: Peter's review of the mockups.
 - Buying the domains (question 31): Peter buys them.
