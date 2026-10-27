@@ -26,9 +26,20 @@ const INPUT_FILES = [
 ];
 
 // Only this module's own packages, so a change to another module's packages needs no rebuild.
-const LOCKED_PACKAGES = ["docx", "harfbuzzjs", "zod"];
+export const LOCKED_PACKAGES = ["docx", "harfbuzzjs", "zod"];
 
 const sha256 = (data: string | Uint8Array) => new Bun.CryptoHasher("sha256").update(data).digest("hex");
+
+/** The files the inputs hash covers, as paths from the repo root. */
+export async function inputFiles(): Promise<string[]> {
+  const paths = new Set<string>();
+  for (const pattern of INPUT_FILES) {
+    for await (const path of new Bun.Glob(pattern).scan({ cwd: REPO, onlyFiles: true })) {
+      if (!path.split("/").includes("__tests__")) paths.add(path);
+    }
+  }
+  return [...paths];
+}
 
 /**
  * The inputs hash, as documents/inputs.sha256 holds it: one `<sha256>  <name>` line per input
@@ -37,11 +48,7 @@ const sha256 = (data: string | Uint8Array) => new Bun.CryptoHasher("sha256").upd
  */
 export async function inputsHash(): Promise<string> {
   const hashes = new Map<string, string>();
-  for (const pattern of INPUT_FILES) {
-    for await (const path of new Bun.Glob(pattern).scan({ cwd: REPO, onlyFiles: true })) {
-      if (!path.split("/").includes("__tests__")) hashes.set(path, sha256(await Bun.file(`${REPO}/${path}`).bytes()));
-    }
-  }
+  for (const path of await inputFiles()) hashes.set(path, sha256(await Bun.file(`${REPO}/${path}`).bytes()));
   const lock = Bun.JSONC.parse(await Bun.file(`${REPO}/bun.lock`).text()) as { packages: Record<string, unknown> };
   for (const name of LOCKED_PACKAGES) {
     const entry = lock.packages[name];
