@@ -4,7 +4,7 @@ Approved by Peter on 2026-10-27 (decision record row 127), with the amendments t
 
 Corrected on 2026-10-27 after the reviews of the other specs (decision record rows 128 to 136). Approved by Peter with the updated mockups on 2026-10-27 (decision record row 139); the scope label and the texts follow rows 137 and 138.
 
-Amended on 2026-10-27: Peter's standing approval covers every push, releases and the deploy spike's pushes included (decision record row 151).
+Amended on 2026-10-27 for Peter's standing approval (decision record row 151): which pushes need him is in [AGENTS.md](../AGENTS.md), "Releases and approvals".
 
 ## Objective
 
@@ -119,7 +119,7 @@ README.md
 
 A small window remains: a site change pushed during step 5 can let the older deployment take the domains after the newer one. The GitHub health check then finds the live commit behind `main` and fails.
 
-A push of site changes to `main` is a release. Peter's standing approval covers every push, releases included (row 151), so agents push once the before-commit checks pass, and follow the `release` skill. [AGENTS.md](../AGENTS.md) carries this rule and points to `scripts/docs-only.txt` ([SPEC-agents](SPEC-agents.md)).
+A push of site changes to `main` is a release. [AGENTS.md](../AGENTS.md), "Releases and approvals", says which pushes need Peter (row 151), sends every push to `main` through the `release` skill, and points to `scripts/docs-only.txt` ([SPEC-agents](SPEC-agents.md)).
 
 **Rollback.** Instant Rollback in the dashboard moves the domains back in seconds, and turns domain auto-assignment off. While it is off, passing deployments do not go live, and the GitHub health check reports the lag. After the fix's deployment passes its checks, Peter selects "Undo Rollback" and chooses that deployment. That makes it live and turns auto-assignment on again. `docs/runbooks/rollback.md` has the steps and ends with a check that the next release goes live without help.
 
@@ -556,7 +556,7 @@ Peter does these steps once, in this order, so that the chat never runs in produ
 The plan's first task, before any production code. A local build cannot answer these questions; a throwaway deployment can.
 
 - **Setup.** Peter creates a second Vercel project in his Pro team from the branch `prototype/deploy-spike`, with no domains and no Anthropic key, and a pay-as-you-go Upstash database for it. The spike costs cents beyond the Pro plan.
-- **Approval.** Each push to that project deploys. Peter's standing approval covers each one (row 151), so the agent pushes once the checks pass.
+- **Approval.** Each push to that project deploys. Its pushes follow [AGENTS.md](../AGENTS.md), "Releases and approvals" (row 151), and each runs the `release` skill's private-detail check first.
 - **Throwaway.** The spike code stays on its branch (brain's prototype rules); its verdicts go into research 12 and, where they change a rule, into this spec. Peter removes the project afterwards.
 
 | # | Check | If it fails |
@@ -616,7 +616,7 @@ Approving this spec approves these amendments:
   - `bun run documents` (`scripts/documents.ts`) writes the public documents to `documents/`, with `documents/inputs.sha256`; the document test above checks them. SPEC-content lists the script, the folder and the test, and defines the hash's inputs.
   - The line "`bun run build --public` (the website and CI use this)" changes: the website uses the committed `documents/`, and CI runs `bun run build` to check that the documents still build.
 - **SPEC-agents** (approved 2026-10-27, row 142) carries these into `AGENTS.md`:
-  - AGENTS.md: a push that changes a site file (a path not in `scripts/docs-only.txt`) is a release; Peter's standing approval covers it (row 151).
+  - AGENTS.md: a push that changes a site file (a path not in `scripts/docs-only.txt`) is a release, and its "Releases and approvals" says which pushes need Peter (row 151).
   - AGENTS.md, Verify: `bun run build`, `bun run build:site` and `bun test` before every commit.
   - `bun run smoke`, `bun run documents` and the runbooks join the commands.
   - The edit-resume skill runs `bun run documents` and checks the committed PDF's page count.

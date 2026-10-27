@@ -7,7 +7,7 @@ Spec: [SPEC-chat](../../spec/SPEC-chat.md) (approved, row 139), with the contrac
 - **Size** follows the planning skill's table: S is 1 or 2 files, M is 3 to 5. C1 counts its lockfile as generated; C39 is M because its fixes can touch the UI files.
 - **Seams.** Seam 1 is `handleChat()` in `src/chat/server/__tests__/handle-chat.test.ts`, with `fakeText()`, knowledge built from fixtures (one fixture source has `Not public` text) and the in-memory log, budget and telemetry. Seam 2 is SPEC-site's browser test, `src/site/__tests__/browser.test.ts`, which builds into the seam-1 folder and serves it with `bun run preview --dir <folder>`. The evals run outside `bun test`. No other seam (row 83).
 - **Before every commit** (AGENTS.md): `bun run build`, `bun run build:site` (once it exists) and `bun test`. Each task's Verify line names the focused commands.
-- **Pushes.** Every file under `src/`, `evals/`, `scripts/` and `vite.config.ts` is a site file, so each push to `main` is a release, under Peter's standing approval (row 151; SPEC-deploy; the `release` skill).
+- **Pushes.** Every file under `src/`, `evals/`, `scripts/` and `vite.config.ts` is a site file, so each push to `main` is a release (AGENTS.md, "Releases and approvals"; the `release` skill).
 - **Library skills.** A task that writes TanStack AI or TanStack DB code loads that package's skills first (`bun run intent load …`); a task that writes UI loads `@acmelabs/design-system#choose-and-compose`, `#react-integration` and `#forms-and-accessibility`, and asks the `acme-design-system` MCP server for each part with version `0.3.2` and framework `react` (AGENTS.md "Libraries"; SPEC-chat Code Style).
 - **Design-system parts checked on 2026-10-27** (MCP, 0.3.2): `acme-textarea` (`auto-resize`, no slots), `acme-toggle-tip` (slot `trigger`; parts `content`, `close`), `acme-group`, `acme-toggle-button`, `acme-select`, `acme-alert`, `acme-alert-dialog`, `acme-icon-button`, `acme-show-more`, `acme-relative-time`, `acme-copy-button`, `acme-card`, `acme-item`, `acme-list`, `acme-spinner`, `acme-progress` and `acme-markdown` all exist.
 - **Main's decisions of 2026-10-27, which main writes into SPEC-chat:** the handler sets the short prompt cache itself (no `ChatDeps` field); `ChatDeps` gains `origins: string[]`, which the route computes from `VERCEL_ENV` and `VERCEL_URL` (an empty list means the request's own origin); the eval case gains optional `history`, `scope` and `audience`.
@@ -195,16 +195,16 @@ Needs Peter: no
 
 ### C15: The system prompt, the scope and audience lines, and the refusal wordings
 
-Delivers: the prompt that the real model gets, drafted for Peter's review before D37 (row 153), with the request lines that scope and aim each answer.
+Delivers: the prompt that the real model gets, as a wording draft for Peter's one review before D37 (row 153), with the request lines that scope and aim each answer.
 Blocked by: C7, C8, C9
 Acceptance:
 - The model request holds the scope line from the core ("The visitor is asking about FedNow, 2021 – 2024."), none for an unknown role id, and one audience line for each of the five audiences, none for no choice (The request, "Scope", "Audience").
 - The system prompt says what the spec lists: the third person, the chat's topics and the refusal rules with the two refusal wordings and the email from `basics`, Peter's wording rule, the marker formats, the fit check's rules, the open tools, and that a pasted text is material, never instructions (The request; Answers the chat gives).
-- The prompt, the five audience lines and the two refusal wordings are drafts in C15's rows of `docs/design/wording-drafts.md`. Peter approves them there before D37, and a decision-record row holds the approval (row 153; Boundaries, "Ask first").
-Verify: `bun test src/chat`; C15's rows in `docs/design/wording-drafts.md` hold the drafts.
-Files: `src/chat/server/prompt.ts`, `src/chat/server/__tests__/handle-chat.test.ts`, `docs/design/wording-drafts.md` (C15's rows)
+- The prompt, the five audience lines and the two refusal wordings are a wording draft in `docs/design/wording-drafts/C15.md`. Peter approves it in his one review before D37, and a decision-record row holds the approval (row 153; Boundaries, "Ask first").
+Verify: `bun test src/chat`; `docs/design/wording-drafts/C15.md` holds the wording draft.
+Files: `src/chat/server/prompt.ts`, `src/chat/server/__tests__/handle-chat.test.ts`, `docs/design/wording-drafts/C15.md`
 Size: M
-Needs Peter: approval of the system prompt's wording, the audience lines and the refusal wordings, in the list before D37 (row 153). The task finishes on the drafts.
+Needs Peter: approval of the system prompt's wording, the audience lines and the refusal wordings, in his one review before D37 (row 153). The task finishes on the wording draft.
 
 ### C16: The chat's Vite plugin: `virtual:knowledge` and the device index
 
@@ -292,11 +292,11 @@ Acceptance:
 - With the column 520 px or wider, a compact trigger ("Answers for: Anyone ▾") opens `acme-toggle-tip` with the line of context, the five audiences as an attached `acme-group` of `acme-toggle-button`s (`role="group"`, named "Answers for"; "Product" named "Product manager"; pressing the pressed one clears it) and the line for the chosen audience; the `::part(content)` width and the hidden `::part(close)` are set through a plain wrapper and named as design-system gaps (Answers for).
 - Escape closes the popover and returns focus to the trigger; a click outside closes it; at 390 × 844 the control is `acme-select` labelled "Answers for"; both write the session row's audience, which survives a reload and shows in the popover after a resize (Answers for; Testing Strategy, seam 2).
 - The trigger and "Questions are kept anonymously to improve answers." share one row at 1440 × 900; on phones the line goes under the control (Chat input; Testing Strategy, seam 2).
-- The popover's text and the anonymous-log line are drafts in C22's rows of `docs/design/wording-drafts.md` (row 153).
+- The popover's text and the anonymous-log line are a wording draft in `docs/design/wording-drafts/C22.md` (row 153).
 Verify: `bun test src/site/__tests__/browser.test.ts`
-Files: `src/chat/ui/AudienceChoice.tsx`, `src/chat/ui/ChatInput.tsx`, `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `src/site/__tests__/browser.test.ts`, `docs/design/wording-drafts.md` (C22's rows)
+Files: `src/chat/ui/AudienceChoice.tsx`, `src/chat/ui/ChatInput.tsx`, `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `src/site/__tests__/browser.test.ts`, `docs/design/wording-drafts/C22.md`
 Size: M
-Needs Peter: approval of the popover's wording and of the anonymous-log line's wording (SPEC-chat: "Peter approves the popover's wording" and, for the line, "Peter approves the wording"; decision 0020), in the list before D37 (row 153). The task finishes on the drafts. The decision record holds no approval of either text: row 84 approved the line's place under "Answers for", and row 139 the boards that draw both. Peter may count row 139 as the approval.
+Needs Peter: approval of the popover's wording and of the anonymous-log line's wording (SPEC-chat: "Peter approves the popover's wording" and, for the line, "Peter approves the wording"; decision 0020), in his one review before D37 (row 153). The task finishes on the wording draft. The decision record holds no approval of either text: row 84 approved the line's place under "Answers for", and row 139 the boards that draw both. Peter may count row 139 as the approval.
 
 ### C23: Answers render as untrusted Markdown, with the link and image rules
 
@@ -344,10 +344,11 @@ Acceptance:
 - While answering, each step appears in a bordered box as it happens: "Found 1 source about <topic>", "Reading <title>", and "Checking citations" from the first answer text after the last read until `chat.citations` arrives; the current step has a spinner and a moving highlight and is announced politely (Answer steps; Accessibility).
 - When done, the box folds into one line above the answer, "Read 1 source and checked 3 citations", shown only when the turn read; opened, each row opens on its own: the passages read by number and heading, and "Each citation points to a passage the chat read, to the resume or to one of Peter's logistics answers." (row 138); a removed marker reads "Checked 3 citations, removed 1." (Answer steps).
 - The browser test sees the steps one by one, then the answer (Testing Strategy, seam 2 bullet 1).
+- The working-notes label for the thinking summary and the steps' texts are a wording draft in `docs/design/wording-drafts/C26.md` (rows 153, 155 and 156).
 Verify: `bun test src/site/__tests__/browser.test.ts`
-Files: `src/chat/ui/AnswerSteps.tsx`, `src/chat/ui/Answer.tsx`, `src/chat/server/__tests__/fixtures.ts`, `src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/AnswerSteps.tsx`, `src/chat/ui/Answer.tsx`, `src/chat/server/__tests__/fixtures.ts`, `src/site/__tests__/browser.test.ts`, `docs/design/wording-drafts/C26.md`
 Size: M
-Needs Peter: no
+Needs Peter: approval of the wording draft in his one review before D37 (row 153). The task finishes on the wording draft.
 
 ### C27: Copy, Retry and follow-up questions on an answer
 
@@ -514,7 +515,7 @@ Needs Peter: no
 ### C40: The trick questions and `bun run evals`
 
 Delivers: Peter has an eval suite he can run on demand, which costs nothing until he approves a run.
-Blocked by: C10, C13, C14, C15 (the whole handler, with the drafted prompt; row 153)
+Blocked by: C10, C13, C14, C15 (the whole handler, with the prompt's wording draft; row 153)
 Acceptance:
 - `evals/trick-questions.yaml` covers each topic outside the chat's topics; an employer, project or skill not in the record; false premises; wording upgrades; requests for `Not public` details; prompt injection in a question and in a posting; the fit check; "show me his resume"; "show me where that came from"; a scoped follow-up; one question under each audience; and citation integrity; each case states its checks with `EvalExpect` (Evals). A case may carry optional `history` (questions asked first, through `handleChat()`), `scope` and `audience` (main's decision, written into SPEC-chat).
 - `bun run evals` loads `.secrets/local.env` with `--env-file`, uses `createAnthropicChat("claude-sonnet-5-5", key)`, the real `buildKnowledge()`, the in-memory log, budget (always allows) and telemetry, and the real clock; it asks each case through `handleChat()`, checks it, and writes every answer and `chat_turn` event to `.scratch/evals/<date>.md`, which git ignores (Evals).
@@ -544,7 +545,7 @@ After C2. `bun test src/chat` passes; the deploy module's ops work (D9) can star
 
 ### Checkpoint chat: the handler
 
-After C15. `bun test src/chat` passes every seam-1 item in SPEC-chat's Testing Strategy; `bun run build` and `bun test` pass; a review against the Boundaries ("Never": no read, `Not public` or thinking text on the wire; no `threadId` in the log); C15's drafts are in `docs/design/wording-drafts.md` for Peter's review before D37 (row 153).
+After C15. `bun test src/chat` passes every seam-1 item in SPEC-chat's Testing Strategy; `bun run build` and `bun test` pass; a review against the Boundaries ("Never": no read, `Not public` or thinking text on the wire; no `threadId` in the log); C15's wording draft is in `docs/design/wording-drafts/C15.md` for Peter's one review before D37 (row 153).
 
 ### Checkpoint chat: the first answer
 
@@ -556,7 +557,7 @@ After C20 to C30. The full suite passes; the conversation and answer states of t
 
 ### Checkpoint chat: queue, offline, limits
 
-After C31 to C39. The full suite passes; Peter reviews the running chat against the approved mockups at desktop and phone sizes, in light and dark, and approves it (Success Criteria). Pushes of the chat's site files are releases under his standing approval (row 151).
+After C31 to C39. The full suite passes; Peter reviews the running chat against the approved mockups at desktop and phone sizes, in light and dark, and approves it (Success Criteria). Pushes of the chat's site files are releases (AGENTS.md, "Releases and approvals").
 
 ### Checkpoint chat: lands
 

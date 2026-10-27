@@ -25,7 +25,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] The test move: tests go to `__tests__/` folders beside the code they test ([decision 0025](../docs/decisions/0025-tests-beside-code.md), row 144). The existing test files and snapshots move with `git mv`; the specs, the plan and the task files name the new paths; `AGENTS.md`'s Code section names the rule; `bun test` runs the same 43 tests — blocked by none; Peter: approve the amended specs, plan and task files (approved 2026-10-27, row 145)
 - [x] [A1](modules/agents.md#a1-agentsmd-routes-by-module-and-carries-the-approval-rules) `AGENTS.md` routes by module and carries the approval rules — blocked by the test move
 - [x] [A2](modules/agents.md#a2-the-release-repo-skill) The `release` repo skill — blocked by A1
-- [ ] [Checkpoint agents: before the first release](modules/agents.md#checkpoint-agents-before-the-first-release) — after A1, A2; Peter: read the new Modules and Releases and approvals sections before T1's push
+- [ ] [Checkpoint agents: before the first release](modules/agents.md#checkpoint-agents-before-the-first-release) — after A1, A2; Peter: read the new Modules and Releases and approvals sections; no task waits for it ([plan](plan.md), "Running the plan")
 - [x] [K1](modules/knowledge.md#k1-the-id-grammar-in-one-module) The id grammar in one module — blocked by none (done 2026-10-27; Peter added the id grammar's own test seam, row 146)
 - [ ] [C1](modules/chat.md#c1-install-the-chats-packages-and-check-spec-chats-tanstack-ai-names) Install the chat's packages and check SPEC-chat's TanStack AI names — blocked by none; Peter: approve a SPEC-chat amendment, only if a TanStack AI name differs
 - [x] [C2](modules/chat.md#c2-the-question-log-budget-and-telemetry-contracts-with-the-contract-suite) The question log, budget and telemetry contracts, with the contract suite — blocked by none (done 2026-10-27)
@@ -46,7 +46,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [A3](modules/agents.md#a3-every-agent-reaches-the-docs-server-and-gemini-cli-reads-agentsmd) Every agent reaches the docs server, and Gemini CLI reads `AGENTS.md` — blocked by A1
 - [ ] [A4](modules/agents.md#a4-the-agent-files-checks-cover-links-scripts-and-private-details-everywhere) The agent files' checks cover links, scripts and private details everywhere — blocked by A1 (runs after A3: same test file)
 - [ ] [A6](modules/agents.md#a6-the-update-mockups-repo-skill) The `update-mockups` repo skill — blocked by A2
-- [ ] [T1](modules/content.md#t1-each-role-has-its-short-label-x-short) Each role has its short label (`x-short`) — blocked by none; Peter: the nine `x-short` labels and the apostrophe are a draft; he approves them in the list before D37 (row 153)
+- [ ] [T1](modules/content.md#t1-each-role-has-its-short-label-x-short) Each role has its short label (`x-short`) — blocked by none; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [T2](modules/content.md#t2-bun-run-documents-writes-the-committed-public-documents-and-their-inputs-hash) `bun run documents` writes the committed public documents and their inputs hash — blocked by none (T1 first is preferred)
 - [ ] [T3](modules/content.md#t3-the-documents-test-checks-the-committed-files-against-a-fresh-build) The documents test checks the committed files against a fresh build — blocked by T2
 - [ ] [A5](modules/agents.md#a5-edit-resume-covers-the-short-labels-and-the-committed-documents) `edit-resume` covers the short labels and the committed documents — blocked by T1, T2, A2
@@ -84,13 +84,13 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [C12](modules/chat.md#c12-the-stub-anthropic-client-anthropics-limit-max_tokens-and-the-thinking-settings) The stub Anthropic client: Anthropic's limit, `max_tokens` and the thinking settings — blocked by C11
 - [ ] [C13](modules/chat.md#c13-the-120-second-deadline) The 120-second deadline — blocked by C12
 - [ ] [C14](modules/chat.md#c14-turn-telemetry-summed-usage-and-one-chat_turn-event-per-turn) Turn telemetry: summed usage and one `chat_turn` event per turn — blocked by C4, C12
-- [ ] [C15](modules/chat.md#c15-the-system-prompt-the-scope-and-audience-lines-and-the-refusal-wordings) The system prompt, the scope and audience lines, and the refusal wordings — blocked by C7 to C9; Peter: the system prompt, the five audience lines and the two refusal wordings are a draft; he approves them in the list before D37 (row 153)
+- [ ] [C15](modules/chat.md#c15-the-system-prompt-the-scope-and-audience-lines-and-the-refusal-wordings) The system prompt, the scope and audience lines, and the refusal wordings — blocked by C7 to C9; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [Checkpoint chat: the handler](modules/chat.md#checkpoint-chat-the-handler) — after C3 to C15
 - [ ] [S3](modules/site.md#s3-the-resume-view-from-build-time-data-with-knowledge-ids) The resume view from build-time data, with knowledge ids — blocked by S2, K1
 - [ ] [S4](modules/site.md#s4-the-app-bar-and-design-system-parts-in-prerendered-pages) The app bar, and design-system parts in prerendered pages — blocked by S3
 - [ ] [S5](modules/site.md#s5-the-static-not-found-page) The static not-found page — blocked by S4
 - [ ] [S6](modules/site.md#s6-page-titles-descriptions-canonical-addresses-and-share-previews) Page titles, descriptions, canonical addresses and share previews — blocked by S3
-- [ ] [S7](modules/site.md#s7-google-sans-flex-served-from-the-site-itself) Google Sans Flex served from the site itself — blocked by S4; Peter: the font format is a draft (WOFF, which needs no new package); he approves it in the list before D37 (row 153)
+- [ ] [S7](modules/site.md#s7-google-sans-flex-served-from-the-site-itself) Google Sans Flex served from the site itself — blocked by S4; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [S8](modules/site.md#s8-seam-1-runs-the-build-script) Seam 1 runs the build script — blocked by S2 to S7, D16
 - [ ] [Checkpoint site: the build output](modules/site.md#checkpoint-site-the-build-output) — after S1 to S8, D16; Peter: look at `/` and `/resume` in `bun run dev`
 - [ ] [K11](modules/knowledge.md#k11-move-three-deep-dives-to-sources-fednow-architecture-fednow-bundle-size-fednow-design-system) Move three deep dives to sources: `fednow-architecture`, `fednow-bundle-size`, `fednow-design-system` — blocked by K5 to K7 and Peter's approval; Peter: approve the three summaries and the moved files
@@ -106,11 +106,11 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [D10](modules/deploy.md#d10-the-question-log-in-upstash-deleted-by-the-store-after-90-days) The question log in Upstash, deleted by the store after 90 days — blocked by D9, D6
 - [ ] [S9](modules/site.md#s9-the-preview-and-the-real-browser-test) The preview and the real-browser test — blocked by S8, D17
 - [ ] [S10](modules/site.md#s10-the-career-timeline-band) The career timeline band — blocked by S9, T1
-- [ ] [S11](modules/site.md#s11-the-workspace-and-its-first-view-on-wide-screens) The workspace and its first view on wide screens — blocked by S10; Peter: the overall suggested questions are a draft; he approves them in the list before D37 (row 153)
+- [ ] [S11](modules/site.md#s11-the-workspace-and-its-first-view-on-wide-screens) The workspace and its first view on wide screens — blocked by S10; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [S12](modules/site.md#s12-the-head-script) The head script — blocked by S11, D16
 - [ ] [S13](modules/site.md#s13-the-theme-switch) The theme switch — blocked by S12
 - [ ] [S14](modules/site.md#s14-the-workspace-contract-and-the-scope-from-the-career-timeline) The workspace contract, and the scope from the career timeline — blocked by S11
-- [ ] [S15](modules/site.md#s15-the-first-view-names-the-selected-role) The first view names the selected role — blocked by S14; Peter: each role's suggested questions are a draft; he approves them in the list before D37 (row 153)
+- [ ] [S15](modules/site.md#s15-the-first-view-names-the-selected-role) The first view names the selected role — blocked by S14; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [S16](modules/site.md#s16-source-pages) Source pages — blocked by S6, S8, K3, K5, K9
 - [ ] [S17](modules/site.md#s17-passage-text-as-markdown) Passage text as Markdown — blocked by S16, S13
 - [ ] [S18](modules/site.md#s18-a-source-opens-in-the-document-panel-from-its-address) A source opens in the document panel from its address — blocked by S14, S16
@@ -131,11 +131,11 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [Checkpoint chat: the first answer](modules/chat.md#checkpoint-chat-the-first-answer) — after C16 to C19, S31; Peter: try the first answer in the preview
 - [ ] [C20](modules/chat.md#c20-the-saved-conversation-one-row-per-message-restored-before-the-first-render) The saved conversation: one row per message, restored before the first render — blocked by C19, S12, S14, S21
 - [ ] [C21](modules/chat.md#c21-the-scope-and-about-chips-each-question-keeps-its-own-request) The scope and About chips; each question keeps its own request — blocked by C20, S14, S18, S20
-- [ ] [C22](modules/chat.md#c22-answers-for-the-popover-on-wide-columns-the-select-on-phones-and-the-anonymous-log-line) "Answers for": the popover on wide columns, the select on phones, and the anonymous-log line — blocked by C21; Peter: the popover's wording and the anonymous-log line's wording are a draft; he approves them in the list before D37 (row 153)
+- [ ] [C22](modules/chat.md#c22-answers-for-the-popover-on-wide-columns-the-select-on-phones-and-the-anonymous-log-line) "Answers for": the popover on wide columns, the select on phones, and the anonymous-log line — blocked by C21; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [C23](modules/chat.md#c23-answers-render-as-untrusted-markdown-with-the-link-and-image-rules) Answers render as untrusted Markdown, with the link and image rules — blocked by C18, C16
 - [ ] [C24](modules/chat.md#c24-kept-citations-as-numbered-buttons-numbered-per-answer) Kept citations as numbered buttons, numbered per answer — blocked by C23, S14, S18
 - [ ] [C25](modules/chat.md#c25-the-citations-card) The citations card — blocked by C24
-- [ ] [C26](modules/chat.md#c26-the-answer-steps) The answer steps — blocked by C23
+- [ ] [C26](modules/chat.md#c26-the-answer-steps) The answer steps — blocked by C23; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [C27](modules/chat.md#c27-copy-retry-and-follow-up-questions-on-an-answer) Copy, Retry and follow-up questions on an answer — blocked by C25, C22
 - [ ] [C28](modules/chat.md#c28-the-resume-card-and-the-open-tools-in-a-live-stream) The resume card, and the open tools in a live stream — blocked by C24, S3, S14
 - [ ] [C29](modules/chat.md#c29-question-actions-and-long-questions) Question actions and long questions — blocked by C27
@@ -156,9 +156,9 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [Checkpoint site: phones, offline, install](modules/site.md#checkpoint-site-phones-offline-install) — after S23 to S30; Peter: review the preview at 390 × 844
 - [ ] [D11](modules/deploy.md#d11-the-daily-cap-holds-under-parallel-requests) The daily cap holds under parallel requests — blocked by D10
 - [ ] [D12](modules/deploy.md#d12-daily-totals-and-the-cost-estimate) Daily totals and the cost estimate — blocked by D11
-- [ ] [D13](modules/deploy.md#d13-limit-alerts-for-the-months-spend-and-the-daily-cap) Limit alerts for the month's spend and the daily cap — blocked by D12; Peter: the `daycap` push text is a draft; he approves it in the list before D37 (row 153)
-- [ ] [D14](modules/deploy.md#d14-the-monthly-limit-pauses-the-chat-and-one-probe-an-hour) The monthly limit pauses the chat, and one probe an hour — blocked by D13; Peter: the `spendlimit` push text is a draft; he approves it in the list before D37 (row 153)
-- [ ] [D15](modules/deploy.md#d15-a-failing-or-slow-store-never-breaks-an-answer) A failing or slow store never breaks an answer — blocked by D13; Peter: the `storefail` push text is a draft; he approves it in the list before D37 (row 153)
+- [ ] [D13](modules/deploy.md#d13-limit-alerts-for-the-months-spend-and-the-daily-cap) Limit alerts for the month's spend and the daily cap — blocked by D12; Peter: its wording draft goes to his one review before D37 (row 153)
+- [ ] [D14](modules/deploy.md#d14-the-monthly-limit-pauses-the-chat-and-one-probe-an-hour) The monthly limit pauses the chat, and one probe an hour — blocked by D13; Peter: its wording draft goes to his one review before D37 (row 153)
+- [ ] [D15](modules/deploy.md#d15-a-failing-or-slow-store-never-breaks-an-answer) A failing or slow store never breaks an answer — blocked by D13; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [Checkpoint deploy: the ops write side](modules/deploy.md#checkpoint-deploy-the-ops-write-side) — after D9 to D15
 - [ ] [D22](modules/deploy.md#d22-health-runs-and-the-status-in-the-ops-module) Health runs and the status in the ops module — blocked by D15
 - [ ] [D29](modules/deploy.md#d29-the-reservation-covers-the-worst-case-turn) The reservation covers the worst-case turn — blocked by D11, C15, K3; Peter: decide only if the worst case reaches $0.90
@@ -186,7 +186,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [C41](modules/chat.md#c41-the-first-approved-eval-run-and-peters-review) The first approved eval run, and Peter's review — blocked by C40, D8 and Peter's `resume-evals` key in `.secrets/local.env`; Peter: approve each eval run (it costs money) and review its answers
 - [ ] [Checkpoint chat: lands](modules/chat.md#checkpoint-chat-lands) — after C40, C41, S32 to S36; Peter: read the fresh-session result
 - [ ] [D23](modules/deploy.md#d23-the-status-route) The status route — blocked by D21, D22
-- [ ] [D24](modules/deploy.md#d24-the-vercel-health-job) The Vercel health job — blocked by D23, D12; Peter: the `health` push text is a draft; he approves it in the list before D37 (row 153)
+- [ ] [D24](modules/deploy.md#d24-the-vercel-health-job) The Vercel health job — blocked by D23, D12; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [D27](modules/deploy.md#d27-the-smoke-checks-production-checks-and-the-protection-bypass) The smoke check's production checks and the protection bypass — blocked by D21, D23, D6
 - [ ] [Checkpoint deploy: the smoke check](modules/deploy.md#checkpoint-deploy-the-smoke-check) — after D21 to D27
 - [ ] [D28](modules/deploy.md#d28-bun-run-questions-reads-the-question-log-and-the-daily-totals) `bun run questions` reads the question log and the daily totals — blocked by D12, D6; Peter: put the read-only token in `.secrets/local.env` for the manual check
@@ -203,8 +203,8 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [D36](modules/deploy.md#d36-runbooks-for-the-store-health-and-release-alerts) Runbooks for the store, health and release alerts — blocked by D32, D33; Peter: review and approve the runbooks
 - [ ] [Checkpoint deploy: setup list and runbooks](modules/deploy.md#checkpoint-deploy-setup-list-and-runbooks) — after D34 to D36; Peter: approve them
 - [ ] Peter: setup steps 1 to 11 of `docs/runbooks/setup.md`, in order: the domains bought, ntfy, the Anthropic workspaces, Vercel Pro and the import, the toolbar and protection, Upstash, the WAF rules, the spend budget, the Actions secrets, Deployment Checks (spike check 12), the domains added — after D34; blocks D37 (done 2026-10-27: step 1, the three domains bought; step 4's Pro sign-up; step 5's toolbar setting; step 8's budget)
-- [ ] Peter: approve the wording drafts in `docs/design/wording-drafts.md` in one sitting (row 153) — after T1, C15, S7, S11, S15, C22, D13 to D15 and D24 have written their drafts; blocks D37
-- [ ] [D37](modules/deploy.md#d37-setup-step-11-the-vercelapp-address-the-first-release) Setup step 11: the `.vercel.app` address, the first release — blocked by D17, D32 to D34, A2, Peter's setup steps 1 to 11 and his approval of the wording drafts; Peter: confirm that the release's push reaches his phone
+- [ ] Peter: one review before D37: the wording drafts that `docs/design/wording-drafts.md` lists (row 153), and any checkpoint review still open ([plan](plan.md), "Running the plan") — after every task in that index has written its wording draft; blocks D37
+- [ ] [D37](modules/deploy.md#d37-setup-step-11-the-vercelapp-address-the-first-release) Setup step 11: the `.vercel.app` address, the first release — blocked by D17, D32 to D34, A2, Peter's setup steps 1 to 11 and his one review before D37; Peter: confirm that the release's push reaches his phone
 - [ ] [Checkpoint agents: the first release follows the release skill](modules/agents.md#checkpoint-agents-the-first-release-follows-the-release-skill) — after D37
 - [ ] Peter: setup step 12: `ANTHROPIC_API_KEY`, then Redeploy with "Use project's Ignore Build Step" unchecked — after D37; blocks D38
 - [ ] [D38](modules/deploy.md#d38-setup-step-13-production-passes-its-checks) Setup step 13: production passes its checks — blocked by D37 and Peter's setup step 12; Peter: run the Vercel health job by hand; ask the live chat one question; read the fresh-session result

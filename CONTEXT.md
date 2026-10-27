@@ -144,6 +144,10 @@ _Avoid_: retrieval, lookup, search
 The record shown with an answer of what the chat did for it: the sources it found and read, and the citations it checked.
 _Avoid_: thinking, reasoning, trace
 
+**Thinking summary**:
+Anthropic's summary of the model's thinking for one model call, shown in the answer steps as the chat's working notes, and never sent back to the server (rows 155 and 156).
+_Avoid_: thoughts, reasoning, chain of thought
+
 **Fit check**:
 The chat's answer to a pasted job description: each requirement with what Peter's record shows and its citations, or "not in Peter's record", and no verdict on fit.
 _Avoid_: job match, fit score
@@ -215,6 +219,18 @@ _Avoid_: "interview" alone (an interview is a source), interview notes, transcri
 **Standing approval**:
 Peter's approval, given once, that covers every push, releases included (row 151). It does not cover a force-push or the other approvals `AGENTS.md` lists.
 _Avoid_: blanket approval, auto-approve
+
+**Conductor**:
+The session that runs `/brain:build auto`: it starts each task's sub-agent, runs the reviews, merges, and asks Peter.
+_Avoid_: orchestrator
+
+**Lane**:
+One task building in its own git worktree; up to 3 build at once (row 150).
+_Avoid_: slot, worker
+
+**Wording draft**:
+A text that Peter has not approved yet, written by a task from the mockups and the spec (row 153).
+_Avoid_: "draft" alone, which the glossary keeps out for a queued question
 
 **Agent files**:
 What a coding agent reads to work on this project: the shared instructions, each agent's own entry file and settings, and the repo skills. They are not site files.

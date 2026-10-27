@@ -19,12 +19,12 @@ It documents the other five modules; no module depends on it ([capability map](R
 Acceptance criteria:
 
 - `AGENTS.md` routes by module: one table names each module's spec, its folders, its test command and whether it is built. It repeats no spec. It stays at 120 lines or fewer.
-- `AGENTS.md` carries the rules the specs hand to the agent files: a push that changes a site file is a release, and Peter's standing approval covers every push except a force-push (row 151; [SPEC-deploy](SPEC-deploy.md)); the before-commit checks; `bun run evals` only with Peter's approval ([SPEC-chat](SPEC-chat.md)); an approved source changes only after Peter approves the change ([SPEC-knowledge](SPEC-knowledge.md), row 130).
+- `AGENTS.md` carries the rules the specs hand to the agent files: a push that changes a site file is a release, and Peter's standing approval with its exceptions (row 151; [SPEC-deploy](SPEC-deploy.md)); the before-commit checks; `bun run evals` only with Peter's approval ([SPEC-chat](SPEC-chat.md)); an approved source changes only after Peter approves the change ([SPEC-knowledge](SPEC-knowledge.md), row 130).
 - `AGENTS.md` carries Peter's capability check (row 147), and it is the check's only home: which skills and the docs server each piece of work confirms, when to check again, what to do when one is missing, and what every sub-agent brief names.
 - Four repo skills exist, each as `.agents/skills/<name>/SKILL.md` with a `.claude/skills/<name>` link: `edit-resume` (updated), `write-source`, `release` and `update-mockups` (row 140).
 - Gemini CLI reads `AGENTS.md` through `.gemini/settings.json`. Codex, Cursor, Copilot and Antigravity read it directly; Claude Code reads it through `CLAUDE.md`.
 - Every agent that takes project settings reaches the design system's docs server with the same command.
-- `bun test ./__tests__` passes (row 141; the folder follows row 144 and [decision 0025](../docs/decisions/0025-tests-beside-code.md)).
+- `bun test ./__tests__` passes (row 141; the folder follows row 144 and [decision 0025](../docs/decisions/0025-tests-beside-code.md)), and so does the private-detail check's test, `bun test scripts/__tests__/private-detail-check`.
 - When each module lands, a fresh agent session told only "continue" reports the phase, the last step, the next step, anything red and the pending decisions, as `AGENTS.md` step 4 asks, and names the right spec for the next task (row 141).
 
 ## Tech Stack
@@ -48,7 +48,9 @@ Gemini CLI reads its own context file name by default, so `.gemini/settings.json
 
 ```sh
 bun test ./__tests__           # the agent files' checks
+bun test scripts/__tests__/private-detail-check   # the private-detail check's test
 bun test                       # all tests, the agent files' checks included
+bun scripts/private-detail-check.ts origin/main..main   # the release skill's private-detail check: one number
 ```
 
 The skills name the commands of the modules they work in, such as `bun run knowledge --draft <source id>` and `bun run build:site`. The test checks that each named command exists (Testing Strategy).
@@ -73,6 +75,8 @@ docs/agents/triage-labels.md           brain's triage labels
 .vscode/mcp.json                       the docs server for VS Code and Copilot
 .gemini/settings.json                  AGENTS.md as Gemini CLI's context file, and the docs server (new)
 __tests__/agent-files.test.ts          the agent files' checks (new)
+scripts/private-detail-check.ts        counts private values in the commits to push; the release skill runs it on every push (new)
+scripts/__tests__/private-detail-check.test.ts   its test, in temporary repositories (new)
 ```
 
 Peter adds `.mcp.json` and `.claude/settings.json` from the README section, because an agent's safety check blocks an agent from writing its own settings ([decision 0014](../docs/decisions/0014-library-skills-and-docs-mcp.md)).
@@ -108,7 +112,7 @@ The task that builds a module updates its row: the folders and the test command 
 
 **Releases and approvals** says, each rule with its spec:
 
-- A push to `main` that changes a site file is a release. A site file is any tracked path not in `scripts/docs-only.txt`. Peter's standing approval covers every push except a force-push, releases included (row 151): push once the before-commit checks pass. Follow the `release` skill for every push to `main` ([SPEC-deploy](SPEC-deploy.md)).
+- A push to `main` that changes a site file is a release. A site file is any tracked path not in `scripts/docs-only.txt`. Peter's standing approval covers every push (row 151) except a force-push and a push that holds a change listed below: push the rest once the before-commit checks pass. Follow the `release` skill for every push to `main`; a push of any other branch runs the skill's private-detail check first ([SPEC-deploy](SPEC-deploy.md)).
 - An approved knowledge source changes only after Peter approves the change in the question dialog; the change waits on a branch until then (row 130).
 - `bun run evals` costs money: run it only after Peter approves that run ([SPEC-chat](SPEC-chat.md)).
 - Force-push, changing a repository's visibility, changing `scripts/docs-only.txt` (it decides which pushes are releases), deploying by hand, and anything that costs money need Peter's approval each time. Agents never sign in to a dashboard and never buy anything.
@@ -131,17 +135,17 @@ The four skills, by step:
 4. Save every answer word for word to `interviews/<date>-<subject>.md` in the private repo, commit and push it there, before anything is written from it. Done when the private repo's remote has the file.
 5. Write the draft source `knowledge/sources/<id>.md` (`status: draft`), and the redaction list beside the raw answers in the private repo. Done when `bun run knowledge --draft <id>` names no broken rule.
 6. Put the source and its redaction list to Peter for approval in the question tool, after he read it with `bun run knowledge --draft <id>`. Done when he approved, or named changes; changes go back to step 5.
-7. Set `status: approved` and the date, add the decision record row, run the before-commit checks, commit. A source is read by the site build, so the push is a release (the `release` skill). Done when the commit exists and the `release` skill has pushed it under Peter's standing approval (row 151).
+7. Set `status: approved` and the date, add the decision record row, run the before-commit checks, commit. A source is read by the site build, so the push is a release (the `release` skill). Done when the commit exists and the `release` skill has pushed it.
 
 A change to an approved source follows the edit rule: it waits on a branch until Peter approves it.
 
 **`release`** (new; [SPEC-deploy](SPEC-deploy.md), "Releases"). While `scripts/site-changed.sh` is missing, step 1 tells Peter that the deploy module is not built. The skill then runs steps 2, 3, 4 and 6, and step 3 records every file the commits change ([plan](../tasks/plan.md), order rule 2).
 
-1. Check what the push sends on `main`, after a fetch and a rebase onto `origin/main`. First the private details, on every push: `git ls-files private.yaml` prints nothing, and no value from `private.yaml` appears in `git log -p origin/main..main`, the commits and their messages; the check prints a count, never a value. Then the site changes: `scripts/site-changed.sh origin/main main`. Exit 0 means no site file changed: the push is not a release, and steps 2, 3 and 5 are left out; the before-commit checks ran on each commit. Done when the private-detail check passed and the exit code is known.
+1. Check what the push sends on `main`, after a fetch and a rebase onto `origin/main`. First the private details, on every push: `bun scripts/private-detail-check.ts origin/main..main` reads `private.yaml` and the commits with their messages and changes, and prints one number, never a value; anything but `0` stops the push. A push of any other branch, such as `prototype/deploy-spike`, runs only this check, on that branch's range. Then the changes Peter still approves: a change to `scripts/docs-only.txt`, or to an approved knowledge file, goes on only with his approval in a decision record row that the push adds; otherwise the skill asks him. Then the site changes: `scripts/site-changed.sh origin/main main`. Exit 0 means no site file changed: the push is not a release, and steps 2, 3 and 5 are left out; the before-commit checks ran on each commit. Done when the private-detail check printed `0`, each change Peter still approves has his approval, and the exit code is known.
 2. Run `bun run build`, `bun run build:site` and `bun test`. Done when all pass.
 3. Record the push: the commit to push, the commits and the site files they change. Done when the record names the commit to push.
 4. Push to `main`, after a check that `main` is still the commit that passed steps 1 and 2. Done when the push is on GitHub.
-5. Watch `ci / test`, `ci / audit` and the release check on the commit with `gh`. Done when all three passed, one failed, or no release check ran.
+5. Watch `ci / test`, `ci / audit` and the release check on the commit with `gh`, as background commands, for at most 90 minutes from the push; find the CI run in at most 10 tries. Done when all three passed, one failed, no CI run appeared, or the 90 minutes are up.
 6. Report, with step 3's record: live (the live commit from `/api/status` equals the pushed one), or which check failed and the limit alert Peter got. On a failure, never promote or roll back by hand; point Peter to `docs/runbooks/rollback.md`.
 
 **`update-mockups`** (new). Only a session with the Artifact tool can change the Design canvas; any other agent stops after step 1 and tells Peter.
@@ -165,7 +169,7 @@ A change to an approved source follows the edit rule: it waits on a branch until
 
 ## Testing Strategy
 
-Two seams (row 141).
+Two seams (row 141), and a third for the private-detail check that the `release` skill runs (row 151's review).
 
 1. **The agent files on disk**, `__tests__/agent-files.test.ts`, under `bun test`. It checks:
    - Every relative link in `AGENTS.md`, `CLAUDE.md`, `README.md`, `docs/agents/*.md` and each `SKILL.md` points to a file or folder that exists. A `#section` part is ignored.
@@ -177,6 +181,7 @@ Two seams (row 141).
    - `.gemini/settings.json` names `AGENTS.md` as a context file.
    - No agent file holds a phone number or a link to an internal Highspot address; the test matches both by pattern.
 2. **A fresh agent session**, by hand, when each module lands. A new session in a fresh clone is told only "continue". It passes when it reports the phase, the last completed step, the next step, anything red and the pending decisions in five lines or fewer, and names the spec of the next task. The task that lands the module records the result.
+3. **The private-detail check**, `scripts/__tests__/private-detail-check.test.ts`, under `bun test`. Each test makes a temporary repository with a fixture `private.yaml` and fake commits, and runs the script on a range. It checks that the script prints `0` for clean commits; counts a value in a changed file, in a commit message only, in a commit that a later one undoes, and a phone number with other separators; counts a tracked `private.yaml`; prints "cannot check" and exits 2 for a missing, empty or broken `private.yaml`, an unknown range and an argument that is not a range; and never prints a value.
 
 ## Boundaries
 

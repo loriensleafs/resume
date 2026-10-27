@@ -7,7 +7,7 @@ Spec: [SPEC-agents](../../spec/SPEC-agents.md). The order is in [todo.md](../tod
 - **Gemini CLI's key** (SPEC-agents, Open Questions), confirmed 2026-10-27 in geminicli.com/docs/reference/configuration: `context.fileName` (string or string[]) inside the `context` object of the project file `.gemini/settings.json`. The spec's JSON is correct. The same page says Gemini CLI was replaced by Antigravity CLI on 2026-06-18; Antigravity already reads `AGENTS.md`. The spec (row 142) keeps `.gemini/settings.json`, and the file is cheap, so A3 stands as written.
 - **Agent files today.** A scratch run of the link and `bun run` checks over `AGENTS.md`, `CLAUDE.md`, `README.md`, `docs/agents/*.md` and `edit-resume` found no broken link and no unknown script. The only phone-pattern match is README's made-up example `(555) 555-0100` in the `private.yaml` block. `AGENTS.md` has 48 lines.
 - **Releases.** Every agents task changes only paths on SPEC-deploy's docs-only list (`AGENTS.md`, `README.md`, `.agents/`, `.claude/`, `.gemini/`, `docs/`, `**/__tests__/**/*.test.ts`); none is a release.
-- **Order inside the module.** A1 first: every build session reads `AGENTS.md`, and the Modules table and the Releases and approvals section must be in place before any other module's task runs. A2 next: `AGENTS.md` sends agents to the `release` skill before every site-change push, and T1 is the first such push. A3 and A4 extend the same test file, so they run one after the other; A3 comes before deploy's docs-only test (D30).
+- **Order inside the module.** A1 first: every build session reads `AGENTS.md`, and the Modules table and the Releases and approvals section must be in place before any other module's task runs. A2 next: `AGENTS.md` sends agents to the `release` skill before every push to `main`. A3 and A4 extend the same test file, so they run one after the other; A3 comes before deploy's docs-only test (D30).
 - **Noticed, not tasked.** SPEC-agents' Objective cites "row 7" for "every AI agent supported in this repository"; that quote is the decision record's Intent paragraph, and row 7 is about offline chat. README's "Edit the content" names `bun run build` and `bun test`; after T2 it should also name `bun run documents`. Both are outside the tasks' spec text.
 
 ## Tasks
@@ -28,10 +28,10 @@ Notes: `scripts/docs-only.txt` and the `release` skill appear as code spans unti
 
 ### A2: The `release` repo skill
 
-Delivers: an agent about to push follows one procedure: it checks the commits for private details, finds whether the push is a release, runs the checks, records the push, pushes, watches the checks and reports. Before the deploy module is built, the skill stops at step 1 and says so.
+Delivers: an agent about to push follows one procedure: it checks the commits for private details, finds whether the push is a release, runs the checks, records the push, pushes, watches the checks and reports. Before the deploy module is built, step 1 says so, and the skill goes on to steps 2, 3, 4 and 6.
 Blocked by: A1
 Acceptance:
-- `.agents/skills/release/SKILL.md` has SPEC-agents' six steps, each ending on a "Done when" line. Step 1 checks every push for private details. Step 3 records the push; before row 151 it asked Peter through `brain:ask-user-question`. Step 6 never promotes or rolls back by hand and points to `docs/runbooks/rollback.md` (a code span until deploy writes it). While `scripts/site-changed.sh` does not exist, step 1 stops and tells Peter that the deploy module is not built.
+- `.agents/skills/release/SKILL.md` has SPEC-agents' six steps, each ending on a "Done when" line. Step 1 checks every push for private details. Step 3 records the push; before row 151 it asked Peter through `brain:ask-user-question`. Step 6 never promotes or rolls back by hand and points to `docs/runbooks/rollback.md` (a code span until deploy writes it). While `scripts/site-changed.sh` does not exist, step 1 tells Peter that the deploy module is not built, and the skill goes on to steps 2, 3, 4 and 6.
 - `.claude/skills/release` links to `../../.agents/skills/release`. The `AGENTS.md` release rule links to the skill.
 - The test also checks every repo skill. Its front matter parses. Its `name` equals the folder's name, is kebab-case and has 64 characters or fewer. Its `description` has 1 to 1,024 characters. `.claude/skills/` holds exactly one link for each skill, and each link resolves to `.agents/skills/<name>`. Every relative link in each `SKILL.md` resolves.
 Verify: `bun test ./__tests__`; `ls -l .claude/skills`
@@ -124,7 +124,7 @@ Needs Peter: no
 
 ### Checkpoint agents: before the first release
 
-After A1 and A2. `bun test` passes. Peter reads the new Modules and Releases and approvals sections before T1's push. Every session after this point reads them.
+After A1 and A2. `bun test` passes. Peter reads the new Modules and Releases and approvals sections. This review does not stop the run: the conductor tells Peter it is ready, and his notes become follow-up tasks ([plan](../plan.md), "Running the plan"). Every session after this point reads them.
 
 ### Checkpoint agents: checks complete
 

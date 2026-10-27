@@ -35,7 +35,7 @@ A missing skill: load it, then continue. A skill that may apply: load it. A docs
 | site | [SPEC-site](spec/SPEC-site.md) | `src/site/`, `public/` | `bun test src/site` | spec approved |
 | chat | [SPEC-chat](spec/SPEC-chat.md) | `src/chat/`, `evals/` | `bun test src/chat` | spec approved |
 | deploy | [SPEC-deploy](spec/SPEC-deploy.md) | `src/deploy/`, `src/ops/`, `scripts/build-site.ts`, `.github/` | `bun test src/ops src/deploy scripts/__tests__/docs-only scripts/__tests__/smoke` | spec approved |
-| agents | [SPEC-agents](spec/SPEC-agents.md) | the agent files | `bun test ./__tests__` | being built (A1 to A8) |
+| agents | [SPEC-agents](spec/SPEC-agents.md) | the agent files, `scripts/private-detail-check.ts` | `bun test ./__tests__ scripts/__tests__/private-detail-check.test.ts` | being built (A1 to A8) |
 
 Before you change a module, read its spec to the last line and the decisions it links ([index](docs/decisions/README.md)). Use the glossary's words.
 
@@ -63,7 +63,7 @@ Run `bun run build` and `bun test` before every commit. Once `package.json` has 
 
 ## Releases and approvals
 
-- A push to `main` that changes a site file is a release. A site file is any tracked path not in `scripts/docs-only.txt`. Peter's standing approval covers every push except a force-push, releases included (row 151): push once the before-commit checks pass. Follow the [release skill](.agents/skills/release/SKILL.md) for every push to `main` ([SPEC-deploy](spec/SPEC-deploy.md)).
+- A push to `main` that changes a site file is a release. A site file is any tracked path not in `scripts/docs-only.txt`. Peter's standing approval covers every push (row 151) except a force-push and a push that holds a change listed below: push the rest once the before-commit checks pass. Follow the [release skill](.agents/skills/release/SKILL.md) for every push to `main`; a push of any other branch runs the skill's private-detail check first ([SPEC-deploy](spec/SPEC-deploy.md)).
 - An approved knowledge source changes only after Peter approves the change in the question dialog; the change waits on a branch until then ([SPEC-knowledge](spec/SPEC-knowledge.md), row 130).
 - `bun run evals` costs money: run it only after Peter approves that run ([SPEC-chat](spec/SPEC-chat.md)).
 - Force-push, changing a repository's visibility, changing `scripts/docs-only.txt` (it decides which pushes are releases), deploying by hand, and anything that costs money need Peter's approval each time. Agents never sign in to a dashboard and never buy anything ([SPEC-deploy](spec/SPEC-deploy.md)).
