@@ -6,6 +6,8 @@ Corrected on 2026-10-27 after the reviews of the other specs (decision record ro
 
 Amended on 2026-10-27 for Peter's standing approval (decision record row 151): which pushes need him is in [AGENTS.md](../AGENTS.md), "Releases and approvals".
 
+Amended on 2026-10-27 with the deploy spike's verdicts (task D6; [research 12](../docs/research/12-deploy-platform.md#deploy-spike-verdicts-2026-10-27)).
+
 ## Objective
 
 Put the site and the chat on the internet at `https://peterkloss.dev`, and keep them safe, cheap and observable without Peter watching them. The site serves recruiters, hiring managers and engineers during Peter's job search, when traffic is higher than usual (row 114), so a quiet failure or a spent limit must reach Peter at once.
@@ -28,7 +30,7 @@ Acceptance criteria:
 - A push that changes a site file goes live on peterkloss.dev only after CI and the smoke check on the new deployment pass (row 107). A site file is any tracked path that `scripts/docs-only.txt` does not list. A push that changes only listed paths builds nothing and changes nothing live.
 - A deployment never takes the domains while `main` holds a newer site change.
 - Previews use the fake model, hold no API key and write nothing to the store (row 108). Code enforces this, not only the dashboard.
-- pkloss.dev, pwk.dev, www.peterkloss.dev and the project's public `.vercel.app` address answer with a 308 to the same path and query on peterkloss.dev ([decision 0018](../docs/decisions/0018-domains.md)). On the `.vercel.app` address, `/api/` paths are not redirected, so Vercel Cron reaches the health job.
+- pkloss.dev, pwk.dev, www.peterkloss.dev and the project's public `.vercel.app` address answer with a 308 to the same path and query on peterkloss.dev ([decision 0018](../docs/decisions/0018-domains.md)). On the `.vercel.app` address, `/api/` paths are not redirected. Vercel Cron does not call that address: it calls each production deployment's own generated URL, which no redirect matches (spike check 6).
 - No page and no server function runs at request time. Only `/api/chat`, `/api/status` and `/api/cron/health` run as functions. Every other path is a file, or the static not-found page with status 404.
 - Every HTML response enforces the Content Security Policy below, with no `'unsafe-inline'` and no `'unsafe-eval'`. Chrome reports no violation on the real deployment, online and offline, the not-found page included.
 - One internet address can send about 20 chat questions in 10 minutes (row 112). A burst at a window's edge can pass up to 40, and counters are kept per region. Every other `/api/` path allows 60 requests in 10 minutes.
@@ -147,7 +149,7 @@ The PDF build drives Chrome, and Vercel's build image (Amazon Linux 2023) has no
 // vercel.json: the build settings only
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "bunVersion": "1.4.x",                          // "1.x" would be Bun 1.3.14; Vercel picks the 1.4 patch
+  "bunVersion": "1.4.x",                          // the build runs Bun 1.4 (1.4.4 in spike check 1); Vercel picks the patch
   "framework": null,                              // the build writes .vercel/output itself
   "installCommand": "bun ci",
   "buildCommand": "bun run build:site",
@@ -160,7 +162,7 @@ The PDF build drives Chrome, and Vercel's build image (Amazon Linux 2023) has no
 nitro({
   preset: "vercel",
   vercel: {
-    functions: { runtime: "bun1.4.x" },           // Nitro writes "bun1.x" when nothing is set; spike check 2
+    functions: { runtime: "bun1.4.x" },           // runs Bun 1.4.1; Nitro's default "bun1.x" runs 1.3.14 (spike check 2)
     functionRules: { "/api/chat": { maxDuration: 150, regions: ["iad1"] } },
   },
 });
@@ -181,16 +183,22 @@ nitro({
 
 **Routes.** A local build of TanStack Start with Nitro's Vercel preset (research 12) showed what Nitro writes to `.vercel/output/config.json`: the immutable cache rule for `/assets/`, the filesystem, `/api/chat`, and last `/(.*)` to `/__server`. That last route renders every unknown path in a function at request time, with no policy tag. So the build script's last step, `writeVercelConfig(outputDir)`, replaces Nitro's `routes` with its own list and keeps Nitro's other fields. In order:
 
-1. **Host redirects.** For each of pkloss.dev, pwk.dev, www.peterkloss.dev and the project's `.vercel.app` address, a route whose `has` matches that host exactly (`{ "type": "host", "value": { "eq": "pkloss.dev" } }`), with a status of 308 and `Location: https://peterkloss.dev/$1`. The `.vercel.app` route's `src` leaves `/api/` out. The syntax follows Vercel's Build Output API documentation; whether Vercel adds the query string to `Location` is a spike check.
+1. **Host redirects.** For each of pkloss.dev, pwk.dev, www.peterkloss.dev and the project's `.vercel.app` address, a route whose `has` matches that host exactly (`{ "type": "host", "value": { "eq": "pkloss.dev" } }`), with a status of 308 and `Location: https://peterkloss.dev/$1`. The `.vercel.app` route's `src` leaves `/api/` out. The syntax follows Vercel's Build Output API documentation.
+   - Vercel adds the request's query to `Location`, so the route names none. Vercel writes the query again, so a `+` becomes `%20` (spike check 5, seen on the `.vercel.app` address).
+   - Each route matches its host exactly, never a pattern such as `*.vercel.app`. A pattern would also match each deployment's own generated URL, which Vercel Cron calls (spike check 6) and the release check's smoke check loads.
 2. **Headers**, with `continue: true` (see Headers).
-3. `{ "handle": "filesystem" }`. An `overrides` entry for each prerendered page serves `<path>/index.html` at its clean address, `<path>`.
-4. **The three API routes**, each with `caseSensitive: true`, because routes otherwise match without regard to case. `/API/chat` is then a miss, not a way around a case-sensitive WAF rule.
-5. **Every other path** gets `/404.html` with status 404.
+3. **Function folders.** Each function folder that no API route names gets `/404.html` with status 404, by its own path: Nitro's `/__server`, and each per-route `.func` link that Nitro writes.
+   - Vercel serves a function folder at its own path in the filesystem phase, before any route after it. Spike check 3 saw `/__server` answer from Nitro's function until this route came first.
+   - `writeVercelConfig()` finds the folders in the output and follows symbolic links. A local test saw the scan find a link; no Vercel run had one.
+4. `{ "handle": "filesystem" }`, with no `overrides`. Vercel serves `<path>/index.html` at its clean address, `<path>`, without one (spike check 2's control).
+5. **The three API routes**, each with `caseSensitive: true`, because routes otherwise match without regard to case. `/API/chat` is then a miss and gets the not-found page (spike check 3). The WAF rules match it too, because their path conditions ignore case (spike check 8).
+6. **Every other path** gets `/404.html` with status 404.
 
-- Nitro's `/__server` function stays only as the destination of `/api/status` and `/api/cron/health`. No route sends a page or `/_serverFn/` to it.
+- Nitro's `/__server` function stays only as the destination of `/api/status` and `/api/cron/health`. No route sends a page or `/_serverFn/` to it, and step 3 answers its own path with the not-found page.
 - The routes also hold the cron: `crons: [{ path: "/api/cron/health", schedule: "17 15 * * *" }]`.
 - The chat's maximum duration is 150 s (row 132): above SPEC-chat's 120 s turn deadline (`deadlineMs: 120_000`), below Vercel's 300 s default, so a stuck function stops early.
-- Every tool in the build runs under Bun 1.4 (`bun --bun` for a tool with a Node shebang). The deploy spike checks which Bun runs the build. If it is not 1.4, the install command installs 1.4.2 with Bun's official installer, and the build command calls it by its absolute path, `$HOME/.bun/bin/bun`.
+- Every tool in the build runs under Bun 1.4 (`bun --bun` for a tool with a Node shebang). Spike check 1: Vercel builds with Bun 1.4.4 when `bunVersion` is `"1.4.x"` or when `bun.lock` has `lockfileVersion: 2`, and with Bun 1.3.14 when neither holds. This setup has `bunVersion` `"1.4.x"`, so the install command installs no Bun of its own.
+- `bun.lock` has `lockfileVersion: 3` since the scoped `zod` override in `package.json`. No deployment has built from a version-3 lockfile yet, so the plan checks it before the first release. If a build runs another Bun, the install command installs 1.4.2 with Bun's official installer, and the build command calls it by its absolute path, `$HOME/.bun/bin/bun`.
 - Pages get their data at build time, not from a server function at request time. A local check showed why: during client-side navigation, a route's loader runs in the browser and calls its server function as `GET /_serverFn/<id>`. With no server, that request gets a 404 and the page comes up empty, online and offline. This is an amendment to SPEC-site (below).
 
 ## Headers
@@ -214,7 +222,8 @@ The Content Security Policy:
 | `/sw.js` and `/workbox-<hash>.js`: the worker policy | The header policy plus `; script-src 'self'` |
 | `/Peter-Kloss-Resume.pdf`, `.docx`, `.txt` | None. `object-src 'none'` on a PDF can blank it in a browser's PDF viewer. A document runs no script. |
 
-- A route's `headers` is an object, so two routes that set the same header on one path do not give two policies. The worker files therefore get one full policy, from the last matching route. The spike checks this merge on Vercel.
+- A route's `headers` is an object, so two routes that set the same header on one path do not give two policies. The worker files therefore get one full policy, from the last matching route. Spike check 4 saw this merge on Vercel, with a control: with the worker policy route first, the worker files got the header policy. So the worker policy route comes after the header policy route, and the config test fails when it moves before it.
+- The header routes write each header name in lower case, as the spike did, so no two routes set one header under two spellings. Whether two spellings merge is not tested.
 - Each HTML file in the output, the not-found page included, starts its `<head>` with its own policy tag. `<hashes>` are the SHA-256 hashes of that page's inline scripts; a page with none gets `script-src 'self'` alone:
 
   ```html
@@ -227,7 +236,8 @@ The Content Security Policy:
 - The second probe on `prototype/csp-probe` ran this split policy, the static not-found page and the service worker with no violation: on first and second visits, a source page, client navigation, and an unknown path online and offline (research 12). It was a local server, so the release check and the GitHub health check also load the real deployment in Chrome.
 - Prerendered HTML holds no `style="…"` attribute, because `style-src 'self'` blocks it and hashes cannot allow it. A style a page needs, such as a role's width on the career timeline, or a Markdown table column's alignment, comes from a class in a stylesheet file the build writes. A test fails on any `style=` in the built pages. The chat's answers set styles through the DOM after load, which the policy allows. Allowing inline style attributes (`style-src-attr 'unsafe-inline'`) is an ask-first change.
 - The policies enforce SPEC-site's rule of no third-party requests: fonts, scripts, images and connections come only from the site's own address.
-- The Vercel Toolbar injects a script from `vercel.live`, which the policy blocks. Setup step 5 turns the toolbar off for production, and the checks send `x-vercel-skip-toolbar: 1`.
+- The Vercel Toolbar injects a script from `vercel.live`, which the policy blocks. Setup step 5 turns the toolbar off for production, and spike check 11 proved that setting on production deployments.
+- The checks send `x-vercel-skip-toolbar: 1`, Vercel's header for automated tests, on every request but one. Its effect is not proven: on a preview with the toolbar on, headless Chrome got the built page with and without the header, and a plain request without it got other bytes (spike check 11). So the smoke check makes one plain request without the header, and a toolbar turned on for production fails the checks.
 
 Caching:
 
@@ -251,7 +261,14 @@ Three Vercel WAF rules, per IP address:
 - Denied requests cost nothing and do not run the function.
 - SPEC-chat already maps a 429 to its alert. Its text changes to "Too many questions in a short time." and "Try again in a few minutes.", approved by Peter (row 138).
 - `/api/cron/health` answers 401 at once without the right `CRON_SECRET`, before it reads anything.
-- Whether a WAF path condition matches without regard to case, and whether the content-type condition works as written, are spike checks. The case-sensitive API routes already send `/API/chat` to the not-found page.
+- Spike check 8, on previews and on production:
+  - the content-type rule gives its 403 to a `text/plain` chat `POST` and lets a JSON one through;
+  - the 21st chat `POST` gets the 429;
+  - the path condition matched `/API/chat` and `/Api/Chat` (Vercel documents every operator as case insensitive), and decoded `%63`;
+  - posts that "chat content type" denied did not count toward "chat rate limit";
+  - the WAF's 403 and 429 both carry `x-vercel-mitigated: deny`.
+  The case-sensitive API routes send `/API/chat` to the not-found page as well. The "api rate limit" rule has not fired in a test.
+- No rule has a persistent action (the dashboard's "for" field), so a rule blocks only the requests it matches, and a visitor at the chat limit still gets the site (spike check 8). A persistent block on "chat content type" would let another site's page lock a visitor out of the whole site, by making the visitor's browser post a form.
 
 The rate limits slow one address; they do not cap spend. The daily cap below does.
 
@@ -296,7 +313,8 @@ The prices and both limits live in `src/ops/limits.ts`. A test checks the estima
 **Which usage a turn settles with.** TanStack AI calls `onUsage` once for each model call that finishes. A call that does not finish reports no usage: the abort event carries none.
 
 - SPEC-chat's telemetry sums `onUsage` across the turn's finished model calls (amendment 5). The token counts in the daily totals are that sum, so they stay true.
-- One rule settles the cost: a turn whose last model call did not finish keeps its whole $0.90 reservation. This covers a stopped turn, a turn cut off by the deadline (`DEADLINE`), a turn whose answer reached `max_tokens` (`MAX_TOKENS`) and a turn whose stream broke. Its real cost is not known, because TanStack AI reports usage only for a call that finishes (SPEC-chat).
+- One rule settles the cost: a turn whose last model call did not finish keeps its whole $0.90 reservation. This covers a turn cut off by the deadline (`DEADLINE`), a turn whose answer reached `max_tokens` (`MAX_TOKENS`), a turn whose stream broke, and a stopped turn whose abort reached the handler. Its real cost is not known, because TanStack AI reports usage only for a call that finishes (SPEC-chat).
+- On Vercel a visitor's Stop does not reach the function (spike check 7). The turn's model calls then finish (inferred: the spike had no model), and the turn settles with the cost of its summed usage, which is its real cost.
 - A turn with no usage at all, for example after a crash, also keeps its whole reservation.
 - A turn whose model calls all finished settles with the cost of its summed usage.
 
@@ -386,6 +404,8 @@ export function createOpsReader(env: { KV_REST_API_URL: string; KV_REST_API_READ
 - All store calls go through Upstash's REST API with `fetch` and `Authorization: Bearer`. No package is added.
 - Each call that writes runs its commands as one transaction, through Upstash's `/multi-exec` endpoint, so a key never exists without its expiry. A pipeline is not atomic: one failed command could leave a key that never expires.
 - Per turn: the reservation's transaction before the run, then `log.append()` and `telemetry.record()`, one transaction each, after the last chunk.
+- Every write finishes before the response ends. Vercel freezes a function between requests, so a write after the response's end lands only when the next request reaches that instance (spike check 7).
+- `/api/chat` does not set `supportsCancellation`. With it, Vercel ends the function when the visitor stops, and the writes after the last chunk are lost; on the Bun runtime the function still does not learn of the Stop (spike check 7).
 - Each store call has a time limit of 2 s, and `reserve()` 1 s; each push, 3 s. A slow service never holds a visitor's answer longer than that.
 - Turns that never reach the model write nothing to the store: a rejected request, and a refusal at the cap or the monthly limit. They print their `chat_turn` line only. So a flood of bad requests cannot spend the store's budget.
 
@@ -409,7 +429,7 @@ export function createOpsReader(env: { KV_REST_API_URL: string; KV_REST_API_READ
 | `health:vercel`, `health:github` | The last Vercel health run and its result; when the GitHub check last ran | 7 days |
 
 - `telemetry.record()` prints SPEC-chat's `chat_turn` line to the function log, adds the turn to `qstats` and `qslow`, settles its reservation, adds to the month, and checks the alerts. It holds no question text, `threadId` or IP address.
-- The handler test proves the response ends only after these writes. Whether they also finish on Vercel when the visitor stops a turn is a spike check.
+- The handler test proves the response ends only after these writes. On Vercel they also finish when the visitor stops a turn: the function never learns of the Stop, sends the whole answer, then writes (spike check 7, a 10 s stream with no model). So the turn is logged with its own ending, not `stopped` (SPEC-chat).
 
 **Limit alerts** (rows 115 and 121) are ntfy pushes with priority `urgent`, a title and one line naming the next step:
 
@@ -444,13 +464,16 @@ export function createOpsReader(env: { KV_REST_API_URL: string; KV_REST_API_READ
 - a count per outcome and the most read sources;
 - the daily totals, with the day's and the month's cost against the cap and the limit.
 
+The reader sends single commands or `/pipeline`, never `/multi-exec`: Upstash refuses `/multi-exec` to the read-only token, even for reads (spike check 9). That token cannot write, delete or run a script. It can run `SCAN`, so it can read every key in the database, which holds only this site's records.
+
 ## Smoke check and health checks
 
-`src/ops/smoke.ts` holds the checks. `bun run smoke <origin> [--browser] [--production] [--documents <dir>]` and the Vercel health job both run them. They ask the model nothing, so they cost nothing. Every request sends `x-vercel-skip-toolbar: 1`.
+`src/ops/smoke.ts` holds the checks. `bun run smoke <origin> [--browser] [--production] [--documents <dir>]` and the Vercel health job both run them. They ask the model nothing, so they cost nothing. Every request but one sends `x-vercel-skip-toolbar: 1`.
 
 - **Pages.**
   - `/`, `/resume` and one source page return 200 with HTML, a title and the canonical address.
   - `/sources/does-not-exist` and `/API/chat` return 404 with the not-found page.
+  - One plain request for `/`, with no browser and without `x-vercel-skip-toolbar`, gets a page whose scripts are all its own: each inline script's hash is in the page's policy tag, and each script `src` is on the site's own address. So a toolbar turned on for production fails the check (spike check 11).
 - **Headers.**
   - Each HTML page carries every header above and its own policy tag, and neither policy has `'unsafe-inline'` or `'unsafe-eval'`.
   - An `/assets/` file and the Workbox file are immutable; `/sw.js` revalidates and has the worker policy; a document has no `Content-Security-Policy`.
@@ -469,8 +492,8 @@ export function createOpsReader(env: { KV_REST_API_URL: string; KV_REST_API_READ
 - **With `--production`:**
   - `GET /api/status` also reports the real model as configured.
   - The three other hosts and the project's `.vercel.app` address return 308 for `/resume?x=1` to `https://peterkloss.dev/resume?x=1`.
-  - A chat `POST` with `Content-Type: text/plain` gets the WAF's 403, not the handler's.
-  - Then malformed chat requests are sent until one gets 429, which must happen by the 41st.
+  - A chat `POST` with `Content-Type: text/plain` gets the WAF's 403, not the handler's: the WAF's answer carries `x-vercel-mitigated: deny` (spike check 8).
+  - Then malformed chat requests are sent until one gets 429 with `x-vercel-mitigated: deny`, which must happen by the 41st.
 - **On a protected deployment URL:** requests carry `x-vercel-protection-bypass` from `VERCEL_AUTOMATION_BYPASS_SECRET`, and the browser also sends `x-vercel-set-bypass-cookie: true`, so the service worker's own requests pass too.
 
 The two health checks watch each other (row 122). Vercel Cron and GitHub's schedules are both best effort, so each check allows the other 50 hours, two daily runs:
@@ -528,13 +551,13 @@ Peter does these steps once, in this order, so that the chat never runs in produ
 4. Vercel: sign up for Pro, and import `loriensleafs/resume` with the variables `NTFY_TOPIC_URL`, `CRON_SECRET` and `HEALTH_SECRET` (Production). Previews need no variable: `VERCEL_ENV` picks the fake model. There is no Anthropic key yet, so the first deployment cannot call the model. Keep Fluid compute on.
 5. Vercel, project settings: turn the Vercel Toolbar off for production. Deployment Protection: Standard Protection with Vercel Authentication; create an automation bypass secret.
 6. Vercel, Marketplace: add Upstash Redis, pay as you go, with a $1 budget; attach its variables to Production only.
-7. Vercel, Firewall: the three WAF rules.
+7. Vercel, Firewall: the three WAF rules, each with its persistent action (the "for" field) left empty.
 8. Vercel, Spend Management: a $20 budget with the webhook set to the ntfy topic URL. Check that the "Pause production deployment" switch is off. Vercel's docs say production pauses only when that switch is on; the third review read a changelog as saying it can start on, so the step checks it.
 9. GitHub, Actions secrets: the Actions rows of the table above.
 10. Vercel, Deployment Checks: require `ci / test`, `ci / audit` and the release check's status, by the name its first run shows. Check that domain auto-assignment is on.
 11. Vercel, Domains: add peterkloss.dev, www.peterkloss.dev, pkloss.dev and pwk.dev, all served by the project. An agent writes the project's `.vercel.app` address into `src/deploy/routes.ts`; its push is a release.
 12. Vercel, Environment Variables: add `ANTHROPIC_API_KEY` (Production, Secret). Then Redeploy the newest production deployment with "Use project's Ignore Build Step" unchecked. With the box checked, the ignore step sees no change and the redeploy does nothing.
-13. Check: `/api/status` reports everything configured; run both health checks by hand once; ask the live chat one question.
+13. Check: `/api/status` reports everything configured; run both health checks by hand once; ask the live chat one question. The Vercel health job's pass also proves that Vercel sends `Authorization: Bearer $CRON_SECRET`, which the spike could not see: its project had no `CRON_SECRET` (spike check 6).
 
 ## Runbooks
 
@@ -562,20 +585,20 @@ The plan's first task, before any production code. A local build cannot answer t
 - **Approval.** Each push to that project deploys. Its pushes follow [AGENTS.md](../AGENTS.md), "Releases and approvals" (row 151), and each runs the `release` skill's step 1 first.
 - **Throwaway.** The spike code stays on its branch (brain's prototype rules); its verdicts go into research 12 and, where they change a rule, into this spec. Peter removes the project afterwards.
 
-| # | Check | If it fails |
-|---|---|---|
-| 1 | Which Bun runs the build, and whether `bunVersion` decides it | The install command installs 1.4.2 (see Configuration in code) |
-| 2 | Vercel serves the `.vercel/output` the build wrote: the post-build routes, the `overrides` for clean addresses and the cron. Which Bun runs the functions (`Bun.version`): with `runtime: "bun1.4.x"`, or with Nitro's documented `"bun1.x"` and `bunVersion: "1.4.x"` | The routes move to the form Vercel accepts; the runtime value is the one that gives Bun 1.4 |
-| 3 | An unknown path and `/API/chat` get `/404.html` with status 404; `/sources/x` with no file is not rendered by a function | As 2 |
-| 4 | How route headers merge: the worker files get one policy; the documents get no policy; headers reach function responses and the not-found page | The header routes change, so each path gets exactly one policy |
-| 5 | A host redirect route keeps the query string in `Location` | The route adds the query itself |
-| 6 | Vercel Cron reaches `/api/cron/health` under Standard Protection, and which host it calls | The health job's host rule changes |
-| 7 | The store writes after the last chunk finish when the visitor stops a turn | Use Vercel's `waitUntil` from `@vercel/functions`, a new package for Peter's approval |
-| 8 | The WAF path condition's case handling, and the content-type condition | The rules change |
-| 9 | Upstash: the read-only token runs `LRANGE`, `HGETALL` and `ZRANGE`; `/multi-exec` runs the reservation with `EXPIREAT` | The reader or the transaction changes |
-| 10 | Chrome's PDF viewer shows the PDF with the site's headers | The documents' headers change |
-| 11 | The Vercel Toolbar is off for production, and `x-vercel-skip-toolbar` keeps it off on deployment URLs | The policy allows nothing more; the checks fail instead |
-| 12 | The status helper's name, and that Deployment Checks hold the domains until it passes | Setup step 10 changes |
+| # | Check | If it fails | Verdict ([research 12](../docs/research/12-deploy-platform.md#deploy-spike-verdicts-2026-10-27)) |
+|---|---|---|---|
+| 1 | Which Bun runs the build, and whether `bunVersion` decides it | The install command installs 1.4.2 (see Configuration in code) | Pass: Bun 1.4.4, from `bunVersion` `"1.4.x"` or a version-2 lockfile |
+| 2 | Vercel serves the `.vercel/output` the build wrote: the post-build routes, the `overrides` for clean addresses and the cron. Which Bun runs the functions (`Bun.version`): with `runtime: "bun1.4.x"`, or with Nitro's documented `"bun1.x"` and `bunVersion: "1.4.x"` | The routes move to the form Vercel accepts; the runtime value is the one that gives Bun 1.4 | Pass: `"bun1.4.x"` runs Bun 1.4.1, `"bun1.x"` runs 1.3.14; clean addresses need no override; the cron runs (check 6) |
+| 3 | An unknown path and `/API/chat` get `/404.html` with status 404; `/sources/x` with no file is not rendered by a function | As 2 | Pass after one change: the function-folder route (Routes, step 3) |
+| 4 | How route headers merge: the worker files get one policy; the documents get no policy; headers reach function responses and the not-found page | The header routes change, so each path gets exactly one policy | Pass: the last matching route wins |
+| 5 | A host redirect route keeps the query string in `Location` | The route adds the query itself | Pass: Vercel adds the query |
+| 6 | Vercel Cron reaches `/api/cron/health` under Standard Protection, and which host it calls | The health job's host rule changes | Pass: it calls each deployment's own URL, so the redirects match exact hosts |
+| 7 | The store writes after the last chunk finish when the visitor stops a turn | Use Vercel's `waitUntil` from `@vercel/functions`, a new package for Peter's approval | Pass: the function never learns of the Stop and writes at its end |
+| 8 | The WAF path condition's case handling, and the content-type condition | The rules change | Pass on previews and production: case ignored, content type as written |
+| 9 | Upstash: the read-only token runs `LRANGE`, `HGETALL` and `ZRANGE`; `/multi-exec` runs the reservation with `EXPIREAT` | The reader or the transaction changes | Pass; the read-only token is refused `/multi-exec` and can run `SCAN` |
+| 10 | Chrome's PDF viewer shows the PDF with the site's headers | The documents' headers change | Pass, Peter's check (row 160) |
+| 11 | The Vercel Toolbar is off for production, and `x-vercel-skip-toolbar` keeps it off on deployment URLs | The policy allows nothing more; the checks fail instead | Pass for the production setting; the header's effect is not proven |
+| 12 | The status helper's name, and that Deployment Checks hold the domains until it passes | Setup step 10 changes | Runs at task D32 and setup step 10: it needs a workflow on `main` |
 
 ## Changes to other specs
 
@@ -613,7 +636,7 @@ Approving this spec approves these amendments:
   4. Prerendered HTML holds no `style` attribute. Prerendered Markdown renders with `@tanstack/markdown/react`, and its `components` option for `th` and `td` turns a column's alignment into a class.
   5. `/sources/<unknown id>` gets the not-found page with status 404. It shows "Page not found" with links to the chat and to the resume, and has no script. An unknown id in a query (`?source=`, `?role=`) still gives the first view.
   6. The service worker tries the network first for a navigation that is not precached, and shows the not-found page only when the network fails. Workbox's `navigateFallback` alone would show the not-found page for such a navigation also online, for example for a source page that a release has just added (research 12). `/api/` is never a navigation fallback. The worker's registration moves from an inline script to a file.
-  7. `bun run preview` serves a built `.vercel/output/`, and `bun run preview --dir <folder>` serves the one in that folder. It serves the static files with the routes, headers, overrides and status codes of that output's `config.json`, as Vercel does, and answers the API routes as SPEC-chat's preview does. The browser test and the smoke test build first into the seam-1 folder and serve it with `--dir`.
+  7. `bun run preview` serves a built `.vercel/output/`, and `bun run preview --dir <folder>` serves the one in that folder. It serves the static files with the routes, headers, overrides and status codes of that output's `config.json`, and `<path>/index.html` at `<path>`, as Vercel does, and answers the API routes as SPEC-chat's preview does. The browser test and the smoke test build first into the seam-1 folder and serve it with `--dir`.
   8. The site's font files are committed.
 - **SPEC-content.**
   - `bun run documents` (`scripts/documents.ts`) writes the public documents to `documents/`, with `documents/inputs.sha256`; the document test above checks them. SPEC-content lists the script, the folder and the test, and defines the hash's inputs.
@@ -706,8 +729,8 @@ expect(tickets.filter((t) => t.ok)).toHaveLength(8); // 8 × $0.90 = $7.20; a ni
      - every function's `.vc-config.json` has the runtime value that spike check 2 settled; the chat's has `maxDuration: 150` and region `iad1`;
      - only the three API paths reach a function, each route is case-sensitive, and no route sends anything else to `/__server`;
      - the four hosts redirect with 308 to peterkloss.dev with the path, and the `.vercel.app` route leaves `/api/` alone;
-     - every header in the tables is set for its paths; the worker files get the worker policy; the documents get no policy;
-     - every prerendered page has an override for its clean address, and the last route sends every other path to `/404.html` with status 404;
+     - every header in the tables is set for its paths; the worker files get the worker policy, and its route comes after the header policy route; the documents get no policy;
+     - the output has no `overrides`; before the filesystem, each function folder that no API route names, symbolic links included, gets `/404.html` with status 404; the last route sends every other path to `/404.html` with status 404;
      - the cron calls `/api/cron/health`;
      - each HTML file, the not-found page included, starts with a policy tag that lists exactly the hashes of its own inline scripts;
      - no built page holds a `style=` attribute.
@@ -816,7 +839,7 @@ The real platform is checked by the deploy spike, by the release check, by the t
 21. As Peter, I want a daily cap that holds under parallel requests, so that one script cannot spend the whole month in an hour during my job search.
 22. As Peter, I want a cap on how much text one request can send, so that a forged conversation cannot cost dollars.
 23. As Peter, I want prompt caching on, and a tool list that never changes within a turn, so that the core and a pasted posting cost full price only once.
-24. As Peter, I want a stopped or cut-off answer to keep its whole reservation, so that the cap and the estimates are never too low.
+24. As Peter, I want a cut-off answer to keep its whole reservation, and an answer that runs on after a visitor's Stop to settle with its real cost, so that the cap and the estimates are never too low.
 25. As Peter, I want a push when the daily cap is reached, so that I can tell a real busy day from abuse.
 26. As Peter, I want a push on my phone when the chat passes 75% of its monthly budget, so that I can raise it before visitors hit the limit.
 27. As Peter, I want a push when the monthly limit is reached, the chat to stop calling Anthropic, and the chat to work again within an hour after I raise the limit, so that I know, no call is wasted, and recovery needs no release.
@@ -882,4 +905,6 @@ The real platform is checked by the deploy spike, by the release check, by the t
 
 ## Open Questions
 
-None for this spec. The platform questions are the deploy spike's checks. The "limit reached" texts, the 429 text and the not-found page's text are approved (row 138).
+- Whether Vercel builds a version-3 `bun.lock` with Bun 1.4 (Configuration in code). The plan checks it before the first release.
+
+The deploy spike answered checks 1 to 11 (research 12); check 12 runs at setup step 10. The "limit reached" texts, the 429 text and the not-found page's text are approved (row 138).

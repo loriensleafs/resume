@@ -202,7 +202,7 @@ bun test                  # every test
 bun run build             # the documents only, unchanged (content module)
 ```
 
-`bun run preview` serves the static folder with the routes, headers, `overrides` and status codes of the output's `config.json`, as Vercel does. It answers the three API routes by importing each function's `index.mjs` from the output's `functions/` folder and calling its default export's `fetch(request)`. A local build with Nitro 3.0.260903-beta wrote that export; the plan confirms it when it installs Nitro. Outside production the chat function uses the fake model ([SPEC-chat](SPEC-chat.md)).
+`bun run preview` serves the static folder with the routes, headers, `overrides` and status codes of the output's `config.json`, and `<path>/index.html` at `<path>`, as Vercel does (deploy spike check 2). It answers the three API routes by importing each function's `index.mjs` from the output's `functions/` folder and calling its default export's `fetch(request)`. A local build with Nitro 3.0.260903-beta wrote that export; the plan confirms it when it installs Nitro. Outside production the chat function uses the fake model ([SPEC-chat](SPEC-chat.md)).
 
 ## Project Structure
 
