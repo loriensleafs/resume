@@ -22,7 +22,7 @@ Current phase: 3 (knowledge and site). Each task ends with its verification.
   - Acceptance: every check in SPEC-knowledge.md "Testing Strategy" is a passing test.
   - Verify: `bun test tests/knowledge`
   - Files: `src/knowledge/*`, `scripts/knowledge.ts`, `knowledge/*`, `tests/knowledge/*`
-- [ ] 7. Interview Peter and approve the nine deep dives, one at a time (1 of 9 approved: highspot-mcp-server)
+- [ ] 7. Interview Peter and approve the nine deep dives, one at a time (2 of 9 approved: highspot-mcp-server, highspot-agent-workflow)
   - Acceptance: each file in `knowledge/deep-dives/` has `status: approved` with Peter's date, and every statement traces to his answers.
   - Verify: `bun run knowledge` lists `deep:<id>` for all nine; `bun test`
 - [ ] 8. Interview Peter and approve the four logistics answers
