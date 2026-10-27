@@ -1,27 +1,23 @@
-import { highlightId, roleId, skillsId } from "../../knowledge/ids";
+import { BASICS_ID, EDUCATION_ID, highlightId, roleId, skillsId } from "../../knowledge/ids";
 import type { SiteData } from "../data";
 
 /**
  * The whole resume as plain semantic HTML that reads without JavaScript (SPEC-site, Views: Resume view): the lead, each
- * role with its highlights, the earlier roles, skills and education, in the documents' order.
- *
- * Each resume entry is one element that carries its knowledge id (SPEC-knowledge, Ids) in data-knowledge-id. A cited
- * entry's number and tint belong on that element, and "Ask about this" inside each highlight's element. The ⋯ menu
- * belongs at the top of the article.
+ * role with its highlights, the earlier roles, skills and education, in the documents' order. Each resume entry is one
+ * element that carries its knowledge id (SPEC-knowledge, Ids) in data-knowledge-id.
  */
 export function ResumeView({ resume }: { resume: SiteData["resume"] }) {
   const roles = resume.work.filter((role) => !role.earlier);
   const earlierRoles = resume.work.filter((role) => role.earlier);
   return (
     <article>
-      {/* "basics" and "education" are ids with no parts, so ids.ts has no builder for them. */}
-      <p data-knowledge-id="basics">{resume.basics.summary}</p>
+      <p data-knowledge-id={BASICS_ID}>{resume.basics.summary}</p>
       {roles.map((role) => (
         <section key={role.id}>
           <header data-knowledge-id={roleId(role.id)}>
             <h2>{role.name}</h2>
             <p>{role.dates}</p>
-            <p>{role.location ? `${role.titleLine}, ${role.location}` : role.titleLine}</p>
+            <p>{role.titleLine}</p>
           </header>
           {role.highlights.length > 0 && (
             <ul>
@@ -66,11 +62,11 @@ export function ResumeView({ resume }: { resume: SiteData["resume"] }) {
       </section>
       <section>
         <h2>Education</h2>
-        <div data-knowledge-id="education">
+        <ul data-knowledge-id={EDUCATION_ID}>
           {resume.education.map((school) => (
-            <p key={school.institution}>{school.institution}</p>
+            <li key={school.institution}>{school.institution}</li>
           ))}
-        </div>
+        </ul>
       </section>
     </article>
   );
