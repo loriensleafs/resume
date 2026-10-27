@@ -72,7 +72,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [Checkpoint agents: lands](modules/agents.md#checkpoint-agents-lands) — after A7, A8
 - [x] [D9](modules/deploy.md#d9-createops-gives-in-memory-parts-outside-production) `createOps()` gives in-memory parts outside production — blocked by C2 (done 2026-10-27)
 - [ ] [Checkpoint deploy: createOps ready](modules/deploy.md#checkpoint-deploy-createops-ready) — after D9
-- [ ] [A9](modules/agents.md#a9-the-type-check) The type check — blocked by C1
+- [x] [A9](modules/agents.md#a9-the-type-check) The type check — blocked by C1 (done 2026-10-27; 44 files, the release skill's scripts included; CI's checks wait for the push)
 - [ ] Peter: release a `@acmelabs/design-system-mcp` with `zod` 4.6.6 or later (acmelabs-15/design-system#9); then a follow-up task removes the `zod` override (row 158) — after A9; blocks nothing
 - [ ] [C3](modules/chat.md#c3-one-turn-through-handlechat-a-resume-citation-kept-and-one-log-entry) One turn through `handleChat()`: a resume citation kept and one log entry — blocked by A9, C1, C2, K3
 - [ ] [C4](modules/chat.md#c4-request-checks-with-the-chaterror-shape-and-turnlimits) Request checks with the `ChatError` shape and `turnLimits` — blocked by C3

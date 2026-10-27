@@ -17,7 +17,13 @@ The working method and the carry-forward notes of the conductor session that ran
 
 Notes the reviews of finished tasks left for tasks not yet built. Each builder brief for these tasks names its line.
 
-- **A9 (the type check):** builds before C3. `bun check` (Bun 1.4.3 and later), minimum Bun 1.4.4, `typescript` 7.0.2 and `@types/bun` 1.4.4 (row 157); its second commit adds the `zod` override (row 158; tracked in `acmelabs-15/design-system#9`). `@types/react` and `@types/react-dom` 19.3.0 came with S1 (row 159). `src/site/routeTree.gen.ts` is generated and marks itself `// @ts-nocheck`.
+- **A9 (done, `ab4d2bb`):** every later builder runs `bun run typecheck` before its commit. A lane that started before a type-check change merges `main` and runs it before its review ends.
+- **D6 and D8:** A9's scoped `zod` override makes Bun write `bun.lock` as `lockfileVersion` 3. Bun's docs say 1.4.0 and later read it; Vercel's build Bun reading it is unverified. D1 found that Vercel picks Bun 1.4 when `bunVersion` is `"1.4.x"` or the lockfile is version 2, so check which rule holds with version 3.
+- **S3:** `buildSite({ root })` ignores `root` since S2. S3 passes `root` into the build (a plugin option or a value `vite.config.ts` reads), and makes seam 1's leak test fail first, so the fake phone number really reaches the build.
+- **S6:** TanStack Start writes a public `pages.json` beside `sitemap.xml`; it lists filtered pages too. S6 decides whether it stays.
+- **S16:** the first page with a `/?source=` link. Its build test proves S2's `?` filter: no `index.html` overwrite, and no sitemap address with `?`.
+- **S26:** the first binary files in the output. Seam 1's private-detail scan reads files as text; make it read bytes then.
+- **The TanStack issue (S2, for Peter):** TanStack Start's prerender starts its preview server without the build's root (`vite/prerender.js` in `@tanstack/start-plugin-core`); S2 fixed it locally with `root` in `vite.config.ts`. Filing an issue upstream is outward-facing, so Peter decides; ask at the next stop.
 - **C3:** replace C2's direct tests of the in-memory budget and telemetry in `handle-chat.test.ts` with handler-level tests (a refusing budget gives one `RUN_ERROR`; one `chat_turn` per turn), then delete the direct ones. Guard `errorCode` so it never holds a message or a stack.
 - **C14:** the in-memory telemetry keeps each reservation with its event, so seam 1 checks that `record()` gets the turn's reservation.
 - **C17:** `createOps()` is built once at module scope; the review checks it (no third seam).
