@@ -56,9 +56,9 @@ AGENTS.md        instructions for every AI coding agent (CLAUDE.md imports it)
 
 ## Working with AI agents
 
-The repository carries its own agent context. An agent starts at [AGENTS.md](AGENTS.md); Claude Code reads it through [CLAUDE.md](CLAUDE.md), and Codex, Cursor, Copilot and Antigravity read it directly. The workflow follows Peter's brain plugin: specs in `spec/`, the plan in `tasks/`, decisions in `docs/decisions/`, research in `docs/research/`, current status in [docs/STATUS.md](docs/STATUS.md).
+The repository carries its own agent context. An agent starts at [AGENTS.md](AGENTS.md); Claude Code reads it through [CLAUDE.md](CLAUDE.md), Gemini CLI through [.gemini/settings.json](.gemini/settings.json), and Codex, Cursor, Copilot and Antigravity read it directly. The workflow follows Peter's brain plugin: specs in `spec/`, the plan in `tasks/`, decisions in `docs/decisions/`, research in `docs/research/`, current status in [docs/STATUS.md](docs/STATUS.md).
 
-Library skills load through TanStack Intent: `bun run intent list`, then `bun run intent load <package>#<skill>`. The design system's read-only documentation MCP server (`bun run design-system-mcp`) is configured for Codex (trusted projects), Cursor and VS Code.
+Library skills load through TanStack Intent: `bun run intent list`, then `bun run intent load <package>#<skill>`. The design system's read-only documentation MCP server (`bun run design-system-mcp`) is configured for Codex (trusted projects), Cursor, VS Code and Gemini CLI.
 
 For Claude Code, add two files at the repository root (an agent cannot write its own configuration):
 
