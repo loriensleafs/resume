@@ -1,11 +1,11 @@
 ---
 name: edit-resume
-description: Change Peter's resume content in resume.yaml, rebuild its PDF, Word and text documents in documents/, and push both in one commit as a release. Use when adding, changing or removing a role, a role's short label on the career timeline (x-short), a highlight, skill, headline, lead or contact detail, or when asked whether the resume still builds at 2 pages.
+description: Change Peter's resume content in resume.yaml and rebuild its PDF, Word and text documents in documents/. One commit holds resume.yaml and the rebuilt documents/, and the release skill pushes it. Use when adding, changing or removing a role, a role's short label on the career timeline (x-short), a highlight, skill, headline, lead or contact detail, or when asked whether the resume still builds at 2 pages.
 ---
 
 # Edit the resume
 
-`resume.yaml` is the one resume source. The PDF, Word and text documents, the site and the chat all read it. One commit carries the whole edit: `resume.yaml`, the documents rebuilt in `documents/`, and any snapshot the edit changes.
+`resume.yaml` is the one resume source. The PDF, Word and text documents, the site and the chat all read it.
 
 ## 1. Trace every fact
 
@@ -23,12 +23,17 @@ Done when every new or changed fact has a source.
 - Dates are `YYYY` or `YYYY-MM`. Titles and dates match HR records exactly.
 - A highlight states what Peter did, then its scale or result: "Cut initial bundle size from over 15 MB to under 1 MB across multiple applications …".
 - Use real typographic characters: ’ for apostrophes, – in ranges.
-- The phone number and any other private detail go in `private.yaml`, never in `resume.yaml`.
-- Each role has `x-short`, its short label on the career timeline. Only the site reads it; no document prints it. The schema requires it, so a new role needs one.
+- A private contact detail, such as the phone number, goes only in the untracked `private.yaml`, never in `resume.yaml` ([decision 0006](../../../docs/decisions/0006-public-repo-private-details.md)).
 
-Peter approves each new or changed `x-short` value ([SPEC-content](../../../spec/SPEC-content.md), Acceptance). Ask him through `brain:ask-user-question`, and recommend a short name: the label stays on one line, and a label longer than its role's span ends in an ellipsis ([SPEC-site](../../../spec/SPEC-site.md), Views, "Labels"). Record his answer, quoted, in a new row of the decision record (`docs/design/interview-*.md`).
+Each role has `x-short`, its short label on the career timeline:
 
-Done when `git diff resume.yaml` shows each traced change and nothing else, and a decision record row quotes Peter's approval of each new or changed `x-short`.
+- Only the site reads it. No document prints it.
+- The schema requires it, so a new role needs one.
+- A short value fits the role's span; [SPEC-site](../../../spec/SPEC-site.md), Views, "Labels", says how a longer one shows.
+- While [T1's wording draft](../../../docs/design/wording-drafts/T1.md) has the status `wording draft`, write each new or changed value into its table, and keep that status. Peter approves the draft in his one review before D37 (row 153).
+- Once that draft is approved, ask Peter about each new or changed value through `brain:ask-user-question`. Record his answer, quoted, in a new row of the decision record, `docs/design/interview-<date>.md`.
+
+Done when `git diff resume.yaml` shows each traced change and nothing else, and each new or changed `x-short` value is in T1's wording draft or quoted in a new decision record row.
 
 ## 3. Build and look
 
@@ -71,7 +76,12 @@ Done when Peter approved the commit, or named changes; changes go back to step 1
 
 ## 7. Commit and push
 
-Run the before-commit checks ([AGENTS.md](../../../AGENTS.md), "Verify"). Make one commit, with each file staged by name: `resume.yaml`, the files in `documents/` that step 4 changed, any snapshot that step 5 updated, and the decision record rows of step 2.
+Run the before-commit checks ([AGENTS.md](../../../AGENTS.md), "Verify"). Make one commit, with each file staged by name:
+
+- `resume.yaml`;
+- the files in `documents/` that step 4 changed;
+- any snapshot that step 5 updated;
+- from step 2, T1's wording draft, or the new row in the decision record, `docs/design/interview-<date>.md`.
 
 `resume.yaml` and `documents/` are site files, so the push to `main` is a release. Push with the [release skill](../release/SKILL.md).
 
