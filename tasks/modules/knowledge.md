@@ -11,7 +11,7 @@ Spec: [SPEC-knowledge](../../spec/SPEC-knowledge.md), approved with decisions 00
 - **Three move batches, not one.** The five-file rule splits the move into three tasks of three deep dives, so Peter answers three approval questions.
 - **K5 and K10 share the checks.** K5 writes the rules on approved sources so that they return every problem, and the build stops with them; K10 reuses them, so `previewDraft()` names each broken rule.
 - **K10 finds a draft among the files in `knowledge/sources/`** instead of joining the id into a path, so `--draft <id>` cannot read a file outside that folder. K7 looks ids up in the built knowledge only (a `Map`), so an id such as `__proto__` is unknown, not a crash.
-- K5 and K6 both edit `src/knowledge/build.ts` and `tests/knowledge/build.test.ts`; run them one after the other.
+- K5 and K6 both edit `src/knowledge/build.ts` and `src/knowledge/__tests__/build.test.ts`; run them one after the other.
 - **The `x-short` fixture.** Content's T1 makes each role's `x-short` required, so the knowledge test fixture's `resume.yaml` needs it too. Whichever of T1 and the K tasks lands second updates that fixture.
 
 ## Tasks
@@ -24,8 +24,8 @@ Acceptance:
 - `src/knowledge/ids.ts` holds the grammar: slug `[a-z0-9]+(-[a-z0-9]+)*` of at most 60 characters, `n` from 1, a source id (a slug, never `basics` or `education`), a passage id of at most 64 characters, and the resume entry and logistics id forms; `toSlug()` moves there and `ID_PATTERN` is gone (Ids; Prior-art tests).
 - A fixture role id or logistics topic that is not a slug, or a skills group whose name gives no slug, stops `buildKnowledge()` with a message that names the file and the field (Ids: "the build stops on one that is not").
 - K1 picks the export names of `src/knowledge/ids.ts` and records them in SPEC-knowledge, so the site and chat tasks can cite them (main's decision, 2026-10-27). The fixture's `resume.yaml` keeps each role's `x-short` if T1 has landed first; otherwise T1 adds it.
-Verify: `bun test tests/knowledge`; the existing core snapshot passes unchanged and `bun run knowledge` prints the same text as before.
-Files: `src/knowledge/ids.ts`, `src/knowledge/build.ts`, `tests/knowledge/build.test.ts`, `tests/knowledge/fixtures.ts` (the fixture folder helper moves here, so later tests and content's `x-short` change edit one place), `spec/SPEC-knowledge.md` (the export names)
+Verify: `bun test src/knowledge`; the existing core snapshot passes unchanged and `bun run knowledge` prints the same text as before.
+Files: `src/knowledge/ids.ts`, `src/knowledge/build.ts`, `src/knowledge/__tests__/build.test.ts`, `src/knowledge/__tests__/fixtures.ts` (the fixture folder helper moves here, so later tests and content's `x-short` change edit one place), `spec/SPEC-knowledge.md` (the export names)
 Size: S
 Needs Peter: no
 
@@ -37,8 +37,8 @@ Acceptance:
 - Front matter for both kinds is read with a strict schema (`id`, `title`, `kind`, `subject`, `roles`, `highlights`, `summary`, `links`, `status`, `approved`, `source`); the file name is `<id>.md`; highlight ids have the form `highlight:<role id>.<n>` and only a deep dive may have them; an approved source needs its `approved:` date (Sources).
 - Every `## ` section except `Not public` is a passage `<id>.<n>`, numbered from 1 in file order; `Not public` comes last and has no passage id; a deep dive has its six sections in order; an interview's "(continued)" heading comes directly after the heading it continues; text before the first section, a missing section or an unknown deep-dive section stops it (Sources; Testing Strategy 2).
 - In an approved source a passage over 3,000 characters, or a summary that is not one line of at most 200 characters, stops it; a draft passes both (Objective; Sources, "Summary"; Drafts and approval).
-Verify: `bun test tests/knowledge/parse.test.ts`
-Files: `src/knowledge/parse.ts`, `tests/knowledge/parse.test.ts`, `tests/knowledge/fixtures.ts`
+Verify: `bun test src/knowledge/__tests__/parse.test.ts`
+Files: `src/knowledge/parse.ts`, `src/knowledge/__tests__/parse.test.ts`, `src/knowledge/__tests__/fixtures.ts`
 Size: M
 Needs Peter: no
 
@@ -50,8 +50,8 @@ Acceptance:
 - On fixtures the core comes in a fixed order: resume entries, approved logistics answers, then one catalog entry per approved source in source-id order; a draft source file reaches neither the catalog nor `sources` (Objective; Testing Strategy 1; replaces the old order and draft tests).
 - `renderCore()` prints `# Resume`, `# Job-search logistics` and `# Catalog`; a catalog line reads `[<source id>] <title>: <kind>, roles <role ids>. <summary>`, without "roles" when the source has none (Rendered text; replaces the `renderKnowledge()` snapshot with a `renderCore()` snapshot of the real files).
 - The rendered core of the real files stays under 80,000 characters, and `bun run knowledge` prints the core and its size against that budget; the `deep:` form, `renderKnowledge()` and `KNOWLEDGE_BUDGET` are gone (Objective; Prior-art tests).
-Verify: `bun test tests/knowledge`; `bun run knowledge` (an empty catalog until K11, see the notes)
-Files: `src/knowledge/build.ts`, `src/knowledge/render.ts`, `scripts/knowledge.ts`, `tests/knowledge/build.test.ts`
+Verify: `bun test src/knowledge`; `bun run knowledge` (an empty catalog until K11, see the notes)
+Files: `src/knowledge/build.ts`, `src/knowledge/render.ts`, `scripts/knowledge.ts`, `src/knowledge/__tests__/build.test.ts`
 Size: M
 Needs Peter: no
 
@@ -61,9 +61,9 @@ Delivers: the knowledge module has one parser, and none of the old contract's as
 Blocked by: K3
 Acceptance:
 - `parseDeepDive()`, its tests and the old fixture front matter (`role: acme`, `highlights: [1]`) are removed; the fixtures build `parseSource()` files only (Prior-art tests: "keeps none of them").
-- `bun test tests/knowledge` passes with none of the old contract's assertions left (Prior-art tests).
-Verify: `bun test tests/knowledge`; `grep -rn "parseDeepDive\|deep:" src tests scripts` finds nothing
-Files: `src/knowledge/parse.ts`, `tests/knowledge/parse.test.ts`, `tests/knowledge/fixtures.ts`, `knowledge/deep-dives/.gitkeep` (removed; the folder empties as K11 to K13 move its nine files)
+- `bun test src/knowledge` passes with none of the old contract's assertions left (Prior-art tests).
+Verify: `bun test src/knowledge`; `grep -rn "parseDeepDive\|deep:" src scripts` finds nothing
+Files: `src/knowledge/parse.ts`, `src/knowledge/__tests__/parse.test.ts`, `src/knowledge/__tests__/fixtures.ts`, `knowledge/deep-dives/.gitkeep` (removed; the folder empties as K11 to K13 move its nine files)
 Size: S
 Needs Peter: no
 
@@ -75,8 +75,8 @@ Acceptance:
 - A source id with a capital letter, an underscore, two hyphens together, 61 characters, `basics` or `education` stops the build; every id in the knowledge base is unique (Ids; Testing Strategy 1).
 - A role id in `roles` or a highlight id in `highlights` that `resume.yaml` does not have, a link that is not an absolute `https://` URL or that holds a user name or password, a URL or email address in `Not public`, and a passage with no text each stop the build: an approved passage holds text, and only `Not public` may be empty (Sources; main's decision 2026-10-27, the old parser's rule; replaces the old role and highlight test).
 - A draft with an unknown role or an oversized passage still builds; a draft with broken front matter or sections stops it (Drafts and approval; Testing Strategy 1).
-Verify: `bun test tests/knowledge`
-Files: `src/knowledge/build.ts`, `src/knowledge/ids.ts`, `tests/knowledge/build.test.ts`
+Verify: `bun test src/knowledge`
+Files: `src/knowledge/build.ts`, `src/knowledge/ids.ts`, `src/knowledge/__tests__/build.test.ts`
 Size: M
 Needs Peter: no
 
@@ -88,8 +88,8 @@ Acceptance:
 - `renderSource()` gives `# [<id>] <title>`, the kind line of a deep dive or an interview, the Roles, Highlights and Links line with only its parts that are not empty (left out when all three are empty), `## [<id>.<n>] <heading>` for each passage asked for (all when omitted) in file order, then `## Not public: decline to describe these kinds of material` with its text or "Nothing listed." (Rendered text; checked against literal text on fixtures).
 - A rendered approved source over 24,000 characters stops the build; the fixture `private.yaml`'s fake phone number appears in neither the core nor any rendered source; `bun run knowledge` prints each source's size (Objective; Testing Strategy 1; Prior-art tests).
 - A fixture source's rendered text has a snapshot, and a snapshot of the real files lists every approved source's passage ids with their headings, which may only grow at the end of a source's list (Testing Strategy 1, append-only).
-Verify: `bun test tests/knowledge`; `bun run knowledge`
-Files: `src/knowledge/render.ts`, `src/knowledge/build.ts`, `scripts/knowledge.ts`, `tests/knowledge/build.test.ts`
+Verify: `bun test src/knowledge`; `bun run knowledge`
+Files: `src/knowledge/render.ts`, `src/knowledge/build.ts`, `scripts/knowledge.ts`, `src/knowledge/__tests__/build.test.ts`
 Size: M
 Needs Peter: no
 
@@ -101,8 +101,8 @@ Acceptance:
 - A source id reads all its passages and a passage id reads one; a draft's id, a resume entry id and any other id (`__proto__` among them) go to `unknown`, each once, in the order asked (`readPassages()` rules).
 - The text groups passages by source, in the order each source first appears, in file order within a source, with one header and one `Not public` section per source, also for a single passage; an id whose passages are already in the text adds nothing; `read` lists each id whose text is in the result once, in the order asked (`readPassages()` rules).
 - `bun run knowledge <source id>` prints the `text` of `readPassages(knowledge, [<source id>])`, and its `unknown` ids (Commands).
-Verify: `bun test tests/knowledge/read.test.ts` (seam 1, in its own file); `bun run knowledge no-such-source` names the id as unknown (real sources exist only after K11)
-Files: `src/knowledge/read.ts`, `tests/knowledge/read.test.ts`, `tests/knowledge/fixtures.ts`, `scripts/knowledge.ts`
+Verify: `bun test src/knowledge/__tests__/read.test.ts` (seam 1, in its own file); `bun run knowledge no-such-source` names the id as unknown (real sources exist only after K11)
+Files: `src/knowledge/read.ts`, `src/knowledge/__tests__/read.test.ts`, `src/knowledge/__tests__/fixtures.ts`, `scripts/knowledge.ts`
 Size: M
 Needs Peter: no
 
@@ -113,8 +113,8 @@ Blocked by: K7
 Acceptance:
 - `readLimits` is `{ ids: 20, idCharacters: 64, characters: 24_000 }`; more than 20 ids, or an id over 64 characters, throws (Code Style; `readPassages()` rules).
 - The 24,000 characters count all of `text`; when the next id would take `text` past them, the read stops, that id and every later id it knows and has not read go to `skipped` in order, and `unknown` still lists each later unknown id once (`readPassages()` rules).
-Verify: `bun test tests/knowledge/read.test.ts`
-Files: `src/knowledge/read.ts`, `tests/knowledge/read.test.ts`
+Verify: `bun test src/knowledge/__tests__/read.test.ts`
+Files: `src/knowledge/read.ts`, `src/knowledge/__tests__/read.test.ts`
 Size: S
 Needs Peter: no
 
@@ -125,8 +125,8 @@ Blocked by: K3
 Acceptance:
 - Its JSON holds no fixture `Not public` text, and the rest equals the output of `buildKnowledge()` (Testing Strategy 1).
 - Its type is `{ core: Entry[]; sources: Omit<Source, "notPublic">[] }` (Code Style, "Who gets which shape").
-Verify: `bun test tests/knowledge`
-Files: `src/knowledge/build.ts`, `tests/knowledge/build.test.ts`
+Verify: `bun test src/knowledge`
+Files: `src/knowledge/build.ts`, `src/knowledge/__tests__/build.test.ts`
 Size: S
 Needs Peter: no
 
@@ -138,8 +138,8 @@ Acceptance:
 - `previewDraft({ root, id })` applies every rule now and names each rule a fixture draft breaks (Drafts and approval; Testing Strategy 1).
 - Its text equals what `renderSource()` gives once the draft is approved (Testing Strategy 1).
 - `bun run knowledge --draft <source id>` prints the text and then each broken rule; `knowledge/README.md` describes `knowledge/sources/` (deep dives and interviews), `logistics.yaml` and the three commands (Commands; STATUS "Next").
-Verify: `bun test tests/knowledge`; with a temporary, uncommitted draft file in `knowledge/sources/`, `bun run knowledge --draft <its id>` prints its text and each broken rule
-Files: `src/knowledge/build.ts`, `scripts/knowledge.ts`, `tests/knowledge/build.test.ts`, `knowledge/README.md`
+Verify: `bun test src/knowledge`; with a temporary, uncommitted draft file in `knowledge/sources/`, `bun run knowledge --draft <its id>` prints its text and each broken rule
+Files: `src/knowledge/build.ts`, `scripts/knowledge.ts`, `src/knowledge/__tests__/build.test.ts`, `knowledge/README.md`
 Size: M
 Needs Peter: no
 
@@ -151,8 +151,8 @@ Acceptance:
 - Each file moves with `git mv` and only its front matter changes: `kind: deep-dive`, `subject: project`, `roles: [<role id>]`, `highlights` as highlight ids, `links: []`, and a one-line summary of at most 200 characters written from the source; no passage text changes (Sources, "Deep dive").
 - The change waits on a branch until Peter approves it in the question tool, after he reads each with `bun run knowledge <source id>` on the branch and sees the passage-id snapshot diff; it lands on `main` with the new `approved:` date, and the decision record gets a row with the source ids and that date (Drafts and approval; the edit rule, row 130).
 - On `main`, `bun run knowledge` shows the three catalog entries, and the passage-id snapshot gained exactly their three lists (append-only).
-Verify: on the branch `bun test tests/knowledge` and `bun run knowledge <source id>` for each; after landing `bun run knowledge`
-Files: `knowledge/sources/fednow-architecture.md`, `knowledge/sources/fednow-bundle-size.md`, `knowledge/sources/fednow-design-system.md`, `tests/knowledge/__snapshots__/build.test.ts.snap`, `docs/design/interview-2026-10-26.md`
+Verify: on the branch `bun test src/knowledge` and `bun run knowledge <source id>` for each; after landing `bun run knowledge`
+Files: `knowledge/sources/fednow-architecture.md`, `knowledge/sources/fednow-bundle-size.md`, `knowledge/sources/fednow-design-system.md`, `src/knowledge/__tests__/__snapshots__/build.test.ts.snap`, `docs/design/interview-2026-10-26.md`
 Size: S
 Needs Peter: yes. Approval in the question tool of the three summaries and the moved files (edit rule, row 130). The push changes site files (the site build reads `knowledge/`), so it is also a release, which Peter approves.
 
@@ -165,7 +165,7 @@ Acceptance:
 - As K11, second bullet: on a branch, Peter's approval in the question tool, a new `approved:` date and a decision record row.
 - As K11, third bullet, for these three.
 Verify: as K11
-Files: `knowledge/sources/fednow-standards-mentoring.md`, `knowledge/sources/highspot-agent-workflow.md`, `knowledge/sources/highspot-ai-standards.md`, `tests/knowledge/__snapshots__/build.test.ts.snap`, `docs/design/interview-2026-10-26.md`
+Files: `knowledge/sources/fednow-standards-mentoring.md`, `knowledge/sources/highspot-agent-workflow.md`, `knowledge/sources/highspot-ai-standards.md`, `src/knowledge/__tests__/__snapshots__/build.test.ts.snap`, `docs/design/interview-2026-10-26.md`
 Size: S
 Needs Peter: yes, as K11.
 
@@ -178,7 +178,7 @@ Acceptance:
 - As K11, second bullet: on a branch, Peter's approval in the question tool, a new `approved:` date and a decision record row.
 - As K11, third bullet, for these three.
 Verify: as K11
-Files: `knowledge/sources/highspot-data-table.md`, `knowledge/sources/highspot-mcp-server.md`, `knowledge/sources/highspot-streaming-markdown.md`, `tests/knowledge/__snapshots__/build.test.ts.snap`, `docs/design/interview-2026-10-26.md`
+Files: `knowledge/sources/highspot-data-table.md`, `knowledge/sources/highspot-mcp-server.md`, `knowledge/sources/highspot-streaming-markdown.md`, `src/knowledge/__tests__/__snapshots__/build.test.ts.snap`, `docs/design/interview-2026-10-26.md`
 Size: S
 Needs Peter: yes, as K11.
 
@@ -206,4 +206,4 @@ After K5 to K10. The knowledge contract in the capability map (`spec/README.md`,
 
 ### Checkpoint knowledge: lands
 
-After K11 to K13. SPEC-knowledge's success criteria: `bun test tests/knowledge` passes on a clean checkout; `bun run knowledge` prints a core under 80,000 characters with nine catalog entries, and every source is under 24,000 characters; `knowledge/deep-dives/` no longer exists; three decision record rows hold the approvals. The knowledge rows of `AGENTS.md`'s Modules table and `spec/README.md` say built, the fresh-session check passes, and STATUS is rewritten.
+After K11 to K13. SPEC-knowledge's success criteria: `bun test src/knowledge` passes on a clean checkout; `bun run knowledge` prints a core under 80,000 characters with nine catalog entries, and every source is under 24,000 characters; `knowledge/deep-dives/` no longer exists; three decision record rows hold the approvals. The knowledge rows of `AGENTS.md`'s Modules table and `spec/README.md` say built, the fresh-session check passes, and STATUS is rewritten.

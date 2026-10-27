@@ -28,3 +28,4 @@ These records explain the choices behind this repository and their reasons. Numb
 | [0022](0022-question-log-store.md) | The question log lives in Upstash Redis, pay as you go, with one list per day that expires |
 | [0023](0023-static-site-build-time-data.md) | The site is static files with build-time data; only the three API routes run as functions |
 | [0024](0024-private-interview-repo.md) | Raw interview answers live in a private GitHub repo, never in this public one |
+| [0025](0025-tests-beside-code.md) | Tests live in `__tests__/` beside the code they test |

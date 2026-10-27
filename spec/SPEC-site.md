@@ -196,7 +196,7 @@ bun run build:site        # scripts/build-site.ts (SPEC-deploy): buildSite(), th
 bun run icons             # renders the app icon and the favicon with Chrome into public/icons/; commit the files
 bun run preview           # serves .vercel/output/ at http://localhost:4173 as Vercel does, the API routes included
 bun run preview --dir <folder>  # serves the .vercel/output/ in <folder>, as `bun run build:site --out <folder>` writes it (the tests' temporary folder)
-bun test tests/site       # this module's tests: the build output and the browser test
+bun test src/site       # this module's tests: the build output and the browser test
 bun test                  # every test
 bun run build             # the documents only, unchanged (content module)
 ```
@@ -224,8 +224,8 @@ scripts/icons.ts             `bun run icons`: renders the icons with Chrome into
 scripts/preview-site.ts      `bun run preview [--dir <folder>]`: Bun.serve over `<folder>/.vercel/output/` (default: the repo root's) with the routes of its config.json
 public/icons/                the committed icons: 192 px, 512 px, maskable 512 px and the favicon
 vite.config.ts               TanStack Start, React, Nitro and prerender settings; adds the chat's Vite plugin
-tests/site/build.test.ts     seam 1: the build output
-tests/site/browser.test.ts   seam 2: the real-browser test
+src/site/__tests__/build.test.ts  seam 1: the build output
+src/site/__tests__/browser.test.ts  seam 2: the real-browser test
 .vercel/output/              site output; ignored by git
 ```
 
@@ -384,13 +384,13 @@ Peter approved this contract on 2026-10-27 ([decision record](../docs/design/int
 
 ## Prior-art tests
 
-- `tests/content/build.test.ts`: runs `build()` into a temporary folder and checks the real files. Seam 1 follows it with the build script's five steps.
-- `tests/knowledge/build.test.ts`: fixture `private.yaml` with a fake phone number, and checks that it reaches no output.
+- `src/__tests__/build.test.ts`: runs `build()` into a temporary folder and checks the real files. Seam 1 follows it with the build script's five steps.
+- `src/knowledge/__tests__/build.test.ts`: fixture `private.yaml` with a fake phone number, and checks that it reaches no output.
 - The offline check in [research 09](../docs/research/09-site-feasibility.md): Playwright in Chromium under Bun, network off after one visit. Seam 2 grows from it.
 
 ## Success Criteria
 
-- `bun test tests/site` passes on a clean checkout with Chrome installed. It builds its own output first, so it needs no earlier `.vercel/output/`.
+- `bun test src/site` passes on a clean checkout with Chrome installed. It builds its own output first, so it needs no earlier `.vercel/output/`.
 - Peter reviews the running preview against the approved mockups at desktop and phone sizes, in light and dark, and approves it.
 
 ## Open Questions

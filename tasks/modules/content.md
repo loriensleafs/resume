@@ -17,8 +17,8 @@ Acceptance:
 - Each role in `resume.yaml` has `x-short`, marked `# extension`, with the approved value. The mockup labels (SPEC-site, Labels) are "Brigham and Women’s", "Six Red Marbles", "HBS", "Jack Morton", "Sheridan", "LinkSquares", "Pippin", "FedNow" and "Highspot". The schema in `src/content.ts` requires the field, so a role without it stops the build, and the message names the file and the field (SPEC-content, Acceptance).
 - The renderer unit tests show that `renderText`, `renderPrintHtml` and `renderDocx` print no role's `x-short` (seam 2). The fixture uses a label that appears nowhere else, such as "ACME-SHORT", so the test can fail.
 - `bun run build` still writes a 2-page PDF, and the text file's snapshot does not change (seam 1). This is independent proof that no document prints the field.
-Verify: `bun run build`; `bun test tests/content tests/knowledge`; `bun test`
-Files: `resume.yaml`, `src/content.ts`, `tests/content/render.test.ts`, `tests/content/build.test.ts` (the `base` fixture gains `x-short`), and the knowledge test fixture's `resume.yaml` (in `tests/knowledge/build.test.ts`, or in `tests/knowledge/fixtures.ts` once K1 has moved it), which gains `x-short` or the knowledge tests break. Whichever of T1 and the K tasks lands second updates that fixture.
+Verify: `bun run build`; `bun test src/__tests__ src/knowledge`; `bun test`
+Files: `resume.yaml`, `src/content.ts`, `src/__tests__/render.test.ts`, `src/__tests__/build.test.ts` (the `base` fixture gains `x-short`), and the knowledge test fixture's `resume.yaml` (in `src/knowledge/__tests__/build.test.ts`, or in `src/knowledge/__tests__/fixtures.ts` once K1 has moved it), which gains `x-short` or the knowledge tests break. Whichever of T1 and the K tasks lands second updates that fixture.
 Size: M
 Needs Peter: approval of each value (SPEC-content, Acceptance). The answer goes in the decision record. Ask about the apostrophe in the same question: SPEC-site writes "Brigham and Women's" with a straight apostrophe, and SPEC-content's Code Style asks for curly apostrophes. The recommendation is the curly one, as in "Brigham and Women’s Hospital". The push is a release.
 
@@ -29,9 +29,9 @@ Blocked by: none. T1 first is preferred. T2 can run first if Peter has not yet a
 Acceptance:
 - `bun run documents` builds the public variant in a temporary folder and writes `documents/Peter-Kloss-Resume.pdf`, `.docx`, `.txt` and `inputs.sha256`. When the hash has not changed, it writes nothing and says so (SPEC-content, Acceptance).
 - The hash covers `resume.yaml`, the module's source files (`src/content.ts`, `src/build.ts`, `src/print/`, `src/export/` and `scripts/documents.ts`), `fonts/`, and the top-level `bun.lock` entries of `zod`, `docx` and `harfbuzzjs`. It covers nothing else from `bun.lock`.
-- `tests/content/documents.test.ts` (seam 3, first check): the hash of the current inputs equals `documents/inputs.sha256`. On a mismatch, the failure names `bun run documents` (SPEC-content, story 16).
-Verify: `bun run documents`; run it again and check that `git status --short documents/` shows no new change; `bun test tests/content`. By hand: change one word of `resume.yaml`, see the documents test fail with the command's name, then revert.
-Files: `scripts/documents.ts`, `package.json` (script `documents`), `tests/content/documents.test.ts`, `documents/` (four generated files), `scripts/build.ts` (its `--public` comment: the website uses `documents/`; SPEC-deploy's amendment to SPEC-content)
+- `scripts/__tests__/documents.test.ts` (seam 3, first check): the hash of the current inputs equals `documents/inputs.sha256`. On a mismatch, the failure names `bun run documents` (SPEC-content, story 16).
+Verify: `bun run documents`; run it again and check that `git status --short documents/` shows no new change; `bun test src/__tests__ scripts/__tests__/documents`. By hand: change one word of `resume.yaml`, see the documents test fail with the command's name, then revert.
+Files: `scripts/documents.ts`, `package.json` (script `documents`), `scripts/__tests__/documents.test.ts`, `documents/` (four generated files), `scripts/build.ts` (its `--public` comment: the website uses `documents/`; SPEC-deploy's amendment to SPEC-content)
 Size: M
 Needs Peter: no decision. `documents/` and the scripts are site files, so the push is a release.
 Notes: the hash function lives in `scripts/documents.ts` behind `import.meta.main`. The test can then import it without running the script, and the files stay where SPEC-content's Project Structure puts them. The source-file list above is the content planner's reading of "this module's source files" in the Project Structure. It is a small choice that can be reversed. A reviewer can trim it.
@@ -44,8 +44,8 @@ Acceptance:
 - The committed PDF has exactly 2 pages, is US Letter and tagged, and embeds every font (`pdfinfo`, `pdffonts`; SPEC-content, Testing Strategy 3).
 - A fresh public build in a temporary folder has the same text as the committed files, with spacing ignored. This covers the text file, the PDF's text from `pdftotext`, and the Word file's `word/document.xml` text.
 - Where `private.yaml` exists, the phone number is in none of the committed documents' extracted text. Without `private.yaml` (CI, fresh clones), the check skips.
-Verify: `bun test tests/content/documents.test.ts`; `bun test`. By hand: replace `documents/Peter-Kloss-Resume.txt` with an edited copy, see the test name the text file, then restore it.
-Files: `tests/content/documents.test.ts`
+Verify: `bun test scripts/__tests__/documents.test.ts`; `bun test`. By hand: replace `documents/Peter-Kloss-Resume.txt` with an edited copy, see the test name the text file, then restore it.
+Files: `scripts/__tests__/documents.test.ts`
 Size: S
 Needs Peter: no
 Notes: keep the `pdftotext` and Word-text helpers inside the test file. A shared helper outside `*.test.ts` would be a site file under SPEC-deploy's docs-only list, so every change to it would be a release.
@@ -55,7 +55,7 @@ Notes: keep the `pdftotext` and Word-text helpers inside the test file. A shared
 Delivers: `AGENTS.md`, the capability map and STATUS show content as built with its amendments. A fresh session told only "continue" names the next task's spec.
 Blocked by: T1, T3, A1
 Acceptance:
-- In `AGENTS.md`, the content row of the Modules table lists the folders as built (`resume.yaml`, `src/content.ts`, `src/build.ts`, `documents/`), `bun test tests/content`, and the state "built". In `spec/README.md`, the content row says built (SPEC-agents, Code Style: "The task that builds a module updates its row").
+- In `AGENTS.md`, the content row of the Modules table lists the folders as built (`resume.yaml`, `src/content.ts`, `src/build.ts`, `documents/`), `bun test src/__tests__ scripts/__tests__/documents`, and the state "built". In `spec/README.md`, the content row says built (SPEC-agents, Code Style: "The task that builds a module updates its row").
 - The fresh-session check passes, and its result is in `docs/STATUS.md`. A sub-agent in a fresh clone is told only "continue", and Peter reads the result. It reports the phase, the last step, the next step, anything red and the pending decisions in 5 lines or fewer, and it names the next task's spec (SPEC-agents, Testing Strategy 2).
 - Research 12 records the fixed-date verdict from "Settled before the tasks".
 Verify: `bun test`; the fresh-session check (a sub-agent in a fresh clone)

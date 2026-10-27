@@ -4,8 +4,8 @@ Spec: [SPEC-deploy](../../spec/SPEC-deploy.md). The order is in [todo.md](../tod
 
 ## Notes
 
-- **Seams** are the three the spec confirms (row 117): seam 1, the site build output and the docs-only scripts (`tests/site/config.test.ts`, `tests/site/docs-only.test.ts`); seam 2, the ops module (`tests/ops/ops.test.ts`); seam 3, the smoke check against the preview (`tests/site/smoke.test.ts`). The real platform has no local seam; the spike, the release check, the health checks and setup step 13 check it (Testing Strategy, last line).
-- **Unit checks only for the build steps.** Deploy's `tests/site/config.test.ts` checks `addPolicyTags()` and `writeVercelConfig()` at unit level; the built-output checks (each page's policy tag, no `style=` attribute) live once, in the site's build test (main's decision, 2026-10-27).
+- **Seams** are the three the spec confirms (row 117): seam 1, the site build output and the docs-only scripts (`src/deploy/__tests__/config.test.ts`, `scripts/__tests__/docs-only.test.ts`); seam 2, the ops module (`src/ops/__tests__/ops.test.ts`); seam 3, the smoke check against the preview (`scripts/__tests__/smoke.test.ts`). The real platform has no local seam; the spike, the release check, the health checks and setup step 13 check it (Testing Strategy, last line).
+- **Unit checks only for the build steps.** Deploy's `src/deploy/__tests__/config.test.ts` checks `addPolicyTags()` and `writeVercelConfig()` at unit level; the built-output checks (each page's policy tag, no `style=` attribute) live once, in the site's build test (main's decision, 2026-10-27).
 - **The spike** (D1 to D6) is first, because its 12 checks settle rules that later tasks build on. Its branch `prototype/deploy-spike` starts from `prototype/csp-probe` and copies its site spike (`prototypes/csp-probe/`, TanStack Start with Nitro's Vercel preset) and `prototypes/nitro-vercel-output/` into `prototypes/deploy-spike/`. Spike code never reaches `main` (brain's prototype rules); its verdicts go into `prototypes/deploy-spike/README.md` on the branch, then D6 copies them to research 12 and the spec. The checks reach the protected deployment through a push-triggered workflow on the spike branch that holds the bypass secret as an Actions secret and prints verdicts only. Check 12 needs a workflow on `main`, so it runs at D32 and setup step 10.
 - **Composition roots.** `scripts/build-site.ts` is deploy's file, but the module that provides a step wires it in: S28 adds the `writeServiceWorker()` call as step 4, and the chat's Vite plugin goes into `vite.config.ts` (C16). `--root` on the build script is the main session's addition to SPEC-deploy, from the site's edges.
 
@@ -113,21 +113,21 @@ Acceptance:
 - `vercel.json` holds only the build settings: `bunVersion` `1.4.x`, `framework: null`, `installCommand` `bun ci` (or the 1.4.2 installer if check 1 failed), `buildCommand` `bun run build:site`, `ignoreCommand` `sh scripts/ignore-build.sh`.
 - `.gitignore` gains `.secrets/`, `.env*` and `.vercel/`; a test fails when any `.env*` file exists in the checkout.
 - Research 12 records whether `bunfig.toml` can turn Bun's automatic `.env` loading off ("Secrets and settings"); if it can, `bunfig.toml` does.
-Verify: `bun test tests/site/config.test.ts`; `bun test`
-Files: `vercel.json`, `.gitignore`, `bunfig.toml` (only if supported), `tests/site/config.test.ts`, `docs/research/12-deploy-platform.md`
+Verify: `bun test src/deploy/__tests__/config.test.ts`; `bun test`
+Files: `vercel.json`, `.gitignore`, `bunfig.toml` (only if supported), `src/deploy/__tests__/config.test.ts`, `docs/research/12-deploy-platform.md`
 Size: S
 Needs Peter: no
 
 ### D9: `createOps()` gives in-memory parts outside production
 
 Delivers: The chat's route file can build its `ChatDeps` from `createOps(process.env)`: outside production the log, budget and telemetry are in memory, and `PREVIEW_LIMIT` lets a preview show the "limit reached" state.
-Blocked by: C2 (the `QuestionLog`, `QuestionLogEntry`, `Budget`, `Telemetry` and `ChatTurnEvent` types in `src/chat/server/question-log.ts` and `src/chat/server/telemetry.ts`, with the QuestionLog contract suite `tests/chat/question-log-contract.ts`). D9 waits on nothing else, and C17 waits on D9.
+Blocked by: C2 (the `QuestionLog`, `QuestionLogEntry`, `Budget`, `Telemetry` and `ChatTurnEvent` types in `src/chat/server/question-log.ts` and `src/chat/server/telemetry.ts`, with the QuestionLog contract suite `src/chat/server/__tests__/question-log-contract.ts`). D9 waits on nothing else, and C17 waits on D9.
 Acceptance:
 - Outside production, `createOps()` gives an in-memory log, budget and telemetry; SPEC-chat's QuestionLog contract suite passes against the log, and the budget allows every turn.
 - With `PREVIEW_LIMIT` `day` or `month` outside production, `budget.reserve()` refuses every turn with `DAILY_LIMIT` or `SPEND_LIMIT`; in production the variable is ignored.
 - With `VERCEL_ENV` `preview` and the store variables set, no server is called (Testing Strategy, "Guards").
-Verify: `bun test tests/ops`
-Files: `src/ops/ops.ts`, `tests/ops/ops.test.ts`, `tests/ops/fake-upstash.ts`
+Verify: `bun test src/ops`
+Files: `src/ops/ops.ts`, `src/ops/__tests__/ops.test.ts`, `src/ops/__tests__/fake-upstash.ts`
 Size: M
 Needs Peter: no
 
@@ -138,8 +138,8 @@ Blocked by: D9, D6 (spike check 9)
 Acceptance:
 - In production, the QuestionLog contract suite passes against the Upstash log on the in-test Upstash server, through the REST API with `fetch` and `Authorization: Bearer` and no package.
 - A day's `qlog:<day>` key expires at 00:00 UTC on the 90th day after its day, and each write's commands arrive as one `/multi-exec` transaction.
-Verify: `bun test tests/ops`
-Files: `src/ops/upstash.ts`, `src/ops/ops.ts`, `tests/ops/fake-upstash.ts`, `tests/ops/ops.test.ts`
+Verify: `bun test src/ops`
+Files: `src/ops/upstash.ts`, `src/ops/ops.ts`, `src/ops/__tests__/fake-upstash.ts`, `src/ops/__tests__/ops.test.ts`
 Size: M
 Needs Peter: no
 
@@ -150,8 +150,8 @@ Blocked by: D10
 Acceptance:
 - 25 parallel `reserve()` calls on an empty day: 8 succeed and 17 refuse with `DAILY_LIMIT`; the reservation and the cap live in `src/ops/limits.ts`.
 - After the first refusal, the same function instance refuses that day with no store call; the next UTC day allows turns again.
-Verify: `bun test tests/ops`
-Files: `src/ops/limits.ts`, `src/ops/upstash.ts`, `src/ops/ops.ts`, `tests/ops/ops.test.ts`
+Verify: `bun test src/ops`
+Files: `src/ops/limits.ts`, `src/ops/upstash.ts`, `src/ops/ops.ts`, `src/ops/__tests__/ops.test.ts`
 Size: M
 Needs Peter: no (the values are the approved ones, rows 121 and 131)
 
@@ -163,8 +163,8 @@ Acceptance:
 - `telemetry.record()` prints the `chat_turn` line and adds the turn to `qstats`, `qslow` and the month; `totals(1)` shows the outcome counts, the five token counts and the longest duration.
 - A turn with known token counts, 1-hour writes among them, adds the worked example's cost from `limits.ts`, counted by hand; settling a smaller real cost frees room for another turn; a turn with `null` counts, or whose last model call did not finish (a stopped turn, a `DEADLINE` turn), keeps its whole reservation, and the totals show the finished call's tokens only.
 - A rejected turn and a limit refusal write nothing to the store.
-Verify: `bun test tests/ops`
-Files: `src/ops/limits.ts`, `src/ops/upstash.ts`, `src/ops/ops.ts`, `tests/ops/ops.test.ts`
+Verify: `bun test src/ops`
+Files: `src/ops/limits.ts`, `src/ops/upstash.ts`, `src/ops/ops.ts`, `src/ops/__tests__/ops.test.ts`
 Size: M
 Needs Peter: no
 
@@ -176,8 +176,8 @@ Acceptance:
 - The month's estimate crossing 75% pushes one `spend75` with priority `urgent` and the spec's text, and none again that month; a `DAILY_LIMIT` refusal pushes one `daycap` that day.
 - A push first claims `alert:<kind>:<period>` with `SET NX` and a 10-minute expiry; after a failed push a later event pushes again; after a success the marker lasts to the end of its period.
 - No push body holds question text.
-Verify: `bun test tests/ops`
-Files: `src/ops/alerts.ts`, `src/ops/ops.ts`, `src/ops/upstash.ts`, `tests/ops/fake-ntfy.ts`, `tests/ops/ops.test.ts`
+Verify: `bun test src/ops`
+Files: `src/ops/alerts.ts`, `src/ops/ops.ts`, `src/ops/upstash.ts`, `src/ops/__tests__/fake-ntfy.ts`, `src/ops/__tests__/ops.test.ts`
 Size: M
 Needs Peter: approval of the `daycap` push text (the spec writes only the `spend75` and `release` texts)
 
@@ -189,8 +189,8 @@ Acceptance:
 - After a `SPEND_LIMIT` turn, `reserve()` refuses with `SPEND_LIMIT` for an hour, then lets exactly one probe through (`limit:probe:<hour>` with `SET NX`).
 - A probe that reaches the model deletes `limit:spend`; a probe that meets the limit resets its time.
 - One `spendlimit` push that day.
-Verify: `bun test tests/ops`
-Files: `src/ops/ops.ts`, `src/ops/upstash.ts`, `tests/ops/ops.test.ts`
+Verify: `bun test src/ops`
+Files: `src/ops/ops.ts`, `src/ops/upstash.ts`, `src/ops/__tests__/ops.test.ts`
 Size: S
 Needs Peter: approval of the `spendlimit` push text
 
@@ -201,8 +201,8 @@ Blocked by: D13
 Acceptance:
 - With the Upstash server returning 500: `reserve()` allows the turn, `record()` and `append()` resolve, an `ops_error` line is printed, and the instance pushes `storefail` once that day.
 - With the Upstash server holding every response: `reserve()` allows the turn within about 1 s and `record()` resolves within about 2 s; a push stops after 3 s ("Store calls").
-Verify: `bun test tests/ops`
-Files: `src/ops/ops.ts`, `src/ops/upstash.ts`, `src/ops/alerts.ts`, `tests/ops/fake-upstash.ts`, `tests/ops/ops.test.ts`
+Verify: `bun test src/ops`
+Files: `src/ops/ops.ts`, `src/ops/upstash.ts`, `src/ops/alerts.ts`, `src/ops/__tests__/fake-upstash.ts`, `src/ops/__tests__/ops.test.ts`
 Size: M
 Needs Peter: approval of the `storefail` push text
 
@@ -214,8 +214,8 @@ Acceptance:
 - `bun run build:site` runs `buildSite()`, then `addPolicyTags(staticDir)`; with `--out <folder>` it writes `<folder>/.vercel/output/` and passes that folder to every step; with `--root <folder>` it passes that root to `buildSite({ root, outDir })` and to every step that reads repo files (`resume.yaml`, `private.yaml`, `knowledge/`, `documents/`). (`--root` is the main session's addition to SPEC-deploy, from the site's edges.)
 - On a fixture static folder, `addPolicyTags()` starts each HTML file's `<head>` with a policy tag that lists exactly the SHA-256 hashes of its own inline scripts (`script-src 'self'` alone when it has none). This is a unit check: the built-output checks (each built page's own tag, no `style=` attribute) live once, in the site's build test (S2, S8; main's decision).
 - CI's job `test` runs `bun run build:site` after `bun run build`.
-Verify: `bun run build:site`; `bun test tests/site/config.test.ts`
-Files: `scripts/build-site.ts`, `src/deploy/policy.ts`, `package.json`, `tests/site/config.test.ts`, `.github/workflows/ci.yml`
+Verify: `bun run build:site`; `bun test src/deploy/__tests__/config.test.ts`
+Files: `scripts/build-site.ts`, `src/deploy/policy.ts`, `package.json`, `src/deploy/__tests__/config.test.ts`, `.github/workflows/ci.yml`
 Size: M
 Needs Peter: no
 
@@ -227,8 +227,8 @@ Acceptance:
 - pkloss.dev, pwk.dev and www.peterkloss.dev redirect with 308 to `https://peterkloss.dev/$1` (query per spike check 5); the `.vercel.app` route leaves `/api/` alone (its address is written in D37).
 - After `{ "handle": "filesystem" }`, every prerendered page has an override for its clean address; the three API routes are case-sensitive; the last route sends every other path to `/404.html` with status 404, and no route sends a page or `/_serverFn/` to `/__server`.
 - Nitro's other fields stay, and `crons` calls `/api/cron/health` at `17 15 * * *`.
-Verify: `bun run build:site`; `bun test tests/site/config.test.ts`
-Files: `src/deploy/routes.ts`, `scripts/build-site.ts`, `tests/site/config.test.ts`
+Verify: `bun run build:site`; `bun test src/deploy/__tests__/config.test.ts`
+Files: `src/deploy/routes.ts`, `scripts/build-site.ts`, `src/deploy/__tests__/config.test.ts`
 Size: M
 Needs Peter: no (the routes are approved; a later change is "ask first")
 
@@ -240,8 +240,8 @@ Acceptance:
 - A route on `/(.*)` with `continue: true` sets `Strict-Transport-Security`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy` and `X-Frame-Options` with the table's values.
 - Every path gets the header policy, except `/sw.js` and `/workbox-<hash>.js`, which get the worker policy, and the three documents, which get none; no policy has `'unsafe-inline'` or `'unsafe-eval'`.
 - `/assets/*` and the Workbox file are `public, max-age=31536000, immutable`; pages, `/sw.js`, the manifest, `device-index.json`, the documents and the icons revalidate.
-Verify: `bun run build:site`; `bun test tests/site/config.test.ts`
-Files: `src/deploy/routes.ts`, `tests/site/config.test.ts`
+Verify: `bun run build:site`; `bun test src/deploy/__tests__/config.test.ts`
+Files: `src/deploy/routes.ts`, `src/deploy/__tests__/config.test.ts`
 Size: M
 Needs Peter: no
 
@@ -251,8 +251,8 @@ Delivers: A check that the build script runs the site's service-worker step afte
 Blocked by: S28 (the step-4 call), D17 (`writeVercelConfig()`, the last step)
 Acceptance:
 - `bun run build:site` runs `buildSite()`, `addPolicyTags()`, `writeServiceWorker()`, `writeVercelConfig()` in that order, and each precached page's revision matches its tagged file.
-Verify: `bun run build:site`; `bun test tests/site/config.test.ts`
-Files: `tests/site/config.test.ts`, and `scripts/build-site.ts` only when the order is wrong
+Verify: `bun run build:site`; `bun test src/deploy/__tests__/config.test.ts`
+Files: `src/deploy/__tests__/config.test.ts`, and `scripts/build-site.ts` only when the order is wrong
 Size: S
 Needs Peter: no
 
@@ -263,8 +263,8 @@ Blocked by: D6, D17, S1 (`vite.config.ts` with Nitro's Vercel preset), C17 (the 
 Acceptance:
 - Every function's `.vc-config.json` has the runtime value from spike check 2.
 - The chat function's `.vc-config.json` has `maxDuration: 150` and region `iad1` (Nitro's `vercel.functionRules`).
-Verify: `bun run build:site`; `bun test tests/site/config.test.ts`
-Files: `vite.config.ts`, `tests/site/config.test.ts`
+Verify: `bun run build:site`; `bun test src/deploy/__tests__/config.test.ts`
+Files: `vite.config.ts`, `src/deploy/__tests__/config.test.ts`
 Size: S
 Needs Peter: no
 
@@ -276,8 +276,8 @@ Acceptance:
 - Against the preview of the seam-1 build, it passes: `/`, `/resume` and a source page return 200 with HTML, a title and the canonical address; `/sources/does-not-exist` and `/API/chat` return 404 with the not-found page; each page carries every header and its own policy tag; the asset, worker and document headers match "Headers"; a malformed chat `POST` gets 400 and one with `Origin: https://example.com` gets 403 `FORBIDDEN_ORIGIN`.
 - Every request sends `x-vercel-skip-toolbar: 1`.
 - It fails, naming the cause, when one header is removed, when a page has an unhashed inline script, and when an HTML file has no policy tag.
-Verify: `bun test tests/site/smoke.test.ts`
-Files: `src/ops/smoke.ts`, `scripts/smoke.ts`, `package.json`, `tests/site/smoke.test.ts`
+Verify: `bun test scripts/__tests__/smoke.test.ts`
+Files: `src/ops/smoke.ts`, `scripts/smoke.ts`, `package.json`, `scripts/__tests__/smoke.test.ts`
 Size: M
 Needs Peter: no
 
@@ -288,8 +288,8 @@ Blocked by: D15
 Acceptance:
 - `health.save()` and `health.markGithubRun()` show in `health.last()` and in `status()`, which holds the live commit, booleans and times only.
 - `status()` reports a missing ntfy variable as `false` and prints `missing_config`.
-Verify: `bun test tests/ops`
-Files: `src/ops/ops.ts`, `src/ops/upstash.ts`, `tests/ops/ops.test.ts`
+Verify: `bun test src/ops`
+Files: `src/ops/ops.ts`, `src/ops/upstash.ts`, `src/ops/__tests__/ops.test.ts`
 Size: S
 Needs Peter: no
 
@@ -301,8 +301,8 @@ Acceptance:
 - `GET /api/status` answers `status()` with `no-store`, kept 60 s per function instance.
 - `POST /api/status` with `Authorization: Bearer $HEALTH_SECRET` records the GitHub run; any other `POST` gets 401.
 - The smoke check reads `/api/status`, and in production fails unless it reports the store and the alerts as configured.
-Verify: `bun test tests/site/smoke.test.ts`
-Files: `src/site/routes/api.status.ts`, `src/ops/smoke.ts`, `tests/site/smoke.test.ts`
+Verify: `bun test scripts/__tests__/smoke.test.ts`
+Files: `src/site/routes/api.status.ts`, `src/ops/smoke.ts`, `scripts/__tests__/smoke.test.ts`
 Size: S
 Needs Peter: no
 
@@ -314,8 +314,8 @@ Acceptance:
 - `/api/cron/health` answers 401 at once without the right `CRON_SECRET`, before it reads anything.
 - Against the preview and the fake Upstash, the job fails and names the error share for a day of 10 turns with 3 errors; a day with 3 `MAX_TOKENS` turns and no other error passes; a GitHub run 50 hours old or older fails it, and one 30 hours old passes.
 - On a failure, one `health` push a day, tried 3 times; each run is saved in `health:vercel`.
-Verify: `bun test tests/site/smoke.test.ts`; `bun test tests/ops`
-Files: `src/site/routes/api.cron.health.ts`, `src/ops/smoke.ts`, `tests/site/smoke.test.ts`, `tests/ops/fake-upstash.ts`
+Verify: `bun test scripts/__tests__/smoke.test.ts`; `bun test src/ops`
+Files: `src/site/routes/api.cron.health.ts`, `src/ops/smoke.ts`, `scripts/__tests__/smoke.test.ts`, `src/ops/__tests__/fake-upstash.ts`
 Size: M
 Needs Peter: approval of the `health` push text
 
@@ -326,8 +326,8 @@ Blocked by: D21, T2 (`bun run documents` and the committed `documents/`)
 Acceptance:
 - Each served document is byte for byte the file in `<dir>`, and the PDF has 2 pages (`pdfinfo`).
 - It fails, naming the document, when a served document differs from the committed one.
-Verify: `bun test tests/site/smoke.test.ts`
-Files: `src/ops/smoke.ts`, `tests/site/smoke.test.ts`
+Verify: `bun test scripts/__tests__/smoke.test.ts`
+Files: `src/ops/smoke.ts`, `scripts/__tests__/smoke.test.ts`
 Size: S
 Needs Peter: no
 
@@ -339,8 +339,8 @@ Acceptance:
 - Chrome loads `/`, `/resume`, a source page and `/sources/does-not-exist`, and fails on any policy violation, page error, service-worker console error or request to `/_serverFn/`.
 - A click from the source page to `/` shows the first view's heading; the chat input becomes usable; a `fetch` from the page that posts a malformed body to `/api/chat` gets 400.
 - With the network off, a reload of `/` and of the source page shows them, and an unknown path shows the not-found page; `bun run smoke <preview origin> --browser --documents documents/` passes, and fails naming the cause when a page requests `/_serverFn/`.
-Verify: `bun test tests/site/smoke.test.ts`
-Files: `src/ops/smoke.ts`, `tests/site/smoke.test.ts`
+Verify: `bun test scripts/__tests__/smoke.test.ts`
+Files: `src/ops/smoke.ts`, `scripts/__tests__/smoke.test.ts`
 Size: M
 Needs Peter: no
 
@@ -351,7 +351,7 @@ Blocked by: D21, D23, D6
 Acceptance:
 - With `--production`: `/api/status` also reports the real model as configured; the three other hosts and the `.vercel.app` address return 308 for `/resume?x=1` to `https://peterkloss.dev/resume?x=1`; a chat `POST` with `Content-Type: text/plain` gets the WAF's 403; malformed chat requests get 429 by the 41st.
 - On a protected deployment URL, requests carry `x-vercel-protection-bypass` from `VERCEL_AUTOMATION_BYPASS_SECRET`, and the browser also sends `x-vercel-set-bypass-cookie: true`.
-Verify: `bun test tests/site/smoke.test.ts` stays green; the production part first runs in D37 (no local seam: Testing Strategy, last line).
+Verify: `bun test scripts/__tests__/smoke.test.ts` stays green; the production part first runs in D37 (no local seam: Testing Strategy, last line).
 Files: `src/ops/smoke.ts`, `scripts/smoke.ts`
 Size: S
 Needs Peter: no
@@ -363,8 +363,8 @@ Blocked by: D12, D6 (spike check 9)
 Acceptance:
 - An entry appended through `log.append()` comes back from `createOpsReader().list(7)`, and the reader makes no write command.
 - `bun run questions` loads `.secrets/local.env` with `--env-file` and prints the entries newest first, a count per outcome, the most read sources, and the daily totals with the day's and the month's cost against the cap and the limit.
-Verify: `bun test tests/ops`; manual after setup: Peter runs `bun run questions` (the read-only token is his; agents never read it).
-Files: `src/ops/ops.ts`, `src/ops/upstash.ts`, `scripts/questions.ts`, `package.json`, `tests/ops/ops.test.ts`
+Verify: `bun test src/ops`; manual after setup: Peter runs `bun run questions` (the read-only token is his; agents never read it).
+Files: `src/ops/ops.ts`, `src/ops/upstash.ts`, `scripts/questions.ts`, `package.json`, `src/ops/__tests__/ops.test.ts`
 Size: M
 Needs Peter: the read-only token in his `.secrets/local.env`, for the manual check
 
@@ -374,8 +374,8 @@ Delivers: `limits.ts` holds the worked worst-case turn, measured from the real s
 Blocked by: D11, C15 (the approved system prompt in `src/chat/server/prompt.ts`), K3 (`renderCore()`)
 Acceptance:
 - The worked worst case (6 model calls of 8,000 output tokens at effort `medium`, the first call's cache write of the whole prompt and the later calls' cache reads, the writes of 3 reads of 24,000 characters) uses the measured size of the system prompt and the core, and costs less than the reservation.
-Verify: `bun test tests/ops`
-Files: `src/ops/limits.ts`, `tests/ops/ops.test.ts`
+Verify: `bun test src/ops`
+Files: `src/ops/limits.ts`, `src/ops/__tests__/ops.test.ts`
 Size: S
 Needs Peter: a decision only if the worst case reaches $0.90 (a change to the reservation is "ask first")
 
@@ -387,8 +387,8 @@ Acceptance:
 - `scripts/docs-only.txt` holds the spec's list, and every entry matches a tracked file.
 - `scripts/site-changed.sh <from> <to>` exits 1 when a site file differs, 0 when none does, and 128 on an error.
 - In a temporary git repository with a shallow clone, `scripts/ignore-build.sh` builds for a change to a site file (also when the previous deployment is more than 10 commits back), skips a docs-only change across several commits, and builds on an empty previous commit, an unknown commit and a failing git command.
-Verify: `bun test tests/site/docs-only.test.ts`
-Files: `scripts/docs-only.txt`, `scripts/site-changed.sh`, `scripts/ignore-build.sh`, `tests/site/docs-only.test.ts`
+Verify: `bun test scripts/__tests__/docs-only.test.ts`
+Files: `scripts/docs-only.txt`, `scripts/site-changed.sh`, `scripts/ignore-build.sh`, `scripts/__tests__/docs-only.test.ts`
 Size: M
 Needs Peter: no (the list is approved; a later change is "ask first")
 
@@ -399,8 +399,8 @@ Blocked by: D30, D16
 Acceptance:
 - `buildSite()` returns the list of repo files it read: the files in Vite's module graph and the files it opens (main's decision: the deploy task that writes this docs-only check adds the recording).
 - No entry of `scripts/docs-only.txt` matches a file in that list; the test builds the real root once into a temporary folder to get it.
-Verify: `bun test tests/site/docs-only.test.ts`
-Files: `tests/site/docs-only.test.ts`, `src/site/build.ts` (a site file, so the push is a release)
+Verify: `bun test scripts/__tests__/docs-only.test.ts`
+Files: `scripts/__tests__/docs-only.test.ts`, `src/site/build.ts` (a site file, so the push is a release)
 Size: S
 Needs Peter: no
 
@@ -472,8 +472,8 @@ Acceptance:
 - `src/deploy/routes.ts` holds the project's `.vercel.app` address, and the config test checks that its route redirects with 308 and leaves `/api/` alone.
 - With Peter's approval, the push goes live on peterkloss.dev only after `ci / test`, `ci / audit` and the release check pass.
 - Before setup step 12, the GitHub health check run by hand fails on the real model, and the push reaches Peter's phone.
-Verify: `bun test tests/site/config.test.ts`; `gh run watch` on `ci` and the release check; `gh workflow run health.yml`
-Files: `src/deploy/routes.ts`, `tests/site/config.test.ts`, `docs/STATUS.md`
+Verify: `bun test src/deploy/__tests__/config.test.ts`; `gh run watch` on `ci` and the release check; `gh workflow run health.yml`
+Files: `src/deploy/routes.ts`, `src/deploy/__tests__/config.test.ts`, `docs/STATUS.md`
 Size: S
 Needs Peter: approval of the release (a push of a site file); confirming the push on his phone
 
@@ -498,11 +498,11 @@ After D6. Every spike check has a verdict in research 12 (check 12 runs at D32);
 
 ### Checkpoint deploy: createOps ready
 
-After D9. `bun test tests/ops` passes; the chat's route file (C17) can build its `ChatDeps` from `createOps()`.
+After D9. `bun test src/ops` passes; the chat's route file (C17) can build its `ChatDeps` from `createOps()`.
 
 ### Checkpoint deploy: the ops write side
 
-After D9 to D15. `bun test tests/ops` and `bun test` pass with no network beyond the in-test servers.
+After D9 to D15. `bun test src/ops` and `bun test` pass with no network beyond the in-test servers.
 
 ### Checkpoint deploy: the Vercel output
 

@@ -13,7 +13,7 @@ All six module specs are approved ([capability map](../spec/README.md)). This pl
 
 ## Phases
 
-**Phase 0, ready now.** A1 puts the Modules table and the approval rules in `AGENTS.md` (not a release); then A2 writes the `release` skill. K1 (the id grammar), C1 (the chat's packages and the TanStack AI names), C2 (the question log contracts), S1 (the TanStack Start app) and D7 (CI) have no blockers. The spike D1 to D6 starts when Peter has set it up. Checkpoints: agents: before the first release; chat: contracts; deploy: the spike.
+**Phase 0, ready now.** First the test move (row 144, [decision 0025](../docs/decisions/0025-tests-beside-code.md)): the tests go to `__tests__/` folders beside the code they test, and the specs and task files name the new paths. Then A1 puts the Modules table and the approval rules in `AGENTS.md` (not a release); then A2 writes the `release` skill. K1 (the id grammar), C1 (the chat's packages and the TanStack AI names), C2 (the question log contracts), S1 (the TanStack Start app) and D7 (CI) have no blockers. The spike D1 to D6 starts when Peter has set it up. Checkpoints: agents: before the first release; chat: contracts; deploy: the spike.
 
 **Phase 1, foundations.** Knowledge K2 to K13: the source parser, the core with its catalog, the reads, `publicKnowledge()`, the draft preview and the three moves. Content T1 to T4: the short labels and the committed documents. The chat handler C3 to C15 at seam 1, ending with Peter's approval of the system prompt. The site's build output S2 to S8, with deploy's build script D16 and `createOps()` D9. Agents A3 to A8, and task 13 (the interviews) once A7 exists. Checkpoints: agents: checks complete; content: lands; knowledge: old contract gone, contract complete, lands; agents: lands; deploy: createOps ready; chat: the handler; site: the build output.
 
@@ -27,7 +27,7 @@ All six module specs are approved ([capability map](../spec/README.md)). This pl
 
 ## Order rules across modules
 
-1. A1 comes before any other module's task, and A2 before any push of a site file.
+1. The test move comes first. A1 comes before any other module's task, and A2 before any push of a site file.
 2. A push that changes a site file is a release, and Peter approves each one. Until the deploy module is built, the `release` skill stops at step 1 and the agent asks him. A push of docs-only paths only is not a release.
 3. D9 waits only on C2, and C17 waits on D9. D16 waits only on S2, and S8 waits on D16.
 4. S9 waits on D17, and D17 on the spike's verdicts (D6). Phase 2 cannot start until Peter has set up the spike and its checks have run.
@@ -35,7 +35,7 @@ All six module specs are approved ([capability map](../spec/README.md)). This pl
 6. S31 runs right after C17: C18, D21 and every later chat browser test need the preview to answer `/api/chat`.
 7. Workspace members exist as no-ops from S14. A chat task checks that it calls a member; the site task that gives the member its behavior checks the effect: S32 for C24, C28 and C36; S34 for C20; S35 for C35; S36 for C18 and C27.
 8. In a composition root (`scripts/build-site.ts`, `vite.config.ts`, the route files), the module that provides a step wires it in. S28 adds `writeServiceWorker()` as the build script's step 4 and waits on C16, so its precache check covers `device-index.json`. D19 then checks the step order.
-9. The built-output checks (each page's policy tag, no `style=` attribute) live once, in `tests/site/build.test.ts` (S2, S8). Deploy's tests check `addPolicyTags()` and `writeVercelConfig()` at unit level.
+9. The built-output checks (each page's policy tag, no `style=` attribute) live once, in `src/site/__tests__/build.test.ts` (S2, S8). Deploy's tests check `addPolicyTags()` and `writeVercelConfig()` at unit level.
 10. D31, the deploy task that adds the docs-only test's check against the site build, makes `buildSite()` return the list of files it read.
 11. T1 makes `x-short` required, so the knowledge test fixture's `resume.yaml` needs it: whichever of T1 and the K tasks lands second updates that fixture.
 12. A7 waits on K10, and task 13 waits on A7 and K10. A2's first full run waits on deploy's release scripts and checks (D7, D16, D30, D32); it is D37's release.

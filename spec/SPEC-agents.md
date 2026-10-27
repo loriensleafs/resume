@@ -23,7 +23,7 @@ Acceptance criteria:
 - Four repo skills exist, each as `.agents/skills/<name>/SKILL.md` with a `.claude/skills/<name>` link: `edit-resume` (updated), `write-source`, `release` and `update-mockups` (row 140).
 - Gemini CLI reads `AGENTS.md` through `.gemini/settings.json`. Codex, Cursor, Copilot and Antigravity read it directly; Claude Code reads it through `CLAUDE.md`.
 - Every agent that takes project settings reaches the design system's docs server with the same command.
-- `bun test tests/agents` passes (row 141).
+- `bun test ./__tests__` passes (row 141; the folder follows row 144 and [decision 0025](../docs/decisions/0025-tests-beside-code.md)).
 - When each module lands, a fresh agent session told only "continue" reports the phase, the last step, the next step, anything red and the pending decisions, as `AGENTS.md` step 4 asks, and names the right spec for the next task (row 141).
 
 ## Tech Stack
@@ -46,7 +46,7 @@ Gemini CLI reads its own context file name by default, so `.gemini/settings.json
 ## Commands
 
 ```sh
-bun test tests/agents          # the agent files' checks
+bun test ./__tests__           # the agent files' checks
 bun test                       # all tests, the agent files' checks included
 ```
 
@@ -71,7 +71,7 @@ docs/agents/triage-labels.md           brain's triage labels
 .cursor/mcp.json                       the docs server for Cursor
 .vscode/mcp.json                       the docs server for VS Code and Copilot
 .gemini/settings.json                  AGENTS.md as Gemini CLI's context file, and the docs server (new)
-tests/agents/agent-files.test.ts       the agent files' checks (new)
+__tests__/agent-files.test.ts          the agent files' checks (new)
 ```
 
 Peter adds `.mcp.json` and `.claude/settings.json` from the README section, because an agent's safety check blocks an agent from writing its own settings ([decision 0014](../docs/decisions/0014-library-skills-and-docs-mcp.md)).
@@ -87,12 +87,12 @@ Agent files follow brain's writing rules (`brain:writing-for-agents`): plain ASD
 
 | Module | Spec | Folders | Tests | State |
 |---|---|---|---|---|
-| content | [SPEC-content](spec/SPEC-content.md) | `resume.yaml`, `src/content.ts`, `src/build.ts`, `documents/` | `bun test tests/content` | built |
-| knowledge | [SPEC-knowledge](spec/SPEC-knowledge.md) | `knowledge/`, `src/knowledge/` | `bun test tests/knowledge` | first version built; two-layer update is task 11 |
-| site | [SPEC-site](spec/SPEC-site.md) | `src/site/`, `public/` | `bun test tests/site` | spec approved |
-| chat | [SPEC-chat](spec/SPEC-chat.md) | `src/chat/`, `evals/` | `bun test tests/chat` | spec approved |
-| deploy | [SPEC-deploy](spec/SPEC-deploy.md) | `src/deploy/`, `src/ops/`, `scripts/build-site.ts`, `.github/` | `bun test tests/ops tests/site` | spec approved |
-| agents | [SPEC-agents](spec/SPEC-agents.md) | the agent files | `bun test tests/agents` | spec in review |
+| content | [SPEC-content](spec/SPEC-content.md) | `resume.yaml`, `src/content.ts`, `src/build.ts`, `documents/` | `bun test src/__tests__ scripts/__tests__/documents` | built |
+| knowledge | [SPEC-knowledge](spec/SPEC-knowledge.md) | `knowledge/`, `src/knowledge/` | `bun test src/knowledge` | first version built; two-layer update is task 11 |
+| site | [SPEC-site](spec/SPEC-site.md) | `src/site/`, `public/` | `bun test src/site` | spec approved |
+| chat | [SPEC-chat](spec/SPEC-chat.md) | `src/chat/`, `evals/` | `bun test src/chat` | spec approved |
+| deploy | [SPEC-deploy](spec/SPEC-deploy.md) | `src/deploy/`, `src/ops/`, `scripts/build-site.ts`, `.github/` | `bun test src/ops src/deploy scripts/__tests__/docs-only scripts/__tests__/smoke` | spec approved |
+| agents | [SPEC-agents](spec/SPEC-agents.md) | the agent files | `bun test ./__tests__` | spec in review |
 
 Before you change a module, read its spec to the last line and the decisions it links.
 ```
@@ -162,7 +162,7 @@ A change to an approved source follows the edit rule: it waits on a branch until
 
 Two seams (row 141).
 
-1. **The agent files on disk**, `tests/agents/agent-files.test.ts`, under `bun test`. It checks:
+1. **The agent files on disk**, `__tests__/agent-files.test.ts`, under `bun test`. It checks:
    - Every relative link in `AGENTS.md`, `CLAUDE.md`, `README.md`, `docs/agents/*.md` and each `SKILL.md` points to a file or folder that exists. A `#section` part is ignored.
    - `CLAUDE.md` starts with `@AGENTS.md`. `AGENTS.md` has 120 lines or fewer, and its Modules table has one row for each module in the [capability map](README.md).
    - Each folder in `.agents/skills/` has a `SKILL.md` whose front matter parses, whose `name` equals the folder's name and is kebab-case with 64 characters or fewer, and whose `description` is not empty and has 1,024 characters or fewer.
@@ -216,8 +216,8 @@ Two seams (row 141).
 
 ## Prior-art tests
 
-- `tests/content/build.test.ts`: reads real files from the repository and checks them with plain assertions; the agent files' test follows its style.
-- `tests/knowledge/build.test.ts`: parses front matter with `Bun.YAML` and checks each rule with a named assertion, as the skill checks do.
+- `src/__tests__/build.test.ts`: reads real files from the repository and checks them with plain assertions; the agent files' test follows its style.
+- `src/knowledge/__tests__/build.test.ts`: parses front matter with `Bun.YAML` and checks each rule with a named assertion, as the skill checks do.
 
 ## Changes to other specs
 
@@ -227,7 +227,7 @@ Two seams (row 141).
 
 ## Success Criteria
 
-- `bun test tests/agents` passes, and `bun test` passes with it.
+- `bun test ./__tests__` passes, and `bun test` passes with it.
 - `AGENTS.md` has the Modules table and the Releases and approvals section, at 120 lines or fewer.
 - The four repo skills exist with their links, and their steps match the specs they cite.
 - `.gemini/settings.json` exists, and every docs server entry runs the same command.

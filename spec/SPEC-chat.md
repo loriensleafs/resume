@@ -22,7 +22,7 @@ Acceptance criteria:
 - The server keeps one anonymous question-log entry per turn, with no visitor identity ([decision 0020](../docs/decisions/0020-anonymous-question-log.md)).
 - At the day's cost cap or Anthropic's monthly limit, a turn shows a "limit reached" state, not a retry, also after a reload ([SPEC-deploy](SPEC-deploy.md)).
 - Every chat state in the approved mockups works as drawn ([mockups](../docs/design/mockups/README.md)).
-- `bun test tests/chat` and the chat part of `bun test tests/site` pass with the fake model. `bun run evals` passes every deterministic check, and Peter reviews its answers.
+- `bun test src/chat` and the chat part of `bun test src/site` pass with the fake model. `bun run evals` passes every deterministic check, and Peter reviews its answers.
 
 ## One turn
 
@@ -352,7 +352,7 @@ export type Telemetry = { record(event: ChatTurnEvent, reservation?: string): Pr
 - No IP address, `threadId`, scope, audience, cookie or other saved-session data (decision 0020).
 - A turn refused before the model call writes no entry. A turn that meets Anthropic's limit during the run writes one with `limit`.
 - SPEC-deploy's `Ops` implements `QuestionLog`, `Budget` and `Telemetry` with its store, and deletes entries after 90 days. Tests use the in-memory ones in `src/chat/server/question-log.ts`.
-- **The day window.** `list(days)` returns the entries whose `date` is one of the last `days` UTC days, today included, newest first. On 2026-10-27, `list(7)` returns the entries dated 2026-10-21 to 2026-10-27, and none dated 2026-10-20. The contract suite `tests/chat/question-log-contract.ts` checks this, and SPEC-deploy runs it against both stores.
+- **The day window.** `list(days)` returns the entries whose `date` is one of the last `days` UTC days, today included, newest first. On 2026-10-27, `list(7)` returns the entries dated 2026-10-21 to 2026-10-27, and none dated 2026-10-20. The contract suite `src/chat/server/__tests__/question-log-contract.ts` checks this, and SPEC-deploy runs it against both stores.
 - Peter reads the log with `bun run questions`, which SPEC-deploy owns.
 - A failed write never breaks the answer.
 
@@ -425,7 +425,7 @@ The cases cover: each topic outside the chat's topics; an employer, project or s
 Versions checked on 2026-10-27 from the published packages.
 
 - `@tanstack/ai` 1.0.0, `@tanstack/ai-react` 1.0.0 and `@tanstack/ai-anthropic` 1.0.0, all on 1.0 together ([research 07](../docs/research/07-tanstack-ai-hosting-model.md)). In production the adapter is `anthropicText("claude-sonnet-5-5")` ([decision 0013](../docs/decisions/0013-claude-sonnet-model.md)); the evals use `createAnthropicChat()`, and the tests `createAnthropicChatWithClient()` with a stub client. Answers stream as server-sent events (`toServerSentEventsResponse`). The handler sets `promptCache: "short"` itself, a 5-minute cache; it is not a `ChatDeps` field, because no caller chooses it.
-- `fakeText()` from `@tanstack/ai/testing` scripts the model in tests and in the preview. When `VERCEL_ENV` is not `production`, the route always uses it, whatever variables are set. The preview's fake model picks its scripted turn from `tests/chat/fixtures.ts` by the question text.
+- `fakeText()` from `@tanstack/ai/testing` scripts the model in tests and in the preview. When `VERCEL_ENV` is not `production`, the route always uses it, whatever variables are set. The preview's fake model picks its scripted turn from `src/chat/server/__tests__/fixtures.ts` by the question text.
 - `@tanstack/markdown` 0.0.13, the version the design system already depends on, as a direct dependency, to render answers with the rules in "Rendering answers".
 - The site's stack from [SPEC-site](SPEC-site.md): TanStack Start, React, `@tanstack/react-db`, `@acmelabs/design-system-react`, zod.
 - The API key is `ANTHROPIC_API_KEY`: in the host's settings ([SPEC-deploy](SPEC-deploy.md)) and, for evals, the `resume-evals` key in Peter's untracked `.secrets/local.env`, which `bun run evals` loads with `--env-file`. No `.env` file is ever created ([SPEC-deploy](SPEC-deploy.md)). Agents never read, print or store it.
@@ -440,8 +440,8 @@ bun run build:site                 # SPEC-deploy's build script; the chat's Vite
 bun run preview                    # the built site with the fake model, because VERCEL_ENV is not production
 bun run preview --dir <folder>     # serves the .vercel/output/ in <folder>, such as SPEC-site's seam-1 build that the browser test uses
 PREVIEW_LIMIT=day bun run preview  # the in-memory budget refuses every turn with DAILY_LIMIT; PREVIEW_LIMIT=month gives SPEND_LIMIT
-bun test tests/chat                # seam 1: the handler
-bun test tests/site                # seam 2: SPEC-site's build output and browser test, chat included
+bun test src/chat                # seam 1: the handler
+bun test src/site                # seam 2: SPEC-site's build output and browser test, chat included
 bun test                           # every test
 bun run evals                      # the trick questions against the real model; costs money; Peter approves each run
 ```
@@ -470,11 +470,11 @@ src/chat/vite-plugin.ts            the chat's Vite plugin: virtual:knowledge and
 src/site/routes/api.chat.ts        the server route (described below)
 evals/trick-questions.yaml         the eval cases
 scripts/evals.ts                   `bun run evals`
-tests/chat/handler.test.ts         seam 1
-tests/chat/fixtures.ts             scripted model turns, keyed by question text, shared with the preview's fake model
-tests/chat/stub-anthropic.ts       the stub Messages client for createAnthropicChatWithClient()
-tests/chat/question-log-contract.ts  the QuestionLog contract suite, which SPEC-deploy also runs
-tests/site/browser.test.ts         seam 2, extended with the chat
+src/chat/server/__tests__/handle-chat.test.ts  seam 1
+src/chat/server/__tests__/fixtures.ts  scripted model turns, keyed by question text, shared with the preview's fake model
+src/chat/server/__tests__/stub-anthropic.ts  the stub Messages client for createAnthropicChatWithClient()
+src/chat/server/__tests__/question-log-contract.ts  the QuestionLog contract suite, which SPEC-deploy also runs
+src/site/__tests__/browser.test.ts  seam 2, extended with the chat
 ```
 
 **The route file.** This spec owns the description of `src/site/routes/api.chat.ts`; [SPEC-site](SPEC-site.md) lists it with its other route files. It builds `ChatDeps` and returns `handleChat(request, deps)`:
@@ -531,7 +531,7 @@ export function readBudget(max = turnLimits.reads, readsBefore = 0): ChatMiddlew
 
 `bun test`, at the seams Peter confirmed on 2026-10-27 (decision record row 83), plus the evals:
 
-1. **The handler.** `handleChat()` with `fakeText()`, the real knowledge built from fixtures (one fixture source has `Not public` text), and the in-memory log, budget and telemetry. A stub Anthropic client (`tests/chat/stub-anthropic.ts`, through `createAnthropicChatWithClient()`) scripts what `fakeText()` cannot: spend-limit errors, `max_tokens`, a stop during a call, and a call that never ends. The tests read the server-sent events, the log and the telemetry events:
+1. **The handler.** `handleChat()` with `fakeText()`, the real knowledge built from fixtures (one fixture source has `Not public` text), and the in-memory log, budget and telemetry. A stub Anthropic client (`src/chat/server/__tests__/stub-anthropic.ts`, through `createAnthropicChatWithClient()`) scripts what `fakeText()` cannot: spend-limit errors, `max_tokens`, a stop during a call, and a call that never ends. The tests read the server-sent events, the log and the telemetry events:
    - **Citations.** An answer with no read keeps a resume citation and writes one `answered` entry with no `threadId`. A read then an answer keeps a citation to a read passage and removes one to an unread passage; `chat.citations` reports 1 removed.
    - **Read results on the wire.** No streamed event holds passage text or the fixture's `Not public` text, and each `read_sources` `TOOL_CALL_RESULT` holds `{ read, unknown, skipped }` only. The model's next call still gets the full read text.
    - **The read budget.** Four scripted reads: the fourth is skipped, and every model call in the turn has the same tools. The call after the third read has `toolChoice: "none"`. A read whose input fails the schema does not count. Another middleware's `onBeforeToolCall` that transforms the arguments cannot skip the budget.
@@ -548,8 +548,8 @@ export function readBudget(max = turnLimits.reads, readsBefore = 0): ChatMiddlew
    - **Thinking.** The stub client sees adaptive thinking with effort `medium`, the thinking text omitted, and `max_tokens` 8,000 on every model call.
    - **Usage.** Two finished model calls, then a Stop during the third: telemetry gets the sum of the two calls' usage, and the stopped call adds nothing. The response ends only after the log and telemetry writes.
    - **Telemetry.** Each turn hands one `chat_turn` event to `telemetry.record()`, with no question text and no `threadId`.
-   - **The QuestionLog contract.** `tests/chat/question-log-contract.ts` exports the suite, and seam 1 runs it against the in-memory log; SPEC-deploy runs it against its store. An appended entry comes back from `list(1)`. On 2026-10-27, `list(7)` returns the entries dated 2026-10-21 to 2026-10-27, newest first, and none dated 2026-10-20. An empty log returns no entries.
-2. **The browser test**, from SPEC-site. It runs after SPEC-site's seam-1 build (`bun run build:site --out <folder>`) and serves that folder with `bun run preview --dir <folder>`; it builds nothing itself. The preview uses the fake model, because `VERCEL_ENV` is not `production`, and picks each scripted turn from `tests/chat/fixtures.ts` by the question text:
+   - **The QuestionLog contract.** `src/chat/server/__tests__/question-log-contract.ts` exports the suite, and seam 1 runs it against the in-memory log; SPEC-deploy runs it against its store. An appended entry comes back from `list(1)`. On 2026-10-27, `list(7)` returns the entries dated 2026-10-21 to 2026-10-27, newest first, and none dated 2026-10-20. An empty log returns no entries.
+2. **The browser test**, from SPEC-site. It runs after SPEC-site's seam-1 build (`bun run build:site --out <folder>`) and serves that folder with `bun run preview --dir <folder>`; it builds nothing itself. The preview uses the fake model, because `VERCEL_ENV` is not `production`, and picks each scripted turn from `src/chat/server/__tests__/fixtures.ts` by the question text:
    - Selecting a suggested question sends it once. The steps show one by one, then the answer, its citations card, Copy and Retry, and follow-up questions. Citation 1 opens the source tab with the passage marked, and the cited role lights up on the timeline.
    - Each kept citation renders as a numbered button. A second answer's citations start again at 1, and its card lists only its own citations. A `#cite:` link to an id that the answer did not keep shows as its text.
    - A question during an answer appears at the end of the conversation with a clock and "Sends when this answer finishes"; the Up arrow and Edit bring it back; Remove removes it; after the answer, or after Stop, it sends. Send now stops the answer and sends that question first.
@@ -662,13 +662,13 @@ export function readBudget(max = turnLimits.reads, readsBefore = 0): ChatMiddlew
 
 ## Prior-art tests
 
-- `tests/knowledge/build.test.ts`: real `buildKnowledge()` output from fixtures, and a fixture `private.yaml` with a fake phone number. Seam 1 builds its knowledge the same way.
-- `tests/content/build.test.ts`: runs the entry point into a temporary folder and checks real output. Seam 1 calls `handleChat()` and reads the real event stream the same way.
-- The browser test in [SPEC-site](SPEC-site.md) (`tests/site/browser.test.ts`): Playwright under Bun against the preview. Seam 2 extends it.
+- `src/knowledge/__tests__/build.test.ts`: real `buildKnowledge()` output from fixtures, and a fixture `private.yaml` with a fake phone number. Seam 1 builds its knowledge the same way.
+- `src/__tests__/build.test.ts`: runs the entry point into a temporary folder and checks real output. Seam 1 calls `handleChat()` and reads the real event stream the same way.
+- The browser test in [SPEC-site](SPEC-site.md) (`src/site/__tests__/browser.test.ts`): Playwright under Bun against the preview. Seam 2 extends it.
 
 ## Success Criteria
 
-- `bun test tests/chat` and `bun test tests/site` pass on a clean checkout with Chrome installed and no API key. SPEC-site's seam 1 builds the site first, and the browser test serves that build.
+- `bun test src/chat` and `bun test src/site` pass on a clean checkout with Chrome installed and no API key. SPEC-site's seam 1 builds the site first, and the browser test serves that build.
 - One approved `bun run evals` run passes every deterministic check, and Peter approves the answers in the review file.
 - Peter reviews the running chat against the approved mockups at desktop and phone sizes, in light and dark, and approves it.
 

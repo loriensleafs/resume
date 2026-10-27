@@ -123,7 +123,7 @@ Bun 1.4.2 and TypeScript; `Bun.YAML` for front matter and `logistics.yaml`; `zod
 ## Commands
 
 ```sh
-bun test tests/knowledge
+bun test src/knowledge
 bun run knowledge                       # prints the core as the chat sees it, its size, and each source's size
 bun run knowledge <source id>           # prints one approved source as readPassages() returns it
 bun run knowledge --draft <source id>   # prints a draft source file as the chat will read it once approved, and names every rule it breaks
@@ -140,7 +140,7 @@ src/knowledge/build.ts     buildKnowledge({ root }), publicKnowledge() and previ
 src/knowledge/render.ts    renderCore() and renderSource(): text with [id] markers
 src/knowledge/read.ts      readPassages(knowledge, ids) and readLimits: what the chat's read tool returns
 scripts/knowledge.ts       `bun run knowledge`
-tests/knowledge/           tests, fixtures and snapshots
+src/knowledge/__tests__/   tests, fixtures and snapshots
 ```
 
 ## Code Style
@@ -303,7 +303,7 @@ No test can check three rules: that `Not public` names kinds only, that headings
 
 ## Prior-art tests
 
-`tests/knowledge/build.test.ts`, `tests/knowledge/parse.test.ts` and `tests/knowledge/fixtures.ts`: fixtures written in the test, a temporary folder, a fake phone number for the private-details checks, and one snapshot.
+`src/knowledge/__tests__/build.test.ts`, `src/knowledge/__tests__/parse.test.ts` and `src/knowledge/__tests__/fixtures.ts`: fixtures written in the test, a temporary folder, a fake phone number for the private-details checks, and one snapshot.
 
 These built tests encode the old contract. The build rewrites these assertions for this spec and keeps none of them:
 
@@ -317,7 +317,7 @@ These built tests encode the old contract. The build rewrites these assertions f
 
 ## Success Criteria
 
-- `bun test tests/knowledge` passes on a clean checkout.
+- `bun test src/knowledge` passes on a clean checkout.
 - With the nine deep dives moved and the change approved under the edit rule, `bun run knowledge` prints a core under 80,000 characters with a catalog entry for each of the nine, and every source is under 24,000 characters.
 - After the interviews, each of the six planned subjects has at least one approved source, and the raw answers behind it are in `interviews/` of `loriensleafs/resume-private`.
 

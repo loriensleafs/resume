@@ -18,7 +18,7 @@ Acceptance criteria:
 - No file in `dist/public/` contains the phone number. `resume.yaml` cannot hold a phone number; the build rejects it.
 - An invalid `resume.yaml` stops the build with a message that names the file and the field.
 - Each role has an `x-short` field, an extension: the short label the site's career timeline shows for that role ([SPEC-site](SPEC-site.md)). Its values are the labels of the approved mockups, and Peter approves each one. No document prints it.
-- `bun run documents` writes the public documents to `documents/`, with `documents/inputs.sha256`, a hash of the inputs. The inputs are `resume.yaml`, this module's source files, `fonts/`, and the locked versions of this module's own packages, read from `bun.lock`. The hash does not cover the whole of `bun.lock`, so a change to another module's packages needs no rebuild. It writes nothing when the hash is unchanged. The website serves these committed files, because Vercel's build has no Chrome ([SPEC-deploy](SPEC-deploy.md)). `tests/content/documents.test.ts` checks the hash, the page count, the fonts and the text of a fresh build, and, where `private.yaml` exists, that no committed document's extracted text holds the phone number.
+- `bun run documents` writes the public documents to `documents/`, with `documents/inputs.sha256`, a hash of the inputs. The inputs are `resume.yaml`, this module's source files, `fonts/`, and the locked versions of this module's own packages, read from `bun.lock`. The hash does not cover the whole of `bun.lock`, so a change to another module's packages needs no rebuild. It writes nothing when the hash is unchanged. The website serves these committed files, because Vercel's build has no Chrome ([SPEC-deploy](SPEC-deploy.md)). `scripts/__tests__/documents.test.ts` checks the hash, the page count, the fonts and the text of a fresh build, and, where `private.yaml` exists, that no committed document's extracted text holds the phone number.
 
 ## Tech Stack
 
@@ -35,7 +35,7 @@ bun run build               # public files, plus private files when private.yaml
 bun run build --public      # public files only; CI runs `bun run build` to check that the documents still build
 bun run documents           # rebuilds the committed public documents in documents/ when their inputs changed
 bun test                    # all tests
-bun test tests/content      # this module's tests
+bun test src/__tests__ scripts/__tests__/documents  # this module's tests
 bun test --update-snapshots # after a deliberate content change; review the snapshot diff
 bun run fonts               # only to change a font weight or add characters
 ```
@@ -55,8 +55,8 @@ scripts/documents.ts      `bun run documents`: builds the public variant and wri
 scripts/make-fonts.ts     cuts fonts/ from the Google Sans Flex variable font
 fonts/                    fixed-weight Google Sans Flex and its license
 documents/                the committed public documents (Peter-Kloss-Resume.pdf, .docx, .txt) and inputs.sha256
-tests/content/            this module's tests, fixtures and snapshots
-tests/content/documents.test.ts  seam 3: the committed documents
+src/__tests__/            seams 1 and 2: build() and the renderers, with their snapshot
+scripts/__tests__/documents.test.ts  seam 3: the committed documents
 dist/                     build output; ignored by git
 ```
 
@@ -84,7 +84,7 @@ export function formatRange(job: Pick<Job, "startDate" | "endDate">): string {
    - On the real `resume.yaml`: the PDF has 2 pages and only CID TrueType fonts. Every summary, highlight and skill line appears in the extracted text, whitespace-normalised. The Word body text appears in reading order. The text file matches its snapshot. No public file contains the phone number.
    - On fixtures: a missing field, a bad date and a phone number in `resume.yaml` each fail with a message that names the field. A job without `endDate` prints "Present".
 2. **Renderer unit tests**: `renderText`, `renderPrintHtml` and `renderDocx` on a small fixture. They check HTML escaping, the earlier-roles block, optional fields and the date formats, and that no renderer prints a role's `x-short`.
-3. **The committed documents**: `tests/content/documents.test.ts` reads `documents/` and a fresh build in a temporary folder. It runs in CI and locally:
+3. **The committed documents**: `scripts/__tests__/documents.test.ts` reads `documents/` and a fresh build in a temporary folder. It runs in CI and locally:
    - The hash of the current inputs equals `documents/inputs.sha256`, so a resume change without rebuilt documents fails.
    - The committed PDF has exactly 2 pages, is US Letter and tagged, and embeds every font.
    - A fresh build's text equals the committed files' text, spacing ignored: the text file, the PDF's text (`pdftotext`) and the Word file's text.
@@ -131,7 +131,7 @@ None in this repo yet. Peter's design system uses `bun test` with tests beside e
 
 ## Success Criteria
 
-- `bun test tests/content` passes on a clean checkout with Chrome and poppler installed.
+- `bun test src/__tests__ scripts/__tests__/documents` passes on a clean checkout with Chrome and poppler installed.
 - The private PDF is pixel-identical to the PDF built from the hand-written `resume.html` it replaced (verified 2026-10-26).
 - The public PDF differs from it only on the contact line.
 

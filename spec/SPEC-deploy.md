@@ -77,7 +77,7 @@ evals/
 .gemini/
 .github/
 .vscode/
-tests/**/*.test.ts
+**/__tests__/**/*.test.ts
 AGENTS.md
 CLAUDE.md
 CONTEXT.md
@@ -87,9 +87,9 @@ README.md
 - Every other tracked path is a site file. A missing entry makes an extra release, never a skipped one.
 - `.gemini/` matches a tracked file once the agents task writes `.gemini/settings.json`, which comes before the docs-only test. `.mcp.json` joins the list once Peter adds it ([SPEC-agents](SPEC-agents.md)); until then it would match no tracked file.
 - The list has no `prototypes/` entry. Prototypes stay on their own branches, so no file on `main` matches it, and an entry that matches no tracked file fails the docs-only test.
-- Shared test helpers, such as `tests/chat/fixtures.ts`, are site files: the preview's fake model bundles them with the chat function.
+- Shared test helpers, such as `src/chat/server/__tests__/fixtures.ts`, are site files: the preview's fake model bundles them with the chat function.
 - `scripts/site-changed.sh <from> <to>` exits 1 when a site file differs between two commits, 0 when none does, and 128 on an error. It runs `git diff --quiet <from> <to> -- . ':(exclude,glob)<entry>'…` for each entry. The ignore step, the release check and the GitHub health check all use it, so the list is read in one place.
-- `tests/site/docs-only.test.ts` fails when an entry matches no tracked file, or when an entry matches a file that the site build reads. `buildSite()` returns the files it read: Vite's module graph and the files it opens. The task that writes the docs-only test adds that return value. The built-output checks (each page's policy tag, no `style=` attribute) live once, in the site's build test; this module's tests check `addPolicyTags()` and `writeVercelConfig()` at unit level.
+- `scripts/__tests__/docs-only.test.ts` fails when an entry matches no tracked file, or when an entry matches a file that the site build reads. `buildSite()` returns the files it read: Vite's module graph and the files it opens. The task that writes the docs-only test adds that return value. The built-output checks (each page's policy tag, no `style=` attribute) live once, in the site's build test; this module's tests check `addPolicyTags()` and `writeVercelConfig()` at unit level.
 
 **The steps of a release.**
 
@@ -131,7 +131,7 @@ The PDF build drives Chrome, and Vercel's build image (Amazon Linux 2023) has no
 - `documents/inputs.sha256` holds a hash of the document build's inputs: `resume.yaml`, the content module's source files, `fonts/`, and the locked versions of the content module's own packages, read from `bun.lock`. The hash does not cover the whole of `bun.lock`, so a change to another module's packages needs no `bun run documents`. [SPEC-content](SPEC-content.md) owns this rule. `bun run documents` writes nothing when the hash is unchanged. So a rebuild with the same sources never changes the files, although Chrome and the Word library stamp the date into them. The plan checks whether the Word library and Chrome accept a fixed date; the hash rule holds either way.
 - A change to `resume.yaml` and the rebuilt documents go in the same commit. The edit-resume skill runs `bun run documents`.
 - `bun run build:site` copies `documents/` into the site. It builds no document and needs no Chrome.
-- `tests/content/documents.test.ts`, run in CI and locally:
+- `scripts/__tests__/documents.test.ts`, run in CI and locally:
   - The hash of the current inputs equals `documents/inputs.sha256`, so a resume change without rebuilt documents fails.
   - The committed PDF has exactly 2 pages, is US Letter and tagged, and embeds every font, as the content module's build test checks its own output.
   - A fresh build's text equals the committed files' text, spacing ignored: the text file, the PDF's text (`pdftotext`) and the Word file's text (`unzip -p … word/document.xml`). The PDF bytes are not compared, because Chrome on the runner is not pinned.
@@ -640,7 +640,7 @@ bun run preview --dir <folder>           # serves the .vercel/output/ in <folder
 bun run smoke http://localhost:4173 --browser --documents documents/   # against the preview
 bun run smoke https://peterkloss.dev --browser --production --documents documents/   # the outside check by hand
 bun run questions                        # entries, daily totals and costs; loads .secrets/local.env
-bun test tests/ops                       # seam 2
+bun test src/ops                       # seam 2
 bun test                                 # every test
 ```
 
@@ -669,13 +669,13 @@ src/site/routes/api.cron.health.ts the Vercel health job
 .github/workflows/release-check.yml the release check
 .github/workflows/health.yml       the outside health check
 docs/runbooks/                     setup, rollback and one file per alert
-tests/ops/ops.test.ts              seam 2
-tests/ops/fake-upstash.ts          an in-test Upstash REST server for the commands and the transactions the module uses
-tests/ops/fake-ntfy.ts             an in-test ntfy server that records pushes
-tests/site/config.test.ts          vercel.json, the Vercel output, the policy tags (seam 1)
-tests/site/docs-only.test.ts       the docs-only list and the three shell scripts (seam 1)
-tests/site/smoke.test.ts           the smoke check against the preview (seam 3)
-tests/content/documents.test.ts    the committed documents (SPEC-content's)
+src/ops/__tests__/ops.test.ts      seam 2
+src/ops/__tests__/fake-upstash.ts  an in-test Upstash REST server for the commands and the transactions the module uses
+src/ops/__tests__/fake-ntfy.ts     an in-test ntfy server that records pushes
+src/deploy/__tests__/config.test.ts  vercel.json, the Vercel output, the policy tags (seam 1)
+scripts/__tests__/docs-only.test.ts  the docs-only list and the three shell scripts (seam 1)
+scripts/__tests__/smoke.test.ts    the smoke check against the preview (seam 3)
+scripts/__tests__/documents.test.ts  the committed documents (SPEC-content's)
 ```
 
 ## Code Style
@@ -696,7 +696,7 @@ expect(tickets.filter((t) => t.ok)).toHaveLength(8); // 8 × $0.90 = $7.20; a ni
 `bun test`, at the three seams Peter confirmed on 2026-10-27 (row 117). No test calls Upstash, ntfy, Anthropic, GitHub or Vercel.
 
 1. **The site seam, extended** ([SPEC-site](SPEC-site.md) seams 1 and 2):
-   - `tests/site/config.test.ts` reads `vercel.json` and the build's `.vercel/output/`:
+   - `src/deploy/__tests__/config.test.ts` reads `vercel.json` and the build's `.vercel/output/`:
      - `vercel.json` holds only the build settings, and `bunVersion` is `1.4.x`;
      - every function's `.vc-config.json` has the runtime value that spike check 2 settled; the chat's has `maxDuration: 150` and region `iad1`;
      - only the three API paths reach a function, each route is case-sensitive, and no route sends anything else to `/__server`;
@@ -706,18 +706,18 @@ expect(tickets.filter((t) => t.ok)).toHaveLength(8); // 8 × $0.90 = $7.20; a ni
      - the cron calls `/api/cron/health`;
      - each HTML file, the not-found page included, starts with a policy tag that lists exactly the hashes of its own inline scripts;
      - no built page holds a `style=` attribute.
-   - `tests/site/docs-only.test.ts`:
+   - `scripts/__tests__/docs-only.test.ts`:
      - every entry matches a tracked file, and no entry matches a file the site build reads;
      - `scripts/site-changed.sh` and `scripts/ignore-build.sh`, run in a temporary git repository with a shallow clone:
        - they build for a change to a site file, also when the previous deployment is more than 10 commits back;
        - they skip a docs-only change across several commits;
        - they build on an empty previous commit, on an unknown commit and on a failing git command.
    - The browser test builds first into the seam-1 folder and runs against `bun run preview --dir <folder>`. It fails on any policy violation, page error or service-worker console error, and on any request to `/_serverFn/`, on every page it visits. It clicks between pages online and offline, and loads an unknown path offline.
-   - `tests/content/documents.test.ts`: the checks in "Documents".
+   - `scripts/__tests__/documents.test.ts`: the checks in "Documents".
    - A test fails when any `.env*` file exists in the checkout.
-2. **The ops module**, `tests/ops/ops.test.ts`, through `createOps()` and `createOpsReader()`, against the in-test Upstash and ntfy servers and a fixed clock:
+2. **The ops module**, `src/ops/__tests__/ops.test.ts`, through `createOps()` and `createOpsReader()`, against the in-test Upstash and ntfy servers and a fixed clock:
    - **Log and contract.**
-     - SPEC-chat's QuestionLog contract suite, `tests/chat/question-log-contract.ts`, passes against both the in-memory log and the Upstash one. The suite fixes the day window of `list(days)`.
+     - SPEC-chat's QuestionLog contract suite, `src/chat/server/__tests__/question-log-contract.ts`, passes against both the in-memory log and the Upstash one. The suite fixes the day window of `list(days)`.
      - An entry appended through `log.append()` comes back from the reader's `list(7)`.
      - A day's keys expire at 00:00 UTC on the 90th day after it, and each write's commands arrive as one transaction.
    - **Totals and cost.**
@@ -749,7 +749,7 @@ expect(tickets.filter((t) => t.ok)).toHaveLength(8); // 8 × $0.90 = $7.20; a ni
    - **Guards.**
      - With `VERCEL_ENV` `preview` and store variables present: no server is called.
      - The reader with the read-only token makes no write command.
-3. **The smoke check**, `tests/site/smoke.test.ts`:
+3. **The smoke check**, `scripts/__tests__/smoke.test.ts`:
    - The test builds first into the seam-1 folder and serves it with `bun run preview --dir <folder>`. `bun run smoke <preview origin> --browser --documents documents/` against it passes.
    - It fails, naming the cause:
      - when one header is removed;
@@ -859,10 +859,10 @@ The real platform is checked by the deploy spike, by the release check, by the t
 
 ## Prior-art tests
 
-- `tests/content/build.test.ts`: runs the real entry point into a temporary folder and checks the real files, the PDF's text (`pdftotext`), the Word file's text (`unzip -p`) and the fonts. `tests/site/config.test.ts` and `tests/content/documents.test.ts` work the same way.
-- `tests/site/browser.test.ts` from SPEC-site: Playwright under Bun against the preview. Seam 1 adds the policy-violation and `/_serverFn/` checks, and the smoke check's `--browser` part reuses them.
+- `src/__tests__/build.test.ts`: runs the real entry point into a temporary folder and checks the real files, the PDF's text (`pdftotext`), the Word file's text (`unzip -p`) and the fonts. `src/deploy/__tests__/config.test.ts` and `scripts/__tests__/documents.test.ts` work the same way.
+- `src/site/__tests__/browser.test.ts` from SPEC-site: Playwright under Bun against the preview. Seam 1 adds the policy-violation and `/_serverFn/` checks, and the smoke check's `--browser` part reuses them.
 - The probes on the branch `prototype/csp-probe`: `prototypes/csp-probe/csp-test.ts` (the `securitypolicyviolation` listener and the per-page hashes), `prototypes/csp-probe-2/` (the split policy, the not-found page, the offline fallback and the client-navigation check), and `prototypes/nitro-vercel-output/` (what Nitro's Vercel preset writes).
-- SPEC-chat's QuestionLog contract suite, `tests/chat/question-log-contract.ts`, with its exact day window. Seam 2 runs it against the in-memory log and the Upstash one.
+- SPEC-chat's QuestionLog contract suite, `src/chat/server/__tests__/question-log-contract.ts`, with its exact day window. Seam 2 runs it against the in-memory log and the Upstash one.
 
 ## Success Criteria
 

@@ -5,7 +5,7 @@ Spec: [SPEC-chat](../../spec/SPEC-chat.md) (approved, row 139), with the contrac
 ## Conventions
 
 - **Size** follows the planning skill's table: S is 1 or 2 files, M is 3 to 5. C1 counts its lockfile as generated; C39 is M because its fixes can touch the UI files.
-- **Seams.** Seam 1 is `handleChat()` in `tests/chat/handler.test.ts`, with `fakeText()`, knowledge built from fixtures (one fixture source has `Not public` text) and the in-memory log, budget and telemetry. Seam 2 is SPEC-site's browser test, `tests/site/browser.test.ts`, which builds into the seam-1 folder and serves it with `bun run preview --dir <folder>`. The evals run outside `bun test`. No other seam (row 83).
+- **Seams.** Seam 1 is `handleChat()` in `src/chat/server/__tests__/handle-chat.test.ts`, with `fakeText()`, knowledge built from fixtures (one fixture source has `Not public` text) and the in-memory log, budget and telemetry. Seam 2 is SPEC-site's browser test, `src/site/__tests__/browser.test.ts`, which builds into the seam-1 folder and serves it with `bun run preview --dir <folder>`. The evals run outside `bun test`. No other seam (row 83).
 - **Before every commit** (AGENTS.md): `bun run build`, `bun run build:site` (once it exists) and `bun test`. Each task's Verify line names the focused commands.
 - **Pushes.** Every file under `src/`, `evals/`, `scripts/` and `vite.config.ts` is a site file, so each push to `main` is a release and needs Peter's approval (SPEC-deploy; the `release` skill).
 - **Library skills.** A task that writes TanStack AI or TanStack DB code loads that package's skills first (`bun run intent load …`); a task that writes UI loads `@acmelabs/design-system#choose-and-compose`, `#react-integration` and `#forms-and-accessibility`, and asks the `acme-design-system` MCP server for each part with version `0.3.2` and framework `react` (AGENTS.md "Libraries"; SPEC-chat Code Style).
@@ -34,11 +34,11 @@ Needs Peter: no, unless a name differs from SPEC-chat; then he approves the spec
 Delivers: the three interfaces SPEC-deploy implements exist with in-memory versions, and the QuestionLog contract suite runs at seam 1, so the deploy module's ops work can start.
 Blocked by: none
 Acceptance:
-- `tests/chat/question-log-contract.ts` exports the suite, and seam 1 runs it against the in-memory log: an appended entry comes back from `list(1)`; on 2026-10-27, `list(7)` returns the entries dated 2026-10-21 to 2026-10-27, newest first, and none dated 2026-10-20; an empty log returns no entries (Question log, "The day window"; Testing Strategy, "The QuestionLog contract").
+- `src/chat/server/__tests__/question-log-contract.ts` exports the suite, and seam 1 runs it against the in-memory log: an appended entry comes back from `list(1)`; on 2026-10-27, `list(7)` returns the entries dated 2026-10-21 to 2026-10-27, newest first, and none dated 2026-10-20; an empty log returns no entries (Question log, "The day window"; Testing Strategy, "The QuestionLog contract").
 - `src/chat/server/question-log.ts` exports `QuestionLog`, `QuestionLogEntry`, `Budget` and `Telemetry`, and `src/chat/server/telemetry.ts` exports `ChatTurnEvent`, as the spec writes them, with no IP address, `threadId`, scope or audience field; the in-memory budget allows, or refuses with the code it was given, and the in-memory telemetry keeps each event (Question log; Turn telemetry; Evals).
 - Nothing under `src/chat/` imports from `src/ops/` or `src/deploy/` ("so the chat imports nothing from the deploy module").
-Verify: `bun test tests/chat`; `grep -r "src/ops\|src/deploy" src/chat` prints nothing.
-Files: `src/chat/server/question-log.ts`, `src/chat/server/telemetry.ts`, `tests/chat/question-log-contract.ts`, `tests/chat/handler.test.ts`
+Verify: `bun test src/chat`; `grep -r "src/ops\|src/deploy" src/chat` prints nothing.
+Files: `src/chat/server/question-log.ts`, `src/chat/server/telemetry.ts`, `src/chat/server/__tests__/question-log-contract.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
 Needs Peter: no
 
@@ -50,8 +50,8 @@ Acceptance:
 - An answer with no read keeps a resume citation in the streamed text, and the `chat.citations` `CUSTOM` event lists it with 0 removed (Testing Strategy, "Citations"; Markers).
 - The turn writes one `answered` entry with the UTC day, the question and the kept citations, and no `threadId`, after the run ends, from the terminal hook with `ctx.defer()` (Question log).
 - The model request holds the system prompt with `renderCore(knowledge)` and the last turns (One turn, step 4); `ChatDeps` and `handleChat()` have the signatures in Code Style.
-Verify: `bun test tests/chat`
-Files: `src/chat/server/handle-chat.ts`, `src/chat/server/prompt.ts`, `src/chat/server/markers.ts`, `tests/chat/handler.test.ts`
+Verify: `bun test src/chat`
+Files: `src/chat/server/handle-chat.ts`, `src/chat/server/prompt.ts`, `src/chat/server/markers.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
 Needs Peter: no (the prompt's wording is approved in C15)
 
@@ -63,8 +63,8 @@ Acceptance:
 - The server reads the request in the spec's order: a body over 256 KB gets 413 `REQUEST_TOO_LARGE`; bad JSON, a body `chatParamsFromRequestBody()` rejects, a `system` message and a user image part each get 400 `INVALID_REQUEST`; a question of 10,001 characters gets 413 `QUESTION_TOO_LONG`; each is the `ChatError` JSON, never a plain-text body; `forwardedProps` without its three keys passes `ChatProps` (The request; Testing Strategy, "Request checks").
 - `Origin: https://example.com` gets 403 `FORBIDDEN_ORIGIN`. The handler allows the origins in `deps.origins` (`ChatDeps` gains `origins: string[]`; main's decision, written into SPEC-chat), and an empty list allows only the request's own origin; no `Origin` header passes (The request, "Origin"). C17's route fills `origins`.
 - None of these calls the model or writes the log, and a body that carries its own `tools` and `context` still gives the model the handler's tools only; `turnLimits` holds the spec's values (Limits).
-Verify: `bun test tests/chat`
-Files: `src/chat/server/handle-chat.ts`, `src/chat/server/props.ts`, `src/chat/server/limits.ts`, `tests/chat/handler.test.ts`
+Verify: `bun test src/chat`
+Files: `src/chat/server/handle-chat.ts`, `src/chat/server/props.ts`, `src/chat/server/limits.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
 Needs Peter: no
 
@@ -76,8 +76,8 @@ Acceptance:
 - A read then an answer keeps a citation to a read passage and removes one to an unread passage; `chat.citations` reports 1 removed (Testing Strategy, "Citations").
 - No streamed event holds passage text or the fixture's `Not public` text; each `read_sources` `TOOL_CALL_RESULT` holds `{ read, unknown, skipped }` only, and the model's next call still gets the full read text (Read results on the wire).
 - A call with 21 ids, or with an id of 65 characters, gets a tool error from the input schema, and the run goes on (Tools; "Read limits").
-Verify: `bun test tests/chat`
-Files: `src/chat/server/tools.ts`, `src/chat/server/wire.ts`, `src/chat/server/markers.ts`, `src/chat/server/handle-chat.ts`, `tests/chat/handler.test.ts`
+Verify: `bun test src/chat`
+Files: `src/chat/server/tools.ts`, `src/chat/server/wire.ts`, `src/chat/server/markers.ts`, `src/chat/server/handle-chat.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
 Needs Peter: no
 
@@ -89,8 +89,8 @@ Acceptance:
 - Four scripted reads: the fourth is skipped with an error result, every model call in the turn has the same tools, and the call after the third read has `toolChoice: "none"` (Limits, "Reads"; Testing Strategy, "The read budget").
 - A read whose input fails the schema does not count, and another middleware's `onBeforeToolCall` that transforms the arguments cannot skip the budget (Testing Strategy, "The read budget").
 - Five scripted model calls that each call a tool: the sixth has `toolChoice: "none"`, and the turn ends with an answer (`agentLoopStrategy: maxIterations(6)`; "The last call").
-Verify: `bun test tests/chat`
-Files: `src/chat/server/limits.ts`, `src/chat/server/handle-chat.ts`, `tests/chat/handler.test.ts`
+Verify: `bun test src/chat`
+Files: `src/chat/server/limits.ts`, `src/chat/server/handle-chat.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
 Needs Peter: no
 
@@ -101,8 +101,8 @@ Blocked by: C6
 Acceptance:
 - An `about` passage or source id is read with `readPassages(knowledge, [about])` after `budget.reserve()` and before the first model call; the stream starts with that `read_sources` call (`topic` is the source's title) and its id-only result; the passage can be cited, and only 2 more reads are allowed (The request, "About"; Testing Strategy, "About").
 - An `about` that is a resume entry id adds a request line naming the entry, with no read (The request, "About").
-Verify: `bun test tests/chat`
-Files: `src/chat/server/handle-chat.ts`, `src/chat/server/prompt.ts`, `tests/chat/handler.test.ts`
+Verify: `bun test src/chat`
+Files: `src/chat/server/handle-chat.ts`, `src/chat/server/prompt.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
 Needs Peter: no
 
@@ -114,8 +114,8 @@ Acceptance:
 - Refusal and follow-up markers leave the text and arrive as `CUSTOM` events; the log has the refusal outcome; a third follow-up question is dropped, and one of 120 characters never reaches the text (Markers; Testing Strategy, "Markers").
 - `[1]`, `[x]`, `items[0]`, and a citation form inside inline code, fenced code or link text pass unchanged; text from `[` is held at most 120 characters (Markers, "Citation forms", "Code and links", "Holding").
 - An unknown `<<…>>` and a whole-source marker are removed and counted; text held at the end of a message is flushed as text (Markers).
-Verify: `bun test tests/chat`
-Files: `src/chat/server/markers.ts`, `tests/chat/handler.test.ts`
+Verify: `bun test src/chat`
+Files: `src/chat/server/markers.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: S
 Needs Peter: no
 
@@ -126,8 +126,8 @@ Blocked by: C8
 Acceptance:
 - `open_source` with an id the conversation never cites returns an error; an id that an earlier answer's text cites with a kept marker, or that this turn read, returns `{ opened: true }` (Tools; Testing Strategy, "`open_source`").
 - `open_resume` returns `{ opened: true }`; neither tool writes anything (Tools).
-Verify: `bun test tests/chat`
-Files: `src/chat/server/tools.ts`, `tests/chat/handler.test.ts`
+Verify: `bun test src/chat`
+Files: `src/chat/server/tools.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: S
 Needs Peter: no
 
@@ -138,8 +138,8 @@ Blocked by: C5
 Acceptance:
 - Earlier turns over 40,000 characters: the oldest are dropped first; twenty-five turns of history: the model receives 20 (Limits, "Conversation sent"; Testing Strategy, "History").
 - Earlier reads reach the model as ids only, also when the request carries edited read text (The request, "Trust").
-Verify: `bun test tests/chat`
-Files: `src/chat/server/handle-chat.ts`, `src/chat/server/limits.ts`, `tests/chat/handler.test.ts`
+Verify: `bun test src/chat`
+Files: `src/chat/server/handle-chat.ts`, `src/chat/server/limits.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
 Needs Peter: no
 
@@ -151,8 +151,8 @@ Acceptance:
 - A `budget` that refuses gives an HTTP 200 stream with one `RUN_ERROR` event and its code (`DAILY_LIMIT` or `SPEND_LIMIT`), no model call and no log entry (The request, "Limits"; Testing Strategy, "Limits").
 - Every `RUN_ERROR` on the wire holds only its code and the fixed message for it: no `rawEvent`, `metadata`, `usage` or Anthropic error body (Stream errors).
 - A model error gives `RUN_ERROR` and an `error` entry; an aborted request gives a `stopped` entry (Testing Strategy, "Endings").
-Verify: `bun test tests/chat`
-Files: `src/chat/server/handle-chat.ts`, `src/chat/server/wire.ts`, `tests/chat/handler.test.ts`
+Verify: `bun test src/chat`
+Files: `src/chat/server/handle-chat.ts`, `src/chat/server/wire.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
 Needs Peter: no
 
@@ -164,8 +164,8 @@ Acceptance:
 - The stub's spend-limit errors, with both documented bodies (HTTP 400 `invalid_request_error` starting "You have reached your specified"; HTTP 429 `error.details.error_code` `enforced_spend_limit_reached`), built with the SDK's real error class, end the stream with `SPEND_LIMIT` and write a `limit` entry; the handler reads the status and body, not the message text (The request, "Limits"; SPEC-deploy, "The monthly limit").
 - The stub's `max_tokens` stop ends the stream with `RUN_ERROR` `MAX_TOKENS` and writes an `error` entry; partial text is not kept (How a turn ends; Testing Strategy, "Endings").
 - The stub sees adaptive thinking with effort `medium`, the thinking text omitted, `max_tokens` 8,000 and the short prompt cache on every model call; `handleChat()` sets the cache itself, with no `ChatDeps` field (Limits, "Thinking"; Testing Strategy, "Thinking"; main's decision, written into SPEC-chat).
-Verify: `bun test tests/chat`
-Files: `tests/chat/stub-anthropic.ts`, `src/chat/server/handle-chat.ts`, `tests/chat/handler.test.ts`
+Verify: `bun test src/chat`
+Files: `src/chat/server/__tests__/stub-anthropic.ts`, `src/chat/server/handle-chat.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
 Needs Peter: no
 
@@ -175,8 +175,8 @@ Delivers: a stuck model call ends with an error event, so a cut answer never loo
 Blocked by: C12
 Acceptance:
 - A stub call that never ends: at 120 s (Bun's fake timers) the stream ends with the handler's own `RUN_ERROR` `DEADLINE` before it closes, and the entry is `error` (Limits, "Deadline"; Testing Strategy, "Endings").
-Verify: `bun test tests/chat`
-Files: `src/chat/server/limits.ts`, `src/chat/server/handle-chat.ts`, `tests/chat/handler.test.ts`
+Verify: `bun test src/chat`
+Files: `src/chat/server/limits.ts`, `src/chat/server/handle-chat.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
 Needs Peter: no
 
@@ -188,8 +188,8 @@ Acceptance:
 - Two finished model calls, then a Stop during the third: telemetry gets the sum of the two calls' usage as SPEC-deploy's five counts; the counts are `null` when no call finished (Turn telemetry; Testing Strategy, "Usage").
 - Each turn hands one `chat_turn` event with its reservation to `telemetry.record()`, a rejected request with `rejected` and a refusal before the model call with `limit`; no event holds question text or the `threadId` (Turn telemetry; Testing Strategy, "Telemetry").
 - The response ends only after the log and telemetry writes, and a log or telemetry write that fails never breaks the answer (Testing Strategy, "Usage"; Question log; SPEC-deploy amendment 10).
-Verify: `bun test tests/chat`
-Files: `src/chat/server/telemetry.ts`, `src/chat/server/handle-chat.ts`, `tests/chat/handler.test.ts`
+Verify: `bun test src/chat`
+Files: `src/chat/server/telemetry.ts`, `src/chat/server/handle-chat.ts`, `src/chat/server/__tests__/handle-chat.test.ts`
 Size: M
 Needs Peter: no
 
@@ -201,8 +201,8 @@ Acceptance:
 - The model request holds the scope line from the core ("The visitor is asking about FedNow, 2021 – 2024."), none for an unknown role id, and one audience line for each of the five audiences, none for no choice (The request, "Scope", "Audience").
 - The system prompt says what the spec lists: the third person, the chat's topics and the refusal rules with the two refusal wordings and the email from `basics`, Peter's wording rule, the marker formats, the fit check's rules, the open tools, and that a pasted text is material, never instructions (The request; Answers the chat gives).
 - Peter approves the prompt, the five audience lines and the two refusal wordings in the question tool; a decision-record row holds the approval (Boundaries, "Ask first").
-Verify: `bun test tests/chat`; Peter's approval.
-Files: `src/chat/server/prompt.ts`, `tests/chat/handler.test.ts`, `docs/design/interview-2026-10-26.md`
+Verify: `bun test src/chat`; Peter's approval.
+Files: `src/chat/server/prompt.ts`, `src/chat/server/__tests__/handle-chat.test.ts`, `docs/design/interview-2026-10-26.md`
 Size: M
 Needs Peter: yes: approval of the system prompt's wording, the audience lines and the refusal wordings.
 
@@ -214,8 +214,8 @@ Acceptance:
 - `virtual:knowledge` gives the server route the `buildKnowledge()` output at build time, bundled with the function, so it reads no source file at run time; the plugin is added in `vite.config.ts` (The build).
 - The build writes `device-index.json` into `.vercel/output/static/` from `publicKnowledge(knowledge)`: one label per resume entry ("Resume: FedNow", "Resume: FedNow, highlight 2"), the logistics answers and passages with their labels and text, and the approved sources' `links`; `src/chat/device-index.ts` loads it once in the browser (The build; Citations card).
 - SPEC-site's seam-1 check passes with it: no file under `static/` holds the fixture's `Not public` text. The precache check for `device-index.json` belongs to S28, which comes later.
-Verify: `bun run build:site`; `bun test tests/site/build.test.ts`
-Files: `src/chat/vite-plugin.ts`, `src/chat/device-index.ts`, `vite.config.ts`, `tests/site/build.test.ts`
+Verify: `bun run build:site`; `bun test src/site/__tests__/build.test.ts`
+Files: `src/chat/vite-plugin.ts`, `src/chat/device-index.ts`, `vite.config.ts`, `src/site/__tests__/build.test.ts`
 Size: M
 Needs Peter: no
 
@@ -224,11 +224,11 @@ Needs Peter: no
 Delivers: `/api/chat` answers in the preview with scripted turns, and in production with Sonnet 5.5.
 Blocked by: C14, C16, D9 (`createOps()` with its in-memory parts outside production and `PREVIEW_LIMIT`), S9 (`bun run preview --dir` and the browser test's harness), K11, K12, K13 (the nine deep dives in `knowledge/sources/`: the scripted turns cite real ids such as `fednow-bundle-size.2`)
 Acceptance:
-- When `VERCEL_ENV` is not `production`, the route uses `fakeText()` with the scripted turns of `tests/chat/fixtures.ts`, picked by question text, whatever variables are set (an `ANTHROPIC_API_KEY` included); in production, `anthropicText("claude-sonnet-5-5")` (The route file; Tech Stack).
+- When `VERCEL_ENV` is not `production`, the route uses `fakeText()` with the scripted turns of `src/chat/server/__tests__/fixtures.ts`, picked by question text, whatever variables are set (an `ANTHROPIC_API_KEY` included); in production, `anthropicText("claude-sonnet-5-5")` (The route file; Tech Stack).
 - `ChatDeps` come from `virtual:knowledge`, SPEC-deploy's `createOps(process.env)`, the real clock and `origins`, which the route computes from `VERCEL_ENV` and `VERCEL_URL`: in production `https://peterkloss.dev` and `https://$VERCEL_URL`, elsewhere an empty list, which means the request's own origin (The route file; main's decision). The check through `bun run preview --dir` (a `POST /api/chat` from the page streams a scripted answer) is S31's, right after this task.
 - `bun run dev` answers a scripted question with the fake model (Commands).
 Verify: `bun run build:site`; `bun test`; manual: `bun run dev`, ask a scripted question.
-Files: `src/site/routes/api.chat.ts`, `tests/chat/fixtures.ts`, `tests/site/browser.test.ts`
+Files: `src/site/routes/api.chat.ts`, `src/chat/server/__tests__/fixtures.ts`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -240,8 +240,8 @@ Acceptance:
 - Selecting a suggested question sends it once, with the current scope and audience, then calls `clearSuggestedQuestion()`; the question shows on the right and the answer on the left, at the column's full width, 20 px apart with a 28 px action row each (Suggested questions; Messages; Testing Strategy, seam 2 bullet 1).
 - The first send calls `setConversationActive(true)`; each finished answer calls `answerFinished()` once (Workspace effects).
 - Each request carries the conversation's `threadId` (a UUID) and the question's `scope`, `audience` and `about` in `forwardedProps`, through `sendMessage`'s `body` (The request).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/site/routes/index.tsx`, `src/chat/ui/ChatColumn.tsx`, `src/chat/ui/Messages.tsx`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/site/routes/index.tsx`, `src/chat/ui/ChatColumn.tsx`, `src/chat/ui/Messages.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -253,8 +253,8 @@ Acceptance:
 - A one-line `acme-textarea` with `auto-resize` in a plain wrapper that holds the send button as an end add-on, named in the code as a design-system gap; the placeholder is "Ask about a project, a role or a skill", then "Ask a follow-up" (Chat input).
 - Empty: Send is off; Ready: Enter sends, Shift+Enter adds a line (the state table).
 - After sending, focus stays in the input, and Tab reaches the input (Accessibility).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/ChatInput.tsx`, `src/chat/ui/ChatColumn.tsx`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/ChatInput.tsx`, `src/chat/ui/ChatColumn.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -266,8 +266,8 @@ Acceptance:
 - The chat opens `peterkloss-chat` once with `createIndexedDB({ name: "peterkloss-chat", version: 1, stores: ["messages", "queue", "session"] })` and one `indexedDBCollectionOptions` collection per store; the sending tab writes a message's row when it is added and again when it ends, never the whole conversation, and `useChat` runs without its own persistence (Saved conversation). The DB names are checked against the package's skills first.
 - A reload restores the conversation at the latest answer with no notice: the collections are read before the first render and passed as `initialMessages` and `threadId`; the restore calls `setConversationActive(true)`, or `setConversationActive(false)` with nothing saved (A returning visitor; Testing Strategy, seam 2). S34 checks the effect: the first view never shows, layout shift stays under 0.1, and with nothing saved the first view shows.
 - A `session` row with an unknown `version` clears the chat's stores, and blocked storage works as a first visit with the conversation in memory (Saved conversation, "Version").
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -279,8 +279,8 @@ Acceptance:
 - With a scope, the chip inside the input reads "Asking about FedNow, 2021 – 2024 ×" from `workspace.scope`, the placeholder is "Ask about FedNow", and × calls `setScope(null)` (Chat input; row 137).
 - `askRequest` puts the chip "About: Resume, FedNow, highlight 2" (a device-index label) in the input, clears the request and focuses the input; with an empty input, Enter or Send asks "Tell me more about this."; × removes the chip, and it clears after sending (Ask about this; the state table, "Empty").
 - Each question's message metadata, and so its saved row, keeps its `about`, scope and audience (Saved conversation, "Each question's request").
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/ChatInput.tsx`, `src/chat/ui/ChatColumn.tsx`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/ChatInput.tsx`, `src/chat/ui/ChatColumn.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -292,8 +292,8 @@ Acceptance:
 - With the column 520 px or wider, a compact trigger ("Answers for: Anyone ▾") opens `acme-toggle-tip` with the line of context, the five audiences as an attached `acme-group` of `acme-toggle-button`s (`role="group"`, named "Answers for"; "Product" named "Product manager"; pressing the pressed one clears it) and the line for the chosen audience; the `::part(content)` width and the hidden `::part(close)` are set through a plain wrapper and named as design-system gaps (Answers for).
 - Escape closes the popover and returns focus to the trigger; a click outside closes it; at 390 × 844 the control is `acme-select` labelled "Answers for"; both write the session row's audience, which survives a reload and shows in the popover after a resize (Answers for; Testing Strategy, seam 2).
 - The trigger and "Questions are kept anonymously to improve answers." share one row at 1440 × 900; on phones the line goes under the control (Chat input; Testing Strategy, seam 2).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/AudienceChoice.tsx`, `src/chat/ui/ChatInput.tsx`, `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/AudienceChoice.tsx`, `src/chat/ui/ChatInput.tsx`, `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: yes: approval of the popover's wording and of the anonymous-log line's wording (SPEC-chat: "Peter approves the popover's wording" and, for the line, "Peter approves the wording"; decision 0020). The decision record holds no approval of either text: row 84 approved the line's place under "Answers for", and row 139 the boards that draw both. Peter may count row 139 as the approval.
 
@@ -305,8 +305,8 @@ Acceptance:
 - `AnswerText` renders through `@tanstack/markdown/react` with `allowHtml` never set: raw HTML shows as text, and `img` renders its alt text only (Rendering answers; Testing Strategy, seam 2).
 - `a` renders a link only for `https://peterkloss.dev/…` (same tab), `https://github.com/loriensleafs/…`, `https://github.com/acmelabs-15/…`, `mailto:` Peter's email and the approved sources' `links` from the device index (new tab, `rel="noopener noreferrer"`); any other link renders as its text (Rendering answers).
 - The prose uses the design system's tokens. The check the spec asks for: `acme-markdown`'s `[data-acme-markdown-prose]` rules are not exported in 0.3.2 (its `./styles/*` holds only `tokens.css` and `dashboard.css`; the rules are adopted only while an `acme-markdown` is on the page), so the chat's stylesheet carries the same rules on the tokens and names the gap (Rendering answers; Open Questions).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/Answer.tsx`, `src/chat/ui/AnswerText.tsx`, `src/chat/ui/answer-markdown.ts`, `tests/chat/fixtures.ts`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/Answer.tsx`, `src/chat/ui/AnswerText.tsx`, `src/chat/ui/answer-markdown.ts`, `src/chat/server/__tests__/fixtures.ts`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -318,8 +318,8 @@ Acceptance:
 - Each kept `[id]` becomes a `#cite:<id>` link node; the `a` component draws a numbered citation button only for an id in this answer's kept citations, numbered by its position from 1; a `#cite:` link to any other id renders as its text; a second answer starts again at 1 (Rendering answers; row 133; Testing Strategy, seam 2).
 - Each button's name says what it opens: "Citation 1: The FedNow bundle cut, What Peter did" (Accessibility).
 - Selecting citation n calls `openCitation(id, n)`, and the chat calls `setCited(keptIds)` after each answer and again on restore (Workspace effects; Testing Strategy, seam 2 bullets 1, 2 and 10). S32 checks the effect: citation 1 opens the source tab with the passage marked, and the cited roles light up on the timeline.
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/answer-markdown.ts`, `src/chat/ui/AnswerText.tsx`, `src/chat/ui/ChatColumn.tsx`, `tests/chat/fixtures.ts`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/answer-markdown.ts`, `src/chat/ui/AnswerText.tsx`, `src/chat/ui/ChatColumn.tsx`, `src/chat/server/__tests__/fixtures.ts`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -330,8 +330,8 @@ Blocked by: C24
 Acceptance:
 - One row per kept citation of this answer, numbered from 1 in order of first use, in an outline card: the icon, then "<source title>: <passage heading>", "Resume: <label>" or "Logistics: <topic>" from the device index; an id that no longer exists shows as plain text (Citations card).
 - The action is "Open beside the chat" for a passage, "Show in the resume" for a resume entry of any kind, and none for a logistics answer; the open citation's row is tinted, and its action reads "Shown in the resume" when it is the resume (Citations card).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/CitationsCard.tsx`, `src/chat/ui/Answer.tsx`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/CitationsCard.tsx`, `src/chat/ui/Answer.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -343,8 +343,8 @@ Acceptance:
 - While answering, each step appears in a bordered box as it happens: "Found 1 source about <topic>", "Reading <title>", and "Checking citations" from the first answer text after the last read until `chat.citations` arrives; the current step has a spinner and a moving highlight and is announced politely (Answer steps; Accessibility).
 - When done, the box folds into one line above the answer, "Read 1 source and checked 3 citations", shown only when the turn read; opened, each row opens on its own: the passages read by number and heading, and "Each citation points to a passage the chat read, to the resume or to one of Peter's logistics answers." (row 138); a removed marker reads "Checked 3 citations, removed 1." (Answer steps).
 - The browser test sees the steps one by one, then the answer (Testing Strategy, seam 2 bullet 1).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/AnswerSteps.tsx`, `src/chat/ui/Answer.tsx`, `tests/chat/fixtures.ts`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/AnswerSteps.tsx`, `src/chat/ui/Answer.tsx`, `src/chat/server/__tests__/fixtures.ts`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -356,8 +356,8 @@ Acceptance:
 - Under each answer: Copy and Retry; the latest answer always shows them, earlier answers on hover, with how long ago (`acme-relative-time`) (Answer; row 66).
 - Retry asks the question again with its saved `about`, scope and audience and replaces the answer; `answerFinished()` is never called after a Retry or on a restore (Workspace effects; Testing Strategy, seam 2). S36 checks the effect: at 390 × 844 the install offer shows after the third finished answer only.
 - Up to two follow-up questions show under the citations card, as plain text in buttons, and each sends as a question with the current scope and audience (Follow-up questions; Rendering answers).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/FollowUps.tsx`, `src/chat/ui/Answer.tsx`, `src/chat/ui/ChatColumn.tsx`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/FollowUps.tsx`, `src/chat/ui/Answer.tsx`, `src/chat/ui/ChatColumn.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -368,8 +368,8 @@ Blocked by: C24, S3 (the resume view), S14 (`openResume()`, a no-op until S32)
 Acceptance:
 - A scripted `open_resume` turn calls `openResume()` and shows the resume card: the resume icon, "Peter's resume" and "Open beside the chat", which calls it again (The resume; Resume card; Testing Strategy, seam 2). S32 checks the effect: the Resume tab opens at its top.
 - An `open_source` result in a live stream calls `openCitation(passageId, n)`; a restored conversation shows the cards but does not act again (Tools).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/ResumeCard.tsx`, `src/chat/ui/Answer.tsx`, `src/chat/ui/ChatColumn.tsx`, `tests/chat/fixtures.ts`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/ResumeCard.tsx`, `src/chat/ui/Answer.tsx`, `src/chat/ui/ChatColumn.tsx`, `src/chat/server/__tests__/fixtures.ts`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -381,8 +381,8 @@ Acceptance:
 - On hover, or a tap on phones: how long ago (`acme-relative-time`), then Retry, Edit and Copy in one icon-button group (Question actions).
 - Retry asks again with the same `about`, scope and audience; Edit puts the question back in the input and moves focus there; on an earlier question both replace that answer and the ones after it (Question actions; Accessibility; Testing Strategy, seam 2).
 - A question longer than four lines shows its first four, fading out, with the design system's Show more (`acme-show-more`) (Messages; row 67).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/Question.tsx`, `src/chat/ui/Messages.tsx`, `src/chat/ui/ChatColumn.tsx`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/Question.tsx`, `src/chat/ui/Messages.tsx`, `src/chat/ui/ChatColumn.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -394,8 +394,8 @@ Acceptance:
 - While answering, Send becomes Stop (a plain square with a progress ring on its border) and the next question can be typed; Stop keeps what arrived, marked "Answer stopped." (the state table; Testing Strategy, seam 2).
 - A scripted error, a 429 (by request interception) and a reload during an answer each show the error alert (`acme-alert`, error variant, `role="alert"`) in the answer's place with Try again and Edit question; the 429 reads "Too many questions in a short time." and "Try again in a few minutes."; a reload keeps no partial text (How a turn ends; Testing Strategy, seam 2).
 - The conversation is not a live region; a streaming answer has `aria-busy="true"`; a separate polite region says only "Answer ready" or "Answer stopped." (Accessibility; Testing Strategy, seam 2).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/ChatInput.tsx`, `src/chat/ui/Answer.tsx`, `src/chat/ui/ChatColumn.tsx`, `tests/chat/fixtures.ts`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/ChatInput.tsx`, `src/chat/ui/Answer.tsx`, `src/chat/ui/ChatColumn.tsx`, `src/chat/server/__tests__/fixtures.ts`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -407,8 +407,8 @@ Acceptance:
 - Enter during an answer queues the question at the end of the conversation as a question message with a clock and an always-visible row: "Sends when this answer finishes", Send now, Edit and Remove; Edit, or the Up arrow in an empty input for the latest queued question, brings it back and takes it off the queue (Queued questions; Testing Strategy, seam 2).
 - The queue store sends in order, one question at a time, when idle, online and not paused: after the answer, after Stop and after an error; it survives a reload; after a 429 it pauses until the visitor sends again (Saved conversation, "The queue", "Pauses").
 - Send now stops the current answer, which stays, marked stopped, and sends that question first; the others keep their order (Queued questions).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/QueuedQuestion.tsx`, `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `src/chat/ui/ChatInput.tsx`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/QueuedQuestion.tsx`, `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `src/chat/ui/ChatInput.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -420,8 +420,8 @@ Acceptance:
 - `navigator.onLine` and the `online` and `offline` events set the state; offline, the button reads Queue (cloud-off icon), Enter queues, and the row says "Sends when you're back online" with no Send now (the state table; Queued questions).
 - A queued question survives a reload and sends when the network returns; a suggested question selected offline becomes a queued question (Testing Strategy, seam 2; Suggested questions).
 - A request that fails before any response puts the question back at the front of the queue and shows the offline state; the chat tries again every 30 s and on `online`, and a try that gets a response clears the state (Saved conversation, "Online and offline").
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/ChatColumn.tsx`, `src/chat/ui/ChatInput.tsx`, `src/chat/ui/QueuedQuestion.tsx`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/ChatColumn.tsx`, `src/chat/ui/ChatInput.tsx`, `src/chat/ui/QueuedQuestion.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -432,8 +432,8 @@ Blocked by: C31
 Acceptance:
 - The tab that sends holds the Web Lock `pk-chat-send` for the whole turn; every send takes the lock first, and when another tab holds it, the question joins the shared queue (Saved conversation, "Tabs").
 - A question sent in one tab streams only there; the other tab shows the answer when its row is written; a queued question sends once (Testing Strategy, seam 2; Objective).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -445,8 +445,8 @@ Acceptance:
 - `DAILY_LIMIT` shows "The chat has reached today's limit." and "It answers again at <00:00 UTC in the visitor's time, such as 5:00 PM> your time. Until then, you can read the resume or email Peter at <email>."; `SPEND_LIMIT` shows the month's texts with the first day of next month; "Open the resume" calls `openResume()`; there is no Try again (How a turn ends; row 138).
 - The question goes back into the input only when the input is empty; the queue pauses, and the session row's `paused` marker keeps the state after a reload until the visitor sends again (Saved conversation, "Pauses").
 - With the preview started with `PREVIEW_LIMIT=day`: the state shows, also after a reload, and typed text in the input stays as it is (Testing Strategy, seam 2).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/Answer.tsx`, `src/chat/ui/ChatColumn.tsx`, `src/chat/saved-conversation.ts`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/Answer.tsx`, `src/chat/ui/ChatColumn.tsx`, `src/chat/saved-conversation.ts`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -458,8 +458,8 @@ Acceptance:
 - New chat shows only while a conversation exists, at the top of the chat column on wide screens and in the app bar's end slot on phones (the workspace route puts it there); it opens `acme-alert-dialog` with first focus on Cancel: "Start a new chat?", "This deletes the current conversation, the open source and your choices from this device. It cannot be undone.", Cancel and New chat (New chat).
 - On confirm, the chat clears each of its stores with `clearObjectStore()` (no `deleteDatabase`), calls `workspace.reset()` and `setConversationActive(false)`, makes a new `threadId` and puts focus in the input; the theme stays (New chat; Testing Strategy, seam 2). S35 checks the effect: the first view returns, and the site's `views` store is empty.
 - Cancel closes the dialog and returns focus to New chat (New chat; Accessibility).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/NewChat.tsx`, `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `src/site/routes/index.tsx`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/NewChat.tsx`, `src/chat/saved-conversation.ts`, `src/chat/ui/ChatColumn.tsx`, `src/site/routes/index.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -471,8 +471,8 @@ Acceptance:
 - The device index is fetched when the input first gets focus or the column first shows an answer or answer steps, never in the first-load JavaScript; from the third typed character, a list above the input shows up to 5 matches under "On this device, 2 matches", each with its label, its text with the typed words marked, then "Ask the chat about "<text>""; it works offline (Device matches; The build).
 - Selecting a match calls `openCitation(id)` with no number (Device matches; Testing Strategy, seam 2). S32 checks the effect: a resume match shows the entry in the resume, and a passage match opens the source at it.
 - The textbox keeps its role and gets `aria-autocomplete="list"`, `aria-controls` and `aria-activedescendant`; the list is a `listbox` of `option`s built with the design system's item parts; arrow keys move through it and Escape closes it; the gap is named in the code (Device matches).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/DeviceMatches.tsx`, `src/chat/device-index.ts`, `src/chat/ui/ChatInput.tsx`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/DeviceMatches.tsx`, `src/chat/device-index.ts`, `src/chat/ui/ChatInput.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -482,8 +482,8 @@ Delivers: a visitor who scrolled back reaches the latest message in one step.
 Blocked by: C19
 Acceptance:
 - Away from the bottom, a round icon button with a down arrow floats 12 px above the input, moves up as the input grows, and scrolls to the latest message (Scroll to the latest; row 68).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `src/chat/ui/ScrollToLatest.tsx`, `src/chat/ui/Messages.tsx`, `tests/site/browser.test.ts`
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/chat/ui/ScrollToLatest.tsx`, `src/chat/ui/Messages.tsx`, `src/site/__tests__/browser.test.ts`
 Size: M
 Needs Peter: no
 
@@ -494,8 +494,8 @@ Blocked by: C26, C29, C31, C35
 Acceptance:
 - Keyboard only: Tab reaches the input and Enter sends; Stop, Send now, a citation, the steps line, the follow-up questions, the message actions and New chat work from the keyboard and show focus (Accessibility; Testing Strategy, seam 2).
 - Focus follows the spec's rules: it stays in the input after sending; Edit and "Ask about this" move it to the input (Accessibility).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `tests/site/browser.test.ts` (and the chat UI files a failure points to)
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/site/__tests__/browser.test.ts` (and the chat UI files a failure points to)
 Size: S
 Needs Peter: no
 
@@ -505,8 +505,8 @@ Delivers: the chat column meets WCAG 2.2 AA in every state the mockups draw.
 Blocked by: C22, C26, C30, C32, C34, C35, C36, C38
 Acceptance:
 - axe reports no WCAG 2.2 AA violation in the answering, queued, offline, error, limit, device-matches and opened-steps states, and with the New chat dialog open, at 1440 × 900 and 390 × 844, in light and dark (Testing Strategy, seam 2).
-Verify: `bun test tests/site/browser.test.ts`
-Files: `tests/site/browser.test.ts` (and the chat UI files a violation points to)
+Verify: `bun test src/site/__tests__/browser.test.ts`
+Files: `src/site/__tests__/browser.test.ts` (and the chat UI files a violation points to)
 Size: M
 Needs Peter: no
 
@@ -539,15 +539,15 @@ Needs Peter: yes: approval of the run (it costs money), the key in `.secrets/loc
 
 ### Checkpoint chat: contracts
 
-After C2. `bun test tests/chat` passes; the deploy module's ops work (D9) can start against the chat's types and contract suite.
+After C2. `bun test src/chat` passes; the deploy module's ops work (D9) can start against the chat's types and contract suite.
 
 ### Checkpoint chat: the handler
 
-After C15. `bun test tests/chat` passes every seam-1 item in SPEC-chat's Testing Strategy; `bun run build` and `bun test` pass; a review against the Boundaries ("Never": no read, `Not public` or thinking text on the wire; no `threadId` in the log); Peter has approved the system prompt (C15).
+After C15. `bun test src/chat` passes every seam-1 item in SPEC-chat's Testing Strategy; `bun run build` and `bun test` pass; a review against the Boundaries ("Never": no read, `Not public` or thinking text on the wire; no `threadId` in the log); Peter has approved the system prompt (C15).
 
 ### Checkpoint chat: the first answer
 
-After C16 to C19, with S31. `bun run build:site`, `bun test tests/site` and `bun test` pass; `bun run dev` and `bun run preview` answer a scripted question; Peter can try the first answer in the preview.
+After C16 to C19, with S31. `bun run build:site`, `bun test src/site` and `bun test` pass; `bun run dev` and `bun run preview` answer a scripted question; Peter can try the first answer in the preview.
 
 ### Checkpoint chat: the answer views
 

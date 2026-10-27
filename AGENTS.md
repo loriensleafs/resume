@@ -33,7 +33,7 @@ For design-system components, also ask the `acme-design-system` MCP server. Pass
 
 ## Code
 
-Write all tooling in Bun and TypeScript, with Bun's APIs ([decision 0004](docs/decisions/0004-bun-only.md)). Add a dependency only after Peter approves it.
+Write all tooling in Bun and TypeScript, with Bun's APIs ([decision 0004](docs/decisions/0004-bun-only.md)). Add a dependency only after Peter approves it. Put each test in a `__tests__/` folder beside the file it tests, named after that file ([decision 0025](docs/decisions/0025-tests-beside-code.md)).
 
 ## Verify
 
