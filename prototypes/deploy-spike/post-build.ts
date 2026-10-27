@@ -2,7 +2,8 @@
 // It runs after `vite build` (see package.json) and:
 // 1. writes static/404.html, a not-found page with no script (SPEC-site amendment 5);
 // 2. replaces the `routes` Nitro wrote in .vercel/output/config.json with SPEC-deploy's list ("Routes"), keeps
-//    Nitro's other fields, and adds `overrides` for the prerendered pages and the cron.
+//    Nitro's other fields, and adds `overrides` for the prerendered pages and the cron. One route is new to the
+//    spec's list: function folders that no API route names get the not-found page (check 3, run 40570467882).
 // Checks 2 and 3 test what Vercel does with this file. D3 adds the redirects and the header routes.
 // https://vercel.com/docs/build-output-api/configuration
 import { Glob } from "bun";
@@ -41,6 +42,23 @@ for (const fn of ["__server", "api/spike", "api/spike-bun1x"]) {
   }
 }
 
+// The API routes: each path and the function it runs in. /api/spike is the chat's twin (its own function);
+// /api/cron/health goes to __server, as SPEC-deploy's /api/status and /api/cron/health do. D4 adds its handler.
+const apiRoutes = [
+  { path: "/api/spike", fn: "/api/spike" },
+  { path: "/api/cron/health", fn: "/__server" },
+];
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// A .func folder also answers at its own path, and the filesystem phase finds it before any later route (run
+// 40570467882: /__server rendered TanStack's page). So every function folder that is not an API route's own path
+// gets the not-found page before the filesystem phase. A route's dest still reaches it.
+const functionPaths: string[] = [];
+for await (const file of new Glob("**/*.func/.vc-config.json").scan({ cwd: `${output}/functions`, dot: true })) {
+  functionPaths.push(`/${file.slice(0, -".func/.vc-config.json".length)}`);
+}
+const hidden = functionPaths.filter((path) => !apiRoutes.some((route) => route.path === path)).sort();
+
 // An override serves each prerendered page at its clean address: "deep-dives/x/index.html" at "deep-dives/x".
 // The root index.html needs none.
 const overrides: Record<string, { path: string }> = {};
@@ -56,12 +74,12 @@ const routes: Route[] = [
   // the filesystem phase can match /api/spike to its own function first.
   { src: "^/api/spike$", has: [{ type: "query", key: "function", value: "server" }], dest: "/__server", caseSensitive: true },
   { src: "^/api/spike$", has: [{ type: "query", key: "function", value: "bun1x" }], dest: "/api/spike-bun1x", caseSensitive: true },
+  // New, before step 3: the function folders that no API route names, by their own paths, get the not-found page.
+  ...hidden.map((path) => ({ src: `^${escape(path)}(?:/.*)?$`, dest: "/404.html", status: 404 })),
   // Step 3: the files, with the overrides above.
   { handle: "filesystem" },
-  // Step 4: the API routes, case-sensitive. /api/spike is the chat's twin (its own function); /api/cron/health goes
-  // to __server, as SPEC-deploy's /api/status and /api/cron/health do. D4 adds the health route's handler.
-  { src: "^/api/spike$", dest: "/api/spike", caseSensitive: true },
-  { src: "^/api/cron/health$", dest: "/__server", caseSensitive: true },
+  // Step 4: the API routes, case-sensitive.
+  ...apiRoutes.map((route) => ({ src: `^${escape(route.path)}$`, dest: route.fn, caseSensitive: true })),
   // Step 5: every other path gets the not-found page with status 404.
   { src: "^/(.*)$", dest: "/404.html", status: 404 },
 ];
@@ -74,6 +92,6 @@ const written = {
 };
 await Bun.write(configPath, JSON.stringify(written, null, 2) + "\n");
 console.log(
-  `post-build: 404.html; ${routes.length} routes; overrides for ${Object.values(overrides).map((o) => `/${o.path}`).join(", ")}; ` +
+  `post-build: 404.html; ${routes.length} routes; function folders sent to 404.html: ${hidden.join(", ")}; overrides for ${Object.values(overrides).map((o) => `/${o.path}`).join(", ")}; ` +
     `cron ${written.crons.map((c) => `${c.path} "${c.schedule}"`).join(", ")}`,
 );

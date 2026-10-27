@@ -145,6 +145,7 @@ const NOT_FOUND_PATHS = [
   "/sources/x", // a source page with no file; the spike has no /sources/ pages
   "/deep-dives/x", // the spike's dynamic route with no file: in a function, its loader would run
   "/__server", // Nitro's function by its folder name (a .func folder also answers at its own path)
+  "/api/spike-bun1x", // the probe's function by its folder name: no API route names it
   "/_serverFn/x", // TanStack's server-function path
 ];
 
