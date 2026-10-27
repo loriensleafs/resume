@@ -11,6 +11,9 @@
 // It prints states, hosts and verdicts only. Rerun only the newest run: an older one waits for a commit that the
 // branch URL no longer serves.
 
+// The routes and the cron that post-build.ts writes. Importing it writes nothing (its build runs only as entry point).
+import { API_ROUTES, CRON, QUERY_ROUTES, SPIKE_PATH } from "./post-build.ts";
+
 const PROJECT_STATUS_URL = "https://vercel.com/peterkloss/resume-deploy-spike/"; // Vercel's commit status links here
 const PROTECTED_HOST = /^resume-deploy-spike-[a-z0-9-]+-peterkloss\.vercel\.app$/; // the deployment and branch URLs
 const PUBLIC_HOST = /^[a-z0-9-]+\.vercel\.app$/; // the production address; it must also equal SPIKE_PRODUCTION_HOST
@@ -82,15 +85,15 @@ const buildBun: Check = {
 const sha256 = (bytes: ArrayBuffer) => new Bun.CryptoHasher("sha256").update(bytes).digest("hex");
 
 /**
- * The requests that reach a function, and the function post-build.ts routes each to. `spec` marks the functions
- * that stand for SPEC-deploy's: those must run Bun 1.4. The probe is recorded, not judged.
+ * The requests that reach a function, and the function post-build.ts routes each to, from the values it exports.
+ * `spec` marks the functions that stand for SPEC-deploy's: those must run Bun 1.4. The probe is recorded, not judged.
  */
 const FUNCTION_ROUTES = [
-  { request: "/api/spike", fn: "/api/spike", spec: true }, // its own function, as SPEC-deploy's /api/chat
-  { request: "/api/spike?function=server", fn: "/__server", spec: true }, // to /__server, as /api/status and the health job
-  { request: "/api/spike?function=bun1x", fn: "/api/spike-bun1x", spec: false }, // runtime "bun1.x", bunVersion "1.4.x"
+  // its own function, as SPEC-deploy's /api/chat
+  ...API_ROUTES.filter((route) => route.path === SPIKE_PATH).map((route) => ({ request: route.path, fn: route.fn, spec: true })),
+  // ?function=server to /__server, as /api/status and the health job; ?function=bun1x to the probe ("bun1.x")
+  ...QUERY_ROUTES.map((route) => ({ request: `${SPIKE_PATH}?function=${route.query}`, fn: route.fn, spec: !route.probe })),
 ];
-const CRON = { path: "/api/cron/health", schedule: "17 15 * * *" }; // SPEC-deploy's cron
 
 /**
  * Check 2: Vercel serves the routes, overrides and cron that post-build.ts wrote, and which Bun runs each function.
@@ -112,7 +115,7 @@ const postBuildRoutes: Check = {
       const runtime = info.functions[String(r.function)]?.runtime ?? "unknown"; // of the function that answered
       seen.push(`${route.request} reached ${r.function} (runtime "${runtime}"): Bun ${r.bunVersion}, path ${r.path}`);
       if (r.function !== route.fn) problems.push(`${route.request} reached ${r.function}, not ${route.fn}`);
-      if (r.path !== "/api/spike") problems.push(`${route.fn} saw the path ${r.path}, not /api/spike`);
+      if (r.path !== SPIKE_PATH) problems.push(`${route.fn} saw the path ${r.path}, not ${SPIKE_PATH}`);
       if (route.spec && !String(r.bunVersion).startsWith("1.4.")) {
         problems.push(`${route.fn} (runtime "${runtime}") runs Bun ${r.bunVersion}; SPEC-deploy needs 1.4`);
       }
