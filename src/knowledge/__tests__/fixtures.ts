@@ -1,6 +1,6 @@
 // Shared fixture builders for the knowledge tests.
 
-import { SECTIONS } from "../../src/knowledge/parse";
+import { SECTIONS } from "../parse";
 
 export function deepDive(overrides: { front?: string; body?: string } = {}): string {
   const front =

@@ -3,10 +3,10 @@
 
 import { describe, expect, test } from "bun:test";
 import { $ } from "bun";
-import { displayUrl, formatDate, formatRange, formatTitle, type Resume } from "../../src/content";
-import { renderDocx } from "../../src/export/docx";
-import { renderText } from "../../src/export/text";
-import { renderPrintHtml } from "../../src/print/template";
+import { displayUrl, formatDate, formatRange, formatTitle, type Resume } from "../content";
+import { renderDocx } from "../export/docx";
+import { renderText } from "../export/text";
+import { renderPrintHtml } from "../print/template";
 
 const fixture = (overrides: Partial<Resume> = {}): Resume => ({
   basics: {

@@ -1,7 +1,7 @@
 // Seam 2 of SPEC-knowledge: the deep-dive parser and its rules.
 
 import { describe, expect, test } from "bun:test";
-import { parseDeepDive, SECTIONS } from "../../src/knowledge/parse";
+import { parseDeepDive, SECTIONS } from "../parse";
 import { deepDive } from "./fixtures";
 
 const FILE = "knowledge/deep-dives/sample.md";

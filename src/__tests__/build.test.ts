@@ -3,8 +3,8 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { $ } from "bun";
-import { build, type BuiltVariant } from "../../src/build";
-import { loadResume, type Resume } from "../../src/content";
+import { build, type BuiltVariant } from "../build";
+import { loadResume, type Resume } from "../content";
 
 const REPO = `${import.meta.dir}/../..`;
 const FAKE_PHONE = "(555) 555-0100";

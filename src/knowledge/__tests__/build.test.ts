@@ -2,12 +2,12 @@
 
 import { afterAll, describe, expect, test } from "bun:test";
 import { $ } from "bun";
-import { loadResume } from "../../src/content";
-import { buildKnowledge, ID_PATTERN } from "../../src/knowledge/build";
-import { KNOWLEDGE_BUDGET, renderKnowledge } from "../../src/knowledge/render";
+import { loadResume } from "../../content";
+import { buildKnowledge, ID_PATTERN } from "../build";
+import { KNOWLEDGE_BUDGET, renderKnowledge } from "../render";
 import { deepDive } from "./fixtures";
 
-const REPO = `${import.meta.dir}/../..`;
+const REPO = `${import.meta.dir}/../../..`;
 const FAKE_PHONE = "(555) 555-0100";
 const tmp = `${Bun.env.TMPDIR ?? "/tmp"}/knowledge-test-${crypto.randomUUID()}`;
 afterAll(async () => {
