@@ -54,4 +54,4 @@ The "Merged" page now follows decisions 0015 to 0019:
 | Merged: installed app, its own window | The app without browser controls, with its icon and name in the title bar |
 | App icon options | A. PK monogram, B. career timeline spans, C. chat bubble, D. pwk; each as a rounded square, a circle, and at 48 and 32 px |
 
-The install sheet and the window use option A as a stand-in until Peter picks an icon.
+Later on 2026-10-27 (interview rows 37 to 40): icon B, the career timeline mark, sits next to Peter's name in the app bar. The career timeline moved out of the right panel into a full-width band under the app bar, at true length with every name on one line; phones scroll it sideways and open at the latest roles. A new phone board shows a selected role and its scope. The "About" chip in the composer is renamed "Asking about FedNow", and its × says "Ask about all roles". Every Merged view has a light or dark switch in its Tweaks, and the "Merged, dark" page shows them all in dark mode.

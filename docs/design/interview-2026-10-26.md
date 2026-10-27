@@ -46,6 +46,10 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 34 | How much cleanup of spoken answers before approval? | Fix transcription errors and smooth filler and false starts, without changing meaning. The recommendation was errors only |
 | 35 | Test seams for the updated knowledge spec | The same two seams, extended: `buildKnowledge()` and the source parser |
 | 36 | Approve the updated SPEC-knowledge? | Approved. Peter added that four specs in the capability map are not written yet (site, chat, deploy, agents), and that the mockups must reflect the latest changes |
+| 37 | App bar: should the app icon replace the name, or sit next to it? | Next to the name. Peter asked whether the name should take the blue accent; the advice was to keep it in ink, because blue marks links, selection and citations on this site, and the icon already carries the blue |
+| 38 | Which app icon? | B, the career timeline mark: four role spans on the site's blue |
+| 39 | The career timeline on one line: which layout? | Peter rejected equal widths ("loses the timeline feel") and chose E: a full-width band under the app bar, at true length, every name on one line; on narrow screens and phones it scrolls sideways and opens at the latest roles |
+| 40 | (Peter, 2026-10-27) Mobile and dark mode | Asked to see the band on a phone and every Merged view in dark mode |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
