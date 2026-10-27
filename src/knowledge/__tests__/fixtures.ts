@@ -16,6 +16,7 @@ export const RESUME_YAML = `basics:
 work:
   - id: acme
     name: Acme
+    x-short: Acme
     position: Engineer
     startDate: 2020
     highlights: [Built the first thing., Built the second thing.]

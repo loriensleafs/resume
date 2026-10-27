@@ -30,6 +30,7 @@ basics:
 work:
   - id: highspot # extension: stable id for citations
     name: Highspot
+    x-short: Highspot # extension: the label on the career timeline; no document prints it
     position: Sr. Software Development Engineer
     team: Polar UI design system team # extension
     location: Seattle, WA
@@ -57,6 +58,7 @@ work:
 
   - id: fednow
     name: Federal Reserve Bank of Boston (FedNow)
+    x-short: FedNow
     position: Lead Front-End Engineer
     promotedFrom: Sr. UI Front End Developer # extension
     location: Boston, MA
@@ -80,6 +82,7 @@ work:
 
   - id: pippin
     name: Pippin Title
+    x-short: Pippin
     position: Senior Front-End Engineer
     location: Boston, MA
     startDate: 2020
@@ -92,6 +95,7 @@ work:
 
   - id: linksquares
     name: LinkSquares
+    x-short: LinkSquares
     position: Senior Front-End Engineer
     location: Boston, MA
     startDate: 2019
@@ -106,6 +110,7 @@ work:
 
   - id: sheridan
     name: Sheridan PubFactory
+    x-short: Sheridan
     position: Senior Front-End Engineer
     location: Boston, MA
     startDate: 2017
@@ -116,6 +121,7 @@ work:
 
   - id: jack-morton
     name: Jack Morton Worldwide
+    x-short: Jack Morton
     position: Senior Front-End Engineer
     location: Boston, MA
     startDate: 2016
@@ -128,6 +134,7 @@ work:
   # Earlier roles print as one compact list, without highlights.
   - id: hbs
     name: Harvard Business School
+    x-short: HBS
     position: Front-End Engineer
     startDate: 2015
     endDate: 2016
@@ -135,6 +142,7 @@ work:
 
   - id: six-red-marbles
     name: Six Red Marbles
+    x-short: Six Red Marbles
     position: Software Engineer
     startDate: 2013
     endDate: 2015
@@ -142,6 +150,7 @@ work:
 
   - id: brigham
     name: Brigham and Women’s Hospital
+    x-short: Brigham and Women’s
     position: UX Engineer
     startDate: 2009
     endDate: 2012
