@@ -38,6 +38,9 @@
     "typescript": "7.0.2",
     "vite": "8.3.5"
   },
+  "overrides": {
+    "@acmelabs/design-system-mcp>zod": "4.6.7"
+  },
   "intent": {
     "skills": [
       "@acmelabs/design-system",
