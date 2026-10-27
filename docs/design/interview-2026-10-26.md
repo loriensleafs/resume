@@ -55,6 +55,13 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 43 | (Peter, 2026-10-27) Answering and Stop | While an answer streams, a Material-style progress ring turns around the button, and Stop is a plain square, not a circled icon |
 | 44 | (Peter, 2026-10-27) Error pattern: does the failed question go back into the input? | Checked: in ChatGPT and chat kits such as Stream, the failed question stays in the conversation and the retry appears where the answer should be; no source found that moves it back into the input. Drawn: the question stays, the error takes the answer's place with "Try again" and "Edit question" (which puts it back in the input) |
 | 45 | (Peter, 2026-10-27) Selected role on the timeline | Only blue, no extra height; the name turns bold. Cited roles are blue with names in normal weight |
+| 46 | (Peter, 2026-10-27) Progress ring | The ring turns on top of the Stop button's border, not outside it |
+| 47 | (Peter, 2026-10-27) Notices | The error ("The answer didn’t arrive") and the "Welcome back" notice use the design system's alert; the welcome notice has a dismiss control. The offline "Queued" notice was changed to the same dismissible alert, to match |
+| 48 | (Peter, 2026-10-27) New chat and Install app | Both use the design system's secondary button, the one with the dimmed border. Install app uses Chrome's own install icon, an arrow pointing down into a monitor (Material "install_desktop") |
+| 49 | (Peter, 2026-10-27) Closing the source | The close × sits in the source's tab, after its title, not in the document |
+| 50 | (Peter, 2026-10-27) Timeline heading | "Career timeline". The state lines next to it ("FedNow is selected, and the chat is scoped to it", "Restored: …") are removed; the instructions "Select a role to read it and scope the chat" and "Swipe for earlier roles" stay |
+| 51 | (Peter, 2026-10-27) App bar name | A blue box with rounded corners and "Peter Kloss" inside replaces icon B and the bold name (replaces the answers to questions 37 and 38), because the timeline icon did not say it is Peter's app |
+| 52 | (Peter, 2026-10-27) Installed app icon | "PK" in capitals in Google Sans on the site's blue, option A (settles question 30) |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
@@ -62,4 +69,3 @@ After question 24, Peter asked for mockups of the site with his design system be
 
 - The site's visual design: Peter's review of the mockups.
 - Buying the domains (question 31): Peter buys them.
-- The app icon (question 30).
