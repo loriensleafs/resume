@@ -47,6 +47,7 @@ bun run fonts               # only to change a font weight or add characters
 resume.yaml               content, JSON Resume shape plus marked extensions
 private.yaml              phone number; ignored by git
 src/content.ts            schema, loadResume(variant, root), date and title formatting
+src/private-details.ts    the one rule for private details: loadPrivateValues(root), holds(text, value), findPhoneNumbers(text)
 src/build.ts              build({ root, outDir, variants }): the module's one entry point
 src/print/                print HTML template, its CSS, the hyphen script, Chrome printing
 src/export/docx.ts        Word renderer
@@ -84,7 +85,7 @@ export function formatRange(job: Pick<Job, "startDate" | "endDate">): string {
 1. **`build()`**: tests run it into a temporary folder and check the real files.
    - On the real `resume.yaml`: the PDF has 2 pages and only CID TrueType fonts. Every summary, highlight and skill line appears in the extracted text, whitespace-normalised. The Word body text appears in reading order. The text file matches its snapshot. No public file contains the phone number.
    - On fixtures: a missing field, a bad date and a phone number in `resume.yaml` each fail with a message that names the field. A job without `endDate` prints "Present".
-2. **Renderer unit tests**: `renderText`, `renderPrintHtml` and `renderDocx` on a small fixture. They check HTML escaping, the earlier-roles block, optional fields and the date formats, and that no renderer prints a role's `x-short`.
+2. **Renderer unit tests**: `renderText`, `renderPrintHtml` and `renderDocx` on a small fixture. They check HTML escaping, the earlier-roles block, optional fields and the date formats, and that no renderer prints a role's `x-short`. Beside them, `src/__tests__/private-details.test.ts` checks the one rule for private details: each format in which `holds` finds a private value, the phone numbers `findPhoneNumbers` finds and the made-up 555-0100 to 555-0199 it lets pass, and each reason for which `loadPrivateValues` cannot check.
 3. **The committed documents**: `scripts/__tests__/documents.test.ts` reads `documents/` and a fresh build in a temporary folder. It runs in CI and locally:
    - The hash of the current inputs equals `documents/inputs.sha256`, so a resume change without rebuilt documents fails.
    - The committed PDF has exactly 2 pages, is US Letter and tagged, and embeds every font.
