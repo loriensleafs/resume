@@ -33,8 +33,8 @@ Current phase: 3 (knowledge and site). Each task ends with its verification.
   - Acceptance: every check in SPEC-knowledge.md "Testing Strategy" is a passing test; Peter approves the nine summaries.
   - Verify: `bun test tests/knowledge`; `bun run knowledge` shows nine catalog entries and a core under 80,000 characters
   - Files: `knowledge/sources/*`, `src/knowledge/*`, `scripts/knowledge.ts`, `tests/knowledge/*`, `knowledge/README.md`
-- [ ] 12. Update the mockups for decisions 0015 to 0019, for Peter's review
-  - Acceptance: the "Merged" page shows the source view instead of the deep-dive tab, the visible source read and passage citations, Start over with its confirmation, a restored session, the install offer, the installed standalone app, and app icon options.
+- [x] 12. Update the mockups for decisions 0015 to 0019, for Peter's review (Peter, 2026-10-27: "I think this all looks pretty good")
+  - Acceptance: the "Merged" page shows the source view instead of the deep-dive tab, the visible source read and passage citations, New chat with its confirmation, a restored session, the install offer, the installed standalone app, and the chosen app icon. Images of every board are in `docs/design/mockups/`; the board sources are on the branch `prototype/site-mockups`.
   - Verify: Peter's review of the canvas
 - [ ] 13. Long-form interviews, one subject at a time: career, working style, stories, opinions, side projects, skills
   - Acceptance: each subject has at least one approved interview source; every raw answer is saved privately first.

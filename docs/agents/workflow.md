@@ -9,6 +9,7 @@ Brain owns the workflow. This table adapts its records to this repository; each 
 | Approved current plan and task list | [tasks/plan.md](../../tasks/plan.md) and [tasks/todo.md](../../tasks/todo.md) |
 | Completed plans and task snapshots | tasks/done/ |
 | Intent and interview answers | [docs/design/](../design/) |
+| Approved mockups, as images | [docs/design/mockups/](../design/mockups/README.md); prototype sources on a `prototype/<name>` branch, never on `main` |
 | Selected decisions and their reasons | [docs/decisions/](../decisions/README.md), `NNNN-slug.md` |
 | Research and its index | [docs/research/](../research/README.md), `NN-slug.md` |
 | Open issues and wayfinder records | [.scratch/](issue-tracker.md) |

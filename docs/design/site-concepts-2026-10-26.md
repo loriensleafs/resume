@@ -69,3 +69,5 @@ Rows 64 to 68: the "Conversation states" boards now hold seven states: a hovered
 Rows 69 to 71: every message keeps a 28 px action row, shown or not, and messages sit 20 px apart, on desktop and phone. Answers use the questions' text size. The returning-visitor view now keeps its notice above the conversation and shows the conversation scrolled to the latest answer.
 
 Rows 72 to 74: an answer reads steps line, text, Copy and Retry, then its citations in an outline card. Steps use the full chat width. The scope chip sits inside the input.
+
+Peter approved the mockups on 2026-10-27 (row 75). Images of every board are in [mockups/](mockups/README.md).
