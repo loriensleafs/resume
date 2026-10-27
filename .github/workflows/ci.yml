@@ -43,6 +43,8 @@ jobs:
       - run: bun run typecheck
       # No private.yaml in CI, so only the public documents are built.
       - run: bun run build
+      # The site's Vercel output, as Vercel's build runs it (SPEC-deploy, CI). It builds no document and needs no Chrome.
+      - run: bun run build:site
       - run: bun test
 
   audit:
