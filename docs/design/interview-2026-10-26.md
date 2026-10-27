@@ -85,6 +85,7 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 73 | (Peter, 2026-10-27) Widths | Messages and answer steps use the full width of the chat column; the steps line and the step box are the same width. In the canvas, styles set on the design system's own elements did not apply, which indented the steps; they now sit on plain wrappers |
 | 74 | (Peter, 2026-10-27) Scope chip | "Asking about FedNow, 2021 – 2024" sits inside the input, above the text, on desktop and phone |
 | 75 | (Peter, 2026-10-27) Mockup review and where they live | "I think this all looks pretty good." Only the chosen app icon stays. The mockups go into the repo: images of every board, light and dark, on `main` in `docs/design/mockups/`, and the board sources on the branch `prototype/site-mockups`. The recommendation was this split |
+| 76 | (Peter, 2026-10-27) Specs before building? | All remaining specs first (site, chat, deploy, agents), then one rewritten plan; task 11 waits. Peter: "I feel like we should get all the specs, I think, done before the plans." The interviews can run at any time |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 

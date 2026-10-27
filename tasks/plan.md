@@ -31,7 +31,7 @@ Vercel Pro with the Bun runtime ([0012](../docs/decisions/0012-vercel-pro-host.m
 
 ## Specs still to write
 
-In build order: SPEC-site (after the mockup review), SPEC-chat (with the Agent Design plugin), SPEC-deploy, and SPEC-agents (the agent files already exist; the spec records their rules). Each is written and approved before its tasks start.
+In build order: SPEC-site (the mockups are approved), SPEC-chat (with the Agent Design plugin), SPEC-deploy, and SPEC-agents (the agent files already exist; the spec records their rules). Peter decided on 2026-10-27 to write and approve all four before any more building: the chat and deploy specs can change how the knowledge module is read and built. Once all four are approved, this plan is rewritten for every module, and building resumes with task 11.
 
 ## Risks
 

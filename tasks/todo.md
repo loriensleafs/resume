@@ -2,6 +2,8 @@
 
 Current phase: 3 (knowledge and site). Each task ends with its verification.
 
+Order (Peter, 2026-10-27): write and approve every remaining spec first (tasks 9 and 14), then rewrite the plan for all of them. Task 11 waits for that plan. Task 13, the interviews, is content and can run at any time.
+
 - [x] 1. Move content to `resume.yaml`; build public and private PDF, Word and text
   - Acceptance: the private PDF is pixel-identical to the PDF built from the hand-written `resume.html`; the public files have no phone number.
   - Verify: `bun run build`; `compare -metric AE` on 100 dpi renders; `grep` for the phone in `dist/public/`.
@@ -27,9 +29,9 @@ Current phase: 3 (knowledge and site). Each task ends with its verification.
   - Verify: `bun run knowledge` lists `deep:<id>` for all nine; `bun test`
 - [x] 8. Interview Peter and approve the four logistics answers (all four approved 2026-10-26)
   - Verify: `bun run knowledge` lists the four `logistics:` entries
-- [ ] 9. Write SPEC-site.md for Peter's review (after task 12)
+- [ ] 9. Write SPEC-site.md for Peter's review, from the approved mockups in `docs/design/mockups/` (next)
 - [x] 10. Update SPEC-knowledge.md for the two layers (approved 2026-10-27)
-- [ ] 11. Move the nine deep dives to `knowledge/sources/` with `kind`, `subject` and a one-line summary; build the source parser, the core with its catalog, and `readPassages()`
+- [ ] 11. Move the nine deep dives to `knowledge/sources/` with `kind`, `subject` and a one-line summary; build the source parser, the core with its catalog, and `readPassages()` (waits until every spec is approved and the plan is rewritten)
   - Acceptance: every check in SPEC-knowledge.md "Testing Strategy" is a passing test; Peter approves the nine summaries.
   - Verify: `bun test tests/knowledge`; `bun run knowledge` shows nine catalog entries and a core under 80,000 characters
   - Files: `knowledge/sources/*`, `src/knowledge/*`, `scripts/knowledge.ts`, `tests/knowledge/*`, `knowledge/README.md`
