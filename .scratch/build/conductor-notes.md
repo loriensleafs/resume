@@ -45,4 +45,6 @@ Notes the reviews of finished tasks left for tasks not yet built. Each builder b
 - **D32:** a push and a pull request both run `ci` on the same commit; the release check takes the newest run of the push event.
 - **Content follow-up (not yet a task):** `src/content.ts` rejects only a `phone` field; a phone-like number typed into a highlight passes. The fix belongs in the schema, through `findPhoneNumbers()` from `src/private-details.ts`.
 - **Glossary gap:** "source file" (a draft or an approved file) appears in SPEC-knowledge and the code, but `CONTEXT.md` defines a source as approved only.
+- **Glossary gap (T1's review):** the role's short label (`x-short`) has no glossary term; SPEC-site, the code comment and the wording draft say "short label" or "label". Add "Short label" through the domain-modeling skill, with the career timeline and the scope chip as its readers.
+- **T1 follow-up:** SPEC-site's Labels line writes "Brigham and Women's" with a straight apostrophe; the value is curly (SPEC-content, Code Style). Change the spec line once Peter approves T1's wording draft.
 - **Mockups:** the Playwright test removed the Chromium build that Playwright 1.63.0 uses from Peter's Mac; the next render needs the mockups branch README's one-time install.

@@ -46,7 +46,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [A3](modules/agents.md#a3-every-agent-reaches-the-docs-server-and-gemini-cli-reads-agentsmd) Every agent reaches the docs server, and Gemini CLI reads `AGENTS.md` — blocked by A1 (done 2026-10-27)
 - [x] [A4](modules/agents.md#a4-the-agent-files-checks-cover-links-scripts-and-private-details-everywhere) The agent files' checks cover links, scripts and private details everywhere — blocked by A1 (runs after A3: same test file) (done 2026-10-27; the shared rule src/private-details.ts)
 - [x] [A6](modules/agents.md#a6-the-update-mockups-repo-skill) The `update-mockups` repo skill — blocked by A2 (done 2026-10-27; the mockups branch renders again)
-- [ ] [T1](modules/content.md#t1-each-role-has-its-short-label-x-short) Each role has its short label (`x-short`) — blocked by none; Peter: its wording draft goes to his one review before D37 (row 153)
+- [x] [T1](modules/content.md#t1-each-role-has-its-short-label-x-short) Each role has its short label (`x-short`) — blocked by none; Peter: its wording draft goes to his one review before D37 (row 153) (done 2026-10-27; the wording draft is written; the knowledge fixture has the field)
 - [x] [T2](modules/content.md#t2-bun-run-documents-writes-the-committed-public-documents-and-their-inputs-hash) `bun run documents` writes the committed public documents and their inputs hash — blocked by none (T1 first is preferred) (done 2026-10-27)
 - [x] [T3](modules/content.md#t3-the-documents-test-checks-the-committed-files-against-a-fresh-build) The documents test checks the committed files against a fresh build — blocked by T2 (done 2026-10-27)
 - [ ] [A5](modules/agents.md#a5-edit-resume-covers-the-short-labels-and-the-committed-documents) `edit-resume` covers the short labels and the committed documents — blocked by T1, T2, A2
@@ -72,7 +72,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [Checkpoint agents: lands](modules/agents.md#checkpoint-agents-lands) — after A7, A8
 - [x] [D9](modules/deploy.md#d9-createops-gives-in-memory-parts-outside-production) `createOps()` gives in-memory parts outside production — blocked by C2 (done 2026-10-27)
 - [ ] [Checkpoint deploy: createOps ready](modules/deploy.md#checkpoint-deploy-createops-ready) — after D9
-- [x] [A9](modules/agents.md#a9-the-type-check) The type check — blocked by C1 (done 2026-10-27; 44 files, the release skill's scripts included; CI's checks wait for the push)
+- [x] [A9](modules/agents.md#a9-the-type-check) The type check — blocked by C1 (done 2026-10-27; 44 files, the release skill's scripts included; CI run 40581851481 on `8e312cf`: `test`, `audit` and `audit-all` pass)
 - [ ] Peter: release a `@acmelabs/design-system-mcp` with `zod` 4.6.6 or later (acmelabs-15/design-system#9); then a follow-up task removes the `zod` override (row 158) — after A9; blocks nothing
 - [ ] [C3](modules/chat.md#c3-one-turn-through-handlechat-a-resume-citation-kept-and-one-log-entry) One turn through `handleChat()`: a resume citation kept and one log entry — blocked by A9, C1, C2, K3
 - [ ] [C4](modules/chat.md#c4-request-checks-with-the-chaterror-shape-and-turnlimits) Request checks with the `ChatError` shape and `turnLimits` — blocked by C3
