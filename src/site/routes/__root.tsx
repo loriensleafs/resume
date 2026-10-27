@@ -2,7 +2,8 @@ import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 // The shell wraps the root route's component, its error component and its not-found component,
-// so every page keeps the document, its language and its scripts.
+// so every page keeps the document, its language and its scripts. TanStack Start's Selective SSR guide
+// defines shellComponent in its section "How to disable SSR of the root route?":
 // https://tanstack.com/start/latest/docs/framework/react/guide/selective-ssr#how-to-disable-ssr-of-the-root-route
 export const Route = createRootRoute({
   head: () => ({
