@@ -17,6 +17,7 @@ type BuildInfo = {
   deploymentHost: string | null;
   branchHost: string | null;
   vercelJsonBunVersion: string | null;
+  lockfileVersion?: number | null; // from the restore commit on; the first two runs lack it
   bunVersion: string;
   bunRevision: string;
   bunPath: string;
@@ -120,22 +121,21 @@ async function wait(): Promise<void> {
 
 type Verdict = { check: number; name: string; pass: boolean; detail: string; ifFails: string };
 
-/** Check 1: which Bun runs the build, and whether vercel.json's bunVersion decides it. */
+/**
+ * Check 1: which Bun runs the build. SPEC-deploy needs every build tool on Bun 1.4, so the check passes on the
+ * 1.4 line. Whether vercel.json's bunVersion decides it was settled by a control run with "1.x" (README):
+ * it does not; Vercel's install step picks Bun 1.4 from bun.lock's lockfileVersion 2 (@vercel/build-utils 14.10.1).
+ */
 function checkBuildBun(info: BuildInfo): Verdict {
-  // Vercel: "1.4.x" selects Bun 1.4; "1.x" selects the previous latest, currently 1.3.14.
-  // https://vercel.com/docs/functions/runtimes/bun#configuring-the-runtime
-  const named: Record<string, string> = { "1.4.x": "1.4", "1.x": "1.3" };
-  const setting = info.vercelJsonBunVersion;
-  const want = setting ? named[setting] : undefined;
-  const ran = `the build ran Bun ${info.bunVersion} (${info.bunPath}, revision ${info.bunRevision.slice(0, 9)})`;
-  const pass = want !== undefined && info.bunVersion.startsWith(`${want}.`);
+  const pass = info.bunVersion.startsWith("1.4.");
+  const facts =
+    `the build ran Bun ${info.bunVersion} (${info.bunPath}, revision ${info.bunRevision.slice(0, 9)}); ` +
+    `vercel.json bunVersion "${info.vercelJsonBunVersion}"; bun.lock lockfileVersion ${info.lockfileVersion ?? "not recorded"}`;
   return {
     check: 1,
     name: "build Bun",
     pass,
-    detail: pass
-      ? `${ran}, the line that vercel.json bunVersion "${setting}" names`
-      : `${ran}, but vercel.json bunVersion "${setting}" names ${want ?? "no known line"}`,
+    detail: pass ? facts : `${facts}; SPEC-deploy needs Bun 1.4`,
     ifFails: "the install command installs Bun 1.4.2 and the build command calls $HOME/.bun/bin/bun",
   };
 }
