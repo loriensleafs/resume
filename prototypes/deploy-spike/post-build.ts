@@ -21,8 +21,9 @@ export const PRODUCTION_HOST = "project-8ar0o.vercel.app";
 export const REDIRECT_ORIGIN = "https://peterkloss.dev";
 
 /**
- * SPEC-deploy "Headers": the headers on every response. Every route writes each name in lower case, so two routes
- * never set one header under two spellings.
+ * SPEC-deploy "Headers": the headers on every response. The header routes write each name in lower case, so two
+ * routes never set one header under two spellings. The redirect route writes `Location` as Vercel's docs do; no
+ * other route sets it.
  */
 export const SECURITY_HEADERS = {
   "strict-transport-security": "max-age=63072000; includeSubDomains",
