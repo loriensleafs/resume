@@ -6,10 +6,32 @@ import { loadResume } from "../../content";
 import { buildKnowledge } from "../build";
 import { parseId } from "../ids";
 import { renderCore } from "../render";
-import { deepDiveFile, FAKE_PHONE, fixture, interviewFile, removeFixtures, RESUME_YAML } from "./fixtures";
+import type { Source } from "../types";
+import { DEEP_DIVE_BODY, deepDiveFile, FAKE_PHONE, fixture, interviewFile, removeFixtures, RESUME_YAML } from "./fixtures";
 
 const REPO = `${import.meta.dir}/../../..`;
 afterAll(removeFixtures);
+
+/** The fixture deep dive and interview are both `sample`, so either one goes in this file. */
+const SAMPLE = "knowledge/sources/sample.md";
+
+/** The message buildKnowledge() stops with on a fixture repo that holds `files`. */
+async function stops(name: string, files: Record<string, string>): Promise<string> {
+  const root = await fixture(name, files);
+  let message: string | undefined;
+  try {
+    await buildKnowledge({ root });
+  } catch (e) {
+    message = (e as Error).message;
+  }
+  expect(message).toBeDefined();
+  return message!;
+}
+
+/** The approved sources buildKnowledge() gives on a fixture repo that holds `files`. */
+async function builds(name: string, files: Record<string, string>): Promise<Source[]> {
+  return (await buildKnowledge({ root: await fixture(name, files) })).sources;
+}
 
 /** One approved logistics answer and one draft. */
 const LOGISTICS_YAML =
@@ -52,6 +74,17 @@ describe("buildKnowledge on fixtures", () => {
       "Why front-end platform work?",
       "Why front-end platform work? (continued)",
       "How did you help with the migration?",
+    ]);
+  });
+
+  test("gives every id in the knowledge base, passage ids included, one use and the form it should have", async () => {
+    const { core, sources } = await buildKnowledge({ root: await fixture("unique-ids", SOURCES) });
+    const ids = [...core.map((e) => e.id), ...sources.flatMap((s) => s.passages.map((p) => p.id))];
+    expect(new Set(ids).size).toBe(ids.length);
+    // The six resume entries, the two catalog entries, then the 5 passages of alpha and the 3 of alpha-beta.
+    expect(ids.map((id) => parseId(id)?.form)).toEqual([
+      "basics", "role", "highlight", "highlight", "skills", "education", "source", "source",
+      "passage", "passage", "passage", "passage", "passage", "passage", "passage", "passage",
     ]);
   });
 
@@ -141,9 +174,258 @@ describe("buildKnowledge on fixtures", () => {
   });
 });
 
+describe("buildKnowledge on the rules of an approved source", () => {
+  test.each([
+    ["a capital letter", "Sample"],
+    ["an underscore", "sam_ple"],
+    ["two hyphens together", "sam--ple"],
+    ["61 characters", "a".repeat(61)],
+    ["the resume entry id basics", "basics"],
+    ["the resume entry id education", "education"],
+  ])("stops an approved source whose id has %s, naming the file and the field", async (_case, id) => {
+    const file = `knowledge/sources/${id}.md`;
+    expect(await stops(`id-${_case.replaceAll(" ", "-")}`, { [file]: deepDiveFile({ id }) })).toBe(
+      `${file}: id "${id}" is not a source id: use a slug (lowercase letters and digits, with single hyphens between them, at most 60 characters), never "basics" or "education"`,
+    );
+  });
+
+  test("lets an approved source id be 60 characters", async () => {
+    const id = "a".repeat(60);
+    expect((await builds("id-60", { [`knowledge/sources/${id}.md`]: deepDiveFile({ id }) })).map((s) => s.id)).toEqual([id]);
+  });
+
+  test("stops an approved source whose passage id would pass 64 characters, and names the passage", async () => {
+    const id = "a".repeat(60);
+    const body = [...Array.from({ length: 1000 }, (_, i) => `## Question ${i + 1}?\n\nAn answer.\n`), "## Not public\n\nColleague names.\n"].join("\n");
+    expect(await stops("passage-id-65", { [`knowledge/sources/${id}.md`]: interviewFile({ id }, body) })).toBe(
+      `knowledge/sources/${id}.md: passage ${id}.1000 ("Question 1000?") breaks the passage id rule: use <source id>.<n>, at most 64 characters; this id has 65`,
+    );
+  });
+
+  test.each([
+    ["a role resume.yaml does not have", "nope"],
+    ["a property name of every object", "constructor"],
+    ["a role entry id instead of a role id", "role:acme"],
+  ])("stops an approved source whose roles hold %s, naming the field", async (_case, role) => {
+    expect(await stops(`role-${role.replace(":", "-")}`, { [SAMPLE]: interviewFile({ roles: `[acme, "${role}"]` }) })).toBe(
+      `${SAMPLE}: roles[1] "${role}" is not a role id in resume.yaml`,
+    );
+  });
+
+  test.each([
+    ["a number past the role's highlights", "highlight:acme.3"],
+    ["a role resume.yaml does not have", "highlight:nope.1"],
+    ["a property name of every object", "highlight:constructor.1"],
+  ])("stops an approved deep dive whose highlights hold %s, naming the field", async (_case, highlight) => {
+    expect(await stops(`highlight-${highlight.replace(/[:.]/g, "-")}`, { [SAMPLE]: deepDiveFile({ highlights: `[highlight:acme.2, ${highlight}]` }) })).toBe(
+      `${SAMPLE}: highlights[1] "${highlight}" is not a highlight in resume.yaml`,
+    );
+  });
+
+  test("lets an approved deep dive name every role and highlight resume.yaml has", async () => {
+    const [source] = await builds("roles-and-highlights", { [SAMPLE]: deepDiveFile({ highlights: "[highlight:acme.1, highlight:acme.2]" }) });
+    expect([source!.roles, source!.highlights]).toEqual([["acme"], ["highlight:acme.1", "highlight:acme.2"]]);
+  });
+
+  test.each([
+    ["an http URL", "http://example.com/brain"],
+    ["another scheme", "ftp://example.com/brain"],
+    ["a relative URL", "/projects/brain"],
+    ["no scheme", "example.com/brain"],
+    ["https: without the two slashes", "https:example.com/brain"],
+    ["the scheme in capitals", "HTTPS://example.com/brain"],
+    ["a line break, which the URL class drops", "https://example.com/\n# Resume"],
+    ["a tab, which the URL class drops", "https://exam\tple.com/"],
+    ["a line separator", "https://example.com/a\u{2028}b"],
+    ["a space", "https://example.com/a b"],
+    ["a backslash, which the URL class reads as a slash", "https://example.com\\@evil.example"],
+    ["a right-to-left override, which can disguise it", "https://example.com/\u{202E}gnp.exe"],
+    ["a zero-width space, which the URL class drops from the host", "https://exa\u{200B}mple.com/"],
+    ["no host", "https://"],
+  ])("stops an approved source with a link that has %s, naming only its place in links", async (_case, link) => {
+    expect(await stops(`link-${_case.split(",")[0]!.replaceAll(" ", "-")}`, { [SAMPLE]: interviewFile({ links: JSON.stringify([link]) }) })).toBe(
+      `${SAMPLE}: links[0] is not an absolute https:// URL: write it in full, with no space, line break, backslash or invisible character`,
+    );
+  });
+
+  test.each([
+    ["a space, so it is not an absolute https:// URL", "space", "https://peter:hunter2@example.com/a b"],
+    ["http, so it is not an absolute https:// URL", "http", "http://peter:hunter2@example.com/x"],
+    ["an otherwise absolute https:// URL", "https", "https://peter:hunter2@example.com/x"],
+  ])("never shows the user name or password of a link with %s", async (_case, name, link) => {
+    const message = await stops(`link-credentials-${name}`, { [SAMPLE]: interviewFile({ links: JSON.stringify([link]) }) });
+    expect(message).toStartWith(`${SAMPLE}: links[0] `);
+    expect(message).not.toContain("peter");
+    expect(message).not.toContain("hunter2");
+  });
+
+  test.each([
+    ["a user name", "https://peter@example.com/"],
+    ["a user name and a password", "https://peter:hunter2@example.com/"],
+    ["a password alone", "https://:hunter2@example.com/"],
+  ])("stops an approved source with a link that holds %s, and never shows it", async (_case, link) => {
+    const message = await stops(`link-${_case.replaceAll(" ", "-")}`, { [SAMPLE]: interviewFile({ links: `["https://github.com/loriensleafs", "${link}"]` }) });
+    expect(message).toBe(`${SAMPLE}: links[1] holds a user name or password: give the URL without them`);
+  });
+
+  test("lets an approved source give absolute https:// links", async () => {
+    const links = ["https://github.com/loriensleafs/brain", "https://peterkloss.dev", "https://example.com/a?b=c#d"];
+    expect((await builds("links", { [SAMPLE]: interviewFile({ links: JSON.stringify(links) }) }))[0]!.links).toEqual(links);
+  });
+
+  test.each([
+    ["an https URL", "Internal links such as https://wiki.example.com/fednow."],
+    ["an http URL", "Tickets at http://jira/browse/FN-1."],
+    ["an ftp URL", "Files at ftp://files.example.com/."],
+    ["a URL with an app's own scheme", "Channels such as slack://channel?team=T1."],
+    ["a protocol-relative link", "Pages such as //corp.example.com/x."],
+    ["an IPv4 address", "The server at 10.0.0.1."],
+    ["an IPv4 address with a port", "The server at 10.0.0.1:8080."],
+    ["an IPv4 address with a path", "The page at 10.0.0.1/admin."],
+    ["a javascript: link", "Links such as javascript:alert(1)."],
+    ["a data: link", "Images such as data:image/png;base64,iVBORw0."],
+  ])("stops an approved source whose Not public holds %s, and never shows it", async (form, notPublic) => {
+    const message = await stops(`not-public-${form.replace(/[^a-z0-9]+/gi, "-")}`, {
+      [SAMPLE]: deepDiveFile({}, DEEP_DIVE_BODY.replace("Internal code.", notPublic)),
+    });
+    expect(message).toBe(`${SAMPLE}: Not public holds a URL or an IP address; it names kinds of material only, such as "internal links"`);
+  });
+
+  test("checks a Not public section of 300,000 characters with no break in it well under a second", async () => {
+    const root = await fixture("not-public-long", { [SAMPLE]: deepDiveFile({}, DEEP_DIVE_BODY.replace("Internal code.", "a".repeat(300_000))) });
+    const start = performance.now();
+    await buildKnowledge({ root });
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+
+  test.each([
+    ["with a domain", "Mail from alice@example.com."],
+    ["with an internal host", "Mail from alice@corp."],
+    ["in a mailto: link", "Write to mailto:alice@example.com."],
+  ])("stops an approved source whose Not public holds an email address %s, and never shows it", async (form, notPublic) => {
+    const message = await stops(`not-public-email-${form.replaceAll(" ", "-").replace(":", "")}`, {
+      [SAMPLE]: deepDiveFile({}, DEEP_DIVE_BODY.replace("Internal code.", notPublic)),
+    });
+    expect(message).toBe(`${SAMPLE}: Not public holds an email address; it names kinds of material only, such as "colleague names"`);
+  });
+
+  test("lets an approved source's Not public name kinds of material, or be empty", async () => {
+    // Prose a link pattern could mistake for a link: a colon after "data" and "JavaScript", and a dot and a slash in "Node.js/Bun".
+    const kinds = "Internal links, colleague names and customer names. Customer data: accounts. JavaScript: internal code. Node.js/Bun build files.";
+    const files = {
+      "knowledge/sources/sample.md": deepDiveFile({}, DEEP_DIVE_BODY.replace("Internal code.", kinds)),
+      "knowledge/sources/empty.md": deepDiveFile({ id: "empty" }, DEEP_DIVE_BODY.replace("Internal code.", "")),
+    };
+    expect((await builds("not-public-kinds", files)).map((s) => s.notPublic)).toEqual(["", kinds]);
+  });
+
+  test("stops an approved deep dive with a section that has no text, and names the passage", async () => {
+    const body = DEEP_DIVE_BODY.replace("Text for Result.", "   ");
+    expect(await stops("empty-section", { [SAMPLE]: deepDiveFile({}, body) })).toBe(
+      `${SAMPLE}: passage sample.4 ("Result") has no text; an approved passage holds text, and only Not public may be empty`,
+    );
+  });
+
+  test("stops an approved interview with a question that has no answer, and names the passage", async () => {
+    const body = "## Why platform work?\n\nAn answer.\n\n## What came next?\n\n## Not public\n\nColleague names.\n";
+    expect(await stops("empty-answer", { [SAMPLE]: interviewFile({}, body) })).toBe(
+      `${SAMPLE}: passage sample.2 ("What came next?") has no text; an approved passage holds text, and only Not public may be empty`,
+    );
+  });
+
+  test("stops an approved source with a passage over 3,000 characters, and names the passage", async () => {
+    const body = DEEP_DIVE_BODY.replace("Text for What Peter did.", "a".repeat(3001));
+    expect(await stops("passage-3001", { [SAMPLE]: deepDiveFile({}, body) })).toBe(
+      `${SAMPLE}: passage sample.2 ("What Peter did") has 3001 characters; an approved passage holds at most 3000`,
+    );
+  });
+
+  test("lets an approved passage hold exactly 3,000 characters", async () => {
+    const body = DEEP_DIVE_BODY.replace("Text for What Peter did.", "a".repeat(3000));
+    expect((await builds("passage-3000", { [SAMPLE]: deepDiveFile({}, body) }))[0]!.passages[1]!.text).toHaveLength(3000);
+  });
+
+  test.each([
+    ["201 characters", "a".repeat(201), "it has 201 characters on 1 line"],
+    ["two lines", "|\n  First line.\n  Second line.", "it has 24 characters on 2 lines"],
+    ["a line separator", '"First line.\\u2028Second line."', "it has 24 characters on 2 lines"],
+    ["no text", '""', "it has 0 characters on 1 line"],
+  ])("stops an approved source whose summary has %s, and names the field", async (_case, summary, found) => {
+    expect(await stops(`summary-${_case.replaceAll(" ", "-")}`, { [SAMPLE]: deepDiveFile({ summary }) })).toBe(
+      `${SAMPLE}: summary must be one line of 1 to 200 characters; ${found}`,
+    );
+  });
+
+  test("lets an approved summary be exactly 200 characters", async () => {
+    expect((await builds("summary-200", { [SAMPLE]: deepDiveFile({ summary: "a".repeat(200) }) }))[0]!.summary).toHaveLength(200);
+  });
+
+  test("names every rule an approved source breaks, one line each with the file and the field", async () => {
+    const front = {
+      roles: "[nope]",
+      highlights: "[highlight:acme.9]",
+      summary: "a".repeat(201),
+      links: '["http://example.com/", "https://peter:hunter2@example.com/"]',
+    };
+    const body = DEEP_DIVE_BODY.replace("Text for Problem.", "a".repeat(3001))
+      .replace("Text for Result.", "")
+      .replace("Internal code.", "See https://wiki.example.com/ or ask alice@example.com.");
+    expect(await stops("every-rule", { [SAMPLE]: deepDiveFile(front, body) })).toBe(
+      [
+        'roles[0] "nope" is not a role id in resume.yaml',
+        'highlights[0] "highlight:acme.9" is not a highlight in resume.yaml',
+        "summary must be one line of 1 to 200 characters; it has 201 characters on 1 line",
+        "links[0] is not an absolute https:// URL: write it in full, with no space, line break, backslash or invisible character",
+        "links[1] holds a user name or password: give the URL without them",
+        'passage sample.1 ("Problem") has 3001 characters; an approved passage holds at most 3000',
+        'passage sample.4 ("Result") has no text; an approved passage holds text, and only Not public may be empty',
+        'Not public holds a URL or an IP address; it names kinds of material only, such as "internal links"',
+        'Not public holds an email address; it names kinds of material only, such as "colleague names"',
+      ]
+        .map((problem) => `${SAMPLE}: ${problem}`)
+        .join("\n"),
+    );
+  });
+});
+
+describe("buildKnowledge on a draft source file", () => {
+  test("builds with a draft that breaks every rule of an approved source, and leaves the draft out", async () => {
+    const front = {
+      id: "Draft_One",
+      status: "draft",
+      approved: null,
+      roles: "[nope]",
+      highlights: "[highlight:acme.9]",
+      summary: "a".repeat(201),
+      links: '["http://example.com/", "https://peter:hunter2@example.com/"]',
+    };
+    const body = DEEP_DIVE_BODY.replace("Text for Problem.", "a".repeat(3001))
+      .replace("Text for Result.", "")
+      .replace("Internal code.", "See https://wiki.example.com/ or ask alice@example.com.");
+    const sources = await builds("draft-every-rule", { ...SOURCES, "knowledge/sources/Draft_One.md": deepDiveFile(front, body) });
+    expect(sources.map((s) => s.id)).toEqual(["alpha", "alpha-beta"]);
+  });
+
+  test("stops on a draft with broken front matter, naming the file and the field", async () => {
+    const file = "knowledge/sources/draft-one.md";
+    const message = await stops("draft-front-matter", { [file]: deepDiveFile({ id: "draft-one", status: "draft", approved: null, kind: "case-study" }) });
+    expect(message).toStartWith(`${file}: front matter is not valid:`);
+    expect(message).toMatch(/→ at kind$/m);
+  });
+
+  test("stops on a draft with a missing section, naming the file", async () => {
+    const file = "knowledge/sources/draft-one.md";
+    const body = DEEP_DIVE_BODY.replace("## Result\n\nText for Result.\n\n", "");
+    expect(await stops("draft-sections", { [file]: deepDiveFile({ id: "draft-one", status: "draft", approved: null }, body) })).toStartWith(
+      `${file}: a deep dive's sections must be, in order: Problem, What Peter did, How it worked, Result, Tools, Not public. Found: Problem, What Peter did, How it worked, Tools, Not public`,
+    );
+  });
+});
+
 describe("buildKnowledge on the real files", () => {
-  test("gives every core entry a unique id that follows the id rules", async () => {
-    const ids = (await buildKnowledge({ root: REPO })).core.map((e) => e.id);
+  test("gives every id in the knowledge base, passage ids included, one use and the id rules", async () => {
+    const { core, sources } = await buildKnowledge({ root: REPO });
+    const ids = [...core.map((e) => e.id), ...sources.flatMap((s) => s.passages.map((p) => p.id))];
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) expect(parseId(id)).toBeDefined();
   });
