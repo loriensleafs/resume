@@ -11,7 +11,7 @@ The mockups that the tasks draw are in `docs/design/mockups/`: first view, after
 - **Seam 1** is `src/site/__tests__/build.test.ts`. Until S8 it runs `buildSite({ root, outDir })` directly, with a fixture root whose `private.yaml` holds a fake phone number (main's decision, 2026-10-27). From S8 it runs `bun run build:site --root <fixture root> --out <folder>` once. The built-output checks (each HTML file's policy tag, no `style=` attribute) live here only; deploy's `src/deploy/__tests__/config.test.ts` checks `addPolicyTags()` and `writeVercelConfig()` at unit level. **Seam 2** is `src/site/__tests__/browser.test.ts`: Playwright drives Chrome (`CHROME_PATH`) under Bun against `bun run preview --dir <folder>`.
 - **The workspace contract.** S14 exports the whole `Workspace` type; each member whose behavior a later task adds is a no-op until then. The chat's tasks check that they call a member; S32 to S36, which run after those chat tasks, check the effect.
 - **Composition roots.** `scripts/build-site.ts`, `vite.config.ts` and the route files import several modules; the module that provides a step wires it in (S28 adds the `writeServiceWorker()` call as the build script's step 4).
-- Every task ends with `bun run build`, `bun test` and, once S8 lands, `bun run build:site` (AGENTS.md, Verify). A push that changes a site file is a release and needs Peter's approval (SPEC-deploy, Releases); the checkpoints name it.
+- Every task ends with `bun run build`, `bun test` and, once S8 lands, `bun run build:site` (AGENTS.md, Verify). A push that changes a site file is a release, under Peter's standing approval (row 151; SPEC-deploy, Releases).
 - S31 to S36 each wait for a chat task, because only a scripted answer from the preview's fake model reaches these contract members. S31 runs right after C17; the rest run in phase 4.
 
 ## Tasks
@@ -474,16 +474,16 @@ Needs Peter: no
 
 ### Checkpoint site: the build output
 
-After S1 to S8, with D16. `bun run build`, `bun run build:site` and `bun test` pass, and seam 1 runs through the build script with a fake-phone fixture root. Peter looks at `/` and `/resume` in `bun run dev` with the app bar, the fonts and the not-found page, and approves a push (it changes site files, so it is a release).
+After S1 to S8, with D16. `bun run build`, `bun run build:site` and `bun test` pass, and seam 1 runs through the build script with a fake-phone fixture root. Peter looks at `/` and `/resume` in `bun run dev` with the app bar, the fonts and the not-found page. The push changes site files, so it is a release.
 
 ### Checkpoint site: the wide workspace
 
-After S9 to S22, with D17. The wide workspace works end to end in the browser test: the timeline, the scope, a source from its address, the × on the source tab, the saved views, the theme and the downloads, with no axe violation in light and dark. Peter reviews the running preview at 1440 × 900, light and dark, against the first-view, career-timeline-states and answer-with-source boards (the source half), and approves a push.
+After S9 to S22, with D17. The wide workspace works end to end in the browser test: the timeline, the scope, a source from its address, the × on the source tab, the saved views, the theme and the downloads, with no axe violation in light and dark. Peter reviews the running preview at 1440 × 900, light and dark, against the first-view, career-timeline-states and answer-with-source boards (the source half).
 
 ### Checkpoint site: phones, offline, install
 
-After S23 to S30. Phones, the icon, the manifest, offline and the speed budget pass; `bun test src/site` passes on a clean checkout with Chrome. Peter reviews the preview at 390 × 844 against the phone boards and the installed-app board, and approves a push.
+After S23 to S30. Phones, the icon, the manifest, offline and the speed budget pass; `bun test src/site` passes on a clean checkout with Chrome. Peter reviews the preview at 390 × 844 against the phone boards and the installed-app board.
 
 ### Checkpoint site: lands
 
-After S31 to S36, with the chat tasks they name. SPEC-site's Success Criteria: `bun test src/site` passes on a clean checkout with Chrome installed, the chat included, and with it the effect checks for C20, C24, C27, C28, C35 and C36. Peter reviews the running preview against the approved mockups at desktop and phone sizes, in light and dark, and approves it and its push. The site rows of `AGENTS.md`'s Modules table and `spec/README.md` say built, and the fresh-session check passes.
+After S31 to S36, with the chat tasks they name. SPEC-site's Success Criteria: `bun test src/site` passes on a clean checkout with Chrome installed, the chat included, and with it the effect checks for C20, C24, C27, C28, C35 and C36. Peter reviews the running preview against the approved mockups at desktop and phone sizes, in light and dark, and approves it. The site rows of `AGENTS.md`'s Modules table and `spec/README.md` say built, and the fresh-session check passes.

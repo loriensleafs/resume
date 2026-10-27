@@ -26,7 +26,7 @@ Acceptance:
 Verify: `gh run list --branch prototype/deploy-spike --workflow spike-check.yml`; `gh run view <run id> --log` shows the check 1 line; the README holds the verdict.
 Files: `prototypes/deploy-spike/` (copied from `prototypes/csp-probe/`), `prototypes/deploy-spike/vercel.json`, `prototypes/deploy-spike/check.ts`, `.github/workflows/spike-check.yml` (spike branch only), `prototypes/deploy-spike/README.md`
 Size: M
-Needs Peter: the Pro team and the throwaway project (account, money); the Actions secret; approval of the first push of `prototype/deploy-spike` and of each later push (SPEC-deploy "Approval")
+Needs Peter: the Pro team and the throwaway project (account, money); the Actions secret. Each push of `prototype/deploy-spike` is under his standing approval (row 151; SPEC-deploy "Approval").
 
 ### D2: Deploy spike, part 2: the post-build routes and the function runtime
 
@@ -39,7 +39,7 @@ Acceptance:
 Verify: `gh run view <run id> --log` shows the check 2 and 3 lines; the README holds both verdicts.
 Files: `prototypes/deploy-spike/post-build.ts`, `prototypes/deploy-spike/vite.config.ts`, `prototypes/deploy-spike/src/site/routes/api.spike.ts`, `prototypes/deploy-spike/check.ts`, `prototypes/deploy-spike/README.md`
 Size: M
-Needs Peter: approval of each push to `prototype/deploy-spike`
+Needs Peter: no. Each push to `prototype/deploy-spike` is under his standing approval (row 151).
 
 ### D3: Deploy spike, part 3: headers, the redirect, the PDF and the Vercel Toolbar
 
@@ -52,7 +52,7 @@ Acceptance:
 Verify: `gh run view <run id> --log` shows the check 4, 5 and 11 lines; manual: Peter opens the spike's PDF in Chrome (check 10).
 Files: `prototypes/deploy-spike/post-build.ts`, `prototypes/deploy-spike/check.ts`, `prototypes/deploy-spike/public/Peter-Kloss-Resume.pdf` (a copy of the public PDF), `prototypes/deploy-spike/README.md`
 Size: M
-Needs Peter: the toolbar setting; the manual PDF check; approval of each push
+Needs Peter: the toolbar setting; the manual PDF check
 
 ### D4: Deploy spike, part 4: Vercel Cron, store writes after Stop, and the Upstash tokens
 
@@ -65,7 +65,7 @@ Acceptance:
 Verify: `gh run view <run id> --log` shows the check 6, 7 and 9 lines (booleans and hosts only, no token); the README holds the verdicts.
 Files: `prototypes/deploy-spike/src/site/routes/api.cron.health.ts`, `prototypes/deploy-spike/src/site/routes/api.spike.ts`, `prototypes/deploy-spike/post-build.ts`, `prototypes/deploy-spike/check.ts`, `prototypes/deploy-spike/README.md`
 Size: M
-Needs Peter: the Upstash database (money); approval of each push; approval of `@vercel/functions` only if check 7 fails
+Needs Peter: the Upstash database (money); approval of `@vercel/functions` only if check 7 fails
 
 ### D5: Deploy spike, part 5: the WAF rules and the status helper
 
@@ -77,7 +77,7 @@ Acceptance:
 Verify: `gh run view <run id> --log` shows the check 8 line; the README holds both verdicts.
 Files: `prototypes/deploy-spike/check.ts`, `prototypes/deploy-spike/README.md`
 Size: S
-Needs Peter: the WAF rules; approval of each push
+Needs Peter: the WAF rules
 
 ### D6: Spike verdicts into research 12 and SPEC-deploy
 
@@ -471,12 +471,12 @@ Delivers: The project's `.vercel.app` address redirects to peterkloss.dev, and t
 Blocked by: D17, D32, D33, D34, A2 (the `release` repo skill); Peter: setup steps 1 to 11 (the domains bought, ntfy, the Anthropic workspaces, Vercel Pro and the import, the toolbar and protection, Upstash, the WAF rules, the spend budget, the Actions secrets, Deployment Checks, the domains added)
 Acceptance:
 - `src/deploy/routes.ts` holds the project's `.vercel.app` address, and the config test checks that its route redirects with 308 and leaves `/api/` alone.
-- With Peter's approval, the push goes live on peterkloss.dev only after `ci / test`, `ci / audit` and the release check pass.
+- Under Peter's standing approval (row 151), the push goes live on peterkloss.dev only after `ci / test`, `ci / audit` and the release check pass.
 - Before setup step 12, the GitHub health check run by hand fails on the real model, and the push reaches Peter's phone.
 Verify: `bun test src/deploy/__tests__/config.test.ts`; `gh run watch` on `ci` and the release check; `gh workflow run health.yml`
 Files: `src/deploy/routes.ts`, `src/deploy/__tests__/config.test.ts`, `docs/STATUS.md`
 Size: S
-Needs Peter: approval of the release (a push of a site file); confirming the push on his phone
+Needs Peter: confirming the push on his phone. The release (a push of a site file) is under his standing approval (row 151).
 
 ### D38: Setup step 13: production passes its checks
 

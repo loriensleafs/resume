@@ -28,7 +28,7 @@ All six module specs are approved ([capability map](../spec/README.md)). This pl
 ## Order rules across modules
 
 1. The test move comes first. A1 comes before any other module's task, and A2 before any push of a site file.
-2. A push that changes a site file is a release, and Peter approves each one. Until the deploy module is built, the `release` skill stops at step 1 and the agent asks him. A push of docs-only paths only is not a release.
+2. A push that changes a site file is a release. Peter's standing approval covers every push, releases included (row 151). Until the deploy module is built, the `release` skill says so at step 1 and records every changed file in step 3. A push of docs-only paths only is not a release.
 3. D9 waits only on C2, and C17 waits on D9. D16 waits only on S2, and S8 waits on D16.
 4. S9 waits on D17, and D17 on the spike's verdicts (D6). Phase 2 cannot start until Peter has set up the spike and its checks have run.
 5. K11 to K13 close Phase 1, because C17's scripted turns cite their ids. They need only K5 to K7 and Peter's approvals, so they can run as soon as those are done.
@@ -47,7 +47,7 @@ All six module specs are approved ([capability map](../spec/README.md)). This pl
 Each item names the task it blocks; todo.md shows them as "Peter:".
 
 1. Done 2026-10-27: the spike's setup: a Vercel Pro team ($20 a month from then on), the throwaway project from `prototype/deploy-spike` (Standard Protection, no domains, no Anthropic key) and its bypass secret as an Actions secret. It blocked D1; the details are in D1's body.
-2. Each push to `prototype/deploy-spike`: D1 to D5.
+2. Done 2026-10-27: Peter's standing approval covers each push to `prototype/deploy-spike` (row 151), so D1 to D5 wait on no push approval.
 3. The Vercel Toolbar off for production (done 2026-10-27, at team level), and the PDF check in Chrome: D3.
 4. A pay-as-you-go Upstash database on the throwaway project (done 2026-10-27), and `@vercel/functions` only if spike check 7 fails: D4.
 5. Done 2026-10-27: the three WAF rules on the throwaway project: D5.
@@ -68,9 +68,9 @@ Each item names the task it blocks; todo.md shows them as "Peter:".
 20. Review and approval of the setup list and the runbooks: D34, D35 and D36.
 21. The Actions secrets (setup step 9): D33.
 22. Setup steps 1 to 11, with the three domains bought; step 10 also runs spike check 12 for D32. Blocks D37. Done 2026-10-27: step 1 (the three domains, in the Peter Kloss team, each renewing on Oct 27, 2027), step 4's Pro sign-up, step 5's toolbar setting (at team level) and step 8's $20 budget with pause off; its ntfy webhook waits for step 2.
-23. The first release, and confirming that its push reaches his phone: D37.
+23. Confirming that the first release's push reaches his phone: D37. The release itself is under his standing approval (row 151).
 24. Setup step 12 (`ANTHROPIC_API_KEY`, then Redeploy), the Vercel health job run by hand, and one live question: D38.
-25. Every push that is a release, and so each checkpoint that ends in one: content: lands; site: the build output, the wide workspace, phones, offline, install, and lands; chat: queue, offline, limits; and the pushes of T1, T2 and K11 to K13.
+25. Done 2026-10-27: Peter's standing approval covers every push, releases included (row 151), so no checkpoint and no task waits on a push approval.
 26. The reviews the checkpoints ask for: the new `AGENTS.md` sections before T1's push; knowledge: old contract gone and contract complete; chat: the first answer and the answer views (suggested); deploy: the workflows.
 27. Reading each fresh-session check's result, at each module's landing.
 

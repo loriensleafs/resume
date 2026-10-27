@@ -179,7 +179,7 @@ _Avoid_: jailbreak test, red-team prompt
 ## Running the site
 
 **Release**:
-A push of site changes to `main`, which goes live at peterkloss.dev once its checks pass. Peter approves each one.
+A push of site changes to `main`, which goes live at peterkloss.dev once its checks pass.
 _Avoid_: ship, go-live, promotion
 
 **Site file**:

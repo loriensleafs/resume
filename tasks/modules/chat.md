@@ -7,7 +7,7 @@ Spec: [SPEC-chat](../../spec/SPEC-chat.md) (approved, row 139), with the contrac
 - **Size** follows the planning skill's table: S is 1 or 2 files, M is 3 to 5. C1 counts its lockfile as generated; C39 is M because its fixes can touch the UI files.
 - **Seams.** Seam 1 is `handleChat()` in `src/chat/server/__tests__/handle-chat.test.ts`, with `fakeText()`, knowledge built from fixtures (one fixture source has `Not public` text) and the in-memory log, budget and telemetry. Seam 2 is SPEC-site's browser test, `src/site/__tests__/browser.test.ts`, which builds into the seam-1 folder and serves it with `bun run preview --dir <folder>`. The evals run outside `bun test`. No other seam (row 83).
 - **Before every commit** (AGENTS.md): `bun run build`, `bun run build:site` (once it exists) and `bun test`. Each task's Verify line names the focused commands.
-- **Pushes.** Every file under `src/`, `evals/`, `scripts/` and `vite.config.ts` is a site file, so each push to `main` is a release and needs Peter's approval (SPEC-deploy; the `release` skill).
+- **Pushes.** Every file under `src/`, `evals/`, `scripts/` and `vite.config.ts` is a site file, so each push to `main` is a release, under Peter's standing approval (row 151; SPEC-deploy; the `release` skill).
 - **Library skills.** A task that writes TanStack AI or TanStack DB code loads that package's skills first (`bun run intent load …`); a task that writes UI loads `@acmelabs/design-system#choose-and-compose`, `#react-integration` and `#forms-and-accessibility`, and asks the `acme-design-system` MCP server for each part with version `0.3.2` and framework `react` (AGENTS.md "Libraries"; SPEC-chat Code Style).
 - **Design-system parts checked on 2026-10-27** (MCP, 0.3.2): `acme-textarea` (`auto-resize`, no slots), `acme-toggle-tip` (slot `trigger`; parts `content`, `close`), `acme-group`, `acme-toggle-button`, `acme-select`, `acme-alert`, `acme-alert-dialog`, `acme-icon-button`, `acme-show-more`, `acme-relative-time`, `acme-copy-button`, `acme-card`, `acme-item`, `acme-list`, `acme-spinner`, `acme-progress` and `acme-markdown` all exist.
 - **Main's decisions of 2026-10-27, which main writes into SPEC-chat:** the handler sets the short prompt cache itself (no `ChatDeps` field); `ChatDeps` gains `origins: string[]`, which the route computes from `VERCEL_ENV` and `VERCEL_URL` (an empty list means the request's own origin); the eval case gains optional `history`, `scope` and `audience`.
@@ -555,7 +555,7 @@ After C20 to C30. The full suite passes; the conversation and answer states of t
 
 ### Checkpoint chat: queue, offline, limits
 
-After C31 to C39. The full suite passes; Peter reviews the running chat against the approved mockups at desktop and phone sizes, in light and dark, and approves it (Success Criteria). Pushes of the chat's site files are releases and wait for his approval each time.
+After C31 to C39. The full suite passes; Peter reviews the running chat against the approved mockups at desktop and phone sizes, in light and dark, and approves it (Success Criteria). Pushes of the chat's site files are releases under his standing approval (row 151).
 
 ### Checkpoint chat: lands
 

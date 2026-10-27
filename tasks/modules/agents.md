@@ -28,10 +28,10 @@ Notes: `scripts/docs-only.txt` and the `release` skill appear as code spans unti
 
 ### A2: The `release` repo skill
 
-Delivers: an agent about to push follows one procedure: it finds whether the push is a release, runs the checks, asks Peter, pushes, watches the checks and reports. Before the deploy module is built, the skill stops at step 1 and says so.
+Delivers: an agent about to push follows one procedure: it finds whether the push is a release, runs the checks, records Peter's standing approval, pushes, watches the checks and reports. Before the deploy module is built, the skill stops at step 1 and says so.
 Blocked by: A1
 Acceptance:
-- `.agents/skills/release/SKILL.md` has SPEC-agents' six steps, each ending on a "Done when" line. Step 3 asks Peter through `brain:ask-user-question`. Step 6 never promotes or rolls back by hand and points to `docs/runbooks/rollback.md` (a code span until deploy writes it). While `scripts/site-changed.sh` does not exist, step 1 stops and tells Peter that the deploy module is not built.
+- `.agents/skills/release/SKILL.md` has SPEC-agents' six steps, each ending on a "Done when" line. Step 3 records Peter's standing approval, with no question (row 151; before row 151 it asked Peter through `brain:ask-user-question`). Step 6 never promotes or rolls back by hand and points to `docs/runbooks/rollback.md` (a code span until deploy writes it). While `scripts/site-changed.sh` does not exist, step 1 stops and tells Peter that the deploy module is not built.
 - `.claude/skills/release` links to `../../.agents/skills/release`. The `AGENTS.md` release rule links to the skill.
 - The test also checks every repo skill. Its front matter parses. Its `name` equals the folder's name, is kebab-case and has 64 characters or fewer. Its `description` has 1 to 1,024 characters. `.claude/skills/` holds exactly one link for each skill, and each link resolves to `.agents/skills/<name>`. Every relative link in each `SKILL.md` resolves.
 Verify: `bun test ./__tests__`; `ls -l .claude/skills`
@@ -136,4 +136,4 @@ After A7 and A8, once the knowledge module has its draft command (K10). A8 has s
 
 ### Checkpoint agents: the first release follows the release skill
 
-At D37, the deploy module's first release. The release follows the `release` skill end to end: site files found, the checks run locally, Peter's approval, the push, the three checks watched with `gh`, and the outcome reported. A step that does not match the built deploy module is fixed in the skill.
+At D37, the deploy module's first release. The release follows the `release` skill end to end: site files found, the checks run locally, Peter's standing approval recorded, the push, the three checks watched with `gh`, and the outcome reported. A step that does not match the built deploy module is fixed in the skill.

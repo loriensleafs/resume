@@ -33,7 +33,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [S1](modules/site.md#s1-the-tanstack-start-app-on-bun-with-nitros-vercel-output) The TanStack Start app on Bun, with Nitro's Vercel output — blocked by none
 - [ ] [D7](modules/deploy.md#d7-ci-runs-the-build-the-tests-and-the-audits) CI runs the build, the tests and the audits — blocked by none
 - [x] Peter: the spike's setup: a Vercel Pro team ($20 a month from here on), the throwaway project from `prototype/deploy-spike` (root `prototypes/deploy-spike/`, Standard Protection, no domains, no Anthropic key) and its automation bypass secret as an Actions secret — blocks D1 (done 2026-10-27: team Peter Kloss, project `resume-deploy-spike`, secret `VERCEL_AUTOMATION_BYPASS_SECRET`; details in D1's body)
-- [ ] [D1](modules/deploy.md#d1-deploy-spike-part-1-the-throwaway-project-builds-the-spike-branch) Deploy spike, part 1: the throwaway project builds the spike branch — blocked by Peter's spike setup; Peter: approve each push to `prototype/deploy-spike`, here and in D2 to D5
+- [ ] [D1](modules/deploy.md#d1-deploy-spike-part-1-the-throwaway-project-builds-the-spike-branch) Deploy spike, part 1: the throwaway project builds the spike branch — blocked by Peter's spike setup
 - [ ] [D2](modules/deploy.md#d2-deploy-spike-part-2-the-post-build-routes-and-the-function-runtime) Deploy spike, part 2: the post-build routes and the function runtime — blocked by D1
 - [ ] [D3](modules/deploy.md#d3-deploy-spike-part-3-headers-the-redirect-the-pdf-and-the-vercel-toolbar) Deploy spike, part 3: headers, the redirect, the PDF and the Vercel Toolbar — blocked by D2 and Peter turning the Vercel Toolbar off for production on the throwaway project (done 2026-10-27, at team level); Peter: open the spike's PDF in Chrome (check 10)
 - [ ] [D4](modules/deploy.md#d4-deploy-spike-part-4-vercel-cron-store-writes-after-stop-and-the-upstash-tokens) Deploy spike, part 4: Vercel Cron, store writes after Stop, and the Upstash tokens — blocked by D2 and Peter's pay-as-you-go Upstash database on the throwaway project (done 2026-10-27); Peter: approve `@vercel/functions` only if check 7 fails
@@ -46,13 +46,13 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [A3](modules/agents.md#a3-every-agent-reaches-the-docs-server-and-gemini-cli-reads-agentsmd) Every agent reaches the docs server, and Gemini CLI reads `AGENTS.md` — blocked by A1
 - [ ] [A4](modules/agents.md#a4-the-agent-files-checks-cover-links-scripts-and-private-details-everywhere) The agent files' checks cover links, scripts and private details everywhere — blocked by A1 (runs after A3: same test file)
 - [ ] [A6](modules/agents.md#a6-the-update-mockups-repo-skill) The `update-mockups` repo skill — blocked by A2
-- [ ] [T1](modules/content.md#t1-each-role-has-its-short-label-x-short) Each role has its short label (`x-short`) — blocked by Peter's approval of the labels; Peter: approve the nine `x-short` labels, with a curly or straight apostrophe in "Brigham and Women’s"; the push is a release
-- [ ] [T2](modules/content.md#t2-bun-run-documents-writes-the-committed-public-documents-and-their-inputs-hash) `bun run documents` writes the committed public documents and their inputs hash — blocked by none (T1 first is preferred); Peter: the push is a release
+- [ ] [T1](modules/content.md#t1-each-role-has-its-short-label-x-short) Each role has its short label (`x-short`) — blocked by Peter's approval of the labels; Peter: approve the nine `x-short` labels, with a curly or straight apostrophe in "Brigham and Women’s"
+- [ ] [T2](modules/content.md#t2-bun-run-documents-writes-the-committed-public-documents-and-their-inputs-hash) `bun run documents` writes the committed public documents and their inputs hash — blocked by none (T1 first is preferred)
 - [ ] [T3](modules/content.md#t3-the-documents-test-checks-the-committed-files-against-a-fresh-build) The documents test checks the committed files against a fresh build — blocked by T2
 - [ ] [A5](modules/agents.md#a5-edit-resume-covers-the-short-labels-and-the-committed-documents) `edit-resume` covers the short labels and the committed documents — blocked by T1, T2, A2
 - [ ] [Checkpoint agents: checks complete](modules/agents.md#checkpoint-agents-checks-complete) — after A3 to A6
 - [ ] [T4](modules/content.md#t4-the-content-module-lands) The content module lands — blocked by T1, T3, A1; Peter: read the fresh-session result
-- [ ] [Checkpoint content: lands](modules/content.md#checkpoint-content-lands) — after T1 to T4; Peter: look at the committed `documents/` and approve the push (a release)
+- [ ] [Checkpoint content: lands](modules/content.md#checkpoint-content-lands) — after T1 to T4; Peter: look at the committed `documents/`
 - [ ] [S2](modules/site.md#s2-buildsite-prerenders--and-resume-and-no-other-page) `buildSite()` prerenders `/` and `/resume`, and no other page — blocked by S1
 - [ ] [D16](modules/deploy.md#d16-the-build-script-writes-pages-with-their-policy-tags) The build script writes pages with their policy tags — blocked by S2
 - [ ] [K2](modules/knowledge.md#k2-the-source-parser-reads-deep-dives-and-interviews) The source parser reads deep dives and interviews — blocked by K1
@@ -92,10 +92,10 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [S6](modules/site.md#s6-page-titles-descriptions-canonical-addresses-and-share-previews) Page titles, descriptions, canonical addresses and share previews — blocked by S3
 - [ ] [S7](modules/site.md#s7-google-sans-flex-served-from-the-site-itself) Google Sans Flex served from the site itself — blocked by S4 and Peter's choice of the font format; Peter: choose WOFF2 (with an encoder package he approves) or WOFF
 - [ ] [S8](modules/site.md#s8-seam-1-runs-the-build-script) Seam 1 runs the build script — blocked by S2 to S7, D16
-- [ ] [Checkpoint site: the build output](modules/site.md#checkpoint-site-the-build-output) — after S1 to S8, D16; Peter: look at `/` and `/resume` in `bun run dev`; approve the push (a release)
-- [ ] [K11](modules/knowledge.md#k11-move-three-deep-dives-to-sources-fednow-architecture-fednow-bundle-size-fednow-design-system) Move three deep dives to sources: `fednow-architecture`, `fednow-bundle-size`, `fednow-design-system` — blocked by K5 to K7 and Peter's approval; Peter: approve the three summaries and the moved files; the push is a release
-- [ ] [K12](modules/knowledge.md#k12-move-three-deep-dives-to-sources-fednow-standards-mentoring-highspot-agent-workflow-highspot-ai-standards) Move three deep dives to sources: `fednow-standards-mentoring`, `highspot-agent-workflow`, `highspot-ai-standards` — blocked by K5 to K7 and Peter's approval; Peter: approve the three summaries and the moved files; the push is a release
-- [ ] [K13](modules/knowledge.md#k13-move-three-deep-dives-to-sources-highspot-data-table-highspot-mcp-server-highspot-streaming-markdown) Move three deep dives to sources: `highspot-data-table`, `highspot-mcp-server`, `highspot-streaming-markdown` — blocked by K5 to K7 and Peter's approval; Peter: approve the three summaries and the moved files; the push is a release
+- [ ] [Checkpoint site: the build output](modules/site.md#checkpoint-site-the-build-output) — after S1 to S8, D16; Peter: look at `/` and `/resume` in `bun run dev`
+- [ ] [K11](modules/knowledge.md#k11-move-three-deep-dives-to-sources-fednow-architecture-fednow-bundle-size-fednow-design-system) Move three deep dives to sources: `fednow-architecture`, `fednow-bundle-size`, `fednow-design-system` — blocked by K5 to K7 and Peter's approval; Peter: approve the three summaries and the moved files
+- [ ] [K12](modules/knowledge.md#k12-move-three-deep-dives-to-sources-fednow-standards-mentoring-highspot-agent-workflow-highspot-ai-standards) Move three deep dives to sources: `fednow-standards-mentoring`, `highspot-agent-workflow`, `highspot-ai-standards` — blocked by K5 to K7 and Peter's approval; Peter: approve the three summaries and the moved files
+- [ ] [K13](modules/knowledge.md#k13-move-three-deep-dives-to-sources-highspot-data-table-highspot-mcp-server-highspot-streaming-markdown) Move three deep dives to sources: `highspot-data-table`, `highspot-mcp-server`, `highspot-streaming-markdown` — blocked by K5 to K7 and Peter's approval; Peter: approve the three summaries and the moved files
 - [ ] [Checkpoint knowledge: lands](modules/knowledge.md#checkpoint-knowledge-lands) — after K11 to K13; Peter: read the fresh-session result
 
 ## Phase 2: the workspace and the chat column
@@ -118,7 +118,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [S20](modules/site.md#s20-ask-about-this-on-resume-highlights) "Ask about this" on resume highlights — blocked by S14
 - [ ] [S21](modules/site.md#s21-saved-views-in-peterkloss-views) Saved views in `peterkloss-views` — blocked by S19
 - [ ] [S22](modules/site.md#s22-document-downloads-from-the-resume-view-and-the-app-bar) Document downloads from the resume view and the app bar — blocked by S11, T2
-- [ ] [Checkpoint site: the wide workspace](modules/site.md#checkpoint-site-the-wide-workspace) — after S9 to S22, D17; Peter: review the preview at 1440 × 900, light and dark; approve the push (a release)
+- [ ] [Checkpoint site: the wide workspace](modules/site.md#checkpoint-site-the-wide-workspace) — after S9 to S22, D17; Peter: review the preview at 1440 × 900, light and dark
 - [ ] [C16](modules/chat.md#c16-the-chats-vite-plugin-virtualknowledge-and-the-device-index) The chat's Vite plugin: `virtual:knowledge` and the device index — blocked by K9, S8
 - [ ] [C17](modules/chat.md#c17-the-route-file-apichatts-with-the-fake-model-outside-production) The route file `api.chat.ts`, with the fake model outside production — blocked by C14, C16, D9, S9, K11 to K13
 - [ ] [S31](modules/site.md#s31-the-preview-answers-the-api-routes) The preview answers the API routes — blocked by S9, C17
@@ -153,7 +153,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [D19](modules/deploy.md#d19-the-service-worker-precaches-the-tagged-pages) The service worker precaches the tagged pages — blocked by S28, D17
 - [ ] [S29](modules/site.md#s29-offline-after-one-visit-and-installable) Offline after one visit, and installable — blocked by S28, S21, S25
 - [ ] [S30](modules/site.md#s30-the-speed-budget) The speed budget — blocked by S29
-- [ ] [Checkpoint site: phones, offline, install](modules/site.md#checkpoint-site-phones-offline-install) — after S23 to S30; Peter: review the preview at 390 × 844; approve the push (a release)
+- [ ] [Checkpoint site: phones, offline, install](modules/site.md#checkpoint-site-phones-offline-install) — after S23 to S30; Peter: review the preview at 390 × 844
 - [ ] [D11](modules/deploy.md#d11-the-daily-cap-holds-under-parallel-requests) The daily cap holds under parallel requests — blocked by D10
 - [ ] [D12](modules/deploy.md#d12-daily-totals-and-the-cost-estimate) Daily totals and the cost estimate — blocked by D11
 - [ ] [D13](modules/deploy.md#d13-limit-alerts-for-the-months-spend-and-the-daily-cap) Limit alerts for the month's spend and the daily cap — blocked by D12; Peter: approve the `daycap` push text
@@ -171,7 +171,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [C37](modules/chat.md#c37-scroll-to-the-latest-message) Scroll to the latest message — blocked by C19
 - [ ] [C38](modules/chat.md#c38-a-keyboard-only-pass) A keyboard-only pass — blocked by C26, C29, C31, C35
 - [ ] [C39](modules/chat.md#c39-axe-across-the-chat-states-at-both-sizes-and-in-both-themes) axe across the chat states, at both sizes and in both themes — blocked by C22, C26, C30, C32, C34 to C36, C38
-- [ ] [Checkpoint chat: queue, offline, limits](modules/chat.md#checkpoint-chat-queue-offline-limits) — after C31 to C39; Peter: review the running chat against the mockups and approve it; each push is a release
+- [ ] [Checkpoint chat: queue, offline, limits](modules/chat.md#checkpoint-chat-queue-offline-limits) — after C31 to C39; Peter: review the running chat against the mockups and approve it
 - [ ] [D26](modules/deploy.md#d26-the-smoke-check-in-chrome-online-and-offline) The smoke check in Chrome, online and offline — blocked by D21, S29, C19
 
 ## Phase 4: everything wired together
@@ -181,7 +181,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [S34](modules/site.md#s34-a-restored-conversation-never-shows-the-first-view) A restored conversation never shows the first view — blocked by S12, S23, S31, C20, C35
 - [ ] [S35](modules/site.md#s35-new-chat-clears-the-saved-views) New chat clears the saved views — blocked by S21, S34, C35
 - [ ] [S36](modules/site.md#s36-the-install-offer-on-phones) The install offer on phones — blocked by S24, S27, S31, C27
-- [ ] [Checkpoint site: lands](modules/site.md#checkpoint-site-lands) — after S31 to S36; Peter: review the running preview against the mockups, approve it and its push (a release); read the fresh-session result
+- [ ] [Checkpoint site: lands](modules/site.md#checkpoint-site-lands) — after S31 to S36; Peter: review the running preview against the mockups and approve it; read the fresh-session result
 - [ ] [C40](modules/chat.md#c40-the-trick-questions-and-bun-run-evals) The trick questions and `bun run evals` — blocked by C10, C13 to C15
 - [ ] [C41](modules/chat.md#c41-the-first-approved-eval-run-and-peters-review) The first approved eval run, and Peter's review — blocked by C40, D8 and Peter's `resume-evals` key in `.secrets/local.env`; Peter: approve each eval run (it costs money) and review its answers
 - [ ] [Checkpoint chat: lands](modules/chat.md#checkpoint-chat-lands) — after C40, C41, S32 to S36; Peter: read the fresh-session result
@@ -203,7 +203,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [D36](modules/deploy.md#d36-runbooks-for-the-store-health-and-release-alerts) Runbooks for the store, health and release alerts — blocked by D32, D33; Peter: review and approve the runbooks
 - [ ] [Checkpoint deploy: setup list and runbooks](modules/deploy.md#checkpoint-deploy-setup-list-and-runbooks) — after D34 to D36; Peter: approve them
 - [ ] Peter: setup steps 1 to 11 of `docs/runbooks/setup.md`, in order: the domains bought, ntfy, the Anthropic workspaces, Vercel Pro and the import, the toolbar and protection, Upstash, the WAF rules, the spend budget, the Actions secrets, Deployment Checks (spike check 12), the domains added — after D34; blocks D37 (done 2026-10-27: step 1, the three domains bought; step 4's Pro sign-up; step 5's toolbar setting; step 8's budget)
-- [ ] [D37](modules/deploy.md#d37-setup-step-11-the-vercelapp-address-the-first-release) Setup step 11: the `.vercel.app` address, the first release — blocked by D17, D32 to D34, A2 and Peter's setup steps 1 to 11; Peter: approve the release and confirm its push reaches his phone
+- [ ] [D37](modules/deploy.md#d37-setup-step-11-the-vercelapp-address-the-first-release) Setup step 11: the `.vercel.app` address, the first release — blocked by D17, D32 to D34, A2 and Peter's setup steps 1 to 11; Peter: confirm that the release's push reaches his phone
 - [ ] [Checkpoint agents: the first release follows the release skill](modules/agents.md#checkpoint-agents-the-first-release-follows-the-release-skill) — after D37
 - [ ] Peter: setup step 12: `ANTHROPIC_API_KEY`, then Redeploy with "Use project's Ignore Build Step" unchecked — after D37; blocks D38
 - [ ] [D38](modules/deploy.md#d38-setup-step-13-production-passes-its-checks) Setup step 13: production passes its checks — blocked by D37 and Peter's setup step 12; Peter: run the Vercel health job by hand; ask the live chat one question; read the fresh-session result

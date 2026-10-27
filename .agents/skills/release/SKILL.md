@@ -1,11 +1,11 @@
 ---
 name: release
-description: Release procedure for every push to `main` in this repository. It checks the branch, finds whether the push changes a site file, asks Peter, pushes, watches the required checks and confirms whether peterkloss.dev is live. Use before every push to `main`, even one that looks docs-only, and whenever Peter asks to push to `main`, release or deploy a change.
+description: Release procedure for every push to `main` in this repository. It checks the branch, finds whether the push changes a site file, runs the checks, records Peter's standing approval, pushes, watches the required checks and confirms whether peterkloss.dev is live. Use before every push to `main`, even one that looks docs-only, and whenever Peter asks to push to `main`, release or deploy a change.
 ---
 
 # Release
 
-A push to `main` that changes a site file is a release. Once its three required checks pass, it goes live at peterkloss.dev, so Peter approves each one ([SPEC-deploy](../../../spec/SPEC-deploy.md), "Releases"). A site file is any tracked path that `scripts/docs-only.txt` does not list. A push that changes no site file is not a release and needs no release question. Every push needs Peter's approval: a release through step 3, any other push once, unless Peter asked for that push.
+A push to `main` that changes a site file is a release. Once its three required checks pass, it goes live at peterkloss.dev ([SPEC-deploy](../../../spec/SPEC-deploy.md), "Releases"). A site file is any tracked path that `scripts/docs-only.txt` does not list. A push that changes no site file is not a release. Peter's standing approval covers every push, releases included (decision record row 151): push without a question once the before-commit checks pass. Peter does not see a release before it goes live, so steps 5 and 6 tell him the outcome.
 
 ## 1. Find the site changes
 
@@ -29,12 +29,12 @@ ls scripts/site-changed.sh
 sh scripts/site-changed.sh origin/main main; echo "exit $?"
 ```
 
-- **No script:** the deploy module is not built yet. No script decides which files are site files, and no release check runs. Tell Peter so. Then do steps 2, 3, 4 and 6. In step 3, list every file that the commits change.
-- **Exit 0:** no site file changed, so the push is not a release. Leave out steps 2, 3 and 5. When Peter has not asked for this push in this session, ask him once through `brain:ask-user-question`, with the commit to push (`git rev-parse --short main`) and the commits. A decline ends the push, and the commits stay local.
+- **No script:** the deploy module is not built yet. No script decides which files are site files, and no release check runs. Tell Peter so. Then do steps 2, 3, 4 and 6. In step 3, record every file that the commits change.
+- **Exit 0:** no site file changed, so the push is not a release. Leave out steps 2, 3 and 5.
 - **Exit 1:** a site file changed, so the push is a release. Go on to step 2.
-- **Any other exit code:** the script failed. Treat the push as a release, and put the error in step 3's question. An extra release question is safe; a skipped one hides a change.
+- **Any other exit code:** the script failed. Treat the push as a release, and put the error in step 3's record. An extra release watch is safe; a skipped one hides a change.
 
-Done when the branch is `main`, the first count is `0` and the second is not, the exit code is known or the script is known to be missing, and Peter has answered any question that exit 0 needed.
+Done when the branch is `main`, the first count is `0` and the second is not, and the exit code is known or the script is known to be missing.
 
 ## 2. Run the before-commit checks
 
@@ -44,24 +44,24 @@ bun run build:site
 bun test
 ```
 
-Run `bun run build:site` once `package.json` has it ([AGENTS.md](../../../AGENTS.md), "Verify"). CI runs the same checks on the pushed commit. Run them here first, so that Peter approves a release that already builds.
+Run `bun run build:site` once `package.json` has it ([AGENTS.md](../../../AGENTS.md), "Verify"). CI runs the same checks on the pushed commit. Run them here first, so that every release already builds when it reaches GitHub.
 
-Done when all of them pass. After a failure, fix it in a new commit and start again at step 1, so that Peter sees the fix in step 3.
+Done when all of them pass. After a failure, fix it in a new commit and start again at step 1, so that step 3 records the fix.
 
-## 3. Ask Peter
+## 3. Record the standing approval
 
-Load `brain:ask-user-question` and ask one question: may these commits go to `main`? Put in the question:
+Peter's standing approval (decision record row 151) covers this push, so go on to step 4 without a question. Write down, for the report in step 6:
 
 - the commit to push, from `git rev-parse --short main`;
 - the commits, from `git log --oneline origin/main..main`;
 - the site files: the files in `git diff --name-only origin/main...main` that `scripts/docs-only.txt` does not list;
 - the result of step 2.
 
-Done when Peter approved this push, or declined it. A decline ends the release, and the commits stay local.
+Done when the record holds these four items.
 
 ## 4. Push
 
-When Peter's approval named a commit, check that `git rev-parse --short main` still prints it. Then push, and compare GitHub's `main` with the local one:
+When step 3 recorded a commit, check that `git rev-parse --short main` still prints it. Then push, and compare GitHub's `main` with the local one:
 
 ```sh
 git push origin main
@@ -94,6 +94,8 @@ gh api "repos/{owner}/{repo}/commits/<commit>/status" --jq '.statuses[] | {conte
 Done when `test`, `audit` and the release check all passed, one of them failed, no release check ran, or the release check is still pending after 45 minutes.
 
 ## 6. Report
+
+Give Peter the outcome, with step 3's record when step 3 ran.
 
 - **Not a release** (step 1, exit 0): the commits are on GitHub, and peterkloss.dev does not change.
 - **No script** (step 1): the commits are on GitHub. No release check ran, because the deploy module is not built.

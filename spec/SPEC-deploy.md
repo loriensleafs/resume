@@ -4,6 +4,8 @@ Approved by Peter on 2026-10-27 (decision record row 127), with the amendments t
 
 Corrected on 2026-10-27 after the reviews of the other specs (decision record rows 128 to 136). Approved by Peter with the updated mockups on 2026-10-27 (decision record row 139); the scope label and the texts follow rows 137 and 138.
 
+Amended on 2026-10-27: Peter's standing approval covers every push, releases and the deploy spike's pushes included (decision record row 151).
+
 ## Objective
 
 Put the site and the chat on the internet at `https://peterkloss.dev`, and keep them safe, cheap and observable without Peter watching them. The site serves recruiters, hiring managers and engineers during Peter's job search, when traffic is higher than usual (row 114), so a quiet failure or a spent limit must reach Peter at once.
@@ -117,7 +119,7 @@ README.md
 
 A small window remains: a site change pushed during step 5 can let the older deployment take the domains after the newer one. The GitHub health check then finds the live commit behind `main` and fails.
 
-Because a push of site changes is a release, agents ask Peter before pushing site changes to `main`. [AGENTS.md](../AGENTS.md) carries this rule and points to `scripts/docs-only.txt` ([SPEC-agents](SPEC-agents.md)).
+A push of site changes to `main` is a release. Peter's standing approval covers every push, releases included (row 151), so agents push without a question once the before-commit checks pass, and follow the `release` skill. [AGENTS.md](../AGENTS.md) carries this rule and points to `scripts/docs-only.txt` ([SPEC-agents](SPEC-agents.md)).
 
 **Rollback.** Instant Rollback in the dashboard moves the domains back in seconds, and turns domain auto-assignment off. While it is off, passing deployments do not go live, and the GitHub health check reports the lag. After the fix's deployment passes its checks, Peter selects "Undo Rollback" and chooses that deployment. That makes it live and turns auto-assignment on again. `docs/runbooks/rollback.md` has the steps and ends with a check that the next release goes live without help.
 
@@ -527,7 +529,7 @@ Peter does these steps once, in this order, so that the chat never runs in produ
 8. Vercel, Spend Management: a $20 budget with the webhook set to the ntfy topic URL. Check that the "Pause production deployment" switch is off. Vercel's docs say production pauses only when that switch is on; the third review read a changelog as saying it can start on, so the step checks it.
 9. GitHub, Actions secrets: the Actions rows of the table above.
 10. Vercel, Deployment Checks: require `ci / test`, `ci / audit` and the release check's status, by the name its first run shows. Check that domain auto-assignment is on.
-11. Vercel, Domains: add peterkloss.dev, www.peterkloss.dev, pkloss.dev and pwk.dev, all served by the project. An agent writes the project's `.vercel.app` address into `src/deploy/routes.ts`, with Peter's approval of that release.
+11. Vercel, Domains: add peterkloss.dev, www.peterkloss.dev, pkloss.dev and pwk.dev, all served by the project. An agent writes the project's `.vercel.app` address into `src/deploy/routes.ts`; its push is a release.
 12. Vercel, Environment Variables: add `ANTHROPIC_API_KEY` (Production, Secret). Then Redeploy the newest production deployment with "Use project's Ignore Build Step" unchecked. With the box checked, the ignore step sees no change and the redeploy does nothing.
 13. Check: `/api/status` reports everything configured; run both health checks by hand once; ask the live chat one question.
 
@@ -554,7 +556,7 @@ Peter does these steps once, in this order, so that the chat never runs in produ
 The plan's first task, before any production code. A local build cannot answer these questions; a throwaway deployment can.
 
 - **Setup.** Peter creates a second Vercel project in his Pro team from the branch `prototype/deploy-spike`, with no domains and no Anthropic key, and a pay-as-you-go Upstash database for it. The spike costs cents beyond the Pro plan.
-- **Approval.** Each push to that project deploys, so each one needs Peter's approval, like any outward action.
+- **Approval.** Each push to that project deploys. Peter's standing approval covers each one (row 151), so the agent pushes without a question.
 - **Throwaway.** The spike code stays on its branch (brain's prototype rules); its verdicts go into research 12 and, where they change a rule, into this spec. Peter removes the project afterwards.
 
 | # | Check | If it fails |
@@ -614,7 +616,7 @@ Approving this spec approves these amendments:
   - `bun run documents` (`scripts/documents.ts`) writes the public documents to `documents/`, with `documents/inputs.sha256`; the document test above checks them. SPEC-content lists the script, the folder and the test, and defines the hash's inputs.
   - The line "`bun run build --public` (the website and CI use this)" changes: the website uses the committed `documents/`, and CI runs `bun run build` to check that the documents still build.
 - **SPEC-agents** (approved 2026-10-27, row 142) carries these into `AGENTS.md`:
-  - AGENTS.md: a push that changes a site file (a path not in `scripts/docs-only.txt`) is a release and needs Peter's approval.
+  - AGENTS.md: a push that changes a site file (a path not in `scripts/docs-only.txt`) is a release; Peter's standing approval covers it (row 151).
   - AGENTS.md, Verify: `bun run build`, `bun run build:site` and `bun test` before every commit.
   - `bun run smoke`, `bun run documents` and the runbooks join the commands.
   - The edit-resume skill runs `bun run documents` and checks the committed PDF's page count.
@@ -771,8 +773,7 @@ The real platform is checked by the deploy spike, by the release check, by the t
   - treat a failed store or push call as a printed `ops_error`, never as a failed answer;
   - run `bun run build`, `bun run build:site` and `bun test` before a commit.
 - **Ask first:**
-  - pushing a change to a site file (a release), or changing `scripts/docs-only.txt`;
-  - each push to the deploy spike's project;
+  - changing `scripts/docs-only.txt`;
   - a change to a limit, the cap, the reservation, a size cap, a header, the policy, a route, a redirect, a WAF rule or a cache rule;
   - a new outside service, GitHub helper or package;
   - a change to the key layout or to what an alert says;
@@ -844,7 +845,7 @@ The real platform is checked by the deploy spike, by the release check, by the t
 53. As an attacker hammering the status route, I should hit its rate limit, and never reach the store more than once a minute per function instance.
 54. As an attacker who learns the ntfy topic, I should find no visitor data in the alerts.
 55. As a future agent, I want tests that name the broken header, route, alert rule, expiry, reservation or document, so that I fix the cause.
-56. As a future agent, I want the release rule in AGENTS.md and one list of docs-only paths, so that I know which pushes need Peter's approval.
+56. As a future agent, I want the release rule in AGENTS.md and one list of docs-only paths, so that I know which pushes are releases.
 
 ## Out of scope
 
