@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "acme-design-system": {
+      "type": "stdio",
+      "command": "bun",
+      "args": ["run", "--silent", "design-system-mcp"]
+    }
+  }
+}

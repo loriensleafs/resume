@@ -25,6 +25,12 @@ Private details (the phone number) live only in the untracked `private.yaml`. Tr
 
 For any change to resume content, use the [edit-resume skill](.agents/skills/edit-resume/SKILL.md).
 
+## Libraries
+
+Before you write code that uses a library, load its skill. `bun run intent list` shows the skills of the installed packages; `bun run intent load <package>#<skill>` prints one. Use `bun run intent`, never `bunx intent` or `intent install` ([decision 0014](docs/decisions/0014-library-skills-and-docs-mcp.md)).
+
+For design-system components, also ask the `acme-design-system` MCP server. Pass the installed version from `package.json` and the framework `react`.
+
 ## Code
 
 Write all tooling in Bun and TypeScript, with Bun's APIs ([decision 0004](docs/decisions/0004-bun-only.md)). Add a dependency only after Peter approves it.

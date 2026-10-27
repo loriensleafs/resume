@@ -10,6 +10,8 @@ Updated 2026-10-26. This file is the one current handoff. A fresh session resume
 
 ## Waiting on Peter
 
+- Add `.mcp.json` and `.claude/settings.json` for Claude Code, from the README section "Working with AI agents" ([decision 0014](decisions/0014-library-skills-and-docs-mcp.md)). An agent's safety check blocks agents from writing their own configuration.
+- Run `bun install` in `~/Dev/resume`, so Intent and the docs MCP server work there.
 - Vercel Pro sign-up and an Anthropic API key with a workspace spend limit, when the deploy module starts ([0012](decisions/0012-vercel-pro-host.md), [0013](decisions/0013-claude-sonnet-model.md)). Peter signs up and pays; agents never do.
 - Logistics answers and deep-dive interviews, during the knowledge module.
 

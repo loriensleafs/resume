@@ -1,0 +1,6 @@
+# Project-scoped Codex settings. Codex loads this file only for trusted projects.
+
+# Read-only documentation for @acmelabs/design-system, served by Bun over stdio.
+[mcp_servers.acme-design-system]
+command = "bun"
+args = ["run", "--silent", "design-system-mcp"]

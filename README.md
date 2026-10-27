@@ -58,4 +58,50 @@ AGENTS.md        instructions for every AI coding agent (CLAUDE.md imports it)
 
 The repository carries its own agent context. An agent starts at [AGENTS.md](AGENTS.md); Claude Code reads it through [CLAUDE.md](CLAUDE.md), and Codex, Cursor, Copilot and Antigravity read it directly. The workflow follows Peter's brain plugin: specs in `spec/`, the plan in `tasks/`, decisions in `docs/decisions/`, research in `docs/research/`, current status in [docs/STATUS.md](docs/STATUS.md).
 
+Library skills load through TanStack Intent: `bun run intent list`, then `bun run intent load <package>#<skill>`. The design system's read-only documentation MCP server (`bun run design-system-mcp`) is configured for Codex (trusted projects), Cursor and VS Code.
+
+For Claude Code, add two files at the repository root (an agent cannot write its own configuration):
+
+`.mcp.json`
+
+```json
+{
+  "mcpServers": {
+    "acme-design-system": {
+      "command": "bun",
+      "args": ["run", "--silent", "design-system-mcp"]
+    }
+  }
+}
+```
+
+`.claude/settings.json` (enables the brain and agent-skills plugins and pre-approves the server)
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "addy-agent-skills": { "source": { "source": "github", "repo": "addyosmani/agent-skills" } },
+    "acmelabs": { "source": { "source": "github", "repo": "acmelabs-15/marketplace" } }
+  },
+  "enabledPlugins": {
+    "agent-skills@addy-agent-skills": true,
+    "brain@acmelabs": true
+  },
+  "enabledMcpjsonServers": ["acme-design-system"]
+}
+```
+
+Antigravity reads MCP servers only from `~/.gemini/config/mcp_config.json`. To use the server there, add this entry with your clone's absolute path:
+
+```json
+{
+  "mcpServers": {
+    "acme-design-system": {
+      "command": "bun",
+      "args": ["run", "--silent", "--cwd", "/absolute/path/to/resume", "design-system-mcp"]
+    }
+  }
+}
+```
+
 A good first prompt for a new session: "Read AGENTS.md and follow its session start, then tell me where we are."

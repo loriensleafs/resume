@@ -17,3 +17,4 @@ These records explain the choices behind this repository and their reasons. Numb
 | [0011](0011-word-and-text-documents.md) | The build also makes Word and text documents |
 | [0012](0012-vercel-pro-host.md) | Host the site and chat on Vercel Pro, with the Bun runtime |
 | [0013](0013-claude-sonnet-model.md) | The chat starts on Claude Sonnet 5.5 |
+| [0014](0014-library-skills-and-docs-mcp.md) | Agents load library skills through TanStack Intent and read the design system's docs MCP |
