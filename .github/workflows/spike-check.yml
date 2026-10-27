@@ -31,6 +31,8 @@ jobs:
       SPIKE_BRANCH_HOST: resume-deploy-spike-git-prototype-deploy-spike-peterkloss.vercel.app
       # The project's production address (public under Standard Protection); it never gets the bypass.
       SPIKE_PRODUCTION_HOST: project-8ar0o.vercel.app
+    outputs:
+      deployment: ${{ steps.deployment.outputs.deployment }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -53,4 +55,29 @@ jobs:
           DEPLOYMENT_HOST: ${{ steps.deployment.outputs.deployment }}
           PRODUCTION_HOST: ${{ steps.deployment.outputs.production }}
           RUN_DEADLINE: ${{ steps.deployment.outputs.deadline }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+  # Check 8 (D5) drives this runner's address to the WAF's chat rate limit on purpose, so it runs in a job of its
+  # own, after the other checks, whatever their verdicts: a limited address never hides another check's result.
+  waf:
+    needs: check
+    if: ${{ !cancelled() && needs.check.outputs.deployment != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: prototypes/deploy-spike
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Check 8, the WAF rules
+        run: bun check.ts waf
+        env:
+          DEPLOYMENT_HOST: ${{ needs.check.outputs.deployment }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
