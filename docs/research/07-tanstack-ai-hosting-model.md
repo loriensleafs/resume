@@ -45,7 +45,7 @@ Estimate for this chat: a knowledge file of about 15,000 tokens, mostly served f
 
 Checked on 2026-10-27 for task C1. C1 installed `@tanstack/ai`, `@tanstack/ai-react` and `@tanstack/ai-anthropic` 1.0.0 and `@tanstack/markdown` 0.0.13 at exact versions. Each package ships its TypeScript source, so each verdict cites a file and line under `node_modules/@tanstack/` (the paths below start there).
 
-Only `@tanstack/ai` ships skills (`bun run intent list`). Its skills say they target 0.42.0, and two are out of date against the 1.0.0 source: `ai-core/middleware` has no `onGuardToolCall`, and `ai-core/ag-ui-protocol` says `chatParamsFromRequestBody()` checks the body with `RunAgentInputSchema` and keeps message `parts`. Where a skill and the source differ, the source decides.
+Only `@tanstack/ai` ships skills (`bun run intent list`). Its skills say they target 0.42.0, and two are out of date against the 1.0.0 source: `ai-core/middleware` has no `onGuardToolCall`, and `ai-core/ag-ui-protocol` says `chatParamsFromRequestBody()` checks the body with `RunAgentInputSchema` and keeps message `parts`. Where a skill and the source differ, the source decides. Each skill below is named in full; load one with `bun run intent load @tanstack/ai#ai-core/middleware`, not `#middleware`.
 
 The verdict words:
 
@@ -96,7 +96,7 @@ The problem. Sonnet 5.5 always thinks. SPEC-chat first asked for `summary: false
 
 The browser's stream processor turns that event into a `thinking` part with empty text (`ai/src/activities/chat/stream/processor.ts:3035–3070`). With the next question, the client sends the part back as a `{ role: "reasoning", content: "", encryptedValue }` message (`ai/src/utilities/ag-ui-wire.ts:371–380`, `ai-client/src/connection-adapters.ts:1409`). SPEC-chat's request check passed only `user`, `assistant` and `tool`. So every question after the first answer would get 400 `INVALID_REQUEST`.
 
-Facts for the choice. The engine stores the raw adapter events before `onChunk` (`index.ts:2094` runs before `2172`). So a wire rule that drops thinking events keeps the signatures that the read loop inside one turn needs. Anthropic needs thinking blocks back only inside a tool-use turn, and allows leaving out earlier turns' thinking (thinking docs, "Preserving thinking blocks"). A returned block stays valid only while the system prompt, the tools and the earlier messages stay unchanged (thinking docs, "Preserved thinking"). This chat changes them on purpose: the scope and audience lines, the 20-turn window and the ids-only reads.
+Facts for the choice. The engine stores the raw adapter events before `onChunk` (`index.ts:2094` runs before `2174`). So a wire rule that drops thinking events keeps the signatures that the read loop inside one turn needs. Anthropic needs thinking blocks back only inside a tool-use turn, and allows leaving out earlier turns' thinking (thinking docs, "Preserving thinking blocks"). A returned block stays valid only while the system prompt, the tools and the earlier messages stay unchanged (thinking docs, "Preserved thinking"). This chat changes them on purpose: the scope and audience lines, the 20-turn window and the ids-only reads.
 
 The options.
 
@@ -106,7 +106,7 @@ The options.
 | B. The request check accepts `reasoning` messages, and the server drops them before `chat()`. | The browser saves the signatures and sends them back with every question, inside the 256 KB request cap. |
 | C. The request check accepts `reasoning` messages and passes them to the model. | A visitor's edited message reaches the model as earlier thinking. The chat changes the prompt on purpose, so Anthropic rejects or drops old blocks. |
 
-The decision. Peter chose A (row 155). The wire middleware drops every event whose type starts with `REASONING_`, by prefix, because the client builds a thinking part from several of them. So the browser holds no thinking part and no signature, and sends nothing back. The request check stays as approved.
+The decision. Peter chose A (row 155). The amendment first dropped every event whose type starts with `REASONING_`. Its review replaced that with an allowlist (the conductor, for Peter's end review): the wire middleware passes only the event types the browser needs and drops every other type. The client also reads forms that a prefix rule could miss in a later version, such as `REASONING_MESSAGE_CHUNK` and `REASONING_MESSAGE` (`ai/src/activities/chat/stream/processor.ts:923`, `1046`). So the browser holds no thinking part and no signature, and sends nothing back. The request check stays as approved.
 
 Row 155 first put a content-free `chat.thinking` event and a live step in place of the dropped events. Peter then chose to show the thinking summary, with guards (row 156), because the mockups leave space to show that the model is working:
 
@@ -117,6 +117,15 @@ Row 155 first put a content-free `chat.thinking` event and a live step in place 
 - The folded steps line shows when the turn read or has a thinking summary, so a visitor can always open the thinking summary. When the turn read nothing, the line's text is a wording draft for C26, for example "Thought it through".
 - The browser saves the thinking summary as `answer.thinking`, outside the `UIMessage`, so it is never in a request. The evals' `mustNotContain` covers it, and the review file shows it. The question log stores no thinking text.
 
+The review of the amendment added these guards (the conductor, for Peter's end review):
+
+- The thinking summary never passes the marker middleware: an `[id]` or `<<…>>` in it stays plain text.
+- The wire middleware sends at most `turnLimits.thinkingCharacters` (20,000) characters of thinking summary per turn; longer text ends with "…". A typical thinking summary is 1 to 3 KB.
+- The wire middleware keeps its state per run, a new instance per request.
+- The browser adds `delta` text to the view once per animation frame, and saves the thinking summary when thinking ends and when the message ends.
+- A stream that ends while thinking is active closes the step, so no live spinner remains.
+- The summarized display can delay the first answer text a little, and the step shows that wait. Billing is the same as with the thinking text omitted (thinking docs: "Either way the block is billed the same"), so the $0.90 reservation stays.
+
 #### 2. A thrown run skips the `RUN_ERROR` rewrite
 
 Status: spec change (row 155).
@@ -124,6 +133,8 @@ Status: spec change (row 155).
 When the `chat()` stream throws, `toServerSentEventsResponse` writes its own `RUN_ERROR` with the error's own message (`ai/src/stream-to-response.ts:279–296`, `ai/src/activities/error-payload.ts:76`). That event never passes `onChunk`. The Anthropic adapter catches its own errors and sends `RUN_ERROR` (`ai-anthropic/src/adapters/text.ts:2341–2372`), but a throw from a hook or the engine still reaches the wire this way.
 
 SPEC-chat now says: `handleChat()` wraps the `chat()` stream, and a throw becomes the handler's own `RUN_ERROR` with the new code `SERVER_ERROR`. The real error is logged on the server only, and an abort stays `stopped`. `wire.ts` exports one table of fixed messages per code and a `wireError(code)` builder, which the chunk middleware and every handler `RUN_ERROR` use.
+
+The review added one shared function, `finishTurn()` in `src/chat/server/finish-turn.ts`. It writes the question-log entry and the `chat_turn` event exactly once per turn; the terminal hook and the wrapper both call it. SPEC-deploy's error share now counts `SERVER_ERROR` as an error.
 
 #### 3. A guard runs after every `onBeforeToolCall` transform, not after a skip
 
