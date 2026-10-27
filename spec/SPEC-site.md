@@ -174,6 +174,7 @@ Versions checked on 2026-10-26 ([research 05](../docs/research/05-framework-supp
 
 - Bun 1.4.2 and TypeScript; Bun APIs for scripts. Vite runs under `bun --bun` ([decision 0004](../docs/decisions/0004-bun-only.md)).
 - `react-dom` 19.3.1 and `nitro` 3.0.260903-beta, both pinned to these exact versions. Peter approved both ([decision record](../docs/design/interview-2026-10-26.md) row 135). Nitro's Vercel preset writes `.vercel/output/` ([SPEC-deploy](SPEC-deploy.md)).
+  - `nitro` 3.0.260903-beta is a beta. On 2026-10-27 no stable 3.x release exists: npm marks `3.0.0` deprecated, and every other 3.x version is an alpha or a beta. 3.0.260903-beta is the newest, and npm's `latest` tag points to it. Each later bump of `nitro` is reviewed by hand, never through a version range.
 - `@tanstack/react-start` 1.169.4 with `@tanstack/react-router` 1.170.46, React 19.3.1, Vite 8.3.5, `@vitejs/plugin-react` 6.1.2. App source in `src/site` (`srcDirectory`), static prerendering with `crawlLinks` and `failOnError`. The prerender settings in `vite.config.ts`:
   - `pages` lists `/`, `/resume` and `/sources/<id>` for each approved source id from `publicKnowledge(knowledge)`. No prerendered page links every source (decision 0015), so link crawling alone would prerender no source page.
   - `prerender.filter` rejects any path with `?`. The crawler strips the query from a page's output path, so a crawled `/?source=` or `/?role=` link would otherwise overwrite `index.html`.
@@ -209,6 +210,8 @@ bun run build             # the documents only, unchanged (content module)
 src/site/                    the TanStack Start app (srcDirectory)
 src/site/routes/             the route files: __root.tsx, index.tsx (workspace), resume.tsx, sources.$id.tsx;
                              api.chat.ts (described in SPEC-chat); api.status.ts and api.cron.health.ts (described in SPEC-deploy)
+src/site/routeTree.gen.ts    the route tree, generated from src/site/routes/ by TanStack Router's plugin inside tanstackStart();
+                             committed (TanStack Router's FAQ) and never edited by hand
 src/site/shell/              AppBar, CareerTimeline, DocumentPanel, ResumeView, SourceView, Sheet, InstallOffer, ThemeSwitch
 src/site/workspace.ts        the workspace contract the chat module reads
 src/site/saved-views.ts      the saved views in the IndexedDB database peterkloss-views

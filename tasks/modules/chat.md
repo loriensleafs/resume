@@ -231,6 +231,7 @@ Blocked by: C14, C16, D9 (`createOps()` with its in-memory parts outside product
 Acceptance:
 - When `VERCEL_ENV` is not `production`, the route uses `fakeText()` with the scripted turns of `src/chat/server/__tests__/fixtures.ts`, picked by question text, whatever variables are set (an `ANTHROPIC_API_KEY` included); in production, `anthropicText("claude-sonnet-5-5")` (The route file; Tech Stack).
 - `ChatDeps` come from `virtual:knowledge`, SPEC-deploy's `createOps(process.env)`, the real clock and `origins`, which the route computes from `VERCEL_ENV` and `VERCEL_URL`: in production `https://peterkloss.dev` and `https://$VERCEL_URL`, elsewhere an empty list, which means the request's own origin (The route file; main's decision). The check through `bun run preview --dir` (a `POST /api/chat` from the page streams a scripted answer) is S31's, right after this task.
+- The route builds `createOps(process.env)` once, at module scope, so every request of a function instance uses the same `Ops` (SPEC-deploy, "The question log, daily totals, alerts and status"). The five-axis review checks this, not a test: outside production the sharing changes nothing a request can see at seam 1 or 2, and row 83 allows no third seam (main's decision).
 - `bun run dev` answers a scripted question with the fake model (Commands).
 Verify: `bun run build:site`; `bun test`; manual: `bun run dev`, ask a scripted question.
 Files: `src/site/routes/api.chat.ts`, `src/chat/server/__tests__/fixtures.ts`, `src/site/__tests__/browser.test.ts`

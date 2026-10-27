@@ -389,7 +389,7 @@ export type Telemetry = { record(event: ChatTurnEvent, reservation?: string): Pr
 - No IP address, `threadId`, scope, audience, cookie or other saved-session data (decision 0020).
 - No thinking text, the thinking summary included (row 156). The turn telemetry is unchanged.
 - A turn refused before the model call writes no entry. A turn that meets Anthropic's limit during the run writes one with `limit`.
-- SPEC-deploy's `Ops` implements `QuestionLog`, `Budget` and `Telemetry` with its store, and deletes entries after 90 days. Tests use the in-memory ones in `src/chat/server/question-log.ts`.
+- SPEC-deploy's `Ops` implements `QuestionLog`, `Budget` and `Telemetry` with its store, and deletes entries after 90 days. Tests, the evals and SPEC-deploy's `createOps()` outside production use the in-memory ones in `src/chat/server/question-log.ts`.
 - **The day window.** `list(days)` returns the entries whose `date` is one of the last `days` UTC days, today included, newest first. On 2026-10-27, `list(7)` returns the entries dated 2026-10-21 to 2026-10-27, and none dated 2026-10-20. The contract suite `src/chat/server/__tests__/question-log-contract.ts` checks this, and SPEC-deploy runs it against both stores.
 - Peter reads the log with `bun run questions`, which SPEC-deploy owns.
 - A failed write never breaks the answer.

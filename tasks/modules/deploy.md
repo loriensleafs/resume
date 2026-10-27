@@ -138,6 +138,7 @@ Blocked by: D9, D6 (spike check 9)
 Acceptance:
 - In production, the QuestionLog contract suite passes against the Upstash log on the in-test Upstash server, through the REST API with `fetch` and `Authorization: Bearer` and no package.
 - A day's `qlog:<day>` key expires at 00:00 UTC on the 90th day after its day, and each write's commands arrive as one `/multi-exec` transaction.
+- It replaces D9's interim log: in production with the store variables set, `createOps().log` is the Upstash log, not the in-memory one; production without them still gives a working `Ops` (D9's test stays green).
 Verify: `bun test src/ops`
 Files: `src/ops/upstash.ts`, `src/ops/ops.ts`, `src/ops/__tests__/fake-upstash.ts`, `src/ops/__tests__/ops.test.ts`
 Size: M
@@ -150,6 +151,7 @@ Blocked by: D10
 Acceptance:
 - 25 parallel `reserve()` calls on an empty day: 8 succeed and 17 refuse with `DAILY_LIMIT`; the reservation and the cap live in `src/ops/limits.ts`.
 - After the first refusal, the same function instance refuses that day with no store call; the next UTC day allows turns again.
+- It replaces D9's interim budget: in production with the store variables set, `createOps().budget` is the Upstash budget, not the in-memory one that allows every turn; production without them still gives a working `Ops` (D9's test stays green).
 Verify: `bun test src/ops`
 Files: `src/ops/limits.ts`, `src/ops/upstash.ts`, `src/ops/ops.ts`, `src/ops/__tests__/ops.test.ts`
 Size: M
@@ -163,6 +165,7 @@ Acceptance:
 - `telemetry.record()` prints the `chat_turn` line and adds the turn to `qstats`, `qslow` and the month; `totals(1)` shows the outcome counts, the five token counts and the longest duration.
 - A turn with known token counts, 1-hour writes among them, adds the worked example's cost from `limits.ts`, counted by hand; settling a smaller real cost frees room for another turn; a turn with `null` counts, or whose last model call did not finish (a stopped turn, a `DEADLINE` turn), keeps its whole reservation, and the totals show the finished call's tokens only.
 - A rejected turn and a limit refusal write nothing to the store.
+- It replaces D9's interim telemetry, the last in-memory part in production: in production with the store variables set, `createOps().telemetry` is the store-backed one, and the interim comment in `ops.ts` goes; production without them still gives a working `Ops` (D9's test stays green).
 Verify: `bun test src/ops`
 Files: `src/ops/limits.ts`, `src/ops/upstash.ts`, `src/ops/ops.ts`, `src/ops/__tests__/ops.test.ts`
 Size: M
