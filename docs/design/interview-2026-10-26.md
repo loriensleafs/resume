@@ -40,11 +40,12 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 28 | (Peter, 2026-10-27) Domains | Peter asked to get www.peterkloss.com and www.pk.com, both opening the same site. Both are registered by others: peterkloss.com since 2005 (Cronon GmbH, expires 2027-10-08), with another person's unfinished site; pk.com since 1997 (GoDaddy, every transfer and update locked, expires 2031-09-03). Peter then named peterwkloss.com, peterwatsonkloss.com and peterklossal.com. These three, and peterkloss.dev and peterkloss.net, return "not found" from their registries on 2026-10-27, so they appear to be free. pwk.com is registered since 1997 (Tucows, transfer and update locked, expires 2027-02-11) and points to a domain-parking service. Other endings, 2026-10-27: pk.dev, pk.app, pk.me and pk.io are registered; peterkloss.dev, peterkloss.app, peterkloss.me, peterkloss.io, pkloss.dev, pkloss.me and pwk.dev return "not found"; .ai and .co registries could not be read. Peter buys any domain; agents never buy |
 | 29 | (Peter, 2026-10-27) Install | The site offers to install itself as an app, on phones and on computers. "When it installs, it should open a standalone app." |
 | 30 | (Peter, 2026-10-27) App icon | Design "a little logo for the app" for the installed app |
+| 31 | (Peter, 2026-10-27) Domain plan | "lets try to use peterkloss.dev as main with pkloss.dev and pwk.dev both as short ones" ([0018](../decisions/0018-domains.md)) |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
 ## Still open
 
 - The site's visual design: Peter's review of the mockups.
-- The domain: Peter's first choices are taken (question 28).
+- Buying the domains (question 31): Peter buys them.
 - The app icon (question 30).

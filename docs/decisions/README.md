@@ -21,3 +21,4 @@ These records explain the choices behind this repository and their reasons. Numb
 | [0015](0015-sources-on-demand.md) | Deep dives become sources the chat opens on demand |
 | [0016](0016-two-layer-knowledge.md) | The knowledge base has two layers: a core in every request, sources read by a tool |
 | [0017](0017-saved-visitor-session.md) | The visitor's session is saved on their device, with a way to start over |
+| [0018](0018-domains.md) | The site lives at peterkloss.dev; pkloss.dev and pwk.dev redirect to it |
