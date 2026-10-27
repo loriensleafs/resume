@@ -182,14 +182,15 @@ async function main(): Promise<void> {
     { src: "^/(?:assets/.*|workbox-[0-9a-f]+\\.js)$", headers: { "cache-control": IMMUTABLE }, continue: true },
     // Every response.
     { src: "^/(.*)$", headers: { ...SECURITY_HEADERS }, continue: true },
+    // CONTROL (D3): the worker policy before the header policy. If the last matching route wins, the worker files
+    // get the header policy and check 4 fails; if the more specific route wins, they keep the worker policy.
+    { src: "^/(?:sw\\.js|workbox-[0-9a-f]+\\.js)$", headers: { "content-security-policy": WORKER_POLICY }, continue: true },
     // The header policy: every path except the documents.
     {
       src: `^/(?!(?:${DOCUMENTS.map(escape).join("|")})$).*$`,
       headers: { "content-security-policy": HEADER_POLICY },
       continue: true,
     },
-    // The worker policy: the worker files, which the route above also matched.
-    { src: "^/(?:sw\\.js|workbox-[0-9a-f]+\\.js)$", headers: { "content-security-policy": WORKER_POLICY }, continue: true },
     // Spike only: the routes to the other functions, chosen by a query. They come before the filesystem, because
     // the filesystem phase can match /api/spike to its own function first.
     ...QUERY_ROUTES.map((route) => ({
