@@ -15,3 +15,5 @@ Consequences:
 - Vite and Nitro run on the Bun runtime ([0004](0004-bun-only.md)).
 
 Evidence: [research 05](../research/05-framework-support.md).
+
+Amended on 2026-10-27: the service worker comes from `generateSW` in `workbox-build`, run by a Bun script, not from the Vite PWA plugin, which wrote no service worker with Vite 8 ([research 09](../research/09-site-feasibility.md)). The site is static files with build-time data ([decision 0023](0023-static-site-build-time-data.md)).

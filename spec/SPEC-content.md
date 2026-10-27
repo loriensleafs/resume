@@ -2,6 +2,8 @@
 
 Amended on 2026-10-27 by the approval of [SPEC-deploy](SPEC-deploy.md) (interview row 127): the committed public documents in `documents/`.
 
+Amended on 2026-10-27 after the spec reviews (interview rows 128 to 136): the documents' files and test seam, the narrower documents hash, the one before-commit rule, and each role's `x-short` field.
+
 ## Objective
 
 Keep Peter's resume in one file, `resume.yaml`, and build every document from it. A recruiter gets a designed PDF, an editable Word file and a plain-text file. Hiring software (ATS) reads all three in order. The public files never contain the phone number.
@@ -15,7 +17,8 @@ Acceptance criteria:
 - The text file has no hard line wraps and uses `-` bullets.
 - No file in `dist/public/` contains the phone number. `resume.yaml` cannot hold a phone number; the build rejects it.
 - An invalid `resume.yaml` stops the build with a message that names the file and the field.
-- `bun run documents` writes the public documents to `documents/`, with `documents/inputs.sha256`, a hash of the inputs. It writes nothing when the hash is unchanged. The website serves these committed files, because Vercel's build has no Chrome ([SPEC-deploy](SPEC-deploy.md)). `tests/content/documents.test.ts` checks the hash, the page count, the fonts and the text of a fresh build, and, where `private.yaml` exists, that no committed document's extracted text holds the phone number.
+- Each role has an `x-short` field, an extension: the short label the site's career timeline shows for that role ([SPEC-site](SPEC-site.md)). Its values are the labels of the approved mockups, and Peter approves each one. No document prints it.
+- `bun run documents` writes the public documents to `documents/`, with `documents/inputs.sha256`, a hash of the inputs. The inputs are `resume.yaml`, this module's source files, `fonts/`, and the locked versions of this module's own packages, read from `bun.lock`. The hash does not cover the whole of `bun.lock`, so a change to another module's packages needs no rebuild. It writes nothing when the hash is unchanged. The website serves these committed files, because Vercel's build has no Chrome ([SPEC-deploy](SPEC-deploy.md)). `tests/content/documents.test.ts` checks the hash, the page count, the fonts and the text of a fresh build, and, where `private.yaml` exists, that no committed document's extracted text holds the phone number.
 
 ## Tech Stack
 
@@ -48,9 +51,12 @@ src/print/                print HTML template, its CSS, the hyphen script, Chrom
 src/export/docx.ts        Word renderer
 src/export/text.ts        text renderer
 scripts/build.ts          `bun run build`: a thin wrapper around build()
+scripts/documents.ts      `bun run documents`: builds the public variant and writes documents/ when the inputs' hash changed
 scripts/make-fonts.ts     cuts fonts/ from the Google Sans Flex variable font
 fonts/                    fixed-weight Google Sans Flex and its license
+documents/                the committed public documents (Peter-Kloss-Resume.pdf, .docx, .txt) and inputs.sha256
 tests/content/            this module's tests, fixtures and snapshots
+tests/content/documents.test.ts  seam 3: the committed documents
 dist/                     build output; ignored by git
 ```
 
@@ -67,22 +73,28 @@ export function formatRange(job: Pick<Job, "startDate" | "endDate">): string {
 
 - Real typographic characters in content: en dash in ranges, curly apostrophes.
 - One schema field per fact. Extensions to JSON Resume are marked `# extension` in `resume.yaml`.
+- A role's `x-short` is an extension that only the site reads. A document prints it only when this spec says so, and this spec does not.
 - Comments say why, not what.
 
 ## Testing Strategy
 
-`bun test`, at two seams Peter confirmed on 2026-10-26:
+`bun test`, at two seams Peter confirmed on 2026-10-26, and a third that came with SPEC-deploy's seams (rows 117 and 127):
 
 1. **`build()`**: tests run it into a temporary folder and check the real files.
    - On the real `resume.yaml`: the PDF has 2 pages and only CID TrueType fonts. Every summary, highlight and skill line appears in the extracted text, whitespace-normalised. The Word body text appears in reading order. The text file matches its snapshot. No public file contains the phone number.
    - On fixtures: a missing field, a bad date and a phone number in `resume.yaml` each fail with a message that names the field. A job without `endDate` prints "Present".
-2. **Renderer unit tests**: `renderText`, `renderPrintHtml` and `renderDocx` on a small fixture. They check HTML escaping, the earlier-roles block, optional fields and the date formats.
+2. **Renderer unit tests**: `renderText`, `renderPrintHtml` and `renderDocx` on a small fixture. They check HTML escaping, the earlier-roles block, optional fields and the date formats, and that no renderer prints a role's `x-short`.
+3. **The committed documents**: `tests/content/documents.test.ts` reads `documents/` and a fresh build in a temporary folder. It runs in CI and locally:
+   - The hash of the current inputs equals `documents/inputs.sha256`, so a resume change without rebuilt documents fails.
+   - The committed PDF has exactly 2 pages, is US Letter and tagged, and embeds every font.
+   - A fresh build's text equals the committed files' text, spacing ignored: the text file, the PDF's text (`pdftotext`) and the Word file's text.
+   - Where `private.yaml` exists, the phone number appears in none of the committed documents' extracted text.
 
 A content edit changes the snapshots. Run `bun test --update-snapshots` and review the diff before committing.
 
 ## Boundaries
 
-- **Always:** take every fact from Peter or his records. Run `bun run build` and `bun test` before a commit. Keep the PDF at 2 pages.
+- **Always:** take every fact from Peter or his records. Run `bun run build`, `bun run build:site` and `bun test` before a commit. Commit a change to `resume.yaml` together with the documents `bun run documents` rebuilt. Keep the PDF at 2 pages.
 - **Ask first:** adding a dependency; changing fonts, colors or layout; changing the shape of `resume.yaml`.
 - **Never:** put the phone number or other private details in a tracked file or a public output. Invent, round up or upgrade a fact. Add Node or Python tooling. Commit `dist/`.
 
@@ -90,7 +102,7 @@ A content edit changes the snapshots. Run `bun test --update-snapshots` and revi
 
 1. As Peter, I want to edit my resume in one file, so that every document stays the same.
 2. As Peter, I want one command to rebuild every document, so that updating takes seconds.
-3. As Peter, I want the build to stop on a typo in a field name, so that a mistake never ships.
+3. As Peter, I want the build to stop on a typo in a field name, so that a mistake never reaches a document.
 4. As Peter, I want my phone number on the files I send but not on the public website, so that scrapers cannot collect it.
 5. As Peter, I want the PDF to stay exactly 2 pages, so that it matches what recruiters expect at my level.
 6. As Peter, I want a preview I can open in a browser, so that I can check the layout before printing.

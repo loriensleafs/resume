@@ -11,3 +11,5 @@ Consequences:
 - "New chat" sits at the top of the chat column, not in the app bar, because it belongs to the conversation. It asks for confirmation, then deletes the saved session and opens the first view. One conversation at a time: old conversations are not kept in a list (Peter, 2026-10-27; first named "Start over").
 - Browser storage can be empty or blocked (a private window, cleared site data). The site then works as a first visit.
 - The site spec chooses the storage (IndexedDB or local storage) and how saved sessions move between site versions. Settled on 2026-10-27 in [SPEC-site](../../spec/SPEC-site.md): IndexedDB through TanStack DB, with a version number; an unknown version starts a first visit.
+
+Amended on 2026-10-27: on phones, New chat sits in the app bar's end slot while a conversation exists; on wide screens it stays at the top of the chat column ([interview record](../design/interview-2026-10-26.md) row 81). The site and the chat each keep their own IndexedDB database, `peterkloss-views` and `peterkloss-chat` (row 134).

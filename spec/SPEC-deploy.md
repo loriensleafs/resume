@@ -2,6 +2,8 @@
 
 Approved by Peter on 2026-10-27 (interview row 127), with the amendments to other specs below. Peter's answers are rows 107 to 127 of the [interview record](../docs/design/interview-2026-10-26.md); the facts are in [research 12](../docs/research/12-deploy-platform.md); the static site with build-time data is [decision 0023](../docs/decisions/0023-static-site-build-time-data.md). Three adversarial reviews found 18, 16 and 39 issues. This version answers all of them, with the local checks that the third review asked for (row 126). What only a real Vercel deployment can settle is the plan's first task, the [deploy spike](#deploy-spike).
 
+Corrected on 2026-10-27 after the reviews of the other specs (interview rows 128 to 136).
+
 ## Objective
 
 Put the site and the chat on the internet at `https://peterkloss.dev`, and keep them safe, cheap and observable without Peter watching them. The site serves recruiters, hiring managers and engineers during Peter's job search, when traffic is higher than usual (row 114), so a quiet failure or a spent limit must reach Peter at once.
@@ -12,10 +14,12 @@ This module owns:
 - the security and cache headers, and the rate limits;
 - the spend limits and the daily cap;
 - the question log's store, the daily totals, the limit alerts and the status route;
+- `bun run questions`, which reads the question log and the daily totals on Peter's laptop;
+- `bun run build:site`, the script that runs the site's, the chat's and this module's build steps in order;
 - the smoke check, the two health checks and CI;
 - the setup list Peter follows in the dashboards, and the runbooks.
 
-It implements SPEC-chat's `QuestionLog`, receives its turn telemetry, and gives it the daily budget.
+It implements three interfaces that SPEC-chat defines: `QuestionLog`, `Budget` and `Telemetry`. The chat module does not import this module.
 
 Acceptance criteria:
 
@@ -27,7 +31,7 @@ Acceptance criteria:
 - Every HTML response enforces the Content Security Policy below, with no `'unsafe-inline'` and no `'unsafe-eval'`. Chrome reports no violation on the real deployment, online and offline, the not-found page included.
 - One internet address can send about 20 chat questions in 10 minutes (row 112). A burst at a window's edge can pass up to 40, and counters are kept per region. Every other `/api/` path allows 60 requests in 10 minutes.
 - One chat request sends at most 10,000 characters of new question, 40,000 characters of earlier turns and 256 KB in total (row 125).
-- The chat stops at $8 of estimated cost a day until 00:00 UTC (row 121), and at Anthropic's $20 a month (row 113). Each turn reserves $0.50, more than its worst case, before its first model call, so parallel requests cannot pass the cap. At either limit, visitors see a "limit reached" state, not a retry, also after a reload (row 114).
+- The chat stops at $8 of estimated cost a day until 00:00 UTC (row 121), and at Anthropic's $20 a month (row 113). Each turn reserves $0.90 (row 131), more than its worst case, before its first model call, so parallel requests cannot pass the cap. At either limit, visitors see a "limit reached" state, not a retry, also after a reload (row 114).
 - The store itself deletes question-log entries and daily totals, at the latest 90 days after their day ([decision 0022](../docs/decisions/0022-question-log-store.md)).
 - Peter's phone gets an urgent push (rows 115, 121, 122) when:
   - the month's estimated chat cost passes 75% of the limit;
@@ -65,7 +69,6 @@ docs/
 spec/
 tasks/
 .scratch/
-prototypes/
 evals/
 .agents/
 .claude/
@@ -78,6 +81,7 @@ README.md
 ```
 
 - Every other tracked path is a site file. A missing entry makes an extra release, never a skipped one.
+- The list has no `prototypes/` entry. Prototypes stay on their own branches, so no file on `main` matches it, and an entry that matches no tracked file fails the docs-only test.
 - Shared test helpers, such as `tests/chat/fixtures.ts`, are site files: the preview's fake model bundles them with the chat function.
 - `scripts/site-changed.sh <from> <to>` exits 1 when a site file differs between two commits, 0 when none does, and 128 on an error. It runs `git diff --quiet <from> <to> -- . ':(exclude,glob)<entry>'…` for each entry. The ignore step, the release check and the GitHub health check all use it, so the list is read in one place.
 - `tests/site/docs-only.test.ts` fails when an entry matches no tracked file, or when an entry matches a file that the site build reads. The site build test records those files: Vite's module graph and the files `buildSite()` opens.
@@ -119,7 +123,7 @@ Because a push of site changes is a release, agents ask Peter before pushing sit
 The PDF build drives Chrome, and Vercel's build image (Amazon Linux 2023) has none, so the public documents are committed (row 119).
 
 - `bun run documents` builds the public variant into a temporary folder and writes `documents/Peter-Kloss-Resume.pdf`, `.docx` and `.txt`, the names SPEC-site serves.
-- `documents/inputs.sha256` holds a hash of the document build's inputs: `resume.yaml`, the content module's templates, styles and code, `fonts/`, and `bun.lock`. `bun run documents` writes nothing when the hash is unchanged. So a rebuild with the same sources never changes the files, although Chrome and the Word library stamp the date into them. The plan checks whether the Word library and Chrome accept a fixed date; the hash rule holds either way.
+- `documents/inputs.sha256` holds a hash of the document build's inputs: `resume.yaml`, the content module's source files, `fonts/`, and the locked versions of the content module's own packages, read from `bun.lock`. The hash does not cover the whole of `bun.lock`, so a change to another module's packages needs no `bun run documents`. [SPEC-content](SPEC-content.md) owns this rule. `bun run documents` writes nothing when the hash is unchanged. So a rebuild with the same sources never changes the files, although Chrome and the Word library stamp the date into them. The plan checks whether the Word library and Chrome accept a fixed date; the hash rule holds either way.
 - A change to `resume.yaml` and the rebuilt documents go in the same commit. The edit-resume skill runs `bun run documents`.
 - `bun run build:site` copies `documents/` into the site. It builds no document and needs no Chrome.
 - `tests/content/documents.test.ts`, run in CI and locally:
@@ -150,12 +154,24 @@ nitro({
   preset: "vercel",
   vercel: {
     functions: { runtime: "bun1.4.x" },           // Nitro writes "bun1.x" when nothing is set; spike check 2
-    functionRules: { "/api/chat": { maxDuration: 90, regions: ["iad1"] } },
+    functionRules: { "/api/chat": { maxDuration: 150, regions: ["iad1"] } },
   },
 });
 ```
 
-**Routes.** A local build of TanStack Start with Nitro's Vercel preset (research 12) showed what Nitro writes to `.vercel/output/config.json`: the immutable cache rule for `/assets/`, the filesystem, `/api/chat`, and last `/(.*)` to `/__server`. That last route renders every unknown path in a function at request time, with no policy tag. So `buildSite()` ends with `writeVercelConfig()` from `src/deploy/routes.ts`. It replaces Nitro's `routes` with its own list and keeps Nitro's other fields. In order:
+**The build script.** `bun run build:site` runs `scripts/build-site.ts`, which this module owns. It runs five steps in this order:
+
+1. Site: `buildSite({ root, outDir })`. The Vite build prerenders the pages into Nitro's Vercel output, copies `documents/` and the committed icons, and writes `404.html`, with no script.
+2. Chat: during that Vite build, the chat's Vite plugin, the one that gives `virtual:knowledge`, also writes `device-index.json` into `.vercel/output/static/`.
+3. Deploy: `addPolicyTags(staticDir)` from `src/deploy/policy.ts` writes each HTML file's policy tag, `404.html` included.
+4. Site: `writeServiceWorker(staticDir)` (Workbox `generateSW`). Its precache includes `device-index.json` and `404.html`.
+5. Deploy: `writeVercelConfig(outputDir)` from `src/deploy/routes.ts`.
+
+- The script writes `.vercel/output/` under the repo root. With `--out <folder>`, it writes `<folder>/.vercel/output/` instead and passes that folder to every step; the tests' seam-1 folder is made this way.
+- The script is the composition root at build time, as the route files are at run time. The site's code imports neither this module nor the chat module.
+- The policy tags come before the service worker, so the precache holds each page with its tag.
+
+**Routes.** A local build of TanStack Start with Nitro's Vercel preset (research 12) showed what Nitro writes to `.vercel/output/config.json`: the immutable cache rule for `/assets/`, the filesystem, `/api/chat`, and last `/(.*)` to `/__server`. That last route renders every unknown path in a function at request time, with no policy tag. So the build script's last step, `writeVercelConfig(outputDir)`, replaces Nitro's `routes` with its own list and keeps Nitro's other fields. In order:
 
 1. **Host redirects.** For each of pkloss.dev, pwk.dev, www.peterkloss.dev and the project's `.vercel.app` address, a route whose `has` matches that host exactly (`{ "type": "host", "value": { "eq": "pkloss.dev" } }`), with a status of 308 and `Location: https://peterkloss.dev/$1`. The `.vercel.app` route's `src` leaves `/api/` out. The syntax follows Vercel's Build Output API documentation; whether Vercel adds the query string to `Location` is a spike check.
 2. **Headers**, with `continue: true` (see Headers).
@@ -165,7 +181,7 @@ nitro({
 
 - Nitro's `/__server` function stays only as the destination of `/api/status` and `/api/cron/health`. No route sends a page or `/_serverFn/` to it.
 - The routes also hold the cron: `crons: [{ path: "/api/cron/health", schedule: "17 15 * * *" }]`.
-- The chat's maximum duration is 90 s: above SPEC-chat's 60 s deadline, below Vercel's 300 s default, so a stuck function stops early.
+- The chat's maximum duration is 150 s (row 132): above SPEC-chat's 120 s turn deadline (`deadlineMs: 120_000`), below Vercel's 300 s default, so a stuck function stops early.
 - Every tool in the build runs under Bun 1.4 (`bun --bun` for a tool with a Node shebang). The deploy spike checks which Bun runs the build. If it is not 1.4, the install command installs 1.4.2 with Bun's official installer, and the build command calls it by its absolute path, `$HOME/.bun/bin/bun`.
 - Pages get their data at build time, not from a server function at request time. A local check showed why: during client-side navigation, a route's loader runs in the browser and calls its server function as `GET /_serverFn/<id>`. With no server, that request gets a 404 and the page comes up empty, online and offline. This is an amendment to SPEC-site (below).
 
@@ -199,7 +215,7 @@ The Content Security Policy:
 
 - The browser enforces both policies, so a page gets the header's rules and the tag's script rule. `frame-ancestors` lives in the header, because a tag cannot carry it.
 - Why a tag and not a per-path header: a tag travels with its page, also from the service worker's cache, and every HTML response is now a file with a tag.
-- TanStack Start's per-request nonce does not fit static pages. `buildSite()` writes each tag after prerendering, and a build test fails on any HTML file without one.
+- TanStack Start's per-request nonce does not fit static pages. `addPolicyTags(staticDir)` writes each tag after prerendering (step 3 of the build script), and a build test fails on any HTML file without one.
 - The second probe on `prototype/csp-probe` ran this split policy, the static not-found page and the service worker with no violation: on first and second visits, a deep-dive page, client navigation, and an unknown path online and offline (research 12). It was a local server, so the release check and the GitHub health check also load the real deployment in Chrome.
 - Prerendered HTML holds no `style="…"` attribute, because `style-src 'self'` blocks it and hashes cannot allow it. A style a page needs, such as a role's width on the career timeline, or a Markdown table column's alignment, comes from a class in a stylesheet file the build writes. A test fails on any `style=` in the built pages. The chat's answers set styles through the DOM after load, which the policy allows. Allowing inline style attributes (`style-src-attr 'unsafe-inline'`) is an ask-first change.
 - The policies enforce SPEC-site's rule of no third-party requests: fonts, scripts, images and connections come only from the site's own address.
@@ -269,16 +285,27 @@ TanStack AI's Anthropic adapter reports `promptTokens` as uncached input plus ca
 
 The prices and both limits live in `src/ops/limits.ts`. A test checks the estimate against a worked example counted by hand.
 
-**Which usage a turn settles with.** TanStack AI calls `onUsage` only when a run finishes. A run that ends in `RUN_ERROR` (the visitor's Stop, `max_tokens`, a broken stream) carries its usage on that event instead. SPEC-chat's terminal hook takes the usage from either (amendment 5). When a turn has no usage at all, for example after a crash, its reservation stays counted in full.
+**Which usage a turn settles with.** TanStack AI calls `onUsage` once for each model call that finishes. A call that does not finish reports no usage: the abort event carries none.
+
+- SPEC-chat's telemetry sums `onUsage` across the turn's finished model calls (amendment 5). The token counts in the daily totals are that sum, so they stay true.
+- One rule settles the cost: a turn whose last model call did not finish keeps its whole $0.90 reservation. This covers a stopped turn, a turn cut off by the deadline (`DEADLINE`) and a turn whose stream broke. Its real cost is not known, because the unfinished call reports no usage.
+- A turn with no usage at all, for example after a crash, also keeps its whole reservation.
+- A turn whose model calls all finished settles with the cost of its summed usage.
 
 **The daily cap.** Before a turn's first model call, the handler calls `budget.reserve()`:
 
-1. In one transaction, it adds $0.50 to the day's total and reads the spend-limit marker.
-2. If the new total passes $8, it takes the $0.50 back and refuses with `DAILY_LIMIT`. The function instance then remembers the capped day and refuses later turns that day without a store call.
-3. After the turn, `telemetry.record()` replaces the reservation with the real cost.
+1. In one transaction, it adds $0.90 to the day's total and reads the spend-limit marker.
+2. If the new total passes $8, it takes the $0.90 back and refuses with `DAILY_LIMIT`. The function instance then remembers the capped day and refuses later turns that day without a store call.
+3. After the turn, `telemetry.record()` replaces the reservation with the turn's cost, or keeps it, as "Which usage a turn settles with" says.
 4. A reservation that is never settled stays counted for the day, which errs toward pausing.
 
-$0.50 is above the worst case of one turn under the size caps and SPEC-chat's limits: 6 model calls with 2,000 output tokens each ($0.12), the first call's cache write of the whole prompt, the later calls' cache reads, and the writes of 3 reads of 24,000 characters. `limits.ts` holds that worked worst case, from the measured size of the system prompt and the core, and a test fails if it reaches the reservation. So 25 parallel requests on an empty day give 16 turns and 9 refusals, and the cap holds.
+$0.90 is above the worst case of one turn under the size caps and SPEC-chat's limits (rows 131 and 132):
+
+- 6 model calls with 8,000 output tokens each, at effort `medium`, thinking included ($0.48);
+- the first call's cache write of the whole prompt, and the later calls' cache reads;
+- the writes of 3 reads of 24,000 characters.
+
+`limits.ts` holds that worked worst case, from the measured size of the system prompt and the core, and a test fails if it reaches the reservation. So 25 parallel requests on an empty day give 8 turns and 17 refusals, and the cap holds.
 
 **The monthly limit.** The handler reads the Anthropic error's status and body, not its message text, because Anthropic's SDK puts the reason only in the body:
 
@@ -304,18 +331,24 @@ Either gives `errorCode: "SPEND_LIMIT"` and sets the marker `limit:spend` with t
 One module, `src/ops/`, behind a small interface. The routes build it from the environment; tests build it with fake servers.
 
 ```ts
+// Budget, Telemetry, QuestionLog, QuestionLogEntry and ChatTurnEvent are the chat module's types (SPEC-chat).
+// This module imports them as types and implements them.
+
 export type OpsEnv = {
   VERCEL_ENV?: string;          // the store and alerts are used only in "production"
   KV_REST_API_URL?: string;     // set by the Upstash integration, Production only
   KV_REST_API_TOKEN?: string;
   NTFY_TOPIC_URL?: string;      // https://ntfy.sh/<secret topic>
   ANTHROPIC_API_KEY?: string;   // only whether it is set is read, for status()
+  PREVIEW_LIMIT?: "day" | "month"; // outside production only: the in-memory budget refuses every turn with
+                                   // DAILY_LIMIT or SPEND_LIMIT, so a preview and the browser tests can show
+                                   // the "limit reached" state; ignored in production
 };
 
 export type Ops = {
-  log: QuestionLog;                                     // SPEC-chat's interface
-  budget: { reserve(): Promise<{ ok: true; reservation: string } | { ok: false; errorCode: "DAILY_LIMIT" | "SPEND_LIMIT" }> };
-  telemetry: { record(event: ChatTurnEvent, reservation?: string): Promise<void> };
+  log: QuestionLog;                                     // append(entry) and list(days)
+  budget: Budget;                                       // reserve()
+  telemetry: Telemetry;                                 // record(event, reservation?)
   totals(days: number): Promise<DailyTotals[]>;
   health: {
     save(run: HealthRun): Promise<void>;                // the Vercel health job's result
@@ -328,12 +361,14 @@ export type Ops = {
 /** In-memory parts outside production; in production, a missing variable is reported, never hidden. */
 export function createOps(env: OpsEnv, io?: { fetch?: typeof fetch; now?: () => Date; print?: (line: string) => void }): Ops;
 
-/** For `bun run questions` on Peter's laptop, with the read-only token. */
+/** For `bun run questions` on Peter's laptop, with the read-only token. `list(days)` is QuestionLog's read. */
 export function createOpsReader(env: { KV_REST_API_URL: string; KV_REST_API_READ_ONLY_TOKEN: string }, io?: { fetch?: typeof fetch }): {
-  entries(days: number): Promise<QuestionLogEntry[]>;
+  list(days: number): Promise<QuestionLogEntry[]>;
   totals(days: number): Promise<DailyTotals[]>;
 };
 ```
+
+- This module describes two route files, `src/site/routes/api.status.ts` and `src/site/routes/api.cron.health.ts`. SPEC-chat describes `api.chat.ts`, which builds `createOps(process.env)` and passes its `log`, `budget` and `telemetry` to `handleChat()` as `ChatDeps`. The route files are composition roots: they import both modules. This module imports only the chat module's types, and the chat module never imports this one.
 
 **Store calls.**
 
@@ -393,7 +428,7 @@ export function createOpsReader(env: { KV_REST_API_URL: string; KV_REST_API_READ
 - Each function instance keeps the answer for 60 s, so repeated calls do not read the store, and the "api rate limit" rule slows one address.
 - `POST /api/status` with `Authorization: Bearer $HEALTH_SECRET` records that the GitHub check ran. Any other `POST` gets 401.
 
-`bun run questions` reads the last 7 days with the read-only token. It prints:
+`bun run questions` runs `scripts/questions.ts`, which this module owns. It loads `.secrets/local.env` and reads the last 7 days through `createOpsReader()` with the read-only token. It prints:
 - the entries, newest first;
 - a count per outcome and the most read sources;
 - the daily totals, with the day's and the month's cost against the cap and the limit.
@@ -448,7 +483,7 @@ The two health checks watch each other (row 122). Vercel Cron and GitHub's sched
   3. `bun ci`.
   4. `bun run build` (the content module's documents, public only), then `bun run build:site`.
   5. `bun test`, with `CHROME_PATH=/usr/bin/google-chrome`. This includes the document checks.
-- **Job `audit`:** `bun audit --prod --audit-level=high`, as its own job, so a registry outage shows as its own failure. Only the packages that ship decide a release.
+- **Job `audit`:** `bun audit --prod --audit-level=high`, as its own job, so a registry outage shows as its own failure. Only the production packages decide a release.
 - **Job `audit-all`:** `bun audit --audit-level=high` over every package, development tools included. It is not a required check, so an advisory in a test tool shows but does not hold a release.
 
 There is no `private.yaml` in CI, so only public documents are built, and the private-detail tests skip there. They run on Peter's laptop and in agents' sessions, where `private.yaml` exists. The evals never run in CI: each run costs money and needs Peter's approval (SPEC-chat). This replaces the plan's line "CI that … runs the evals".
@@ -464,7 +499,6 @@ There is no `private.yaml` in CI, so only public documents are built, and the pr
 | `NTFY_TOPIC_URL` | Vercel, Production, Secret; Actions secret | `https://ntfy.sh/` plus a long random topic name |
 | `CRON_SECRET` | Vercel, Production, Secret | A long random value |
 | `HEALTH_SECRET` | Vercel, Production, Secret; Actions secret | A long random value |
-| `CHAT_FAKE` | Vercel, Preview: `1` | Not a secret. Production ignores it |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Actions secret | Vercel, Deployment Protection |
 | `KV_REST_API_URL`, `KV_REST_API_READ_ONLY_TOKEN`, `ANTHROPIC_API_KEY` (evals) | Peter's untracked `.secrets/local.env` | The Upstash console; the `resume-evals` key |
 
@@ -480,7 +514,7 @@ Peter does these steps once, in this order, so that the chat never runs in produ
 1. Buy peterkloss.dev, pkloss.dev and pwk.dev (decision 0018).
 2. ntfy: install the app on his phone; subscribe to a long random topic name; send a test push.
 3. Anthropic Console: workspaces `resume-chat` ($20 a month, email at $10) and `resume-evals` ($5); a service-account key for each, kept aside for now.
-4. Vercel: sign up for Pro, and import `loriensleafs/resume` with the variables `NTFY_TOPIC_URL`, `CRON_SECRET` and `HEALTH_SECRET` (Production), and `CHAT_FAKE=1` (Preview). There is no Anthropic key yet, so the first deployment cannot call the model. Keep Fluid compute on.
+4. Vercel: sign up for Pro, and import `loriensleafs/resume` with the variables `NTFY_TOPIC_URL`, `CRON_SECRET` and `HEALTH_SECRET` (Production). Previews need no variable: `VERCEL_ENV` picks the fake model. There is no Anthropic key yet, so the first deployment cannot call the model. Keep Fluid compute on.
 5. Vercel, project settings: turn the Vercel Toolbar off for production. Deployment Protection: Standard Protection with Vercel Authentication; create an automation bypass secret.
 6. Vercel, Marketplace: add Upstash Redis, pay as you go, with a $1 budget; attach its variables to Production only.
 7. Vercel, Firewall: the three WAF rules.
@@ -537,7 +571,7 @@ The plan's first task, before any production code. A local build cannot answer t
 Approving this spec approves these amendments:
 
 - **SPEC-chat.**
-  1. `ChatDeps` gains `budget` and `telemetry`. The handler:
+  1. `ChatDeps` gains `budget: Budget` and `telemetry: Telemetry`. SPEC-chat defines both types next to `QuestionLog`, and this module implements them. The handler:
      - calls `budget.reserve()` before the first model call, and on refusal answers with the limit stream (below);
      - hands each `ChatTurnEvent` and its reservation to `telemetry.record()` instead of printing them.
      Tests pass in-memory ones.
@@ -551,26 +585,27 @@ Approving this spec approves these amendments:
      - the views gain the "limit reached" state, and the question queue pauses on it.
   5. Usage:
      - `ChatTurnEvent` gains `cacheWriteTokens` and `cacheWrite1hTokens`, and `inputTokens` means uncached input only;
-     - the terminal hook takes the usage from `onUsage` or from the `RUN_ERROR` event, and the token counts are `null` when neither has it.
+     - telemetry sums `onUsage` across the turn's finished model calls; the token counts are `null` when no call finished;
+     - a turn whose last model call did not finish (stopped, `DEADLINE` or a broken stream), and a turn with no usage, keep their whole reservation.
   6. The route sets `promptCache: "short"` explicitly.
   7. The 429 text becomes "Try again in a few minutes".
-  8. `bun run questions` also prints the daily totals and the day's and the month's cost.
+  8. `bun run questions` (`scripts/questions.ts`) moves to this spec, which owns `createOpsReader()`. It also prints the daily totals and the day's and the month's cost. `QuestionLog` keeps `append(entry)` and `list(days)`, and the reader also uses `list(days)`.
   9. Origin: in production, the handler accepts a request whose `Origin` header is `https://peterkloss.dev` or the deployment's own address (`https://$VERCEL_URL`); elsewhere, the request's own origin. Any other origin gets 403 `FORBIDDEN_ORIGIN`, so other sites' pages cannot spend the chat's budget through their visitors' browsers. A request with no `Origin` header passes this check; the rate limits and the cap still apply to it.
   10. The handler test proves the response ends only after the log and telemetry writes.
-  11. Outside production, the route always uses the fake model; in production, it ignores `CHAT_FAKE`.
+  11. `VERCEL_ENV` alone picks the model: when it is not `production`, the route always uses the fake model. No other variable switches it.
   12. The evals key lives in `.secrets/local.env`, not `.env`.
   13. The read budget keeps `read_sources` in the tool list after the third read and skips a fourth call with an error result, so the cached tool list never changes within a turn. The handler test "the next model call has no `read_sources` tool" becomes "the next model call has the same tools, and a fourth read is skipped".
 - **SPEC-site.**
   1. `bun run build:site` writes Nitro's Vercel output, `.vercel/output/`, in every environment. The pages land in `.vercel/output/static/`, which replaces `dist/client/`.
   2. Loaders get their data at build time, not from a server function at request time, so a click between pages needs no server, online or offline. A Vite module made at build time holds the public data the pages need, never `Not public` text, as the device index does. The browser test fails on any request to `/_serverFn/`, and it clicks between pages with the network off.
-  3. `buildSite()` writes each HTML file's policy tag with its script hashes, writes the static not-found page `404.html`, copies `documents/` instead of building documents, and ends with `writeVercelConfig()`.
+  3. `buildSite()` writes the static not-found page `404.html`, with no script, and copies `documents/` instead of building documents. It writes no policy tag and no routes: `scripts/build-site.ts`, which this module owns, runs `buildSite()`, then this module's `addPolicyTags(staticDir)`, then the site's `writeServiceWorker(staticDir)`, then this module's `writeVercelConfig(outputDir)` (see "The build script").
   4. Prerendered HTML holds no `style` attribute. Prerendered Markdown renders with `@tanstack/markdown/react`, and its `components` option for `th` and `td` turns a column's alignment into a class.
   5. `/sources/<unknown id>` gets the not-found page with status 404. It shows "Page not found" with links to the chat and to the resume, and has no script. An unknown id in a query (`?source=`, `?role=`) still gives the first view.
   6. The service worker tries the network first for a navigation that is not precached, and shows the not-found page only when the network fails. Workbox's `navigateFallback` alone would show the not-found page for such a navigation also online, for example for a source page that a release has just added (research 12). `/api/` is never a navigation fallback. The worker's registration moves from an inline script to a file.
-  7. `bun run preview` serves `.vercel/output/static/` with the routes, headers, overrides and status codes of `.vercel/output/config.json`, as Vercel does, and answers the API routes as SPEC-chat's preview does.
+  7. `bun run preview` serves a built `.vercel/output/`, and `bun run preview --dir <folder>` serves the one in that folder. It serves the static files with the routes, headers, overrides and status codes of that output's `config.json`, as Vercel does, and answers the API routes as SPEC-chat's preview does. The browser test and the smoke test build first into the seam-1 folder and serve it with `--dir`.
   8. The site's font files are committed.
 - **SPEC-content.**
-  - `bun run documents` writes the public documents to `documents/`, with `documents/inputs.sha256`; the document test above checks them.
+  - `bun run documents` (`scripts/documents.ts`) writes the public documents to `documents/`, with `documents/inputs.sha256`; the document test above checks them. SPEC-content lists the script, the folder and the test, and defines the hash's inputs.
   - The line "`bun run build --public` (the website and CI use this)" changes: the website uses the committed `documents/`, and CI runs `bun run build` to check that the documents still build.
 - **SPEC-agents**, when it is written. It does not exist yet, so these changes wait for it:
   - AGENTS.md: a push that changes a site file (a path not in `scripts/docs-only.txt`) is a release and needs Peter's approval.
@@ -592,8 +627,10 @@ No npm package is added. Approving this spec approves the three GitHub helpers a
 
 ```sh
 bun run documents                        # rebuilds documents/ when its inputs changed (needs Chrome)
-bun run build:site                       # .vercel/output/: pages with policy tags, functions, routes
+bun run build:site                       # scripts/build-site.ts: .vercel/output/ with pages, policy tags, device index, service worker, functions, routes
 bun run preview                          # serves .vercel/output/ as Vercel does
+bun run build:site --out <folder>        # the same build into <folder>/.vercel/output/; the tests' seam-1 folder
+bun run preview --dir <folder>           # serves the .vercel/output/ in <folder>; the tests pass the seam-1 folder
 bun run smoke http://localhost:4173 --browser --documents documents/   # against the preview
 bun run smoke https://peterkloss.dev --browser --production --documents documents/   # the outside check by hand
 bun run questions                        # entries, daily totals and costs; loads .secrets/local.env
@@ -605,21 +642,21 @@ bun test                                 # every test
 
 ```text
 vercel.json                        bunVersion, install, build and ignore commands
-documents/                         Peter-Kloss-Resume.pdf, .docx, .txt and inputs.sha256: the committed public documents
+documents/                         Peter-Kloss-Resume.pdf, .docx, .txt and inputs.sha256: the committed public documents (SPEC-content's)
 scripts/docs-only.txt              the paths that never change the live site
 scripts/site-changed.sh            exit 1 when a site file differs between two commits
 scripts/ignore-build.sh            Vercel's ignore step: skips only when no site file changed
-scripts/documents.ts               `bun run documents`
+scripts/documents.ts               `bun run documents` (SPEC-content's)
 scripts/smoke.ts                   `bun run smoke`
-scripts/questions.ts               `bun run questions` (from SPEC-chat), extended with the totals
-src/deploy/routes.ts               writeVercelConfig(): the redirects, headers, policies, cache rules, API routes, the not-found route, the cron
-src/deploy/policy.ts               the per-page policy tags and their script hashes, for buildSite()
+scripts/questions.ts               `bun run questions`: the question log, the daily totals and the costs, through createOpsReader()
+scripts/build-site.ts              `bun run build:site`: the build script, the composition root of the five build steps
+src/deploy/routes.ts               writeVercelConfig(outputDir): the redirects, headers, policies, cache rules, API routes, the not-found route, the cron
+src/deploy/policy.ts               addPolicyTags(staticDir): each HTML file's policy tag and its script hashes
 src/ops/ops.ts                     createOps(), createOpsReader()
 src/ops/upstash.ts                 the REST calls, the transactions, the key layout and the expiry rules
 src/ops/alerts.ts                  the alert rules, the markers and the ntfy push
 src/ops/limits.ts                  the size caps' worst-case turn, the reservation, the daily cap, the monthly limit, the 75% threshold, the prices
 src/ops/smoke.ts                   the checks shared by `bun run smoke` and the Vercel health job
-src/site/routes/api.chat.ts        builds createOps(process.env) and passes log, budget and telemetry to handleChat()
 src/site/routes/api.status.ts      GET and POST /api/status
 src/site/routes/api.cron.health.ts the Vercel health job
 .github/workflows/ci.yml           jobs test, audit and audit-all
@@ -632,7 +669,7 @@ tests/ops/fake-ntfy.ts             an in-test ntfy server that records pushes
 tests/site/config.test.ts          vercel.json, the Vercel output, the policy tags (seam 1)
 tests/site/docs-only.test.ts       the docs-only list and the three shell scripts (seam 1)
 tests/site/smoke.test.ts           the smoke check against the preview (seam 3)
-tests/content/documents.test.ts    the committed documents
+tests/content/documents.test.ts    the committed documents (SPEC-content's)
 ```
 
 ## Code Style
@@ -645,7 +682,7 @@ const ops = createOps(
   { now: () => new Date("2026-10-27T12:00:00Z") },
 );
 const tickets = await Promise.all(Array.from({ length: 25 }, () => ops.budget.reserve()));
-expect(tickets.filter((t) => t.ok)).toHaveLength(16); // 16 × $0.50 reaches the $8 cap
+expect(tickets.filter((t) => t.ok)).toHaveLength(8); // 8 × $0.90 = $7.20; a ninth would pass the $8 cap
 ```
 
 ## Testing Strategy
@@ -655,7 +692,7 @@ expect(tickets.filter((t) => t.ok)).toHaveLength(16); // 16 × $0.50 reaches the
 1. **The site seam, extended** ([SPEC-site](SPEC-site.md) seams 1 and 2):
    - `tests/site/config.test.ts` reads `vercel.json` and the build's `.vercel/output/`:
      - `vercel.json` holds only the build settings, and `bunVersion` is `1.4.x`;
-     - every function's `.vc-config.json` has the runtime value that spike check 2 settled; the chat's has `maxDuration: 90` and region `iad1`;
+     - every function's `.vc-config.json` has the runtime value that spike check 2 settled; the chat's has `maxDuration: 150` and region `iad1`;
      - only the three API paths reach a function, each route is case-sensitive, and no route sends anything else to `/__server`;
      - the four hosts redirect with 308 to peterkloss.dev with the path, and the `.vercel.app` route leaves `/api/` alone;
      - every header in the tables is set for its paths; the worker files get the worker policy; the documents get no policy;
@@ -669,21 +706,22 @@ expect(tickets.filter((t) => t.ok)).toHaveLength(16); // 16 × $0.50 reaches the
        - they build for a change to a site file, also when the previous deployment is more than 10 commits back;
        - they skip a docs-only change across several commits;
        - they build on an empty previous commit, on an unknown commit and on a failing git command.
-   - The browser test, against `bun run preview`, fails on any policy violation, page error or service-worker console error, and on any request to `/_serverFn/`, on every page it visits. It clicks between pages online and offline, and loads an unknown path offline.
+   - The browser test builds first into the seam-1 folder and runs against `bun run preview --dir <folder>`. It fails on any policy violation, page error or service-worker console error, and on any request to `/_serverFn/`, on every page it visits. It clicks between pages online and offline, and loads an unknown path offline.
    - `tests/content/documents.test.ts`: the checks in "Documents".
    - A test fails when any `.env*` file exists in the checkout.
 2. **The ops module**, `tests/ops/ops.test.ts`, through `createOps()` and `createOpsReader()`, against the in-test Upstash and ntfy servers and a fixed clock:
    - **Log and contract.**
-     - An appended entry comes back from `entries(7)`; entries from 8 days ago are not listed.
+     - SPEC-chat's QuestionLog contract suite, `tests/chat/question-log-contract.ts`, passes against both the in-memory log and the Upstash one. The suite fixes the day window of `list(days)`.
+     - An entry appended through `log.append()` comes back from the reader's `list(7)`.
      - A day's keys expire at 00:00 UTC on the 90th day after it, and each write's commands arrive as one transaction.
-     - The QuestionLog contract tests from SPEC-chat pass against both the in-memory log and the Upstash one.
    - **Totals and cost.**
      - `record()` adds a turn to the day's totals; `totals(1)` shows the outcome counts, the five token counts and the longest duration.
      - A turn with known token counts, 1-hour writes among them, adds the worked example's cost from `limits.ts`, counted by hand.
      - A turn with `null` token counts keeps its whole reservation.
+     - A turn with one finished model call and a second one that did not finish keeps its whole reservation, and the totals show the first call's tokens only. The test runs this for a stopped turn and for a `DEADLINE` turn.
      - A rejected turn and a limit refusal write nothing to the store.
    - **Daily cap.**
-     - 25 parallel `reserve()` calls on an empty day: 16 succeed and 9 refuse with `DAILY_LIMIT`.
+     - 25 parallel `reserve()` calls on an empty day: 8 succeed and 17 refuse with `DAILY_LIMIT`.
      - After the first refusal, the same instance refuses that day with no store call.
      - Settling a reservation with a smaller real cost frees room for another turn.
      - One `daycap` push that day; the next UTC day allows turns again.
@@ -706,7 +744,7 @@ expect(tickets.filter((t) => t.ok)).toHaveLength(16); // 16 × $0.50 reaches the
      - With `VERCEL_ENV` `preview` and store variables present: no server is called.
      - The reader with the read-only token makes no write command.
 3. **The smoke check**, `tests/site/smoke.test.ts`:
-   - `bun run smoke --browser --documents documents/` against `bun run preview` passes.
+   - The test builds first into the seam-1 folder and serves it with `bun run preview --dir <folder>`. `bun run smoke <preview origin> --browser --documents documents/` against it passes.
    - It fails, naming the cause:
      - when one header is removed;
      - when a page has an unhashed inline script;
@@ -768,7 +806,7 @@ The real platform is checked by the deploy spike, by the release check, by the t
 21. As Peter, I want a daily cap that holds under parallel requests, so that one script cannot spend the whole month in an hour during my job search.
 22. As Peter, I want a cap on how much text one request can send, so that a forged conversation cannot cost dollars.
 23. As Peter, I want prompt caching on, and a tool list that never changes within a turn, so that the core and a pasted posting cost full price only once.
-24. As Peter, I want a stopped or cut-off answer to count its real cost, so that the cap and the estimates are not too low.
+24. As Peter, I want a stopped or cut-off answer to keep its whole reservation, so that the cap and the estimates are never too low.
 25. As Peter, I want a push when the daily cap is reached, so that I can tell a real busy day from abuse.
 26. As Peter, I want a push on my phone when the chat passes 75% of its monthly budget, so that I can raise it before visitors hit the limit.
 27. As Peter, I want a push when the monthly limit is reached, the chat to stop calling Anthropic, and the chat to work again within an hour after I raise the limit, so that I know, no call is wasted, and recovery needs no release.
@@ -818,7 +856,7 @@ The real platform is checked by the deploy spike, by the release check, by the t
 - `tests/content/build.test.ts`: runs the real entry point into a temporary folder and checks the real files, the PDF's text (`pdftotext`), the Word file's text (`unzip -p`) and the fonts. `tests/site/config.test.ts` and `tests/content/documents.test.ts` work the same way.
 - `tests/site/browser.test.ts` from SPEC-site: Playwright under Bun against the preview. Seam 1 adds the policy-violation and `/_serverFn/` checks, and the smoke check's `--browser` part reuses them.
 - The probes on the branch `prototype/csp-probe`: `prototypes/csp-probe/csp-test.ts` (the `securitypolicyviolation` listener and the per-page hashes), `prototypes/csp-probe-2/` (the split policy, the not-found page, the offline fallback and the client-navigation check), and `prototypes/nitro-vercel-output/` (what Nitro's Vercel preset writes).
-- SPEC-chat's handler test, which uses the in-memory `QuestionLog`. Seam 2 runs the same contract against the Upstash one.
+- SPEC-chat's QuestionLog contract suite, `tests/chat/question-log-contract.ts`, with its exact day window. Seam 2 runs it against the in-memory log and the Upstash one.
 
 ## Success Criteria
 

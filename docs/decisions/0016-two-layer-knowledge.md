@@ -13,3 +13,5 @@ Consequences:
 - The read shows in the answer, and a browser tool opens the cited passage beside the chat ([decision 0015](0015-sources-on-demand.md)).
 - Citations stay `[id]` markers until a library returns native citations for text. The server accepts a marker only for a passage read in the same turn.
 - Every source still comes from Peter or his records and needs his approval ([decision 0001](0001-facts-from-records.md)).
+
+Amended 2026-10-27 by Peter ([interview record](../design/interview-2026-10-26.md), row 84): the server also accepts a marker for a resume entry or a logistics answer, which are in the core, with no read; a passage still needs a read in the same turn ([SPEC-chat](../../spec/SPEC-chat.md)).

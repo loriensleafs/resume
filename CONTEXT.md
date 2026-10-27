@@ -89,8 +89,16 @@ The id of the passage, resume entry or logistics answer an answer used, shown wi
 _Avoid_: source link, reference
 
 **Saved session**:
-A visitor's conversation, queued questions, audience and open views, kept in their own browser and restored when they return.
+A visitor's conversation, queued questions, audience and open views, kept in their own browser and restored when they return. It has two parts: the saved conversation and the saved views.
 _Avoid_: account, profile
+
+**Saved conversation**:
+The chat's part of the saved session: the questions and answers of the current conversation, the queued questions and the audience.
+_Avoid_: chat history (that sounds like the question log), transcript
+
+**Saved views**:
+The site's part of the saved session: the open tab, the open source with its marked passage, and the scope.
+_Avoid_: view state, layout
 
 **Workspace**:
 The site's main view at `/`: the app bar, the career timeline, the chat column and the document panel.
@@ -109,15 +117,15 @@ The area beside the chat that shows the resume, or a source opened from a citati
 _Avoid_: artifact panel, side panel
 
 **Scope**:
-The role the chat is asking about, set from the career timeline and shown in the chat input.
-_Avoid_: filter, context
+The role the chat is asking about, set from the career timeline and shown in the chat input. It never means the topics the chat answers.
+_Avoid_: filter, context; "scope" for the chat's topics (say "outside the chat's topics")
 
 **Source page**:
 The standalone prerendered page of one approved source at `/sources/<id>`, readable without JavaScript.
 _Avoid_: deep-dive page, article page
 
 **Refusal**:
-The chat's answer to a topic outside its scope (salary, immigration, health, age, personal life), or to a question the knowledge base does not cover: it declines and points to Peter's email.
+The chat's answer to a question outside the chat's topics (salary, immigration, health, age, personal life), or to a question the knowledge base does not cover: it declines and points to Peter's email.
 _Avoid_: guardrail message, block
 
 **Queued question**:
@@ -156,6 +164,10 @@ _Avoid_: artifact card, attachment
 The resume entries and passages that match what the visitor types, found on the visitor's own device.
 _Avoid_: autocomplete, search results
 
+**Device index**:
+The labels and public text of the resume entries, logistics answers and passages, kept on the visitor's device so that device matches work offline. It never holds `Not public` material.
+_Avoid_: search index, local index, cache
+
 **Question log**:
 The anonymous record the server keeps of the questions visitors ask and how each turn ended.
 _Avoid_: analytics, chat history, transcript
@@ -193,3 +205,9 @@ _Avoid_: metrics, analytics, stats
 **Limit alert**:
 An urgent push to Peter's phone when the chat's spend nears or reaches a limit, or when a health check, a release check or the question log's store fails.
 _Avoid_: notification, page, alarm
+
+## Making the project
+
+**Decision record**:
+The dated record of the product questions put to Peter and his answers, one numbered row per decision, in `docs/design/interview-<date>.md`. A row number names one decision, as in "row 131".
+_Avoid_: "interview" alone (an interview is a source), interview notes, transcript
