@@ -7,6 +7,7 @@
 // Adding a check (D2 to D5): append a Check to CHECKS. Its run(ctx) gets both hosts, build-info.json, the shared
 // deadline and the helpers below. A check never touches the bypass secret; deploymentFetch adds it and
 // productionFetch never sends it. Expected values come from build-info.json, which the build reads from its output.
+// Checks 2 and 3 (D2) test the config.json that post-build.ts writes: the routes, overrides, cron and functions.
 // It prints states, hosts and verdicts only. Rerun only the newest run: an older one waits for a commit that the
 // branch URL no longer serves.
 
@@ -28,6 +29,10 @@ type BuildInfo = {
   bunRevision: string;
   bunPath: string;
   functions: Record<string, { runtime: string | null; maxDuration: number | null }>;
+  routeCount: number;
+  overrides: Record<string, { path: string | null; sha256: string | null }>; // file -> its clean address
+  notFoundSha256: string | null; // static/404.html
+  crons: { path: string; schedule: string }[];
 };
 
 type Report = Record<string, boolean | string | number | null>;
@@ -74,7 +79,98 @@ const buildBun: Check = {
   },
 };
 
-const CHECKS: Check[] = [buildBun];
+const sha256 = (bytes: ArrayBuffer) => new Bun.CryptoHasher("sha256").update(bytes).digest("hex");
+
+/**
+ * The requests that reach a function, and the function post-build.ts routes each to. `spec` marks the functions
+ * that stand for SPEC-deploy's: those must run Bun 1.4. The probe is recorded, not judged.
+ */
+const FUNCTION_ROUTES = [
+  { request: "/api/spike", fn: "/api/spike", spec: true }, // its own function, as SPEC-deploy's /api/chat
+  { request: "/api/spike?function=server", fn: "/__server", spec: true }, // to /__server, as /api/status and the health job
+  { request: "/api/spike?function=bun1x", fn: "/api/spike-bun1x", spec: false }, // runtime "bun1.x", bunVersion "1.4.x"
+];
+const CRON = { path: "/api/cron/health", schedule: "17 15 * * *" }; // SPEC-deploy's cron
+
+/**
+ * Check 2: Vercel serves the routes, overrides and cron that post-build.ts wrote, and which Bun runs each function.
+ * Each route must reach the function it names (the function reports its name from its .vc-config.json), and the
+ * function must see the path that was asked for. Each override's clean address must serve its file byte for byte.
+ */
+const postBuildRoutes: Check = {
+  check: 2,
+  name: "post-build routes",
+  ifFails: "the routes move to the form Vercel accepts; the runtime value is the one that gives Bun 1.4",
+  async run({ info, report, deploymentFetch }) {
+    const problems: string[] = [];
+    const seen: string[] = [`config.json has ${info.routeCount} routes`];
+
+    for (const route of FUNCTION_ROUTES) {
+      const runtime = info.functions[route.fn]?.runtime ?? "absent";
+      const r = await report(route.request).catch((error: Error) => void problems.push(`${route.request}: ${error.message}`));
+      if (!r) continue;
+      seen.push(`${route.request} reached ${r.function} (runtime "${runtime}"): Bun ${r.bunVersion}, path ${r.path}`);
+      if (r.function !== route.fn) problems.push(`${route.request} reached ${r.function}, not ${route.fn}`);
+      if (r.path !== "/api/spike") problems.push(`${route.fn} saw the path ${r.path}, not /api/spike`);
+      if (route.spec && !String(r.bunVersion).startsWith("1.4.")) {
+        problems.push(`${route.fn} (runtime "${runtime}") runs Bun ${r.bunVersion}; SPEC-deploy needs 1.4`);
+      }
+    }
+
+    const overrides = Object.entries(info.overrides);
+    if (overrides.length === 0) problems.push("config.json has no overrides");
+    for (const [file, { path, sha256: expected }] of overrides) {
+      const res = await deploymentFetch(`/${path}`);
+      const same = expected !== null && sha256(await res.arrayBuffer()) === expected;
+      seen.push(`/${path}: HTTP ${res.status}, ${same ? "" : "not "}the file ${file}`);
+      if (res.status !== 200 || !same) problems.push(`/${path} answered HTTP ${res.status} ${same ? "with" : "without"} the file ${file}`);
+    }
+
+    const cron = info.crons.some((c) => c.path === CRON.path && c.schedule === CRON.schedule);
+    seen.push(cron ? `config.json has the cron ${CRON.path} "${CRON.schedule}"` : "config.json has no cron");
+    if (!cron) problems.push(`config.json has no cron ${CRON.path} "${CRON.schedule}"`);
+
+    return { pass: problems.length === 0, detail: problems.length ? `${problems.join("; ")}; seen: ${seen.join("; ")}` : seen.join("; ") };
+  },
+};
+
+/**
+ * Paths that must get the static not-found page with status 404. The page must be static/404.html byte for byte:
+ * a function in this spike renders TanStack's page or Nitro's JSON error, never that file.
+ */
+const NOT_FOUND_PATHS = [
+  "/no-such-page", // an unknown path
+  "/API/chat", // the acceptance's path; the spike has no /api/chat route in any case
+  "/API/spike", // the case test: /api/spike reaches a function (check 2), so this tests caseSensitive
+  "/sources/x", // a source page with no file; the spike has no /sources/ pages
+  "/deep-dives/x", // the spike's dynamic route with no file: in a function, its loader would run
+  "/__server", // Nitro's function by its folder name (a .func folder also answers at its own path)
+  "/_serverFn/x", // TanStack's server-function path
+];
+
+/** Check 3: unknown paths get /404.html with status 404, and no function renders them. */
+const notFound: Check = {
+  check: 3,
+  name: "not-found paths",
+  ifFails: "as check 2: the routes move to the form Vercel accepts",
+  async run({ info, deploymentFetch }) {
+    if (!info.notFoundSha256) return { pass: false, detail: "the build wrote no 404.html" };
+    const wrong: string[] = [];
+    for (const path of NOT_FOUND_PATHS) {
+      const res = await deploymentFetch(path);
+      const page = sha256(await res.arrayBuffer()) === info.notFoundSha256;
+      if (res.status !== 404 || !page) {
+        wrong.push(`${path} answered HTTP ${res.status} with ${page ? "404.html" : `another body (${res.headers.get("content-type")})`}`);
+      }
+    }
+    const all = NOT_FOUND_PATHS.join(", ");
+    return wrong.length
+      ? { pass: false, detail: `${wrong.join("; ")}; the others got 404.html with status 404` }
+      : { pass: true, detail: `${all}: HTTP 404 with static/404.html byte for byte, so no function rendered them` };
+  },
+};
+
+const CHECKS: Check[] = [buildBun, postBuildRoutes, notFound];
 
 // ---- the harness ------------------------------------------------------------------------------------------------
 

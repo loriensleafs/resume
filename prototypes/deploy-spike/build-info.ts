@@ -2,7 +2,8 @@
 // - /build-info.json, which check.ts polls on the protected deployment and Git branch hosts;
 // - /api/build-info.json, which stays reachable on the production .vercel.app address after D3 adds the host
 //   redirect there (SPEC-deploy's redirect leaves /api/ alone), so `wait` can confirm that address too.
-// Checks take their expected values from this file, read from the built output, not from constants in check.ts.
+// Checks take their expected values from this file, read from the built output, not from constants in check.ts:
+// each function's runtime, and the overrides, the not-found page and the crons that post-build.ts wrote.
 // It writes named fields only: the build environment also holds VERCEL_AUTOMATION_BYPASS_SECRET.
 import { $, Glob } from "bun";
 
@@ -23,6 +24,20 @@ for await (const path of configs) {
   };
 }
 
+// What config.json holds after post-build.ts (checks 2 and 3), with the SHA-256 of each file a route serves,
+// so a check can tell the static file from a page a function rendered.
+const sha256 = async (path: string) =>
+  (await Bun.file(path).exists()) ? new Bun.CryptoHasher("sha256").update(await Bun.file(path).bytes()).digest("hex") : null;
+const config = (await Bun.file(`${output}/config.json`).json()) as {
+  routes?: unknown[];
+  overrides?: Record<string, { path?: string }>;
+  crons?: { path: string; schedule: string }[];
+};
+const overrides: Record<string, { path: string | null; sha256: string | null }> = {};
+for (const [file, override] of Object.entries(config.overrides ?? {})) {
+  overrides[file] = { path: override.path ?? null, sha256: await sha256(`${output}/static/${file}`) };
+}
+
 const info = {
   commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
   vercelEnv: process.env.VERCEL_ENV ?? null,
@@ -35,6 +50,10 @@ const info = {
   bunRevision: Bun.revision,
   bunPath: process.execPath,
   functions,
+  routeCount: config.routes?.length ?? 0,
+  overrides,
+  notFoundSha256: await sha256(`${output}/static/404.html`),
+  crons: config.crons ?? [],
   builtAt: new Date().toISOString(),
 };
 
@@ -43,5 +62,6 @@ await Bun.write(`${output}/static/build-info.json`, json);
 await Bun.write(`${output}/static/api/build-info.json`, json);
 console.log(
   `build-info: bun ${info.bunVersion} at ${info.bunPath}; vercel.json bunVersion ${info.vercelJsonBunVersion}; ` +
-    `lockfileVersion ${info.lockfileVersion}; functions ${Object.keys(functions).join(", ") || "none"}`,
+    `lockfileVersion ${info.lockfileVersion}; functions ${Object.entries(functions).map(([f, c]) => `${f} ${c.runtime}`).join(", ") || "none"}; ` +
+    `${info.routeCount} routes, ${Object.keys(overrides).length} overrides, ${info.crons.length} crons`,
 );

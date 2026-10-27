@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiSpikeRouteImport } from './routes/api.spike'
 import { Route as DeepDivesIdRouteImport } from './routes/deep-dives/$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSpikeRoute = ApiSpikeRouteImport.update({
+  id: '/api/spike',
+  path: '/api/spike',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DeepDivesIdRoute = DeepDivesIdRouteImport.update({
@@ -25,27 +31,31 @@ const DeepDivesIdRoute = DeepDivesIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/spike': typeof ApiSpikeRoute
   '/deep-dives/$id': typeof DeepDivesIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/spike': typeof ApiSpikeRoute
   '/deep-dives/$id': typeof DeepDivesIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/spike': typeof ApiSpikeRoute
   '/deep-dives/$id': typeof DeepDivesIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/deep-dives/$id'
+  fullPaths: '/' | '/api/spike' | '/deep-dives/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/deep-dives/$id'
-  id: '__root__' | '/' | '/deep-dives/$id'
+  to: '/' | '/api/spike' | '/deep-dives/$id'
+  id: '__root__' | '/' | '/api/spike' | '/deep-dives/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiSpikeRoute: typeof ApiSpikeRoute
   DeepDivesIdRoute: typeof DeepDivesIdRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/spike': {
+      id: '/api/spike'
+      path: '/api/spike'
+      fullPath: '/api/spike'
+      preLoaderRoute: typeof ApiSpikeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/deep-dives/$id': {
@@ -70,6 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiSpikeRoute: ApiSpikeRoute,
   DeepDivesIdRoute: DeepDivesIdRoute,
 }
 export const routeTree = rootRouteImport
