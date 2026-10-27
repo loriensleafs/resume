@@ -23,7 +23,7 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 11 | Where do open issues live? | Local markdown under `.scratch/` |
 | 12 | Rewrite the first commit and force-push? | Yes |
 | 13 | Make the repository public now or at launch? | Now |
-| 14 | Hosting | Peter: "I am happy to pay a little bit for the hosting of this." Host: Vercel ([0012](../decisions/0012-vercel-pro-host.md)). The first version of this question mixed host and plan; Peter answered `/wait-what`, and it was split |
+| 14 | Hosting | Peter: "I’m happy to pay a little bit for the hosting of this." Host: Vercel ([0012](../decisions/0012-vercel-pro-host.md)). The first version of this question mixed host and plan; Peter answered `/wait-what`, and it was split |
 | 15 | Vercel plan | Pro, $20/month |
 | 16 | Chat model | Claude Sonnet 5.5 ([0013](../decisions/0013-claude-sonnet-model.md)) |
 
