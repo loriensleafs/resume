@@ -1,7 +1,18 @@
 // Seam 3 of SPEC-knowledge: the id grammar, including the forms the build never makes.
 
 import { describe, expect, test } from "bun:test";
-import { highlightId, logisticsId, parseId, passageId, roleId, skillsId, toSlug, type IdForm } from "../ids";
+import {
+  BASICS_ID,
+  EDUCATION_ID,
+  highlightId,
+  logisticsId,
+  parseId,
+  passageId,
+  roleId,
+  skillsId,
+  toSlug,
+  type IdForm,
+} from "../ids";
 
 const slug60 = "a".repeat(60);
 
@@ -57,6 +68,10 @@ describe("parseId", () => {
 
 describe("the id builders", () => {
   test("give ids that parseId reads back", () => {
+    expect(BASICS_ID).toBe("basics");
+    expect(parseId(BASICS_ID)).toEqual({ form: "basics" });
+    expect(EDUCATION_ID).toBe("education");
+    expect(parseId(EDUCATION_ID)).toEqual({ form: "education" });
     expect(roleId("fednow")).toBe("role:fednow");
     expect(highlightId("highspot", 3)).toBe("highlight:highspot.3");
     expect(skillsId("Platform and tooling")).toBe("skills:platform-and-tooling");

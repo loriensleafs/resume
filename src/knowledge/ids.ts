@@ -28,7 +28,7 @@ export type IdForm =
 export const isSlug = (s: string) => s.length <= SLUG_CHARACTERS && SLUG.test(s);
 
 /** A slug that is not one of the bare resume entry ids. */
-export const isSourceId = (s: string) => isSlug(s) && s !== "basics" && s !== "education";
+export const isSourceId = (s: string) => isSlug(s) && s !== BASICS_ID && s !== EDUCATION_ID;
 
 /** A name in lowercase, each run of other characters made one hyphen, no hyphen at either end. */
 export const toSlug = (s: string) =>
@@ -37,6 +37,9 @@ export const toSlug = (s: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
+/** The two resume entry ids with no parts, so no builder makes them. */
+export const BASICS_ID = "basics";
+export const EDUCATION_ID = "education";
 export const roleId = (role: string) => `role:${role}`;
 export const highlightId = (role: string, n: number) => `highlight:${role}.${n}`;
 export const skillsId = (groupName: string) => `skills:${toSlug(groupName)}`;
@@ -53,7 +56,7 @@ function splitNumber(s: string): [string, number] | undefined {
 
 /** The form of an id and its parts, or undefined when the id follows no form. */
 export function parseId(id: string): IdForm | undefined {
-  if (id === "basics" || id === "education") return { form: id };
+  if (id === BASICS_ID || id === EDUCATION_ID) return { form: id };
   const colon = id.indexOf(":");
   if (colon === -1) {
     if (isSourceId(id)) return { form: "source", source: id };
