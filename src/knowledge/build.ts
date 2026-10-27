@@ -79,6 +79,9 @@ async function logisticsEntries(root: string): Promise<Entry[]> {
     .map((t) => ({ id: logisticsId(t.topic), kind: "logistics" as const, title: t.topic, text: t.answer!.trim() }));
 }
 
+/** Source-id order, by code unit: "alpha" comes before "alpha-beta", although "alpha-beta.md" comes before "alpha.md". */
+const bySourceId = (a: Source, b: Source) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
 /**
  * The approved sources in knowledge/sources/, in source-id order; none when the folder does not
  * exist. Every file is parsed, so a draft's shape is checked too, and then a draft is left out.
@@ -100,9 +103,6 @@ async function approvedSources(root: string): Promise<Source[]> {
     .map((parsed) => parsed.source)
     .sort(bySourceId);
 }
-
-/** Source-id order, by code unit: "alpha" comes before "alpha-beta", although "alpha-beta.md" comes before "alpha.md". */
-const bySourceId = (a: Source, b: Source) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 /** A source's catalog entry: its title, then its kind, its roles when it has any, and its summary. */
 function catalogEntry(source: Source): Entry {

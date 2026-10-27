@@ -11,12 +11,12 @@ const core = renderCore(knowledge);
 await Bun.write(Bun.stdout, core);
 
 const count = (kind: Entry["kind"]) => knowledge.core.filter((e) => e.kind === kind).length;
-const number = (n: number) => n.toLocaleString("en-US");
+const formatCount = (n: number) => n.toLocaleString("en-US");
 console.error(
   `Core: ${knowledge.core.length} entries (${count("resume")} resume, ${count("logistics")} logistics, ${count("catalog")} catalog); ` +
-    `${number(core.length)} of ${number(CORE_CHARACTERS)} characters.`,
+    `${formatCount(core.length)} of ${formatCount(CORE_CHARACTERS)} characters.`,
 );
 if (core.length >= CORE_CHARACTERS) {
-  console.error(`The core must stay under ${number(CORE_CHARACTERS)} characters.`);
+  console.error(`The core must stay under ${formatCount(CORE_CHARACTERS)} characters.`);
   process.exitCode = 1;
 }
