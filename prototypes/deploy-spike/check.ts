@@ -53,6 +53,10 @@ async function fetchBuildInfo(origin: string): Promise<{ status: number; info?: 
   return { status: 200, info: (await res.json()) as BuildInfo };
 }
 
+/** Without a valid bypass, Vercel answers 302 to its sign-in page (seen on this project), or 401. */
+const httpNote = (status: number) =>
+  status === 401 || (status >= 300 && status < 400) ? `HTTP ${status} (the bypass was not accepted)` : `HTTP ${status}`;
+
 const short = (sha: string | null) => (sha ?? "none").slice(0, 7);
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -102,7 +106,7 @@ async function wait(): Promise<void> {
       if (http === 0) {
         // a failed fetch; try again
       } else if (http !== 200) {
-        say(`branch URL ${branchHost}: HTTP ${http}`);
+        say(`branch URL ${branchHost}: ${httpNote(http)}`);
       } else if (info?.commit !== sha) {
         say(`branch URL ${branchHost}: serves ${short(info?.commit ?? null)}, waiting for ${short(sha)}`);
       } else {
@@ -145,7 +149,7 @@ async function run(origin: string): Promise<void> {
   const host = projectHost(new URL(origin).host, "origin");
   const { status, info } = await fetchBuildInfo(`https://${host}`);
   if (status !== 200 || !info) {
-    console.log(`error: build-info.json answered HTTP ${status}${status === 401 ? " (the bypass was not accepted)" : ""}`);
+    console.log(`error: build-info.json answered ${httpNote(status)}`);
     process.exit(1);
   }
   if (info.commit !== sha) {
