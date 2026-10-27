@@ -65,6 +65,10 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 53 | (Peter, 2026-10-27) Light and dark together | One canvas page, "Merged, light and dark", shows each view in light and dark side by side, desktop and phone. The separate "Merged, dark" page is gone |
 | 54 | (Peter, 2026-10-27) Tab close icon | A simple ×, the same icon as in the "Asking about FedNow" chip |
 | 55 | (Peter, 2026-10-27) Send button inside the input | Peter wondered whether the send button belongs inside the input, without the outline around it. Drawn for his review: the button sits inside the input at its right end, and the box around the input and the button is gone; "Answers for" stays underneath |
+| 56 | (Peter, 2026-10-27) Send button placement | An end add-on inside the input, centered like the clear × in a design-system text input, in every state. Every input starts at one line |
+| 57 | (Peter, 2026-10-27) Error alert | The design system's error alert with its circled "!" icon, the message as the alert's bold heading, the icon centered on it |
+| 58 | (Peter, 2026-10-27) Offline queue notice | No "Queued:" label; the clock icon says it. The notice keeps the question, when it sends, and × |
+| 59 | (Peter, 2026-10-27) Questions asked during an answer | Enter during an answer queues the new question in the same notice (clock, question, ×); it sends when the answer finishes. In an empty input, the Up arrow key brings a queued question back into the input and takes it off the queue. This applies to the offline queue too |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 
