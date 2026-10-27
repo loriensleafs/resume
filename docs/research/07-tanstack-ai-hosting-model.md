@@ -106,7 +106,7 @@ The options.
 | B. The request check accepts `reasoning` messages, and the server drops them before `chat()`. | The browser saves the signatures and sends them back with every question, inside the 256 KB request cap. |
 | C. The request check accepts `reasoning` messages and passes them to the model. | A visitor's edited message reaches the model as earlier thinking. The chat changes the prompt on purpose, so Anthropic rejects or drops old blocks. |
 
-The decision. Peter chose A (row 155). The amendment first dropped every event whose type starts with `REASONING_`. Its review replaced that with an allowlist (the conductor, for Peter's end review): the wire middleware passes only the event types the browser needs and drops every other type. The client also reads forms that a prefix rule could miss in a later version, such as `REASONING_MESSAGE_CHUNK` and `REASONING_MESSAGE` (`ai/src/activities/chat/stream/processor.ts:923`, `1046`). So the browser holds no thinking part and no signature, and sends nothing back. The request check stays as approved.
+The decision. Peter chose A (row 155). The amendment first dropped every event whose type starts with `REASONING_`. Its review replaced that with an allowlist (the conductor, for Peter's end review): the wire middleware passes only the event types the browser needs and drops every other type (finding 9 checks the list against the source). The client also reads forms that a prefix rule could miss in a later version, such as `REASONING_MESSAGE_CHUNK` and `REASONING_MESSAGE` (`ai/src/activities/chat/stream/processor.ts:923`, `1046`). So the browser holds no thinking part and no signature, and sends nothing back. The request check stays as approved.
 
 Row 155 first put a content-free `chat.thinking` event and a live step in place of the dropped events. Peter then chose to show the thinking summary, with guards (row 156), because the mockups leave space to show that the model is working:
 
@@ -173,3 +173,50 @@ Status: note for C18, C23 and S30.
 Status: note for S1.
 
 `package.json` lists only the four packages. `bun install` put `react` 19.3.1 and `@types/react` 19.3.0 in `bun.lock` as peers of `@tanstack/ai-react`. S1 declares them in `package.json` at those versions.
+
+#### 9. The event allowlist, checked against the source
+
+Status: spec change (the review of rows 155 and 156; the conductor, for Peter's end review).
+
+AG-UI 1.0.0 defines 31 event types (`@ag-ui/core/dist/version-DEKfpZNa.d.ts:5–37`). Two lists from the installed source decide the allowlist in SPEC-chat (The request, "Events on the wire"):
+
+- **Emitted.** `@tanstack/ai` 1.0.0's engine and `@tanstack/ai-anthropic`'s adapter can emit 22 types on a chat stream. A grep for every `type:` constant outside the tests finds them; `ai/src/utilities/spec-event-keys.ts` names the other types only as a key map. With the chat's setup, which has no interrupts, `state`, subagents, `outputSchema`, sandbox or MCP, the stream carries 17 of the 22.
+- **Consumed.** `@tanstack/ai-client` uses the `StreamProcessor` of `@tanstack/ai/client` (`ai-client/src/chat-client.ts:1–14`, `451`). It consumes 26 types: 23 in its dispatch switch (`ai/src/activities/chat/stream/processor.ts:705–842`) and the three `*_CHUNK` forms, which it expands (lines 857–1000). Its default branch ignores the other 5 (line 840).
+
+The allowlist holds the 11 types that the chat's stream carries and the browser needs. Every other type is dropped.
+
+| Type | Emitted (`ai/src/…` or the adapter) | Processor reads (`processor.ts`) | On the wire | Why it is safe to drop |
+|---|---|---|---|---|
+| `RUN_STARTED` | adapter `text.ts:1738`; `activities/chat/index.ts:3131` | 777 | passes | |
+| `RUN_FINISHED` | adapter `text.ts:2201`; `index.ts:1739` | 753 | passes | |
+| `RUN_ERROR` | adapter `text.ts:752`, `2266`; `index.ts:3909`; `stream-to-response.ts:166` | 759 | passes, as `wireError(code)` | |
+| `TEXT_MESSAGE_START` | adapter `text.ts:1957`; `index.ts:7178` | 717 | passes | |
+| `TEXT_MESSAGE_CONTENT` | adapter `text.ts:1968` | 723 | passes | |
+| `TEXT_MESSAGE_END` | adapter `text.ts:2170` | 729 | passes | |
+| `TOOL_CALL_START` | adapter `text.ts:1853`; `index.ts:4221` | 735 | passes | |
+| `TOOL_CALL_ARGS` | adapter `text.ts:2028`; `index.ts:4229` | 741 | passes | |
+| `TOOL_CALL_END` | adapter `text.ts:1863`; `index.ts:4236` | 747 | passes | |
+| `TOOL_CALL_RESULT` | `index.ts:2512`, `4243` | 821 | passes, read results as ids | |
+| `CUSTOM` | `index.ts:6045` (`ctx.emitCustomEvent`), `2162` | 771 | passes, the chat's own `chat.<name>` events only | The engine's own names need features the chat does not use: `structured-output.*` (`outputSchema`), `sandbox.file*` (`index.ts:1410–1419`, a sandbox), `ui-resource` (`index.ts:5906`, MCP apps) |
+| `REASONING_START` | adapter `text.ts:1882` | 783, no action | dropped | Row 155: the client would build a thinking part from it; `chat.thinking` replaces it |
+| `REASONING_MESSAGE_START` | adapter `text.ts:1888` | 789 | dropped | Row 155, as above |
+| `REASONING_MESSAGE_CONTENT` | adapter `text.ts:1983` | 809 | dropped | Row 155; its text goes out as `chat.thinking` `delta` |
+| `REASONING_MESSAGE_END` | adapter `text.ts:1922` | 784, no action | dropped | Row 155, as above |
+| `REASONING_END` | adapter `text.ts:1928` | 785, no action | dropped | Row 155, as above |
+| `REASONING_ENCRYPTED_VALUE` | adapter `text.ts:1914`, `2054` | 815 | dropped | It is the signature; row 155 keeps it off the wire |
+| `MESSAGES_SNAPSHOT` | `index.ts:3816`, sent only at an interrupt (`3974`) | 765 | dropped | The chat has no interrupt. It would carry the full tool messages, read text included |
+| `STATE_SNAPSHOT` | `index.ts:3977`, only at an interrupt with `chat({ state })` | 840, ignored | dropped | The chat has neither |
+| `SUBAGENT_STARTED` | `activities/chat/agents/spawn.ts:764` | 705 | dropped | Only with `chat({ subagents })`; the chat has none |
+| `SUBAGENT_FINISHED` | `spawn.ts:705` | 709 | dropped | As above |
+| `SUBAGENT_ERROR` | `spawn.ts:319` | 713 | dropped | As above |
+| `ACTIVITY_SNAPSHOT` | none; the engine only passes on an adapter's (`index.ts:2294`), and the Anthropic adapter sends none | 827 | dropped | Never on this stream; it would build activity parts that the chat does not show |
+| `ACTIVITY_DELTA` | none, as above | 833 | dropped | As above |
+| `TEXT_MESSAGE_CHUNK` | none | 858, expanded | dropped | Never emitted. If a later version sent text this way, the seam-1 tests and C12's round trip through the real processor would fail on the missing text: the rule fails closed, it never leaks |
+| `TOOL_CALL_CHUNK` | none | 887, expanded | dropped | As above |
+| `REASONING_MESSAGE_CHUNK` | none | 923, expanded | dropped | As above, and row 155 keeps every thinking event off the wire |
+| `STEP_STARTED` | none | 840, ignored | dropped | Never emitted, and the processor ignores it |
+| `STEP_FINISHED` | none | 840, ignored | dropped | As above |
+| `STATE_DELTA` | none | 840, ignored | dropped | As above |
+| `RAW` | none | 840, ignored | dropped | As above |
+
+The client also reads `RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR`, `REASONING_ENCRYPTED_VALUE` and `SUBAGENT_*` itself, outside the processor (`ai-client/src/chat-client.ts:369`, `1398`; `connection-adapters.ts`). That adds no type the allowlist needs.
