@@ -15,6 +15,8 @@
 // holds the KV_* variables (api.spike.ts, `mode=`); the run sees booleans, numbers, hosts and error words only.
 // Check 6 runs last: when post-build.ts writes its probe cron (PROBE_CRON, off since the D4 review), it waits for
 // the call a few minutes after the build; otherwise it reads the cron's record once.
+// Check 8 (D5) tests the WAF rules: `bun check.ts waf` runs it alone, in a job of its own after the other checks,
+// because it drives the runner's address to the chat rate limit on purpose.
 // It prints states, hosts and verdicts only. Rerun only the newest run: an older one waits for a commit that the
 // branch URL no longer serves.
 
@@ -966,6 +968,121 @@ async function visitAll(cdp: Cdp, origin: string, paths: string[], headersFor: (
   return visits;
 }
 
+// ---- check 8 (D5): the WAF rules, in a job of its own ----------------------------------------------------------
+
+/** What one answer shows about who gave it: Vercel's WAF, the not-found route, or a function. */
+async function whoAnswered(res: Response, info: BuildInfo) {
+  const body = await res.arrayBuffer();
+  const mitigated = res.headers.get("x-vercel-mitigated"); // Vercel's edge sets it on the answers it blocks
+  const notFoundPage = info.notFoundSha256 !== null && sha256(body) === info.notFoundSha256;
+  // The first part of x-vercel-id is the edge region that took the request; the WAF counts per region.
+  const region = /^([a-z]{3}\d)::/.exec(res.headers.get("x-vercel-id") ?? "")?.[1] ?? "unknown";
+  const mark = mitigated === null ? "none" : /^[a-z_-]{1,32}$/i.test(mitigated) ? mitigated : "other";
+  const label = notFoundPage ? "the not-found page" : mitigated !== null ? `x-vercel-mitigated ${mark}` : `another body (${res.headers.get("content-type")})`;
+  return { status: res.status, waf: mitigated !== null && !notFoundPage, notFoundPage, region, body, text: `HTTP ${res.status}, ${label}` };
+}
+
+const CHAT_POSTS = 41; // SPEC-deploy's smoke check: a 429 must come by the 41st chat POST
+
+/**
+ * Check 8: the three WAF rules of SPEC-deploy's "Rate limits". The spike has no /api/chat route, so without the WAF
+ * every chat POST gets static/404.html with status 404, and the WAF's own answer carries x-vercel-mitigated. Judged:
+ * a chat POST with Content-Type text/plain gets the WAF's 403; chat POSTs with a malformed JSON body get the
+ * not-found page (the first is the control: the content type, not the path, decides the 403) until one gets the
+ * WAF's 429, which must come by the 41st. Recorded, not judged: whether the path condition matches /API/chat and
+ * /api/%63hat, whether the routes send /api/sp%69ke to its function, and whether the address still gets a page
+ * after its 429. The rules count per address for 10
+ * minutes, so this check runs in a job of its own, after the other checks, and a rerun within 10 minutes from the
+ * same address meets the old count.
+ */
+export const wafRules = {
+  check: 8,
+  name: "WAF rules",
+  ifFails: "the rules change",
+  async run({ info, deploymentFetch }: Pick<Ctx, "info" | "deploymentFetch">) {
+    if (!info.notFoundSha256) return { pass: false, detail: "the build wrote no 404.html" };
+    const problems: string[] = [];
+    const seen: string[] = [];
+    const post = (path: string, type: string, body: string) =>
+      deploymentFetch(path, { method: "POST", headers: { "content-type": type }, body }).then((res) => whoAnswered(res, info));
+
+    // Judged: the "chat content type" rule denies a chat POST that is not JSON.
+    const plain = await post("/api/chat", "text/plain", "spike check 8");
+    seen.push(`POST /api/chat text/plain: ${plain.text}`);
+    if (plain.status !== 403 || !plain.waf) problems.push(`POST /api/chat text/plain answered ${plain.text}, not the WAF's 403`);
+
+    // Recorded: does the path condition match another case, and a percent-encoded letter?
+    const upper = await post("/API/chat", "text/plain", "spike check 8");
+    seen.push(
+      `POST /API/chat text/plain: ${upper.text}: the path condition ${upper.waf ? "matches" : "does not match"} /API/chat` +
+        (upper.waf ? " regardless of case" : ""),
+    );
+    const encoded = await post("/api/%63hat", "text/plain", "spike check 8");
+    seen.push(`POST /api/%63hat text/plain: ${encoded.text}: the path condition ${encoded.waf ? "decodes" : "does not decode"} %63`);
+    // Recorded: do the routes decode it too? /api/spike answers with its function's name (check 2).
+    const routed = await deploymentFetch("/api/sp%69ke");
+    const routedFn = routed.status === 200 ? String(((await routed.json()) as Report).function) : null;
+    seen.push(
+      routedFn
+        ? `GET /api/sp%69ke: HTTP 200 from the function ${routedFn}: the routes decode %69`
+        : `GET /api/sp%69ke: ${(await whoAnswered(routed, info)).text}: the routes do not send it to a function`,
+    );
+
+    // Judged: malformed chat POSTs get the not-found page until the "chat rate limit" rule answers 429.
+    const before: string[] = [];
+    const regions = new Set<string>();
+    let limited: { n: number; text: string; waf: boolean } | null = null;
+    for (let n = 1; n <= CHAT_POSTS && !limited; n++) {
+      const r = await post("/api/chat", "application/json", '{"messages":');
+      regions.add(r.region);
+      if (r.status === 429) limited = { n, text: r.text, waf: r.waf };
+      else if (r.status !== 404 || !r.notFoundPage) before.push(`${n}: ${r.text}`);
+    }
+    const others = before.length ? `; not the not-found page: ${before.join(", ")}` : "";
+    const where = `edge region ${[...regions].join(", ")}`;
+    if (!limited) {
+      seen.push(`POST /api/chat application/json (malformed), ${CHAT_POSTS} times: no 429${others}; ${where}`);
+      problems.push(`no 429 in ${CHAT_POSTS} malformed chat POSTs`);
+    } else {
+      const firsts = limited.n === 1 ? "" : `1 to ${limited.n - 1} got the not-found page with status 404${others}; `;
+      seen.push(`POST /api/chat application/json (malformed): ${firsts}${limited.n} got ${limited.text}; ${where}`);
+      if (!limited.waf) problems.push(`the 429 at ${limited.n} is not the WAF's`);
+      if (limited.n === 1) problems.push("the control got 429: this address met the limit in the last 10 minutes; rerun later");
+      if (before.length) problems.push("a malformed chat POST before the 429 did not get the not-found page");
+      // Recorded: does the limited address still get a page? A persistent action would block it everywhere.
+      const page = await deploymentFetch("/build-info.json");
+      const pageWho = page.status === 200 ? null : await whoAnswered(page, info);
+      seen.push(
+        pageWho
+          ? `then GET /build-info.json: ${pageWho.text}: the limited address is blocked beyond chat POSTs`
+          : "then GET /build-info.json: HTTP 200: the limited address still gets the site",
+      );
+    }
+    return { pass: problems.length === 0, detail: problems.length ? `${problems.join("; ")}; seen: ${seen.join("; ")}` : seen.join("; ") };
+  },
+} satisfies Check;
+
+/** `bun check.ts waf`: check 8 against DEPLOYMENT_HOST, with the bypass, because Deployment Protection comes first. */
+async function waf(): Promise<void> {
+  const sha = env("GITHUB_SHA");
+  const deployment = protectedHost(env("DEPLOYMENT_HOST"), "DEPLOYMENT_HOST");
+  const { status, info } = await readBuildInfo(`https://${deployment}/build-info.json`, withBypass(deployment));
+  if (status !== 200 || !info) {
+    console.log(`error: build-info.json answered ${httpNote(status)}`);
+    process.exit(1);
+  }
+  if (info.commit !== sha) {
+    console.log(`error: ${deployment} is the deployment of ${short(info.commit)}, not ${short(sha)}`);
+    process.exit(1);
+  }
+  console.log(`deployment ${deployment}: commit ${short(sha)}, VERCEL_ENV ${info.vercelEnv}`);
+  const deploymentFetch: Ctx["deploymentFetch"] = (path, init, options) => fetch(`https://${deployment}${path}`, withBypass(deployment, init, options));
+  const result = await wafRules.run({ info, deploymentFetch }).catch((error: Error) => ({ pass: false, detail: `error: ${error.message}` }));
+  const tail = result.pass ? "" : `; if it fails: ${wafRules.ifFails}`;
+  console.log(`check ${wafRules.check} (${wafRules.name}): ${result.pass ? "pass" : "FAIL"}: ${result.detail}${tail}`);
+  if (!result.pass) process.exit(1);
+}
+
 // ---- the harness ------------------------------------------------------------------------------------------------
 
 function env(name: string): string {
@@ -1183,8 +1300,9 @@ if (import.meta.main) {
   const command = process.argv[2];
   if (command === "wait") await wait();
   else if (command === "run") await run();
+  else if (command === "waf") await waf();
   else {
-    console.log("usage: bun check.ts wait | bun check.ts run");
+    console.log("usage: bun check.ts wait | bun check.ts run | bun check.ts waf");
     process.exit(2);
   }
 }
