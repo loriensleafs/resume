@@ -12,3 +12,5 @@ Source observations and experiments behind the decisions. Each note keeps its da
 | [06](06-resume-chat.md) | A public resume site with an AI chat |
 | [07](07-tanstack-ai-hosting-model.md) | TanStack AI 1.0, hosting and the model |
 | [08](08-library-skills-and-mcp.md) | Library skills and the design system's docs MCP |
+| [09](09-site-feasibility.md) | TanStack Start, prerendering, offline and the design system under Bun |
+| [10](10-chat-knowledge-depth.md) | Deeper chat answers from a fuller knowledge base |
