@@ -1,12 +1,12 @@
 # Spec: site
 
-Approved by Peter on 2026-10-27.
+Approved by Peter on 2026-10-27. Amended (the resume view's ⋯ menu, `openResume()`, the optional citation number, the app bar's end slot, the route files as the only place site and chat meet, design-system parts for sheets and the menu) and approved again the same day ([interview record](../docs/design/interview-2026-10-26.md) rows 81 and 85 to 106).
 
 ## Objective
 
 Build the site: the public TanStack Start progressive web app at peterkloss.dev ([decision 0007](../docs/decisions/0007-tanstack-start-pwa.md), [decision 0018](../docs/decisions/0018-domains.md)). It puts the chat first, keeps the resume beside it, opens a source beside the chat when a citation asks for it ([decision 0015](../docs/decisions/0015-sources-on-demand.md)), saves the visitor's views in their own browser ([decision 0017](../docs/decisions/0017-saved-visitor-session.md)), installs as a standalone app, and keeps its pages readable offline ([decision 0010](../docs/decisions/0010-offline-chat.md)). The look is the approved mockups in [docs/design/mockups/](../docs/design/mockups/README.md), built with Peter's ACME design system.
 
-The site is the shell. The chat column's contents belong to the chat module ([SPEC-chat](README.md)): the conversation, the input and its states, the answer steps, the message actions, the citations card, queued questions, "Answers for", the "Welcome back" notice, New chat and `/api/chat`. The site gives the chat module one contract, the workspace (see Code Style), and never imports the chat module ([capability map](README.md)).
+The site is the shell. The chat column's contents belong to the chat module ([SPEC-chat](SPEC-chat.md)): the conversation, the input and its states, the answer steps, the message actions, the citations card, queued questions, "Answers for", New chat and `/api/chat`. The site gives the chat module one contract, the workspace contract (see Code Style). The site's shell, workspace and data code never import the chat module. Only the route files in `src/site/routes/` put the two together: the workspace route renders the chat column, and the `/api/chat` route calls the chat's handler ([capability map](README.md)).
 
 Acceptance criteria:
 
@@ -32,10 +32,10 @@ The approved mockups are the reference for every view. The image index names eac
 
 **Document panel.** Right of the chat column, with design-system tabs: "Resume", and "Source: <title>" while a source is open. The source tab has a × in the tab to close it; at most one source tab is open, and a new source replaces it. The panel notes which citation opened the source ("Opened from citation 1").
 
-- **Resume view:** the lead, each role with its highlights, the earlier roles, skills and education, from `resume.yaml`. Each highlight carries its knowledge id. A cited highlight is tinted and shows its citation number. Hovering or focusing a highlight shows "Ask about this". A ⋯ icon button ("More actions") at the view's top-right corner opens a menu: PDF, Word, Text. Each item downloads that public document. The menu appears wherever the resume view does: the Resume tab, the phone resume sheet and `/resume` (Peter, [interview record](../docs/design/interview-2026-10-26.md) row 81; the mockups do not show it yet).
+- **Resume view:** the lead, each role with its highlights, the earlier roles, skills and education, from `resume.yaml`. Each highlight carries its knowledge id. A cited highlight is tinted and shows its citation number. Hovering or focusing a highlight shows "Ask about this". A ⋯ icon button ("More actions") at the view's top-right corner opens the design system's `acme-menu`: PDF, Word, Text. Each item downloads that public document; the plan checks how a menu item starts a download. The menu appears wherever the resume view does: the Resume tab, the phone resume sheet and `/resume` (Peter, [interview record](../docs/design/interview-2026-10-26.md) row 81; the mockups do not show it yet).
 - **Source view:** the title, a line naming its kind and approval ("Deep dive, written from Peter's answers and approved by him. FedNow, 2021 – 2024. 5 passages."), and the numbered passages. The marked passage is tinted, scrolled into view and shows "Ask about this passage".
 
-**Phone sheets.** A source opens as a bottom sheet over the conversation with the cited passage first ("Source for citation 1", "Ask about this passage", "All passages"). The resume opens as a full-height sheet at the selected role ("Read FedNow in the resume"), or at its top when the chat opens it.
+**Phone sheets.** Sheets are the design system's `acme-drawer` with `placement="bottom"`: focus moves into the sheet, stays there, Escape closes it, and focus returns to what opened it. A source opens as a bottom sheet over the conversation with the cited passage first ("Source for citation 1", "Ask about this passage", "All passages"). The resume opens as a full-height sheet at the selected role ("Read FedNow in the resume"), or at its top when the chat opens it.
 
 **Install offer.** "Install app" in the app bar appears only when the browser offers installation (`beforeinstallprompt`) and the site is not already running as an app. On phones, after the visitor's third answer, a sheet offers the app once ("Install Peter Kloss": opens on its own, picks up the conversation, readable offline; "Not now" and "Install"). "Not now" hides it for 30 days. Where the browser has no install prompt (Safari on iPhone), the sheet's button shows the steps to add the site to the home screen.
 
@@ -135,7 +135,7 @@ The same as [SPEC-content](SPEC-content.md): small pure functions, errors that n
 /** The role the chat is asking about, from the career timeline. */
 export type Scope = { roleId: string } | null;
 
-/** What the site gives the chat module. The chat reads it; the site never imports the chat. */
+/** What the site gives the chat module. The chat reads it; the site's shell never imports the chat. */
 export type Workspace = {
   scope: Scope;
   setScope(scope: Scope): void;
@@ -228,7 +228,7 @@ export function useWorkspace(): Workspace;
 ## Out of scope
 
 - Everything inside the chat column apart from the first view's static text, and `/api/chat`: [SPEC-chat](README.md). That includes New chat, which calls the workspace's `reset()`.
-- The domains, redirects, hosting settings, rate limits and CI: [SPEC-deploy](README.md).
+- The domains, redirects, hosting settings, security headers (which enforce "no third-party requests"), rate limits and CI: [SPEC-deploy](README.md).
 - A page or menu that lists the sources ([decision 0015](../docs/decisions/0015-sources-on-demand.md)).
 - Accounts, server-side storage of visitors and analytics.
 - An update prompt for a new site version.

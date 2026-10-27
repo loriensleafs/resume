@@ -85,16 +85,20 @@ An entry in the core that Peter approves about his job search: remote or on-site
 _Avoid_: FAQ, preferences
 
 **Citation**:
-The id of the passage, resume entry or logistics answer an answer used, shown with the answer. The server keeps it only when the id is a resume entry, a logistics answer or a passage read in the same turn.
+The id of the passage, resume entry or logistics answer an answer used, shown with the answer.
 _Avoid_: source link, reference
 
 **Saved session**:
-A visitor's conversation and open views, kept in their own browser and restored when they return. The site's part is the saved views: the open tab, the open source and its marked passage, and the scope.
+A visitor's conversation, queued questions, audience and open views, kept in their own browser and restored when they return.
 _Avoid_: account, profile
 
 **Workspace**:
-The site's main view at `/`: the app bar, the career timeline, the chat column and the document panel. Also the contract the site gives the chat module.
+The site's main view at `/`: the app bar, the career timeline, the chat column and the document panel.
 _Avoid_: dashboard, home page
+
+**Workspace contract**:
+The one interface the site gives the chat module, through which the chat reads the scope and opens what an answer cites.
+_Avoid_: workspace (that is the view), API, bridge
 
 **Career timeline**:
 The full-width band of Peter's roles at their true lengths; selecting a role sets the scope.
@@ -117,7 +121,7 @@ The chat's answer to a topic outside its scope (salary, immigration, health, age
 _Avoid_: guardrail message, block
 
 **Queued question**:
-A question asked while offline or while an answer streams, stored on the visitor's device and sent when the chat is free and online.
+A question waiting to be sent, asked while offline or while an answer streams, and kept on the visitor's device.
 _Avoid_: pending message, draft
 
 **Turn**:
@@ -125,11 +129,11 @@ One question and its answer, with the reads made for it.
 _Avoid_: exchange, round, request
 
 **Read**:
-One call of the chat's read tool, which returns the text of the sources or passages asked for. At most 3 per turn.
+One use of the chat's read tool: the text of the sources or passages the chat asked for.
 _Avoid_: retrieval, lookup, search
 
 **Answer steps**:
-The lines that show what the chat did for an answer: the sources found, the source read, the citations checked. Shown one by one while it works, then folded into one line above the answer.
+The record shown with an answer of what the chat did for it: the sources it found and read, and the citations it checked.
 _Avoid_: thinking, reasoning, trace
 
 **Fit check**:
@@ -137,11 +141,11 @@ The chat's answer to a pasted job description: each requirement with what Peter'
 _Avoid_: job match, fit score
 
 **Audience**:
-The visitor's "Answers for" choice (recruiter, hiring manager or engineer), which sets what an answer leads with.
+The visitor's "Answers for" choice (recruiter, manager, engineer, designer or product manager), which sets what an answer leads with.
 _Avoid_: persona, mode, role (a role is a job in the resume)
 
 **Follow-up question**:
-One of at most two questions the chat suggests under an answer.
+A question the chat suggests under an answer, written for that answer.
 _Avoid_: suggestion chip, related question
 
 **Resume card**:
@@ -149,11 +153,11 @@ The card in an answer that opens the whole resume beside the chat, after a visit
 _Avoid_: artifact card, attachment
 
 **Device matches**:
-The resume entries and passages that match what the visitor types, found on the device with no model and no network.
+The resume entries and passages that match what the visitor types, found on the visitor's own device.
 _Avoid_: autocomplete, search results
 
 **Question log**:
-The anonymous record the server keeps of each turn: the question, what was read and cited, and the outcome. No visitor identity.
+The anonymous record the server keeps of the questions visitors ask and how each turn ended.
 _Avoid_: analytics, chat history, transcript
 
 **Trick question**:
