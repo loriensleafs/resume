@@ -15,6 +15,11 @@ Spec: [SPEC-deploy](../../spec/SPEC-deploy.md). The order is in [todo.md](../tod
 
 Delivers: A push to `prototype/deploy-spike` builds on Peter's throwaway Vercel project, and a spike workflow runs `check.ts` against that deployment and prints one verdict line per check, starting with check 1.
 Blocked by: Peter: a Vercel Pro team (setup step 4's sign-up, $20 a month, comes before the spike, so the cost starts here); Peter: the throwaway project from `prototype/deploy-spike` with no domains and no Anthropic key (SPEC-deploy "Deploy spike", Setup), its root folder `prototypes/deploy-spike/`, Standard Protection with an automation bypass secret, and that secret as an Actions secret (agents never read it; the spike workflow uses it and prints verdicts only)
+Setup done (2026-10-27, Peter with the main session):
+- Vercel team Peter Kloss (`vercel.com/peterkloss`), Pro. Project `resume-deploy-spike`; its address stays `project-8ar0o.vercel.app` (a rename keeps the first address). Connected to `loriensleafs/resume`; production branch `prototype/deploy-spike`; root folder `prototypes/deploy-spike`; Ignored Build Step "Only build production" (`VERCEL_ENV` is production), so pushes to `main` and other branches build nothing there. Standard Protection with Vercel Authentication. No deployment exists yet: D1's first push makes the first one.
+- The branch exists: `prototype/csp-probe` plus one commit (07aed2b) that copies `prototypes/csp-probe/` to `prototypes/deploy-spike/`. D1 adds the parts of `prototypes/nitro-vercel-output/`, `vercel.json`, `check.ts`, the workflow and the README.
+- The Actions secret is `VERCEL_AUTOMATION_BYPASS_SECRET`, SPEC-deploy's name; setup step 9 later replaces its value with the real project's secret.
+- Vercel's GitHub app reads `loriensleafs/resume` only. Commit Status is on; the project's `deployment_status` and `repository_dispatch` events are off. If the workflow needs `deployment_status`, Peter turns it on in the project's Git settings.
 Acceptance:
 - A push to `prototype/deploy-spike` builds a deployment on the throwaway project, and `.github/workflows/spike-check.yml` (push trigger, on the spike branch only) waits for that commit's deployment and runs `check.ts` against it, printing verdicts and no secret.
 - Check 1 has a verdict in the README: which Bun runs the build (the build writes `bun --version` into a static file), and whether `bunVersion` decides it ("Deploy spike" table, row 1).
@@ -39,7 +44,7 @@ Needs Peter: approval of each push to `prototype/deploy-spike`
 ### D3: Deploy spike, part 3: headers, the redirect, the PDF and the Vercel Toolbar
 
 Delivers: The README records how route headers merge on Vercel, whether a host redirect keeps the query string, and whether the PDF and the toolbar behave with the site's headers.
-Blocked by: D2; Peter: Vercel Toolbar off for production on the throwaway project (as setup step 5)
+Blocked by: D2; Peter: Vercel Toolbar off for production on the throwaway project (as setup step 5). Done 2026-10-27 at team level: the team's Production Deployments setting is Off, and both projects inherit it ("Default (controlled at the team level)").
 Acceptance:
 - Check 4: the worker files get exactly one policy, the PDF gets none, and the headers reach a function response and the not-found page.
 - Check 5: a host redirect route on the project's `.vercel.app` address answers 308 and keeps the query string in `Location`, or the README records that the route must add it.
@@ -52,7 +57,7 @@ Needs Peter: the toolbar setting; the manual PDF check; approval of each push
 ### D4: Deploy spike, part 4: Vercel Cron, store writes after Stop, and the Upstash tokens
 
 Delivers: The README records whether Vercel Cron reaches the health route under Standard Protection, whether store writes finish after a visitor stops a streamed turn, and what the Upstash tokens can run.
-Blocked by: D2; Peter: a pay-as-you-go Upstash database attached to the throwaway project (cents)
+Blocked by: D2; Peter: a pay-as-you-go Upstash database attached to the throwaway project (cents). Done 2026-10-27: `resume-deploy-spike-kv`, Upstash for Redis, region iad1, Pay As You Go, Auto Upgrade off. Connected to Production only with the prefix `KV`, so the project has `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `KV_REST_API_READ_ONLY_TOKEN`, `KV_URL` and `KV_REDIS_URL`, all marked sensitive.
 Acceptance:
 - Check 6: Vercel Cron reaches the spike's `/api/cron/health` under Standard Protection, and the README names the host it calls.
 - Check 7: a streamed response that the client stops still finishes its store writes after the last chunk; if not, the README records the fallback, `waitUntil` from `@vercel/functions`, a new package for Peter's approval.
@@ -65,7 +70,7 @@ Needs Peter: the Upstash database (money); approval of each push; approval of `@
 ### D5: Deploy spike, part 5: the WAF rules and the status helper
 
 Delivers: The README records how the WAF rules match on Vercel, and that check 12 moved to D32.
-Blocked by: D2; Peter: the three WAF rules of "Rate limits" on the throwaway project (as setup step 7)
+Blocked by: D2; Peter: the three WAF rules of "Rate limits" on the throwaway project (as setup step 7). Done 2026-10-27, published in this order: "chat content type" (Deny), "chat rate limit" (fixed window, 600 s, 20, key IP address, 429), "api rate limit" (fixed window, 600 s, 60, key IP address, 429; written as two OR groups: path starts with `/api/` and not `/api/chat`, or path starts with `/api/` and method is not POST). The path conditions use Vercel's "Request Path" field, which Vercel describes as the normalized path; "Raw Path" is the other field, so check 8 tells which one handles `/API/chat`.
 Acceptance:
 - Check 8: a chat `POST` with `Content-Type: text/plain` gets the WAF's 403, chat posts get 429 by the 41st, and the README says whether the path condition matches `/API/chat` regardless of case.
 - Check 12 moves to D32 and setup step 10, because it needs a workflow on `main` (`repository_dispatch` runs only workflows on the default branch, research 12); the README records the move (main's decision, 2026-10-27).

@@ -46,11 +46,11 @@ All six module specs are approved ([capability map](../spec/README.md)). This pl
 
 Each item names the task it blocks; todo.md shows them as "Peter:".
 
-1. The spike's setup: a Vercel Pro team ($20 a month from then on), the throwaway project from `prototype/deploy-spike` (Standard Protection, no domains, no Anthropic key) and its bypass secret as an Actions secret. Blocks D1, and through it Phase 2.
+1. Done 2026-10-27: the spike's setup: a Vercel Pro team ($20 a month from then on), the throwaway project from `prototype/deploy-spike` (Standard Protection, no domains, no Anthropic key) and its bypass secret as an Actions secret. It blocked D1; the details are in D1's body.
 2. Each push to `prototype/deploy-spike`: D1 to D5.
-3. The Vercel Toolbar off for production on the throwaway project, and the PDF check in Chrome: D3.
-4. A pay-as-you-go Upstash database on the throwaway project (cents), and `@vercel/functions` only if spike check 7 fails: D4.
-5. The three WAF rules on the throwaway project: D5.
+3. The Vercel Toolbar off for production (done 2026-10-27, at team level), and the PDF check in Chrome: D3.
+4. A pay-as-you-go Upstash database on the throwaway project (done 2026-10-27), and `@vercel/functions` only if spike check 7 fails: D4.
+5. Done 2026-10-27: the three WAF rules on the throwaway project: D5.
 6. Each spec change the spike's verdicts need: D6.
 7. Deleting the throwaway project and its Upstash database: D32.
 8. The nine `x-short` labels, with a curly or straight apostrophe in "Brigham and Women’s": T1, and through it S10.
@@ -67,7 +67,7 @@ Each item names the task it blocks; todo.md shows them as "Peter:".
 19. The read-only token in `.secrets/local.env`, for the manual check of `bun run questions`: D28.
 20. Review and approval of the setup list and the runbooks: D34, D35 and D36.
 21. The Actions secrets (setup step 9): D33.
-22. Setup steps 1 to 11, with the three domains bought; step 10 also runs spike check 12 for D32. Blocks D37.
+22. Setup steps 1 to 11, with the three domains bought; step 10 also runs spike check 12 for D32. Blocks D37. Done 2026-10-27: step 1 (the three domains, in the Peter Kloss team, each renewing on Oct 27, 2027), step 4's Pro sign-up, step 5's toolbar setting (at team level) and step 8's $20 budget with pause off; its ntfy webhook waits for step 2.
 23. The first release, and confirming that its push reaches his phone: D37.
 24. Setup step 12 (`ANTHROPIC_API_KEY`, then Redeploy), the Vercel health job run by hand, and one live question: D38.
 25. Every push that is a release, and so each checkpoint that ends in one: content: lands; site: the build output, the wide workspace, phones, offline, install, and lands; chat: queue, offline, limits; and the pushes of T1, T2 and K11 to K13.
