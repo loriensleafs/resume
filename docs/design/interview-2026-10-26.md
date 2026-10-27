@@ -146,6 +146,7 @@ Peter asked for: every AI agent supported in this repository (AGENTS.md, CLAUDE.
 | 134 | Approve the amended workspace contract (suggestedQuestion and clearSuggestedQuestion, setConversationActive, answerFinished; openCitation for every resume entry kind; setCited numbered by position and called on restore; separate IndexedDB databases for the site and the chat)? | Approved as drafted. The recommendation was this option |
 | 135 | Approve two dependencies: nitro 3.0.260903-beta and react-dom 19.3.1, pinned? | Approved both. The recommendation was this option |
 | 136 | (Peter, 2026-10-27) Mockups after spec changes | "If there are changes that mean we need to update the mockups, we should update them to match those changes." |
+| 137 | When a visitor picks a role, where do the scope chip's short name and years come from? (Peter first confirmed that a request for the whole resume sets no scope.) | The site passes them: `Scope` becomes `{ roleId, label, years }`, filled from `resume.yaml`, so the chip shows at once. An amendment to the contract approved in row 134. The recommendation was this option |
 
 After question 24, Peter asked for mockups of the site with his design system before the site spec is written. They are on a private Design canvas, "Resume site mockups", for his review.
 

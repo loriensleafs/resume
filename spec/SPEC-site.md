@@ -234,8 +234,9 @@ tests/site/browser.test.ts   seam 2: the real-browser test
 The same as [SPEC-content](SPEC-content.md): small pure functions, errors that name the file and the field, Bun APIs in scripts. React components are function components, one per file, named for what they show. The workspace contract is the site's whole interface to the chat module:
 
 ```ts
-/** The role the chat is asking about, from the career timeline. */
-export type Scope = { roleId: string } | null;
+/** The role the chat is asking about, from the career timeline. The site fills label and years
+ *  from resume.yaml (row 137), so the chat's scope chip needs no lookup: "FedNow", "2021 – 2024". */
+export type Scope = { roleId: string; label: string; years: string } | null;
 
 /** What the site gives the chat module. The chat reads it; the site's shell never imports the chat. */
 export type Workspace = {
@@ -267,7 +268,7 @@ Peter approved this contract on 2026-10-27 ([decision record](../docs/design/int
 
 | Member | What the site does |
 |---|---|
-| `scope`, `setScope()` | Holds the selected role, which the saved views keep. On wide screens, a role set from the timeline also shows in the resume. `setScope(null)` clears the selection on the timeline |
+| `scope`, `setScope()` | Holds the selected role, which the saved views keep, with the role's `x-short` label and its years (row 137). Only the timeline sets a scope; a request for the whole resume sets none. On wide screens, a role set from the timeline also shows in the resume. `setScope(null)` clears the selection on the timeline |
 | `openCitation(id, n)` | A resume entry id (`basics`, `role:<id>`, `highlight:<role id>.<n>`, `skills:<slug>`, `education`): the resume shows that entry, scrolled into view and tinted, in the Resume tab on wide screens and in the full-height resume sheet on phones. A passage id: its source opens with the passage marked, in the source tab on wide screens and in the source sheet on phones. A logistics id, or an id that no longer exists: nothing opens. With a number, the panel says "Opened from citation <n>" and the phone sheet says "Source for citation <n>". Without a number (a device match), neither line shows |
 | `openResume()` | The whole resume at its top: the Resume tab on wide screens, the full-height resume sheet on phones (row 81) |
 | `setCited(ids)` | The id at index i is citation i + 1. The timeline lights the role of each `role:` and `highlight:` id, and every role in a cited passage's source `roles`. Each cited resume entry shows its citation number. The numbers live in memory only; the chat calls `setCited()` again on restore |
