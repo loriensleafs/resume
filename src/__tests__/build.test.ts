@@ -5,9 +5,16 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { $ } from "bun";
 import { build, type BuiltVariant } from "../build";
 import { loadResume, type Resume } from "../content";
+import { holds, isMadeUpNumber, loadPrivateValues } from "../private-details";
 
 const REPO = `${import.meta.dir}/../..`;
 const FAKE_PHONE = "(555) 555-0100";
+// The private values that no tracked file may hold. README's made-up number is not private.
+const PRIVATE = await loadPrivateValues(REPO);
+const PRIVATE_VALUES = PRIVATE.ok ? PRIVATE.values.filter((value) => !isMadeUpNumber(value)) : [];
+// CI and a fresh clone have no private.yaml, and a made-up number leaves nothing private: then nothing can leak.
+// A broken private.yaml is no reason to skip: the test runs and fails with the reason.
+const NOTHING_PRIVATE = PRIVATE.ok ? PRIVATE_VALUES.length === 0 : PRIVATE.missing;
 const tmp = `${Bun.env.TMPDIR ?? "/tmp"}/resume-test-${crypto.randomUUID()}`;
 const normalize = (s: string) => s.replace(/\s+/g, " ").trim();
 
@@ -110,16 +117,16 @@ describe("private details", () => {
     for (const file of [pub.txt, pub.html]) expect(await Bun.file(file).text()).not.toContain(FAKE_PHONE);
   });
 
-  test("never appear in a tracked file", async () => {
-    const file = Bun.file(`${REPO}/private.yaml`);
-    if (!(await file.exists())) return; // CI and fresh clones have no private details to leak
-    const phone = String(Bun.YAML.parse(await file.text())?.basics?.phone ?? "");
-    if (!phone) return;
+  // The failure names each file and never the value (src/private-details.ts).
+  test.skipIf(NOTHING_PRIVATE)("never appear in a tracked file, in any format", async () => {
+    expect(PRIVATE.ok ? "" : PRIVATE.reason).toBe("");
     const tracked = (await $`git -C ${REPO} ls-files -z`.text()).split("\0").filter(Boolean);
     const leaks: string[] = [];
     for (const path of tracked) {
-      const f = Bun.file(`${REPO}/${path}`);
-      if ((await f.exists()) && (await f.text()).includes(phone)) leaks.push(path);
+      const file = Bun.file(`${REPO}/${path}`);
+      if (!(await file.exists())) continue;
+      const text = await file.text();
+      if (PRIVATE_VALUES.some((value) => holds(text, value))) leaks.push(path);
     }
     expect(leaks).toEqual([]);
   });

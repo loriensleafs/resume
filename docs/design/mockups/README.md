@@ -1,26 +1,6 @@
 # Site mockups
 
-The approved look of the site, as images. Peter reviewed the mockups on 2026-10-27: "I think this all looks pretty good." [SPEC-site](../../../spec/SPEC-site.md) and [SPEC-chat](../../../spec/SPEC-chat.md) are written from them.
-
-Updated later on 2026-10-27 (canvas version 44; [decision record](../interview-2026-10-26.md) rows 81 and 85 to 105):
-
-- Queued questions are question messages with a clock at the end of the conversation, with Send now, Edit and Remove.
-- "Answers for" is a compact trigger, "Answers for: Anyone ▾", that opens a popover with a line of context, the five audiences and a line for the chosen one. The popover has no title and no Close button. On phones it is a select.
-- The line about the anonymous question log shares the row with the trigger.
-- The resume view has a ⋯ menu for the downloads.
-- The conversation board shows the resume card.
-- The "Welcome back" notice is gone.
-
-Updated again on 2026-10-27 after the spec reviews (canvas version 46; [decision record](../interview-2026-10-26.md) rows 133, 136, 138 and 139). Peter approved the new texts in row 138 and the boards with the amended specs in row 139:
-
-- Each answer numbers its own citations from 1, and its card lists only its own citations (row 133). Citation numbers in answers are drawn as the citation buttons on every board.
-- In the resume, every highlight the latest answer cites shows its number; only the opened one is tinted, with a blue number.
-- The audience lines read "Manager:" and "Recruiter:".
-- The phone boards show the "Answers for" select and the anonymous-log line under the input.
-- The phone sheets have no grab handle: the design system's drawer has no swipe to close.
-- New input states: limit reached for the day and for the month, and "Too many questions". Peter approved their texts (row 138).
-- A new not-found page, desktop and phone. It has no script, so it follows the system's light or dark setting, not the visitor's own choice. Peter approved its text (row 138).
-- The steps' citation line also names Peter's logistics answers (row 138).
+The approved look of the site, as images. Peter reviewed the mockups on 2026-10-27: "I think this all looks pretty good." [SPEC-site](../../../spec/SPEC-site.md) and [SPEC-chat](../../../spec/SPEC-chat.md) are written from them. The changes since that review are under "Updating".
 
 The mockups were made on a private Claude Design canvas, "Resume site mockups", with Peter's ACME design system 0.3.2. These images are rendered from the canvas boards. The board sources are on the branch [`prototype/site-mockups`](https://github.com/loriensleafs/resume/tree/prototype/site-mockups/prototypes/site-mockups), not on `main`, because they open only inside the canvas.
 
@@ -59,4 +39,9 @@ The choices behind each view are in the [decision record](../interview-2026-10-2
 
 ## Updating
 
-When the design changes, change the canvas, render the boards again with the export script on the prototype branch, and replace the images here. Each image is the board at its canvas size: 1440 px wide for desktop boards, 390 px for phones.
+The [update-mockups skill](../../../.agents/skills/update-mockups/SKILL.md) changes the mockups. Each image is the board at its canvas size: 1440 px wide for desktop boards, 390 px for phones.
+
+One dated line per change, with the canvas version and the [decision record](../interview-2026-10-26.md) rows that hold the details:
+
+- 2026-10-27, canvas version 44, rows 81 and 85 to 105: queued questions with Send now, Edit and Remove; the compact "Answers for" trigger with its popover, a select on phones; the anonymous-log line beside the trigger; the resume's ⋯ menu for the downloads; the resume card; no "Welcome back" notice.
+- 2026-10-27, canvas version 46, rows 133, 136, 138 and 139: each answer numbers its own citations; the resume shows the cited highlights' numbers; the audience lines "Manager:" and "Recruiter:"; the "Answers for" select and the anonymous-log line on phones; phone sheets with no grab handle; the limit and "Too many questions" input states; the not-found page, desktop and phone; the logistics answers in the steps' citation line. Peter approved the texts in row 138 and the boards in row 139.

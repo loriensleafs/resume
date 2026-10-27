@@ -1,7 +1,9 @@
-// Seam 1 of SPEC-agents: the agent files on disk.
+// Seam 1 of SPEC-agents: the agent files on disk. A failure names the file, the line and the rule it breaks, and
+// never quotes the file: CI prints failures in a public log, and a file could hold a private detail.
 
 import { describe, expect, test } from "bun:test";
 import { $ } from "bun";
+import { findPhoneNumbers } from "../src/private-details";
 
 const REPO = `${import.meta.dir}/..`;
 const SKILLS = `${REPO}/.agents/skills`;
@@ -10,6 +12,47 @@ const read = (path: string) => Bun.file(`${REPO}/${path}`).text();
 // Bun.file().exists() is false for a folder; stat() sees both.
 const exists = (path: string) => Bun.file(path).stat().then(() => true, () => false);
 const list = (cwd: string) => [...new Bun.Glob("*").scanSync({ cwd, onlyFiles: false })].sort();
+
+/**
+ * The text of every file that git tracks or would track once added, so a new file is checked before its commit.
+ * Ignored files, such as private.yaml and node_modules/, stay out, and so do folders, links to folders such as
+ * .claude/skills/<name>, and binary files (git's own test: a NUL byte in the first 8,000 bytes).
+ */
+async function textFiles(): Promise<Map<string, string>> {
+  const paths = (await $`git -C ${REPO} ls-files -z --cached --others --exclude-standard`.text()).split("\0").filter(Boolean);
+  const texts = new Map<string, string>();
+  for (const path of [...new Set(paths)].sort()) {
+    const file = Bun.file(`${REPO}/${path}`);
+    if (!(await file.stat().then((stat) => stat.isFile(), () => false))) continue;
+    const bytes = await file.bytes();
+    if (!bytes.subarray(0, 8000).includes(0)) texts.set(path, new TextDecoder().decode(bytes));
+  }
+  return texts;
+}
+const TEXT_FILES = await textFiles();
+
+// The agent files (CONTEXT.md): the shared instructions, Claude Code's entry file, the README, brain's record layout
+// in docs/agents/, every file of every repo skill, and each agent's settings. The test only reads Peter's .mcp.json
+// and .claude/settings.json.
+const AGENT_SETTINGS = [".claude/settings.json", ".codex/config.toml", ".cursor/mcp.json", ".vscode/mcp.json", ".gemini/settings.json", ".mcp.json"];
+const isAgentFile = (path: string) =>
+  ["AGENTS.md", "CLAUDE.md", "README.md", ...AGENT_SETTINGS].includes(path) ||
+  path.startsWith("docs/agents/") ||
+  path.startsWith(".agents/skills/");
+const AGENT_FILES = [...TEXT_FILES.keys()].filter(isAgentFile);
+
+// The lines, from 1, of `text` where `breaks` is true.
+const linesWhere = (text: string, breaks: (line: string) => boolean) =>
+  text.split("\n").flatMap((line, i) => (breaks(line) ? [i + 1] : []));
+
+/** `path:line breaks "rule"` for each line that `brokenLines` gives for each file. It never quotes the file. */
+async function findings(paths: string[], rule: string, brokenLines: (text: string, path: string) => number[] | Promise<number[]>) {
+  const found: string[] = [];
+  for (const path of paths) {
+    for (const line of await brokenLines(TEXT_FILES.get(path)!, path)) found.push(`${path}:${line} breaks "${rule}"`);
+  }
+  return found;
+}
 
 // The first cell of each body row in the first table at or after the line that starts with `from`.
 function firstColumn(markdown: string, from: string): string[] {
@@ -39,6 +82,65 @@ function jsonBlockAfter(markdown: string, label: string) {
   return JSON.parse(lines.slice(open + 1, close).join("\n"));
 }
 
+const LINK_RULE = "a relative link points to a file or folder that exists";
+/** The lines of a Markdown file in `dir` with a relative link whose target does not exist; `#section` is ignored. */
+async function brokenLinkLines(text: string, dir: string): Promise<number[]> {
+  const lines: number[] = [];
+  for (const [i, line] of text.split("\n").entries()) {
+    // A Markdown link's target: the text between "](" and ")".
+    for (const [, target] of line.matchAll(/\]\(([^)\s]+)\)/g)) {
+      // A target with a scheme, such as https: or mailto:, or only a #section, is no relative link.
+      if (/^[a-z]+:/.test(target!) || target!.startsWith("#")) continue;
+      if (!(await exists(`${REPO}/${dir}/${target!.split("#")[0]}`))) lines.push(i + 1);
+    }
+  }
+  return [...new Set(lines)];
+}
+
+const SCRIPT_RULE = "every bun run names a script in package.json or in a spec's Commands section";
+/** The script that each `bun run` in `text` names. A `bun run` of a file path, such as `export.ts`, names none. */
+function scriptsNamed(text: string): string[] {
+  const scripts: string[] = [];
+  // "bun run", any flags (words that start with a hyphen), then the script: the first word that does not.
+  for (const [, word] of text.matchAll(/\bbun run(?:[ \t]+-[^\s`]*)*[ \t]+([^\s`-][^\s`]*)/g)) {
+    const script = word!.replace(/[.,;:)]+$/, ""); // the punctuation of the sentence around it
+    const isFilePath = script.includes("/") || /\.[cm]?[jt]sx?$/.test(script); // a folder, or a JavaScript or TypeScript file
+    if (script && !isFilePath) scripts.push(script);
+  }
+  return scripts;
+}
+
+/** The scripts in package.json, and those that a spec's Commands section names before its module builds them. */
+function knownScripts(): Set<string> {
+  const known = new Set(Object.keys(JSON.parse(TEXT_FILES.get("package.json")!).scripts ?? {}));
+  for (const [path, text] of TEXT_FILES) {
+    if (!/^spec\/[^/]+\.md$/.test(path)) continue; // a spec: a Markdown file directly in spec/
+    const start = text.indexOf("\n## Commands\n");
+    if (start < 0) continue;
+    const end = text.indexOf("\n## ", start + 1);
+    for (const script of scriptsNamed(text.slice(start, end < 0 ? undefined : end))) known.add(script);
+  }
+  return known;
+}
+
+const PHONE_RULE = "no phone number, except the made-up 555-0100 to 555-0199";
+
+const HIGHSPOT_RULE = "no link to a Highspot address (decision 0024)";
+// A link to a Highspot address. A pattern cannot tell Highspot's public pages from its internal ones, and no file
+// needs either. Only the host decides, so this project's own pages and slugs, such as a source page named after a
+// Highspot deep dive, pass. Every repeat has a bound, so a line of any length costs linear time.
+const HIGHSPOT_ADDRESSES = [
+  // A URL, with a scheme or protocol-relative ("//"), whose host names highspot.
+  /(?<![\w+.-])(?:[a-z][\w+.-]{0,30}:)?\/\/[^\s/?#)\]>"'`]{0,253}highspot/i,
+  // A host name or an email domain with a highspot label, such as a subdomain or an email address there. It starts
+  // after a space, an @, a bracket, a quote, an = or "//", never after a single "/", which starts a path.
+  /(?<=(?:^|[\s@(<[{"'`=]|\/\/)(?:[\w-]{1,63}\.){0,10})highspot\.[a-z]/i,
+  // Highspot's GitHub organization.
+  /github\.com\/highspot(?![\w-])/i,
+];
+const holdsHighspotAddress = (line: string) =>
+  line.toLowerCase().includes("highspot") && HIGHSPOT_ADDRESSES.some((address) => address.test(line));
+
 describe("the agent files", () => {
   test("CLAUDE.md starts with the AGENTS.md import", async () => {
     expect((await read("CLAUDE.md")).split("\n")[0]).toBe("@AGENTS.md");
@@ -54,17 +156,15 @@ describe("the agent files", () => {
     expect(firstColumn(await read("AGENTS.md"), "## Modules")).toEqual(map);
   });
 
-  test("every relative link resolves", async () => {
-    const files = ["AGENTS.md", "CLAUDE.md", ...list(SKILLS).map((name) => `.agents/skills/${name}/SKILL.md`)];
-    const broken: string[] = [];
-    for (const path of files) {
-      const dir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ".";
-      for (const [, target] of (await read(path)).matchAll(/\]\(([^)\s]+)\)/g)) {
-        if (/^[a-z]+:/.test(target!) || target!.startsWith("#")) continue;
-        if (!(await exists(`${REPO}/${dir}/${target!.split("#")[0]}`))) broken.push(`${path} -> ${target}`);
-      }
-    }
-    expect(broken).toEqual([]);
+  test("the checks read every kind of agent file", () => {
+    const kinds = ["AGENTS.md", "CLAUDE.md", "README.md", "docs/agents/domain.md", ".agents/skills/release/SKILL.md", ...AGENT_SETTINGS];
+    expect(AGENT_FILES).toEqual(expect.arrayContaining(kinds));
+  });
+
+  test("every relative link in the agent files' Markdown resolves", async () => {
+    const markdown = AGENT_FILES.filter((path) => path.endsWith(".md"));
+    const dirOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ".");
+    expect(await findings(markdown, LINK_RULE, (text, path) => brokenLinkLines(text, dirOf(path)))).toEqual([]);
   });
 });
 
@@ -132,5 +232,61 @@ describe("Gemini CLI's settings", () => {
     // context.fileName is a string or a list of strings: https://geminicli.com/docs/reference/configuration/#context
     // Only AGENTS.md: a second entry could load a file from outside the repository.
     expect([context?.fileName].flat()).toEqual(["AGENTS.md"]);
+  });
+});
+
+describe("the agent files' commands", () => {
+  test("every bun run names a script in package.json or in a spec's Commands section", async () => {
+    expect(scriptsNamed(TEXT_FILES.get("AGENTS.md")!)).toContain("build"); // control: Verify's `bun run build` was read
+    const known = knownScripts();
+    const unknownScripts = (line: string) => scriptsNamed(line).some((script) => !known.has(script));
+    expect(await findings(AGENT_FILES, SCRIPT_RULE, (text) => linesWhere(text, unknownScripts))).toEqual([]);
+  });
+});
+
+// The private-detail checks. Where private.yaml exists, the content module's tracked-file test and the release
+// skill's push guard also compare every file with it, in any format (src/private-details.ts).
+describe("private details", () => {
+  test("no agent file holds a phone number, except the made-up 555-0100 to 555-0199", async () => {
+    expect(await findings(AGENT_FILES, PHONE_RULE, findPhoneNumbers)).toEqual([]);
+  });
+
+  test("no tracked text file holds a link to a Highspot address", async () => {
+    expect(TEXT_FILES.size).toBeGreaterThan(AGENT_FILES.length); // control: the scan reads more than the agent files
+    expect(await findings([...TEXT_FILES.keys()], HIGHSPOT_RULE, (text) => linesWhere(text, holdsHighspotAddress))).toEqual([]);
+  });
+});
+
+// The name is built from two parts, so this file holds no Highspot address for the scan above to find.
+const HS = ["high", "spot"].join("");
+
+describe("the Highspot rule", () => {
+  test.each([
+    ["a URL on a highspot host", `https://app.${HS}.com/x`],
+    ["a URL whose host is highspot alone", `http://${HS}/wiki`],
+    ["a protocol-relative link", `<img src="//cdn.${HS}.com/x.png">`],
+    ["a bare host name", `See x.${HS}.com for it.`],
+    ["an email address", `Write to someone@${HS}.com.`],
+    ["the GitHub organization", `See github.com/${HS}/polar.`],
+    ["the GitHub organization at a sentence's end", `See github.com/${HS[0]!.toUpperCase()}${HS.slice(1)}.`],
+  ])("finds %s", (_name, line) => {
+    expect(holdsHighspotAddress(line)).toBe(true);
+  });
+
+  test.each([
+    ["this site's page for a deep dive", `https://peterkloss.dev/sources/${HS}-mcp-server`],
+    ["this repository's file for a deep dive", `https://github.com/loriensleafs/resume/blob/main/knowledge/deep-dives/${HS}-data-table.md`],
+    ["a path whose last part has a dot", `knowledge/deep-dives/${HS}.md`],
+    ["a citation id", `[highlight:${HS}.1]`],
+    ["the company's name", "Peter worked at Highspot."],
+  ])("lets %s pass", (_name, line) => {
+    expect(holdsHighspotAddress(line)).toBe(false);
+  });
+
+  test("reads a 100,000-character line in under 50 ms", () => {
+    const lines = [`https://${"a".repeat(100_000)}${HS}`, `${"a.".repeat(50_000)}${HS}.com`, `//${"a-".repeat(50_000)}${HS}`];
+    const start = performance.now();
+    for (const line of lines) holdsHighspotAddress(line);
+    expect(performance.now() - start).toBeLessThan(50);
   });
 });

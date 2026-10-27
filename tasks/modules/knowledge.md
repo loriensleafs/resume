@@ -154,7 +154,7 @@ Acceptance:
 Verify: on the branch `bun test src/knowledge` and `bun run knowledge <source id>` for each; after landing `bun run knowledge`
 Files: `knowledge/sources/fednow-architecture.md`, `knowledge/sources/fednow-bundle-size.md`, `knowledge/sources/fednow-design-system.md`, `src/knowledge/__tests__/__snapshots__/build.test.ts.snap`, `docs/design/interview-2026-10-26.md`
 Size: S
-Needs Peter: yes. Approval in the question tool of the three summaries and the moved files (edit rule, row 130). The push changes site files (the site build reads `knowledge/`), so it is also a release, which Peter approves.
+Needs Peter: yes. Approval in the question tool of the three summaries and the moved files (edit rule, row 130). The push changes site files (the site build reads `knowledge/`), so it is also a release (AGENTS.md, "Releases and approvals").
 
 ### K12: Move three deep dives to sources: `fednow-standards-mentoring`, `highspot-agent-workflow`, `highspot-ai-standards`
 
@@ -192,7 +192,7 @@ Acceptance:
 Verify: `bun run knowledge` lists the sources; `bun test`
 Files: `knowledge/sources/<id>.md` per interview source
 Size: S per source
-Needs Peter: yes. The interviews themselves; the kind line for interview sources (SPEC-site gives only the deep-dive wording) before the first interview source is approved; each source's approval; each push of a source is a release.
+Needs Peter: yes. The interviews themselves; the kind line for interview sources (SPEC-site gives only the deep-dive wording) before the first interview source is approved; each source's approval. Each push of a source is a release (AGENTS.md, "Releases and approvals").
 
 ## Checkpoints
 

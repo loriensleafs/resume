@@ -8,6 +8,8 @@ Brain owns the workflow. This table adapts its records to this repository; each 
 | Capability map and module specs | [spec/](../../spec/README.md) |
 | Approved current plan and task list | [tasks/plan.md](../../tasks/plan.md) and [tasks/todo.md](../../tasks/todo.md) |
 | Completed plans and task snapshots | tasks/done/ |
+| Wording drafts that wait for Peter's one review before D37 (row 153) | [docs/design/wording-drafts.md](../design/wording-drafts.md), the index; each task's own file in `docs/design/wording-drafts/` |
+| Review findings the conductor decided, for Peter's review at the end of the run (row 154) | [docs/design/build-decisions.md](../design/build-decisions.md); STATUS points there |
 | Intent and Peter's decisions (the decision record) | [docs/design/](../design/). Raw knowledge-interview answers never go here: they live in the private repo `loriensleafs/resume-private`, folder `interviews/` ([decision 0024](../decisions/0024-private-interview-repo.md)) |
 | Approved mockups, as images | [docs/design/mockups/](../design/mockups/README.md); prototype sources on a `prototype/<name>` branch, never on `main` |
 | Selected decisions and their reasons | [docs/decisions/](../decisions/README.md), `NNNN-slug.md` |
