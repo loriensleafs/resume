@@ -29,6 +29,9 @@ export type OpsEnv = {
   ANTHROPIC_API_KEY?: string; // only whether it is set is read, for status()
   PREVIEW_LIMIT?: string; // "day" or "month", outside production only: the budget refuses every turn with
                           // DAILY_LIMIT or SPEND_LIMIT, so a preview can show the "limit reached" state
+  // Every other variable, which createOps() ignores. With only optional fields and no index signature, TypeScript
+  // refuses process.env here: its own fields, NODE_ENV and TZ, are none of these (the weak-type check, TS2559).
+  [variable: string]: string | undefined;
 };
 
 /** The parts the chat's route file passes to handleChat() as ChatDeps, and the daily totals. */

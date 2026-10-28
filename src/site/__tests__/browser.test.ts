@@ -52,10 +52,22 @@ function chrome() {
   return path ? { executablePath: path } : { channel: "chrome" };
 }
 
+/**
+ * The preview's variables, as a preview deployment can hold them: the test's own, with VERCEL_ENV "preview" and a
+ * stand-in key that the Anthropic API refuses. Outside production the chat answers with the fake model whatever
+ * variables are set, an ANTHROPIC_API_KEY included (SPEC-chat, Tech Stack), so every chat test here runs with a key
+ * set. The test's own Anthropic credentials stay out, so no browser test can reach the model with them.
+ */
+function previewEnv(): Record<string, string | undefined> {
+  const { ANTHROPIC_API_KEY: _key, ANTHROPIC_AUTH_TOKEN: _token, ANTHROPIC_OAUTH_TOKEN: _oauth, ...inherited } = process.env;
+  return { ...inherited, VERCEL_ENV: "preview", ANTHROPIC_API_KEY: "stand-in-key-for-the-browser-test" };
+}
+
 beforeAll(async () => {
   await buildOutput();
   preview = Bun.spawn([process.execPath, "run", "preview", "--dir", seam1.outDir, "--port", "0"], {
     cwd: REPO,
+    env: previewEnv(),
     stdin: "ignore",
     stdout: "pipe",
     stderr: "inherit",
