@@ -1,8 +1,9 @@
 // The fixture root of seam 1 (SPEC-site, Testing 1): a folder that holds the project's files, as the build script's
 // --root reads them. Its resume.yaml is the repository's, with a name, a lead and a headline of its own, so a page that
 // shows them read this root. Its private.yaml holds a fake phone number, so a file that holds it leaks a private
-// detail. Its knowledge/sources/ holds two approved sources and a draft, each with Not public text (S16). A task whose
-// build step reads another project file adds that file here.
+// detail. Its knowledge/sources/ holds two approved sources and a draft, each with Not public text (S16). Its
+// knowledge/logistics.yaml holds an approved answer and a draft one, which only the device index can show (C16). A task
+// whose build step reads another project file adds that file here.
 
 const REPO = `${import.meta.dir}/../../..`;
 
@@ -25,6 +26,27 @@ export const FIXTURE_INTERVIEW = "fixture-interview";
 /** The fixture root's draft source: no page, no file and no text of it may reach the output. */
 export const FIXTURE_DRAFT = "fixture-draft";
 
+/** The deep dive's one link, which the interview also gives. Only the device index shows a source's links (C16). */
+export const FIXTURE_LINK = "https://example.com/the-fixture-root/deep-dive";
+/** The interview's second link. */
+export const FIXTURE_INTERVIEW_LINK = "https://example.com/the-fixture-root/interview";
+
+/** The fixture root's one approved logistics answer, on the topic work-arrangement. */
+export const FIXTURE_LOGISTICS_ANSWER = "The fixture root’s work-arrangement answer.";
+/** The fixture root's draft logistics answer: no output may hold it. */
+export const FIXTURE_DRAFT_LOGISTICS_ANSWER = "The fixture root’s draft availability answer, which no output holds.";
+
+/** The fixture root's knowledge/logistics.yaml (SPEC-knowledge, Logistics answers). */
+const LOGISTICS = `topics:
+  - topic: work-arrangement
+    answer: ${FIXTURE_LOGISTICS_ANSWER}
+    status: approved
+    approved: 2026-10-27
+  - topic: availability
+    answer: ${FIXTURE_DRAFT_LOGISTICS_ANSWER}
+    status: draft
+`;
+
 /** The knowledge/sources/ files of the fixture root, by file name. Each text is the fixture's own, in plain prose. */
 const SOURCES: Record<string, string> = {
   [`${FIXTURE_DEEP_DIVE}.md`]: `---
@@ -35,7 +57,7 @@ subject: project
 roles: [fednow]
 highlights: [highlight:fednow.1]
 summary: The fixture deep dive’s summary, which its page gives as its description.
-links: []
+links: ["${FIXTURE_LINK}"]
 status: approved
 approved: 2026-10-27
 source: Interview with Peter, 2026-10-27
@@ -72,7 +94,7 @@ kind: interview
 subject: career
 roles: [highspot, fednow]
 summary: The fixture interview’s summary, which its page gives as its description.
-links: []
+links: ["${FIXTURE_LINK}", "${FIXTURE_INTERVIEW_LINK}"]
 status: approved
 approved: 2026-10-27
 source: Interview with Peter, 2026-10-27
@@ -103,7 +125,7 @@ kind: interview
 subject: story
 roles: [fednow]
 summary: The fixture draft’s summary, which no output holds.
-links: []
+links: ["https://example.com/${FIXTURE_DRAFT}"]
 status: draft
 source: Interview with Peter, 2026-10-27
 ---
@@ -118,7 +140,10 @@ The fixture draft’s Not public kinds of material.
 `,
 };
 
-/** Writes the fixture root into the folder `root`: its resume.yaml, its private.yaml and its knowledge sources. */
+/**
+ * Writes the fixture root into the folder `root`: its resume.yaml, its private.yaml, its logistics answers and its
+ * knowledge sources.
+ */
 export async function writeFixtureRoot(root: string): Promise<void> {
   const source = Bun.YAML.parse(await Bun.file(`${REPO}/resume.yaml`).text()) as { basics: object };
   const fixtureSource = {
@@ -127,5 +152,6 @@ export async function writeFixtureRoot(root: string): Promise<void> {
   };
   await Bun.write(`${root}/resume.yaml`, Bun.YAML.stringify(fixtureSource));
   await Bun.write(`${root}/private.yaml`, `basics:\n  phone: ${FAKE_PHONE}\n`);
+  await Bun.write(`${root}/knowledge/logistics.yaml`, LOGISTICS);
   for (const [name, text] of Object.entries(SOURCES)) await Bun.write(`${root}/knowledge/sources/${name}`, text);
 }

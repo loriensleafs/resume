@@ -6,6 +6,7 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
 import { defineConfig, type Plugin } from "vite";
+import { chatKnowledge } from "./src/chat/vite-plugin";
 import { siteData } from "./src/site/data";
 import { SITE_ADDRESS } from "./src/site/page-head";
 
@@ -53,6 +54,10 @@ export default defineConfig({
     // The pages' data, made at build time from resume.yaml and the approved sources (src/site/data.ts). buildSite()
     // sets `siteData.root`; `vite dev` reads this folder's files.
     siteData({ pages }),
+    // The chat's plugin (SPEC-chat, "The build"): virtual:knowledge for the chat's server route, and device-index.json in
+    // the static folder, both from the same root as the pages' data (src/chat/vite-plugin.ts). This file is the one
+    // place that adds it: the site's code imports no chat module (SPEC-site, Objective).
+    chatKnowledge(),
     // Static prerendering (SPEC-site, Tech Stack), with the options of TanStack Start's guide:
     // https://tanstack.com/start/latest/docs/framework/react/guide/static-prerendering
     tanstackStart({

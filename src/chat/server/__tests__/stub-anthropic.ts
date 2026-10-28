@@ -20,8 +20,27 @@ const TEXT_PIECE = 8;
 /** The signature of every scripted thinking block, unless a call sets its own: a test finds it anywhere. */
 export const SIGNATURE = "EqQBCkgIBxABGAIiQHN0dWItc2lnbmF0dXJl-stub-signature";
 
+/**
+ * One model call's token counts, as the Messages API reports them: the input counts in message_start,
+ * the output count in message_delta. SPEC-deploy's "Cost estimate" maps them to the five counts.
+ */
+export type StubUsage = {
+  /** The uncached input. */
+  input_tokens: number;
+  /** The cache reads. */
+  cache_read_input_tokens: number;
+  /** All cache writes, the 1-hour ones included. */
+  cache_creation_input_tokens: number;
+  /** The 1-hour part of the cache writes. */
+  ephemeral_1h_input_tokens: number;
+  /** The output, thinking included. */
+  output_tokens: number;
+};
+
 /** One scripted model call: one thinking block, then text, then a tool call, as Sonnet 5.5 answers. */
 export type StubCall = {
+  /** The call's usage. Not set: 1,000 tokens of uncached input, no cache, and a quarter of the written characters as output. */
+  usage?: StubUsage;
   /** The thinking summary: the text of one thinking block. */
   thinking?: string;
   /** The thinking summary streams in pieces of this many characters. THINKING_PIECE when not set. */
@@ -73,6 +92,19 @@ function piecesOf(text: string, size: number): string[] {
   return pieces;
 }
 
+/** message_start's usage of a call: its input counts, with the cache writes split by their lifetime. */
+function startUsage(usage: StubUsage | undefined) {
+  if (usage === undefined) return { input_tokens: 1_000, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+  const { input_tokens, cache_read_input_tokens, cache_creation_input_tokens, ephemeral_1h_input_tokens } = usage;
+  return {
+    input_tokens,
+    output_tokens: 1,
+    cache_creation_input_tokens,
+    cache_read_input_tokens,
+    cache_creation: { ephemeral_5m_input_tokens: cache_creation_input_tokens - ephemeral_1h_input_tokens, ephemeral_1h_input_tokens },
+  };
+}
+
 /** The Messages API's stream events for one scripted call, the `n`th of the turn, whose request has `signal`. */
 async function* streamOf(call: StubCall, n: number, signal: AbortSignal | undefined) {
   yield {
@@ -85,7 +117,7 @@ async function* streamOf(call: StubCall, n: number, signal: AbortSignal | undefi
       content: [],
       stop_reason: null,
       stop_sequence: null,
-      usage: { input_tokens: 1_000, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
+      usage: startUsage(call.usage),
     },
   };
   let index = 0;
@@ -118,7 +150,7 @@ async function* streamOf(call: StubCall, n: number, signal: AbortSignal | undefi
   yield {
     type: "message_delta",
     delta: { stop_reason: call.stopReason ?? (call.toolUse ? "tool_use" : "end_turn"), stop_sequence: null },
-    usage: { output_tokens: Math.ceil(written / 4) },
+    usage: { output_tokens: call.usage?.output_tokens ?? Math.ceil(written / 4) },
   };
   yield { type: "message_stop" };
 }

@@ -1823,7 +1823,7 @@ describe("a thrown run", () => {
     ["an Error", (text: string): unknown => new Error(text)],
     ["a bare string", (text: string): unknown => text],
   ])(
-    "a middleware that throws %s with a marker: the marker never reaches the wire, the stream ends with RUN_ERROR SERVER_ERROR, each server log line holds the error alone, and the turn writes one error entry",
+    "a middleware that throws %s with a marker: the marker never reaches the wire, the stream ends with RUN_ERROR SERVER_ERROR, each server log line holds the error alone, and the turn writes one error entry and one chat_turn event",
     async (_name, thrown) => {
       const asked = "What did Test Person build at Acme?";
       const fake = fakeText();
@@ -1835,7 +1835,8 @@ describe("a thrown run", () => {
           if (chunk.type === EventType.TEXT_MESSAGE_CONTENT) throw thrown(`${MARKER}: ${asked}`);
         },
       };
-      const deps = seamDeps(fake, { testMiddleware: [throwing] });
+      const telemetry = inMemoryTelemetry();
+      const deps = seamDeps(fake, { telemetry, testMiddleware: [throwing] });
       let events: WireEvent[] = [];
 
       const lines = await serverLogLines(async () => {
@@ -1852,6 +1853,8 @@ describe("a thrown run", () => {
         expect(line).not.toContain(THREAD_ID);
       }
       expect((await deps.log.list(1)).map(({ question, outcome }) => ({ question, outcome }))).toEqual([{ question: asked, outcome: "error" }]);
+      expect(telemetry.events.map(({ outcome, errorCode }) => ({ outcome, errorCode }))).toEqual([{ outcome: "error", errorCode: "SERVER_ERROR" }]);
+      expect(JSON.stringify(telemetry.events)).not.toContain(MARKER);
     },
   );
 
@@ -2184,6 +2187,384 @@ describe("turn telemetry", () => {
           reservation: undefined,
         },
       ]);
+    },
+  );
+
+  /** The question of every ending below: no chat_turn event holds it. */
+  const ASKED = "What did Test Person build at Acme?";
+  const ANSWER: FakeResponse = { text: "Test Person built the first thing [highlight:acme.1]." };
+  /** A budget whose every reservation is "reservation-1". */
+  const RESERVES: Budget = { reserve: async () => ({ ok: true, reservation: "reservation-1" }) };
+
+  /** A fake model that gives `response` to its one model call. */
+  function answering(response: FakeResponse) {
+    const fake = fakeText();
+    fake.setResponses([response]);
+    return fake;
+  }
+
+  /** A middleware that throws inside the run at the answer's first text, so the chat() stream throws. */
+  const throwsInRun: ChatMiddleware = {
+    name: "throws",
+    onChunk: (_ctx, chunk) => {
+      if (chunk.type === EventType.TEXT_MESSAGE_CONTENT) throw new Error("The middleware failed.");
+    },
+  };
+
+  /** The signal of a visitor who selected Stop before the request reached the handler. */
+  function stoppedAlready(): AbortSignal {
+    const visitor = new AbortController();
+    visitor.abort();
+    return visitor.signal;
+  }
+
+  /** The question log and the telemetry that a turn writes to. */
+  type Writes = Pick<ChatDeps, "log" | "telemetry">;
+
+  /**
+   * One way a request ends: the outcome, error code and reservation of its chat_turn event, the
+   * question-log entries it writes, and how to send it with the given log and telemetry.
+   */
+  type Ending = {
+    outcome: ChatTurnEvent["outcome"];
+    errorCode: string | null;
+    reservation: string | undefined;
+    entries: number;
+    send: (writes: Writes) => Promise<Response>;
+  };
+
+  const endings: Record<string, Ending> = {
+    "an answer": {
+      outcome: "answered",
+      errorCode: null,
+      reservation: "reservation-1",
+      entries: 1,
+      send: (writes) => handleChat(chatRequest([question(ASKED)]), seamDeps(answering(ANSWER), { ...writes, budget: RESERVES })),
+    },
+    "a model error": {
+      outcome: "error",
+      errorCode: "SERVER_ERROR",
+      reservation: "reservation-1",
+      entries: 1,
+      send: (writes) => handleChat(chatRequest([question(ASKED)]), seamDeps(answering({ error: "The provider failed." }), { ...writes, budget: RESERVES })),
+    },
+    "a thrown run": {
+      outcome: "error",
+      errorCode: "SERVER_ERROR",
+      reservation: "reservation-1",
+      entries: 1,
+      send: (writes) =>
+        handleChat(chatRequest([question(ASKED)]), seamDeps(answering(ANSWER), { ...writes, budget: RESERVES, testMiddleware: [throwsInRun] })),
+    },
+    "a Stop before the run": {
+      outcome: "stopped",
+      errorCode: null,
+      reservation: "reservation-1",
+      // One entry per turn that reached the model (Question log).
+      entries: 0,
+      send: (writes) =>
+        handleChat(postChat(chatBody([question(ASKED)]), {}, CHAT_URL, stoppedAlready()), seamDeps(answering(ANSWER), { ...writes, budget: RESERVES })),
+    },
+    "a refusal by the budget": {
+      outcome: "limit",
+      errorCode: "DAILY_LIMIT",
+      reservation: undefined,
+      entries: 0,
+      send: (writes) => handleChat(chatRequest([question(ASKED)]), seamDeps(answering(ANSWER), { ...writes, budget: inMemoryBudget("DAILY_LIMIT") })),
+    },
+    // The checks read this question before they reject it: 10,036 characters, over the limit.
+    "a rejected request": {
+      outcome: "rejected",
+      errorCode: null,
+      reservation: undefined,
+      entries: 0,
+      send: (writes) =>
+        handleChat(chatRequest([question(`${ASKED} ${"x".repeat(10_000)}`)]), seamDeps(answering(ANSWER), { ...writes, budget: RESERVES })),
+    },
+  };
+
+  test.each(Object.entries(endings))(
+    "%s hands one chat_turn event, with its outcome, error code and reservation, to telemetry.record(); the event holds neither the question nor the threadId, and no log entry holds the threadId",
+    async (_name, ending) => {
+      const telemetry = recordingTelemetry();
+      const log = inMemoryQuestionLog(now);
+
+      await (await ending.send({ log, telemetry })).text();
+
+      expect(telemetry.records.map(({ event, reservation }) => ({ event: event.event, outcome: event.outcome, errorCode: event.errorCode, reservation }))).toEqual([
+        { event: "chat_turn", outcome: ending.outcome, errorCode: ending.errorCode, reservation: ending.reservation },
+      ]);
+      const entries = await log.list(1);
+      expect(entries).toHaveLength(ending.entries);
+      expect(JSON.stringify(telemetry.records)).not.toContain(ASKED);
+      expect(JSON.stringify(telemetry.records)).not.toContain(THREAD_ID);
+      expect(JSON.stringify(entries)).not.toContain(THREAD_ID);
+    },
+  );
+
+  test.each<[string, number, () => Request]>([
+    ["FORBIDDEN_ORIGIN", 403, () => postChat(chatBody([question(ASKED)]), { origin: "https://example.com" })],
+    ["REQUEST_TOO_LARGE", 413, () => postChat("x".repeat(262_145))],
+    ["QUESTION_TOO_LONG", 413, () => chatRequest([question("a".repeat(10_001))])],
+    ["INVALID_REQUEST", 400, () => postChat("{")],
+  ])(
+    "a request rejected with %s hands one chat_turn event, rejected, with no model call, no token counts, no error code and no reservation",
+    async (code, status, request) => {
+      const telemetry = recordingTelemetry();
+
+      const response = await handleChat(request(), seamDeps(fakeText(), { telemetry, budget: RESERVES }));
+
+      expect({ status: response.status, code: (await response.json()).error.code }).toEqual({ status, code });
+      expect(telemetry.records).toEqual([
+        {
+          event: {
+            event: "chat_turn",
+            outcome: "rejected",
+            reads: 0,
+            citations: 0,
+            removed: 0,
+            modelCalls: 0,
+            inputTokens: null,
+            cachedInputTokens: null,
+            cacheWriteTokens: null,
+            cacheWrite1hTokens: null,
+            outputTokens: null,
+            durationMs: 0,
+            errorCode: null,
+          },
+          reservation: undefined,
+        },
+      ]);
+    },
+  );
+
+  /**
+   * The visitor's Stop at the turn's first answer text. It runs inside the run, so the Stop lands
+   * during the model call that streams that text, before the call finishes.
+   */
+  function stopsAtFirstText(visitor: AbortController): ChatMiddleware {
+    return {
+      name: "visitor-stop",
+      onChunk: (_ctx, chunk) => {
+        if (chunk.type === EventType.TEXT_MESSAGE_CONTENT) visitor.abort();
+      },
+    };
+  }
+
+  /** What the usage tests read of a chat_turn record: how the turn ended, its model calls and reads, the five counts and the reservation. */
+  const usageOf = ({ event, reservation }: { event: ChatTurnEvent; reservation: string | undefined }) => ({
+    outcome: event.outcome,
+    errorCode: event.errorCode,
+    modelCalls: event.modelCalls,
+    reads: event.reads,
+    inputTokens: event.inputTokens,
+    cachedInputTokens: event.cachedInputTokens,
+    cacheWriteTokens: event.cacheWriteTokens,
+    cacheWrite1hTokens: event.cacheWrite1hTokens,
+    outputTokens: event.outputTokens,
+    reservation,
+  });
+
+  test("two finished model calls, then a Stop during the third: telemetry gets the sum of the two calls' usage as SPEC-deploy's five counts, and the stopped call adds nothing", async () => {
+    // Each call's usage as the Messages API reports it. The chat's short cache writes no 1-hour
+    // tokens; the first call has some, so the test also checks that count.
+    const stub = stubAnthropic([
+      {
+        ...thinkingRead("The catalog names sample.", ["sample.2"]),
+        usage: { input_tokens: 200, cache_read_input_tokens: 0, cache_creation_input_tokens: 3_000, ephemeral_1h_input_tokens: 1_000, output_tokens: 50 },
+      },
+      {
+        ...thinkingRead("The passage names the next step.", ["sample.3"]),
+        usage: { input_tokens: 300, cache_read_input_tokens: 3_000, cache_creation_input_tokens: 400, ephemeral_1h_input_tokens: 0, output_tokens: 60 },
+      },
+      {
+        thinking: "The passages answer it.",
+        text: "Test Person planned it [sample.2] and tested it [sample.3].",
+        usage: { input_tokens: 700, cache_read_input_tokens: 3_400, cache_creation_input_tokens: 500, ephemeral_1h_input_tokens: 0, output_tokens: 70 },
+      },
+    ]);
+    const visitor = new AbortController();
+    const telemetry = recordingTelemetry();
+    const deps = seamDeps(stub.adapter, { telemetry, budget: RESERVES, testMiddleware: [stopsAtFirstText(visitor)] });
+
+    await readEvents(await handleChat(postChat(chatBody([question("How did Test Person build the first thing?")]), {}, CHAT_URL, visitor.signal), deps));
+
+    expect(stub.requests).toHaveLength(3);
+    // Counted by hand: uncached input 200 + 300, cache reads 0 + 3,000, all cache writes 3,000 + 400,
+    // of them 1-hour 1,000 + 0, output 50 + 60. The third call's 700, 3,400, 500 and 70 are not in it.
+    expect(telemetry.records.map(usageOf)).toEqual([
+      {
+        outcome: "stopped",
+        errorCode: null,
+        modelCalls: 3,
+        reads: 2,
+        inputTokens: 500,
+        cachedInputTokens: 3_000,
+        cacheWriteTokens: 3_400,
+        cacheWrite1hTokens: 1_000,
+        outputTokens: 110,
+        reservation: "reservation-1",
+      },
+    ]);
+  });
+
+  test("a Stop during the turn's only model call: the five counts are null, as no model call finished, and the event says stopped with no error code", async () => {
+    const stub = stubAnthropic([
+      {
+        thinking: "The visitor asks what was built.",
+        text: "Test Person built the first thing [highlight:acme.1].",
+        usage: { input_tokens: 700, cache_read_input_tokens: 0, cache_creation_input_tokens: 3_000, ephemeral_1h_input_tokens: 0, output_tokens: 70 },
+      },
+    ]);
+    const visitor = new AbortController();
+    const telemetry = recordingTelemetry();
+    const deps = seamDeps(stub.adapter, { telemetry, budget: RESERVES, testMiddleware: [stopsAtFirstText(visitor)] });
+
+    await readEvents(await handleChat(postChat(chatBody([question("What did Test Person build?")]), {}, CHAT_URL, visitor.signal), deps));
+
+    expect(telemetry.records.map(usageOf)).toEqual([
+      {
+        outcome: "stopped",
+        errorCode: null,
+        modelCalls: 1,
+        reads: 0,
+        inputTokens: null,
+        cachedInputTokens: null,
+        cacheWriteTokens: null,
+        cacheWrite1hTokens: null,
+        outputTokens: null,
+        reservation: "reservation-1",
+      },
+    ]);
+  });
+
+  test("a read whose model call finishes, then a call that stops at max_tokens: the five counts are the first call's only, as a max_tokens stop reports no usage", async () => {
+    const stub = stubAnthropic([
+      {
+        ...thinkingRead("The catalog names sample.", ["sample.2"]),
+        usage: { input_tokens: 200, cache_read_input_tokens: 0, cache_creation_input_tokens: 3_000, ephemeral_1h_input_tokens: 0, output_tokens: 50 },
+      },
+      {
+        thinking: "The passage answers it.",
+        text: "Test Person planned the first thing [sample.2] and then the",
+        stopReason: "max_tokens",
+        usage: { input_tokens: 300, cache_read_input_tokens: 3_000, cache_creation_input_tokens: 400, ephemeral_1h_input_tokens: 0, output_tokens: 8_000 },
+      },
+    ]);
+    const telemetry = recordingTelemetry();
+    const deps = seamDeps(stub.adapter, { telemetry, budget: RESERVES });
+
+    await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), deps));
+
+    expect(telemetry.records.map(usageOf)).toEqual([
+      {
+        outcome: "error",
+        errorCode: "MAX_TOKENS",
+        modelCalls: 2,
+        reads: 1,
+        inputTokens: 200,
+        cachedInputTokens: 0,
+        cacheWriteTokens: 3_000,
+        cacheWrite1hTokens: 0,
+        outputTokens: 50,
+        reservation: "reservation-1",
+      },
+    ]);
+  });
+
+  test("durationMs is the time from the request's arrival to the turn's end, by ChatDeps.now()", async () => {
+    let clock = Date.parse("2026-10-27T12:00:00.000Z");
+    const fake = fakeText();
+    // The model call takes 1.5 s of the clock.
+    fake.setResponses([
+      () => {
+        clock += 1_500;
+        return ANSWER;
+      },
+    ]);
+    const telemetry = recordingTelemetry();
+
+    await readEvents(await handleChat(chatRequest([question(ASKED)]), seamDeps(fake, { telemetry, now: () => new Date(clock) })));
+
+    expect(telemetry.records.map(({ event }) => event.durationMs)).toEqual([1_500]);
+  });
+
+  test.each(Object.entries(endings))("%s: the response ends only after its log and telemetry writes", async (_name, ending) => {
+    // Every write waits until the test lets it finish (SPEC-deploy, amendment 10; row 168).
+    const writesMayFinish = Promise.withResolvers<void>();
+    const firstWrite = Promise.withResolvers<void>();
+    const finished: string[] = [];
+    const slowWrite = async (store: string) => {
+      firstWrite.resolve();
+      await writesMayFinish.promise;
+      finished.push(store);
+    };
+    const writes: Writes = {
+      log: { append: () => slowWrite("question-log"), list: async () => [] },
+      telemetry: { record: () => slowWrite("telemetry") },
+    };
+    let ended = false;
+
+    const response = ending.send(writes).then(async (r) => {
+      await r.text();
+      ended = true;
+    });
+    await firstWrite.promise;
+    // Time for a response that did not wait for its writes to end.
+    await Bun.sleep(20);
+    expect(ended).toBe(false);
+    writesMayFinish.resolve();
+    await response;
+
+    expect(finished.sort()).toEqual(ending.entries === 0 ? ["telemetry"] : ["question-log", "telemetry"]);
+  });
+
+  /** What the visitor gets of a response: its status, and its JSON body, or its events' types, answer text and error codes. */
+  async function visitorGets(response: Response) {
+    if (response.headers.get("content-type")?.includes("application/json")) return { status: response.status, body: await response.json() };
+    const events = await readEvents(response);
+    return {
+      status: response.status,
+      types: events.map((e) => e.type),
+      text: streamedText(events),
+      errorCodes: events.filter((e) => e.type === "RUN_ERROR").map((e) => e.code),
+    };
+  }
+
+  test.each(Object.entries(endings))(
+    "%s: a log write that rejects and a telemetry write that throws never break the response, and each server log line about them holds neither the question nor the error's message",
+    async (_name, ending) => {
+      const working = await visitorGets(await ending.send({ log: inMemoryQuestionLog(now), telemetry: inMemoryTelemetry() }));
+      // Stores whose errors repeat what they were given, the question included.
+      const failing: Writes = {
+        log: {
+          append: async (entry) => {
+            throw new Error(`the store refused ${JSON.stringify(entry)}`);
+          },
+          list: async () => [],
+        },
+        telemetry: {
+          record: (event) => {
+            throw new Error(`the store refused ${JSON.stringify(event)} for ${ASKED}`);
+          },
+        },
+      };
+      const consoleError = spyOn(console, "error").mockImplementation(() => {});
+
+      try {
+        const broken = await visitorGets(await ending.send(failing));
+
+        expect(broken).toEqual(working);
+        const lines = consoleError.mock.calls.map((args) => args.map(String).join(" ")).filter((line) => line.includes("write failed"));
+        const stores = lines.map((line) => ["question-log", "telemetry"].find((store) => line.includes(store)));
+        expect(stores.sort()).toEqual(ending.entries === 0 ? ["telemetry"] : ["question-log", "telemetry"]);
+        for (const line of lines) {
+          expect(line).not.toContain(ASKED);
+          expect(line).not.toContain("the store refused");
+        }
+      } finally {
+        consoleError.mockRestore();
+      }
     },
   );
 });
