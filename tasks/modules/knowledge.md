@@ -182,6 +182,19 @@ Files: `knowledge/sources/highspot-data-table.md`, `knowledge/sources/highspot-m
 Size: S
 Needs Peter: yes, as K11.
 
+### K14: The knowledge script's own test seam
+
+Delivers: seam 4 of SPEC-knowledge: a test that runs `bun run knowledge` on fixtures and checks each of its modes, its flag errors, its Skipped id line and its exit codes (Peter's row 176).
+Blocked by: K10
+Acceptance:
+- `bun run knowledge` takes `--root <folder>` (absolute or relative to the working folder), as `bun run build:site` does, and reads the knowledge, the resume and the drafts from that root.
+- `scripts/__tests__/knowledge.test.ts` runs the script as a child process on the fixture root and checks: the core print, a source id and passage ids, `--draft <id>` with a clean draft and with a broken one, an unknown id, a Skipped id, each flag error, and each exit code.
+- SPEC-knowledge's Testing Strategy names seam 4 and its file; the module notes' seam list follows.
+Verify: `bun test scripts/__tests__/knowledge.test.ts`; `bun test`
+Files: `scripts/knowledge.ts`, `scripts/__tests__/knowledge.test.ts`, `spec/SPEC-knowledge.md`, `tasks/modules/knowledge.md` (the notes)
+Size: S
+Needs Peter: no (row 176)
+
 ### Task 13: Long-form interviews, one subject at a time: career, working style, stories, opinions, side projects, skills
 
 Delivers: approved interview sources for the six subjects, from Peter's own words.

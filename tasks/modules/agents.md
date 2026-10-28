@@ -170,6 +170,19 @@ Files: `.agents/skills/update-mockups/SKILL.md`, `docs/design/mockups/README.md`
 Size: S
 Needs Peter: no, unless a board looks different after the move (then his look, before the canvas changes)
 
+### A12: The `update-mockups` skill opens the canvas by its address
+
+Delivers: the `update-mockups` skill finds the canvas "Resume site mockups" by its recorded address, not by `list`, so it runs under Peter's hook, which lets only that address through for `read` and `publish` (row 175).
+Blocked by: Peter's hook edit and the canvas address (row 175)
+Acceptance:
+- The skill names the canvas address in one place and opens the canvas with `read` on it; no step uses `list` or any other artifact.
+- One `read` of the canvas succeeds under the hook, and the skill's publish step targets that address only.
+- The agent-files test covers the skill's new step.
+Verify: one `read` of the canvas; `bun test`
+Files: `.agents/skills/update-mockups/SKILL.md`
+Size: S
+Needs Peter: the hook edit and the canvas address, before it starts
+
 ## Checkpoints
 
 ### Checkpoint agents: before the first release
