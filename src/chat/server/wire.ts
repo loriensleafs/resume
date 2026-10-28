@@ -150,7 +150,7 @@ function thinkingSummary() {
 }
 
 /** What the browser gets of a read: its ids, never its text (Read results on the wire). */
-type ReadIds = Omit<ReadResult, "text">;
+export type ReadIds = Omit<ReadResult, "text">;
 
 /** A list of ids, or none when the value is not a list of strings. */
 const Ids = z.array(z.string()).catch([]);

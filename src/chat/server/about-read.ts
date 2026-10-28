@@ -16,6 +16,7 @@ import type { Knowledge, ReadResult, Source } from "../../knowledge/types";
 import { turnLimits } from "./limits";
 import { READ_SOURCES } from "./tools";
 import { recordRead, type Turn } from "./turn";
+import type { ReadIds } from "./wire";
 
 /** What a question's About read adds to the turn. A question with no About read adds no message, and its middleware sends nothing. */
 export type AboutRead = {
@@ -25,7 +26,8 @@ export type AboutRead = {
   middleware: ChatMiddleware;
 };
 
-const NO_ABOUT_READ: AboutRead = { messages: [], middleware: { name: "about-read" } };
+/** A new About read that adds nothing, one per call, so no two turns share its messages or its middleware. */
+const noAboutRead = (): AboutRead => ({ messages: [], middleware: { name: "about-read" } });
 
 /** The approved source that `id` names, as a source id or as one of its passage ids. */
 const sourceNamedBy = (knowledge: Knowledge, id: string): Source | undefined =>
@@ -44,7 +46,7 @@ function topicOf(title: string): string {
 /** The call and its result as the browser gets them: the result's ids, never its text (Read results on the wire). */
 function streamEvents(callId: string, input: { ids: string[]; topic: string }, result: ReadResult): StreamChunk[] {
   const timestamp = Date.now();
-  const ids = { read: result.read, unknown: result.unknown, skipped: result.skipped };
+  const ids: ReadIds = { read: result.read, unknown: result.unknown, skipped: result.skipped };
   return [
     { type: EventType.TOOL_CALL_START, toolCallId: callId, toolCallName: READ_SOURCES, timestamp },
     { type: EventType.TOOL_CALL_ARGS, toolCallId: callId, delta: JSON.stringify(input), timestamp },
@@ -60,12 +62,14 @@ function streamEvents(callId: string, input: { ids: string[]; topic: string }, r
  * line from prompt.ts, and any other id is ignored, as the scope ignores an unknown role id.
  */
 export function readAbout(knowledge: Knowledge, turn: Turn, about: string | null | undefined): AboutRead {
-  const source = about ? sourceNamedBy(knowledge, about) : undefined;
-  if (!about || !source) return NO_ABOUT_READ;
+  if (!about) return noAboutRead();
+  const source = sourceNamedBy(knowledge, about);
+  if (!source) return noAboutRead();
   const input = { ids: [about], topic: topicOf(source.title) };
   const result = readPassages(knowledge, input.ids);
   recordRead(turn, result);
   const callId = `about-${crypto.randomUUID()}`;
+  // Each model call of the turn sends its own RUN_STARTED, and onChunk sees every one: the read goes out after the first only.
   let sent = false;
   return {
     messages: [
