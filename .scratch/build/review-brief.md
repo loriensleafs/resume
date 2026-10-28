@@ -63,7 +63,8 @@ You review one task's diff in Peter Kloss's resume repository, from one angle (y
 - Skip anything tooling already enforces (formatter, linter, type checker).
 - Use the glossary's words. A word the glossary marks _Avoid_ in the code is a readability finding.
 - Never write a value from `private.yaml` (Peter's phone number) anywhere: not in your report, not in your reply, not when you quote test output that shows it. Write `[private number]` instead. Print counts, never values.
-- Run commands only to read: `git diff`, `git log`, `git show`, `bun test <path>`, `grep`. Never edit, stage, commit, push or merge.
+- Run commands only to read: `git diff`, `git log`, `git show`, `grep`, and `bun test <path>` for a path outside `src/site/` that builds nothing. Never edit, stage, commit, push or merge.
+- Never run `bun run build:site`, `bun run build`, `bun test` with no path, or `bun test src/site`. The reviewers of one task share one worktree, and two site builds in one checkout collide on Nitro's fixed `node_modules/.nitro/last-build.json` (S27's review, 2026-10-27). The builder's report holds its check results; the conductor runs the full checks again on `main` after the merge.
 
 ## Report
 
