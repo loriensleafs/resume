@@ -184,7 +184,7 @@ Versions checked on 2026-10-26 ([research 05](../docs/research/05-framework-supp
 - `workbox-build` 7.4.1 for the service worker.
 - Google Sans Flex served from the site itself, a Latin subset of the variable font (weights 400 to 700) cut with `harfbuzzjs`. No request to Google Fonts or any other third party. The cut font files are committed, so the Vercel build downloads nothing.
 - Prerendered Markdown renders with `@tanstack/markdown/react`. Its `components` option for `th` and `td` turns a column's alignment into a class, because a `style` attribute breaks the policy.
-- Dev: `playwright` (driving Chromium under Bun) and `axe-core` for the browser test.
+- Dev: `playwright` (driving Google Chrome under Bun) and `axe-core` for the browser test.
 
 Approving this spec approves adding these dependencies.
 
@@ -302,7 +302,7 @@ Peter approved this contract on 2026-10-27 ([decision record](../docs/design/int
    - Each HTML file starts with a policy tag that lists exactly the hashes of its own inline scripts. Each page except `404.html` holds the head script right after its policy tag. No file holds a `style=` attribute.
    - The not-found page `404.html` exists and has no script.
    - Each page has a title, a description, a canonical address on `https://peterkloss.dev`, and Open Graph tags; the sitemap lists every page.
-2. **One real-browser test.** Playwright drives Chromium under Bun against `bun run preview --dir <folder>`, where `<folder>` is the one seam 1 built into with `bun run build:site --out <folder>`. So the test builds first and passes on a clean checkout. The chat's scripted answers come from the preview's fake model ([SPEC-chat](SPEC-chat.md)).
+2. **One real-browser test.** Playwright drives Google Chrome (or `CHROME_PATH`) under Bun against `bun run preview --dir <folder>`, where `<folder>` is the one seam 1 built into with `bun run build:site --out <folder>`. So the test builds first and passes on a clean checkout. The chat's scripted answers come from the preview's fake model ([SPEC-chat](SPEC-chat.md)).
    - **Accessibility.** axe-core reports no WCAG 2.2 AA violation, in light and dark, on `/`, `/resume`, a source page and the workspace with a source open, at 1440 × 900 and 390 × 844. At 390 × 844 also with the source sheet, the resume sheet, the ⋯ menu and the install sheet open.
      - The app bar's name box keeps the approved board's colors, white on `--ds-blue-700`: 4.44:1 in Chrome, below AA's 4.5:1 for its 15 px bold text, by Peter's choice ([decision record](../docs/design/interview-2026-10-26.md) row 171). It is the one known contrast exception, so the axe check skips the color-contrast rule for that element only.
    - **Speed.** With 4× CPU slowdown and a slow 4G network: the largest content paint on `/` and `/resume` is under 2.5 s, and layout shift is under 0.1. From the network log, the JavaScript that `/` loads before any interaction, gzip-compressed, is under 200 KB.

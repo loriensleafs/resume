@@ -80,8 +80,8 @@ function compileRoutes(routes: Config["routes"] = []): { before: CompiledRoute[]
     }
     for (const condition of route.has ?? []) {
       const value = condition.value as unknown;
-      const isHostEq =
-        condition.type === "host" && typeof value === "object" && value !== null && Object.keys(value).join() === "eq";
+      const keys = typeof value === "object" && value !== null ? Object.keys(value) : [];
+      const isHostEq = condition.type === "host" && keys.length === 1 && keys[0] === "eq";
       if (!isHostEq) {
         fail(`route ${i} has the condition ${JSON.stringify(condition)}; the preview follows { eq } on the host only`);
       }
@@ -135,7 +135,7 @@ async function indexStaticFiles(
 async function indexFunctions(functionsDir: string): Promise<Set<string>> {
   const functions = new Set<string>();
   const configs = new Glob("**/*.func/.vc-config.json").scan({ cwd: functionsDir, dot: true, followSymlinks: true });
-  for await (const config of configs) functions.add(`/${config.slice(0, -".func/.vc-config.json".length)}`);
+  for await (const configPath of configs) functions.add(`/${configPath.slice(0, -".func/.vc-config.json".length)}`);
   return functions;
 }
 

@@ -33,7 +33,9 @@ async function previewOrigin(child: typeof preview): Promise<string> {
     const address = output.match(/Preview: (http:\/\/\S+?)\/? /)?.[1];
     if (address) {
       void (async () => {
-        while (!(await reader.read()).done);
+        // Drain the rest of the output: read each chunk and drop it, until the stream ends.
+        let chunk = await reader.read();
+        while (!chunk.done) chunk = await reader.read();
       })();
       return address;
     }
