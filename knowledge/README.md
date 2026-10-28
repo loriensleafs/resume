@@ -2,9 +2,8 @@
 
 What the resume chat may answer from, besides `resume.yaml`. The rules are in [SPEC-knowledge](../spec/SPEC-knowledge.md).
 
-- `sources/<source id>.md`: the source files, approved or draft. Each is a deep dive or an interview. A deep dive explains one highlight or project in the third person, written from Peter's answers. An interview holds Peter's answers in his own words, each under the question asked. Each `## ` section is a passage, numbered from 1 in file order. The last section, `## Not public`, names the kinds of material the chat declines to describe.
+- `sources/<source id>.md`: the source files, approved or draft. Each is a deep dive or an interview. A deep dive explains one highlight or project in the third person, written from Peter's answers. The nine deep dives are approved sources here; they moved from the old `deep-dives/` folder. An interview holds Peter's answers in his own words, each under the question asked. Each `## ` section is a passage, numbered from 1 in file order. The last section, `## Not public`, names the kinds of material the chat declines to describe.
 - `logistics.yaml`: Peter's logistics answers about remote work, location, availability and target roles.
-- `deep-dives/`: the nine deep dives in their old form. Nothing reads them. Each moves to `sources/` after Peter approves its move.
 
 A source file or a logistics answer reaches the chat only after Peter approves it: `status: approved` plus the date he approved it. Until then it is a draft (`status: draft`), and the build checks only its front matter and its sections.
 

@@ -1,10 +1,14 @@
 ---
 id: highspot-data-table
 title: The Polar UI data table, built on TanStack Table
-role: highspot
-highlights: [4]
+kind: deep-dive
+subject: project
+roles: [highspot]
+highlights: [highlight:highspot.4]
+summary: How Peter wrote the 21 specs and 189 requirement documents for Polar UI's data table, designed its API and built it on TanStack Table, after an AG Grid Enterprise license was blocked.
+links: []
 status: approved
-approved: 2026-10-26
+approved: 2026-10-27
 source: Interview with Peter, 2026-10-26
 ---
 
