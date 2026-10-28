@@ -7,7 +7,7 @@
 // the 120 seconds of a run.
 
 import type { ChatMiddleware } from "@tanstack/ai";
-import type { TurnEnding } from "./finish-turn";
+import type { EndTurn } from "./finish-turn";
 import type { Turn } from "./turn";
 
 export const turnLimits = {
@@ -68,10 +68,10 @@ export function readBudget(turn: Pick<Turn, "reads">): ChatMiddleware {
 }
 
 /** The reason the deadline aborts a run with. Only passedDeadline() reads it. */
-const DEADLINE = "DEADLINE";
+const DEADLINE_REASON = "DEADLINE";
 
 /** Whether the deadline aborted the run whose controller has `signal`. */
-export const passedDeadline = (signal: AbortSignal): boolean => signal.reason === DEADLINE;
+export const passedDeadline = (signal: AbortSignal): boolean => signal.reason === DEADLINE_REASON;
 
 /**
  * The deadline of one turn (Limits, "Deadline"): a timer on the run's abortController, `run`.
@@ -89,7 +89,7 @@ export const passedDeadline = (signal: AbortSignal): boolean => signal.reason ==
  *   one terminal hook per run, and it runs the middleware's hooks in array order: put the deadline
  *   first, so it stops the timer before any of the chat's other terminal hooks runs or waits.
  */
-export function deadline(run: AbortController, endTurn: (ending: TurnEnding) => Promise<void>): ChatMiddleware {
+export function deadline(run: AbortController, endTurn: EndTurn): ChatMiddleware {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const stop = () => clearTimeout(timer);
   return {
@@ -98,7 +98,7 @@ export function deadline(run: AbortController, endTurn: (ending: TurnEnding) => 
       timer = setTimeout(() => {
         if (run.signal.aborted) return;
         ctx.defer(endTurn({ outcome: "error", errorCode: "DEADLINE" }));
-        run.abort(DEADLINE);
+        run.abort(DEADLINE_REASON);
       }, turnLimits.deadlineMs);
     },
     onFinish: stop,

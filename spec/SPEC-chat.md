@@ -492,7 +492,8 @@ bun run evals                      # the trick questions against the real model;
 
 ```text
 src/chat/server/handle-chat.ts     handleChat(request, deps) and ChatDeps: the module's server entry point, which wires one turn
-src/chat/server/request-checks.ts  checkRequest(): the request checks in order; the ChatError shape, its codes and chatError()
+src/chat/server/request-checks.ts  checkRequest(): the request checks in order, with an { ok } result; the ChatError shape, its
+                                   codes and chatError()
 src/chat/server/run.ts             the run's controller, which a Stop aborts, and the stream wrapper that ends the stream with
                                    SERVER_ERROR after a throw and with DEADLINE after the deadline
 src/chat/server/about-read.ts      readAbout(): the About read of a passage or a source, its read_sources call and whole result
@@ -506,7 +507,8 @@ src/chat/server/wire.ts            the chunk middleware, a new instance per requ
                                    RUN_ERROR events as wireError(code), and the thinking summary as chat.thinking events;
                                    the fixed messages per code and wireError()
 src/chat/server/finish-turn.ts     finishTurn(): writes the turn's question-log entry and its chat_turn event exactly once;
-                                   the terminal hook, the deadline middleware and the stream wrapper call it
+                                   the terminal hook, the deadline middleware and the stream wrapper call it; finishRejected():
+                                   the chat_turn event of a rejected request
 src/chat/server/question-log.ts    QuestionLog, QuestionLogEntry, Budget and Telemetry, and their in-memory versions
 src/chat/server/telemetry.ts       ChatTurnEvent, and the middleware that sums onUsage for finishTurn()
 src/chat/ui/                       ChatColumn, Messages, Question, QueuedQuestion, Answer, AnswerText, AnswerSteps,
@@ -759,4 +761,4 @@ All rows are in the [decision record](../docs/design/interview-2026-10-26.md).
 - 2026-10-27, after C12's review: the two spend-limit tests run the adapter's own SDK behind a stub `fetch` with Anthropic's documented bodies, and every other stubbed turn goes through `createAnthropicChatWithClient()`. The conductor's decision, for Peter's end review ([build decisions](../docs/design/build-decisions.md)).
 - 2026-10-27, after C16's review: Project Structure puts the device index's build code in `src/chat/device-index-build.ts`, apart from the browser's `device-index.ts`, and lists `src/chat/virtual-knowledge.d.ts`. The labels of the resume entries come from the site's `buildSiteData(root)` at build time. The conductor's decision, for Peter's end review ([build decisions](../docs/design/build-decisions.md)).
 - 2026-10-27, after C14's review: Question log names `finishRejected()`, which writes the `chat_turn` event of a rejected request and no question-log entry, because a rejected request is not a turn.
-- 2026-10-27, task C13: Project Structure gains `request-checks.ts` and `run.ts`, which take the request checks and the stream wrapper out of `handle-chat.ts` (the carry-forward notes of C4 and C11). The Question log names the deadline middleware as a caller of `finishTurn()`, and Limits, "Deadline", says when the timer starts and stops.
+- 2026-10-27, task C13: Project Structure gains `request-checks.ts` and `run.ts`, which take the request checks and the stream wrapper out of `handle-chat.ts` (the carry-forward notes of C4 and C11). The Question log names the deadline middleware as a caller of `finishTurn()`, and Limits, "Deadline", says when the timer starts and stops. After C13's review, the `finish-turn.ts` line also names `finishRejected()`, and the `request-checks.ts` line says that `checkRequest()` gives an `{ ok }` result.

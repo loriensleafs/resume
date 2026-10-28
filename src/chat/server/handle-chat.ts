@@ -12,7 +12,7 @@ import {
 } from "@tanstack/ai";
 import type { Knowledge } from "../../knowledge/types";
 import { readAbout } from "./about-read";
-import { finishRejected, finishTurn, finishTurnHooks, type TurnEnding } from "./finish-turn";
+import { finishRejected, finishTurn, finishTurnHooks, type EndTurn } from "./finish-turn";
 import { deadline, readBudget, turnLimits } from "./limits";
 import { answerMarkers } from "./markers";
 import { systemPrompts } from "./prompt";
@@ -51,12 +51,12 @@ async function* only(event: StreamChunk): AsyncGenerator<StreamChunk> {
 export async function handleChat(request: Request, deps: ChatDeps): Promise<Response> {
   const startedAt = deps.now();
   const checked = await checkRequest(request, deps.origins);
-  if (typeof checked === "string") {
+  if (!checked.ok) {
     // A rejected request never reaches the model: it writes its chat_turn event only (Turn telemetry).
     await finishRejected(deps, startedAt);
-    return chatError(checked);
+    return chatError(checked.errorCode);
   }
-  const { threadId, messages, question, props } = checked;
+  const { threadId, messages, question, props } = checked.request;
 
   // At the day's cap or the month's limit, the answer is the limit stream, and the model is not called.
   // The browser reads no body of a response that is not 200, so the refusal is a 200 stream (The request, "Limits").
@@ -76,7 +76,7 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
   // still sends the deadline's RUN_ERROR.
   const delivery = new AbortController();
   const run = stoppedBy(request.signal, delivery.signal);
-  const endTurn = (ending: TurnEnding) => finishTurn(deps, turn, ending);
+  const endTurn: EndTurn = (ending) => finishTurn(deps, turn, ending);
   const stream = chat({
     adapter: deps.adapter,
     threadId,

@@ -83,6 +83,15 @@ export type CheckedRequest = {
 };
 
 /**
+ * What checkRequest() gives, in the { ok } shape of Budget.reserve(): the request that passed every
+ * check, or the ChatError code of the first check that failed.
+ */
+export type CheckResult = { ok: true; request: CheckedRequest } | { ok: false; errorCode: ChatErrorCode };
+
+/** The result of a check that failed with `errorCode`. */
+const rejected = (errorCode: ChatErrorCode): CheckResult => ({ ok: false, errorCode });
+
+/**
  * Whether the request's page may use the chat (The request, "Origin"): its Origin is one of `origins`,
  * or, when the list is empty, the request's own origin. A request with no Origin header passes; the
  * rate limits and the cap still apply to it. Any other Origin, "null" included, fails.
@@ -94,30 +103,30 @@ function originAllowed(request: Request, origins: readonly string[]): boolean {
 }
 
 /** The request checks, in SPEC-chat's order (The request). Each failure is one ChatError code. */
-export async function checkRequest(request: Request, origins: readonly string[]): Promise<CheckedRequest | ChatErrorCode> {
+export async function checkRequest(request: Request, origins: readonly string[]): Promise<CheckResult> {
   // The origin first, so another site's page cannot make the server read its body.
-  if (!originAllowed(request, origins)) return "FORBIDDEN_ORIGIN";
+  if (!originAllowed(request, origins)) return rejected("FORBIDDEN_ORIGIN");
   // 1. The body as bytes, read no further than the limit. A body that fails to arrive is no chat request.
   const bytes = await attempt(() => readBody(request, turnLimits.requestBytes));
-  if (!bytes.ok) return "INVALID_REQUEST";
-  if (bytes.value === "too-large") return "REQUEST_TOO_LARGE";
+  if (!bytes.ok) return rejected("INVALID_REQUEST");
+  if (bytes.value === "too-large") return rejected("REQUEST_TOO_LARGE");
   const sent = bytes.value;
   // 2. The bytes as JSON.
   const body = await attempt((): unknown => JSON.parse(utf8.decode(sent)));
-  if (!body.ok) return "INVALID_REQUEST";
+  if (!body.ok) return rejected("INVALID_REQUEST");
   // 3. TanStack AI's check of the body. Not chatParamsFromRequest(): it reads the body itself and answers a plain-text 400.
   const params = await attempt(() => chatParamsFromRequestBody(body.value));
-  if (!params.ok) return "INVALID_REQUEST";
+  if (!params.ok) return rejected("INVALID_REQUEST");
   const { threadId, messages, forwardedProps } = params.value;
   // 4. The messages: the roles user, assistant and tool only, a user message of text only, and the newest
   // message the question, with text. Then the question's length; earlier turns are bounded by the bytes
   // and by the conversation sent.
   const checked = ChatMessages.safeParse(messages);
-  if (!checked.success) return "INVALID_REQUEST";
+  if (!checked.success) return rejected("INVALID_REQUEST");
   const { question } = checked.data;
-  if (question.length > turnLimits.questionCharacters) return "QUESTION_TOO_LONG";
+  if (question.length > turnLimits.questionCharacters) return rejected("QUESTION_TOO_LONG");
   // 5. The question's own request properties.
   const props = ChatProps.safeParse(forwardedProps);
-  if (!props.success) return "INVALID_REQUEST";
-  return { threadId, messages, question, props: props.data };
+  if (!props.success) return rejected("INVALID_REQUEST");
+  return { ok: true, request: { threadId, messages, question, props: props.data } };
 }

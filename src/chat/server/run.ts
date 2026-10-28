@@ -3,7 +3,7 @@
 // handler's own RUN_ERROR when the run threw or passed its deadline.
 
 import type { StreamChunk } from "@tanstack/ai";
-import type { TurnEnding } from "./finish-turn";
+import type { EndTurn } from "./finish-turn";
 import { passedDeadline } from "./limits";
 import { logServerError } from "./server-log";
 import { wireError } from "./wire";
@@ -23,8 +23,8 @@ export function stoppedBy(...signals: AbortSignal[]): AbortController {
 
 /**
  * The stream wrapper: the chat() stream, ended with the handler's own RUN_ERROR when the turn ended
- * with an error the browser must see. `run` is the run's abort signal, and `endTurn` ends the turn
- * through finishTurn(), which writes nothing when the turn already ended.
+ * with an error the browser must see. `runSignal` is the run's abort signal, and `endTurn` ends the
+ * turn through finishTurn(), which writes nothing when the turn already ended.
  *
  * - A thrown run (The request, "A thrown run"). A throw out of the chat() stream never passes the
  *   chunk middleware, and toServerSentEventsResponse() would send the error's own message. So a throw
@@ -39,13 +39,13 @@ export function stoppedBy(...signals: AbortSignal[]): AbortController {
  */
 export async function* wrapRun(
   stream: AsyncIterable<StreamChunk>,
-  run: AbortSignal,
-  endTurn: (ending: TurnEnding) => Promise<void>,
+  runSignal: AbortSignal,
+  endTurn: EndTurn,
 ): AsyncGenerator<StreamChunk> {
   try {
     yield* stream;
   } catch (error) {
-    if (!run.aborted) {
+    if (!runSignal.aborted) {
       logServerError("chat: the run threw, and the turn ends with SERVER_ERROR", error);
       await endTurn({ outcome: "error", errorCode: "SERVER_ERROR" });
       yield wireError("SERVER_ERROR");
@@ -54,5 +54,5 @@ export async function* wrapRun(
     // After the deadline's abort the turn has ended, and this writes nothing.
     await endTurn({ outcome: "stopped", errorCode: null });
   }
-  if (passedDeadline(run)) yield wireError("DEADLINE");
+  if (passedDeadline(runSignal)) yield wireError("DEADLINE");
 }
