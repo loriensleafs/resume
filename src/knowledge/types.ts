@@ -11,3 +11,5 @@ export type Entry = { id: string; kind: "resume" | "logistics" | "catalog"; titl
 export type Knowledge = { core: Entry[]; sources: Source[] };
 /** Everything that reaches a browser: the site's pages and the device index. It holds no Not public text. */
 export type PublicKnowledge = { core: Entry[]; sources: Omit<Source, "notPublic">[] };
+/** What readPassages() gives. `text` stays on the server; only `{ read, unknown, skipped }` reaches a browser. */
+export type ReadResult = { text: string; read: string[]; unknown: string[]; skipped: string[] };
