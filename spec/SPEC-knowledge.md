@@ -214,7 +214,7 @@ export const PASSAGE_ID_RULE: string;
 | Consumer | Shape | How |
 |---|---|---|
 | The chat's server function | `Knowledge`, with `Not public` | `virtual:knowledge`, bundled with the function ([SPEC-chat](SPEC-chat.md)) |
-| The site's pages | `PublicKnowledge` | `src/site/data.ts` ([SPEC-site](SPEC-site.md)) |
+| The site's pages | `PublicKnowledge` | `src/site/site-data.ts` ([SPEC-site](SPEC-site.md)) |
 | The device index | `PublicKnowledge` | `device-index.json` ([SPEC-chat](SPEC-chat.md)) |
 
 So the function bundle holds `Not public` text on purpose, and no file under `.vercel/output/static/` holds it.

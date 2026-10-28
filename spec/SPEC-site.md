@@ -217,8 +217,11 @@ src/site/workspace.ts        the workspace contract the chat module reads
 src/site/saved-views.ts      the saved views in the IndexedDB database peterkloss-views
 src/site/head-script.ts      the inline head script: the theme and the first view's pre-paint flag
 src/site/suggested-questions.ts  the first view's suggested questions, overall and per role
-src/site/data.ts             the pages' data: a Vite module made at build time from resume.yaml and the PublicKnowledge
-                             shape from publicKnowledge(knowledge), never the full knowledge; one lazy JSON file per source
+src/site/site-data.ts        buildSiteData(): the pages' data, made at build time from resume.yaml and the PublicKnowledge
+                             shape from publicKnowledge(knowledge), never the full knowledge; the career timeline's spans
+                             and the stylesheet that places them on its year axis
+src/site/data.ts             siteData(), the Vite plugin that makes modules from buildSiteData(): the pages' data, one
+                             lazy JSON file per source, and the career timeline's stylesheet
 src/site/styles/             tokens import, fonts, layout
 src/site/build.ts            buildSite({ root, outDir }): the Vite build with prerendering, documents/ and 404.html
 src/site/not-found.tsx       renderNotFoundPage(): the text of 404.html, a React tree with no script

@@ -2,7 +2,7 @@
 import { AppBar as AcmeAppBar } from "@acmelabs/design-system-react/components/app-bar";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import type { SiteResume } from "../data";
+import type { SiteResume } from "../site-data";
 
 export type AppBarProps = {
   /** `name`, Peter's name, goes in the blue name box; `label`, the headline, follows it. */

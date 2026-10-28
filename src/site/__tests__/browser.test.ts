@@ -64,11 +64,13 @@ beforeAll(async () => {
   browser = await chromium.launch(chrome());
 }, 120_000);
 
+// Google Chrome's own shutdown took up to 6.5 s while other worktrees' builds and browsers ran (task S10, 2026-10-27),
+// longer than bun test's default hook timeout of 5 s, so the hook has its own limit.
 afterAll(async () => {
   await browser?.close();
   preview?.kill();
   await preview?.exited;
-});
+}, 30_000);
 
 /** The two screen sizes of SPEC-site's browser checks. */
 const WIDE = { width: 1440, height: 900 };
@@ -257,6 +259,177 @@ describe.each(["/", "/resume"])("accessibility of %s", (path) => {
     await inWindow(viewport, async (browserWindow) => {
       const { page } = await visit(browserWindow, path);
       expect(await axeViolations(page)).toEqual([]);
+    });
+  });
+});
+
+/** The box of each element that matches a selector, in page order: its left and right edges and its size, in px. */
+function boxesOf(page: Page, selector: string) {
+  return page.$$eval(selector, (elements) =>
+    elements.map((element) => {
+      const { left, right, width, height } = element.getBoundingClientRect();
+      return { left, right, width, height };
+    }),
+  );
+}
+
+/** Presses Tab until keyboard focus is on the career timeline span whose button name starts with `name`. */
+async function tabToSpan(page: Page, name: string): Promise<void> {
+  for (let press = 0; press < 20; press++) {
+    await page.keyboard.press("Tab");
+    const focused = await page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? "");
+    if (focused.startsWith(name)) return;
+  }
+  throw new Error(`Tab never reached the career timeline span "${name}"`);
+}
+
+/** A span's bar colour and outline, with the colour of its label, which is --ds-gray-1000, the darkened bar's colour. */
+function barOf(page: Page, roleId: string) {
+  return page.$eval(`.career-timeline-span-${roleId}`, (span) => {
+    const bar = getComputedStyle(span.querySelector(".career-timeline-bar")!);
+    const label = getComputedStyle(span.querySelector(".career-timeline-label")!);
+    return { color: bar.backgroundColor, outline: `${bar.outlineStyle} ${bar.outlineWidth}`, darkened: label.color };
+  });
+}
+
+/** Whether a span's tooltip is open, and the text of each line its surface shows. */
+function tooltipOf(page: Page, roleId: string) {
+  return page.$eval(`.career-timeline-span-${roleId} acme-tooltip`, (tooltip) => ({
+    open: tooltip.shadowRoot?.querySelector('[part="content"]')?.matches(":popover-open") ?? false,
+    lines: [...tooltip.querySelectorAll<HTMLElement>('[slot="content"]')]
+      .filter((line) => line.checkVisibility())
+      .map((line) => line.textContent),
+  }));
+}
+
+// SPEC-site, Views: Career timeline band; Testing 2. The band on /, as the first-view and career-timeline-states boards
+// draw it. The build-output test checks its text and its stylesheet; these check what the browser makes of them.
+describe("the career timeline on /", () => {
+  // The fixture root's resume.yaml is the repository's: Brigham and Women's (2009 – 2012) has 36 months, Jack Morton
+  // (2016 – 2017) 12, and the year from 2012 to 2013 holds no role.
+  test("each span is as long as its role, and the gap from 2012 to 2013 shows as space, at 1440 × 900", async () => {
+    await inWindow(WIDE, async (browserWindow) => {
+      const { page } = await visit(browserWindow, "/");
+      const [axis] = await boxesOf(page, ".career-timeline-spans");
+      const spans = await boxesOf(page, ".career-timeline-span");
+      const [brigham] = await boxesOf(page, ".career-timeline-span-brigham");
+      const [sixRedMarbles] = await boxesOf(page, ".career-timeline-span-six-red-marbles");
+      const [jackMorton] = await boxesOf(page, ".career-timeline-span-jack-morton");
+      expect(brigham!.left).toBeCloseTo(axis!.left, 0);
+      expect(spans.at(-1)!.right).toBeCloseTo(axis!.right, 0);
+      expect(brigham!.width).toBeCloseTo(3 * jackMorton!.width, 0);
+      expect(sixRedMarbles!.left - brigham!.right).toBeCloseTo(jackMorton!.width, 0);
+      // Left to right, earliest first, with no overlap.
+      spans.slice(1).forEach((span, i) => expect(span.left).toBeGreaterThanOrEqual(spans[i]!.right - 0.5));
+      // Each bar fills its span, but for the 2 px at each end that keep neighbouring roles apart.
+      const bars = await boxesOf(page, ".career-timeline-bar");
+      bars.forEach((bar, i) => expect(bar.width).toBeCloseTo(spans[i]!.width - 4, 0));
+    });
+  });
+
+  // Decision record row 50: the instruction follows the heading on wide screens.
+  test('shows "Select a role to read it and scope the chat" at 1440 × 900, and not at 390 × 844', async () => {
+    for (const [viewport, visible] of [
+      [WIDE, true],
+      [PHONE, false],
+    ] as const) {
+      await inWindow(viewport, async (browserWindow) => {
+        const { page } = await visit(browserWindow, "/");
+        const hint = page.getByText("Select a role to read it and scope the chat");
+        expect({ viewport, visible: await hint.isVisible() }).toEqual({ viewport, visible });
+      });
+    }
+  });
+
+  // At 1024 × 768, the narrowest wide screen, a year is about 53 px, so "Jack Morton" is longer than its span.
+  test("keeps each label on one line, and ends a label longer than its span in an ellipsis", async () => {
+    await inWindow({ width: 1024, height: 768 }, async (browserWindow) => {
+      const { page } = await visit(browserWindow, "/");
+      const labels = await page.$$eval(".career-timeline-label", (elements) =>
+        elements.map((label) => ({
+          text: label.textContent,
+          cut: label.scrollWidth > label.clientWidth,
+          lines: Math.round(label.getBoundingClientRect().height / Number.parseFloat(getComputedStyle(label).lineHeight)),
+          overflow: `${getComputedStyle(label).overflow} ${getComputedStyle(label).textOverflow}`,
+        })),
+      );
+      expect(labels.filter((label) => label.cut).map((label) => label.text)).toContain("Jack Morton");
+      expect(labels.map((label) => label.lines)).toEqual(labels.map(() => 1));
+      expect(labels.map((label) => label.overflow)).toEqual(labels.map(() => "hidden ellipsis"));
+    });
+  });
+
+  test("hover darkens the span, and its tooltip shows the full employer name, then the title and the years", async () => {
+    await inWindow(WIDE, async (browserWindow) => {
+      const { page } = await visit(browserWindow, "/");
+      const before = await barOf(page, "jack-morton");
+      expect(before.color).not.toBe(before.darkened);
+      await page.locator(".career-timeline-span-jack-morton button").hover();
+      await page.locator(".career-timeline-span-jack-morton acme-tooltip[open]").waitFor();
+      const after = await barOf(page, "jack-morton");
+      expect(after.color).toBe(after.darkened);
+      // SPEC-site's own example.
+      expect(await tooltipOf(page, "jack-morton")).toEqual({
+        open: true,
+        lines: ["Jack Morton Worldwide", "Senior Front-End Engineer, 2016 – 2017"],
+      });
+    });
+  });
+
+  // Chrome's own accessibility tree is the oracle: the name and the description that a screen reader receives.
+  test("keyboard focus darkens and rings the span, and the tooltip's text is the button's description", async () => {
+    await inWindow(WIDE, async (browserWindow) => {
+      const { page } = await visit(browserWindow, "/");
+      await tabToSpan(page, "Jack Morton");
+      await page.locator(".career-timeline-span-jack-morton acme-tooltip[open]").waitFor();
+      const bar = await barOf(page, "jack-morton");
+      expect({ darkened: bar.color === bar.darkened, outline: bar.outline }).toEqual({
+        darkened: true,
+        outline: "solid 2px",
+      });
+      const cdp = await browserWindow.context.newCDPSession(page);
+      const { root } = await cdp.send("DOM.getDocument", { depth: -1 });
+      const { nodeId } = await cdp.send("DOM.querySelector", {
+        nodeId: root.nodeId,
+        selector: ".career-timeline-span-jack-morton button",
+      });
+      const { nodes } = await cdp.send("Accessibility.getPartialAXTree", { nodeId, fetchRelatives: false });
+      const button = nodes.find((node) => node.role?.value === "button");
+      expect({
+        name: button?.name?.value,
+        description: button?.description?.value,
+      }).toEqual({
+        name: "Jack Morton Worldwide, 2016 – 2017",
+        // acme-tooltip joins the lines of its content slot with a space (0.3.3).
+        description: "Jack Morton Worldwide Senior Front-End Engineer, 2016 – 2017",
+      });
+    });
+  });
+
+  test("axe-core reports no WCAG 2.2 AA violation with a span's tooltip open, at 1440 × 900", async () => {
+    await inWindow(WIDE, async (browserWindow) => {
+      const { page } = await visit(browserWindow, "/");
+      await tabToSpan(page, "Jack Morton");
+      await page.locator(".career-timeline-span-jack-morton acme-tooltip[open]").waitFor();
+      expect(await axeViolations(page)).toEqual([]);
+    });
+  });
+
+  // Below 1024 px the band keeps about 70 px a year and scrolls sideways inside itself (task S23 adds the rest of the
+  // phone band), so its spans stay targets of at least 24 × 24 px and the page never scrolls sideways.
+  test("never makes the page scroll sideways at 390 × 844; the band scrolls inside itself", async () => {
+    await inWindow(PHONE, async (browserWindow) => {
+      const { page } = await visit(browserWindow, "/");
+      const widths = await page.evaluate(() => {
+        const scroller = document.querySelector(".career-timeline-scroller")!;
+        return {
+          page: document.documentElement.scrollWidth <= window.innerWidth,
+          band: scroller.scrollWidth > scroller.clientWidth,
+        };
+      });
+      expect(widths).toEqual({ page: true, band: true });
+      const buttons = await boxesOf(page, ".career-timeline-span button");
+      expect(buttons.filter((button) => button.width < 24 || button.height < 24)).toEqual([]);
     });
   });
 });

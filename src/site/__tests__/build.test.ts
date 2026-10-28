@@ -428,6 +428,143 @@ describe.each(["index.html", "resume/index.html"])("the app bar in %s", (page) =
   });
 });
 
+/**
+ * The years of a role as SPEC-site writes them ("FedNow", "2021 – 2024"): the start year, an en dash and the end year,
+ * one year alone when the role starts and ends in it, and "Present" with no end date.
+ */
+function yearsOf({ startDate, endDate }: Resume["work"][number]): string {
+  const [start, end] = [startDate.slice(0, 4), endDate?.slice(0, 4) ?? "Present"];
+  return start === end ? start : `${start} – ${end}`;
+}
+
+/** The fixture root's roles and earlier roles, earliest first: the career timeline's order from left to right. */
+const rolesByStart = () => resume.work.toSorted((a, b) => a.startDate.localeCompare(b.startDate));
+
+/**
+ * The value of a property in the rule for one selector, in a stylesheet's text, or undefined. A minifier may join two
+ * rules with the same declarations into one selector list, so the selector is one item of the rule's list.
+ */
+function declarationOf(css: string, selector: string, property: string): string | undefined {
+  for (const [, selectors, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!selectors!.split(",").some((item) => item.trim() === selector)) continue;
+    const value = body!.match(new RegExp(`(?:^|;)\\s*${property}\\s*:([^;]*)`))?.[1];
+    if (value !== undefined) return value.trim();
+  }
+  return undefined;
+}
+
+/** The grid lines of a timeline span or year label from its class's rule, `grid-column: <start> / <end>`. */
+function gridColumnOf(css: string, className: string): [number, number] | undefined {
+  const value = declarationOf(css, `.${className}`, "grid-column");
+  const lines = value?.match(/^(\d+)\s*\/\s*(\d+)$/);
+  return lines ? [Number(lines[1]), Number(lines[2])] : undefined;
+}
+
+// SPEC-site, Views: Career timeline band; Testing 1. The workspace shows every role and earlier role as a span at its
+// true length on a year axis, as the first-view and career-timeline-states boards draw it.
+describe("the career timeline in index.html", () => {
+  const page = "index.html";
+
+  test('comes first in main, under the app bar, as a group named by its heading "Career timeline"', async () => {
+    const [first] = await attributeOn(page, "main > *", "role");
+    const [labelledBy] = await attributeOn(page, "main > *", "aria-labelledby");
+    expect(first).toBe("group");
+    expect(await elementsOn(page, `#${labelledBy}`)).toEqual([{ tag: "h2", text: "Career timeline" }]);
+  });
+
+  // Decision record row 50: the instruction follows the heading. The stylesheet shows it on wide screens only (seam 2).
+  test('has the line "Select a role to read it and scope the chat" after its heading', async () => {
+    expect(await elementsOn(page, ".career-timeline-header > *")).toEqual([
+      { tag: "h2", text: "Career timeline" },
+      { tag: "p", text: "Select a role to read it and scope the chat" },
+    ]);
+  });
+
+  test("has one span for each role and earlier role, earliest first, labelled with the role's x-short value", async () => {
+    const labels = (await elementsOn(page, ".career-timeline-label")).map((label) => label.text);
+    expect(labels).toEqual(rolesByStart().map((role) => role["x-short"]));
+  });
+
+  // Testing 1: each span's button name holds the full employer name and the years. It also holds the span's visible
+  // label, as WCAG 2.2's 2.5.3 Label in Name asks, so a visitor who speaks "HBS" reaches Harvard Business School. Text
+  // in parentheses does not count for that (axe-core 4.14, after ACT rule 2ee8b8), so "(FedNow)" in the employer name
+  // does not hold the label "FedNow".
+  test("each span is a real button whose name holds the full employer name, the years and its label", async () => {
+    const buttons = await elementsOn(page, ".career-timeline-span button");
+    const types = await attributeOn(page, ".career-timeline-span button", "type");
+    const names = await attributeOn(page, ".career-timeline-span button", "aria-label");
+    expect(buttons.map((button) => button.tag)).toEqual(rolesByStart().map(() => "button"));
+    expect(types).toEqual(rolesByStart().map(() => "button"));
+    rolesByStart().forEach((role, i) => {
+      for (const part of [role.name, yearsOf(role)]) expect(names[i]).toContain(part);
+      expect(names[i]!.replace(/\([^()]*\)/g, "")).toContain(role["x-short"]);
+    });
+    // SPEC-site's own example, and a label that the employer name does not hold.
+    expect(names).toContain("Jack Morton Worldwide, 2016 – 2017");
+    expect(names).toContain("HBS, Harvard Business School, 2015 – 2016");
+  });
+
+  // The tooltip's text is its description of the button (acme-tooltip 0.3.3: the content slot's text).
+  test("each span's acme-tooltip holds the full employer name, then the title and the years", async () => {
+    const texts = (await elementsOn(page, '.career-timeline-span acme-tooltip > [slot="content"]')).map(({ text }) => text);
+    expect(texts).toEqual(rolesByStart().flatMap((role) => [role.name, `${role.position}, ${yearsOf(role)}`]));
+    // SPEC-site's own example.
+    expect(texts).toContain("Senior Front-End Engineer, 2016 – 2017");
+  });
+
+  test("labels its year axis with every second year from the first, and the last year at its end", async () => {
+    const years = (await elementsOn(page, ".career-timeline-axis > *")).map((label) => label.text);
+    // The first-view board's axis for resume.yaml's roles, 2009 to Aug 2026.
+    expect(years).toEqual(["2009", "2011", "2013", "2015", "2017", "2019", "2021", "2023", "2026"]);
+  });
+
+  // SPEC-deploy, Headers: no style attribute, so each span's place on the axis is a class in a stylesheet the build
+  // writes. The axis has one grid column per month; a span covers the months of its role. A role's dates name a year
+  // or a month: it starts at the first month its start date names, and ends after the month that its end date names,
+  // or, for a year alone, as that year begins, so "2019 – 2020" and "2020 – 2021" meet and do not overlap.
+  test("the stylesheets / links give each span its true length on a year axis of one column per month", async () => {
+    const css = await cssOf(page);
+    const columns = Object.fromEntries(
+      rolesByStart().map((role) => [role.id, gridColumnOf(css, `career-timeline-span-${role.id}`)]),
+    );
+    const months = (id: string) => columns[id]![1] - columns[id]![0];
+    // Jan 2009 to the end of Aug 2026, the first-view board's axis: 17 years and 8 months.
+    expect(declarationOf(css, ".career-timeline", "--career-timeline-months")).toBe("212");
+    expect(columns.brigham).toEqual([1, 37]); // 2009 – 2012: from the axis's first column, 36 months
+    expect(months("jack-morton")).toBe(12); // 2016 – 2017
+    expect(months("highspot")).toBe(21); // Dec 2024 – Aug 2026, August included
+    expect(columns.highspot![1]).toBe(213); // the latest role ends the axis
+    // The career-timeline-states board: "the gap from 2012 to 2013 shows as space".
+    expect(columns["six-red-marbles"]![0] - columns.brigham![1]).toBe(12);
+    // Left to right, earliest first, and no two spans overlap.
+    const ordered = rolesByStart().map((role) => columns[role.id]!);
+    ordered.slice(1).forEach(([start], i) => expect(start).toBeGreaterThanOrEqual(ordered[i]![1]));
+  });
+
+  test("the stylesheets / links place each year label at its January, and the last at the axis's end", async () => {
+    const css = await cssOf(page);
+    const years = ["2009", "2011", "2013", "2015", "2017", "2019", "2021", "2023"];
+    expect(years.map((year) => gridColumnOf(css, `career-timeline-year-${year}`)?.[0])).toEqual(
+      years.map((year) => (Number(year) - 2009) * 12 + 1),
+    );
+    expect(gridColumnOf(css, "career-timeline-year-2026")?.[1]).toBe(213);
+  });
+
+  // A class with no rule in a linked stylesheet would leave the band unstyled until a script ran, or for ever.
+  test("has a rule for each class it uses in the stylesheets / links", async () => {
+    const classes = new Set<string>();
+    new HTMLRewriter()
+      .on(".career-timeline, .career-timeline [class]", {
+        element: (element) => element.getAttribute("class")!.split(/\s+/).forEach((name) => classes.add(name)),
+      })
+      .transform(await Bun.file(`${staticDir}/${page}`).text());
+    const css = await cssOf(page);
+    const unstyled = [...classes].filter((name) => !new RegExp(`\\.${name}(?![-\\w])`).test(css));
+    expect(classes.size).toBeGreaterThan(0);
+    expect(unstyled).toEqual([]);
+  });
+});
+
 // The page's one h1 names what the page is about. On /resume that is Peter, as the documents open with his name; the
 // app bar above it is the site's banner, not the page's heading. The workspace's h1 is its first view's heading (S11).
 describe("the headings of resume/index.html", () => {
@@ -582,6 +719,8 @@ describe("the not-found page 404.html", () => {
  */
 const PARTS: Record<string, (resume: Resume) => string[]> = {
   "acme-app-bar": (resume) => [resume.basics.name, resume.basics.label],
+  // Each career timeline span's tooltip holds its own role's text; the career timeline tests check each one.
+  "acme-tooltip": () => [],
 };
 
 // SPEC-site, Tech Stack and Testing 1. The wrappers render in the browser only (decision 0007), so the prerender writes
