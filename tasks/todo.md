@@ -112,7 +112,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [D17](modules/deploy.md#d17-the-routes-redirects-clean-addresses-three-api-routes-and-the-not-found-page) The routes: redirects, clean addresses, three API routes and the not-found page — blocked by D16, D6 (done 2026-10-27; `findFunctionFolders()`; the named-folder check moves to D20)
 - [x] [D18](modules/deploy.md#d18-security-and-cache-headers) Security and cache headers — blocked by D17 (done 2026-10-27; one policy header per path, the worker policy route last; a 404 under `/assets/` stays immutable as the spec writes it)
 - [x] [D10](modules/deploy.md#d10-the-question-log-in-upstash-deleted-by-the-store-after-90-days) The question log in Upstash, deleted by the store after 90 days — blocked by D9, D6 (done 2026-10-27; REST with `fetch`, one `/multi-exec` per write)
-- [ ] [S9](modules/site.md#s9-the-preview-and-the-real-browser-test) The preview and the real-browser test — blocked by S8, D17
+- [x] [S9](modules/site.md#s9-the-preview-and-the-real-browser-test) The preview and the real-browser test — blocked by S8, D17 (done 2026-10-27; `bun run preview`; seam 2 drives Google Chrome; axe at both sizes)
 - [ ] [S10](modules/site.md#s10-the-career-timeline-band) The career timeline band — blocked by S9, T1
 - [ ] [S11](modules/site.md#s11-the-workspace-and-its-first-view-on-wide-screens) The workspace and its first view on wide screens — blocked by S10; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [S12](modules/site.md#s12-the-head-script) The head script — blocked by S11, D16
