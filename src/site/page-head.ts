@@ -20,6 +20,13 @@ export type PageHeadOptions = {
   description: string;
 };
 
+/**
+ * The image a share preview shows: the app icon at 512 px, which `bun run icons` renders into public/icons/ (Peter,
+ * decision record row 173). The preview loads it from the site's one address, so the tag gives its full address, and
+ * its width and height let the preview lay it out before the file arrives (https://ogp.me/#structured).
+ */
+const SHARE_IMAGE = { path: "/icons/icon-512.png", width: 512, height: 512 };
+
 /** One page's title, description, canonical address and Open Graph tags (https://ogp.me). */
 export function pageHead({ path, title, description }: PageHeadOptions) {
   const address = new URL(path, SITE_ADDRESS).href;
@@ -31,6 +38,9 @@ export function pageHead({ path, title, description }: PageHeadOptions) {
       { property: "og:url", content: address },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
+      { property: "og:image", content: new URL(SHARE_IMAGE.path, SITE_ADDRESS).href },
+      { property: "og:image:width", content: String(SHARE_IMAGE.width) },
+      { property: "og:image:height", content: String(SHARE_IMAGE.height) },
     ],
     links: [{ rel: "canonical", href: address }],
   };

@@ -9,6 +9,7 @@
     "dev": "bun --bun vite dev",
     "documents": "bun run scripts/documents.ts",
     "fonts": "bun run scripts/make-fonts.ts",
+    "icons": "bun run scripts/icons.ts",
     "intent": "bun --bun node_modules/@tanstack/intent/dist/cli.mjs",
     "design-system-mcp": "bun --bun node_modules/@acmelabs/design-system-mcp/dist/cli.js",
     "knowledge": "bun run scripts/knowledge.ts",
