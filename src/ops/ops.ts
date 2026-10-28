@@ -1,7 +1,8 @@
 // The ops module (SPEC-deploy, "The question log, daily totals, alerts and status"). It gives the
 // chat's route file the question log, budget and telemetry that SPEC-chat defines. Outside
 // production they are the chat module's in-memory versions, whatever variables are set, so a
-// preview never reaches the store or sends an alert (decision record row 108).
+// preview never reaches the store or sends an alert (decision record row 108). In production the
+// log is the store's (upstash.ts).
 
 import {
   inMemoryBudget,
@@ -11,6 +12,7 @@ import {
   type QuestionLog,
   type Telemetry,
 } from "../chat/server/question-log";
+import { upstashQuestionLog } from "./upstash";
 
 /** What createOps() reads from the environment. `process.env` fits it as it is. */
 export type OpsEnv = {
@@ -37,18 +39,25 @@ export type Ops = {
  * - Outside production (any `VERCEL_ENV` but "production"): the chat module's in-memory log, budget
  *   and telemetry, whatever other variables are set. `PREVIEW_LIMIT` "day" or "month" makes the
  *   budget refuse every turn; an empty value counts as unset; any other value throws.
- * - In production, `PREVIEW_LIMIT` is ignored, whatever its value.
+ * - In production, `PREVIEW_LIMIT` is ignored, whatever its value. With `KV_REST_API_URL` and
+ *   `KV_REST_API_TOKEN` both set, the log is the store's, and each store call goes through `io.fetch`.
+ *   Without both, the log stays in memory, so answers keep working (SPEC-deploy, "A setting is
+ *   missing in production").
  */
-export function createOps(env: OpsEnv, io: { now?: () => Date } = {}): Ops {
+export function createOps(env: OpsEnv, io: { fetch?: typeof fetch; now?: () => Date } = {}): Ops {
   const now = io.now ?? (() => new Date());
   if (env.VERCEL_ENV !== "production") {
     return inMemoryOps(now, previewRefusal(env.PREVIEW_LIMIT));
   }
-  // The interim: the store-backed parts (SPEC-deploy, "Store calls") are not built yet. Until D10,
-  // D11 and D12 replace the log, the budget and the telemetry, production gets the in-memory parts
-  // with a budget that allows every turn. A missing or failing store keeps answers working, and
-  // Anthropic's monthly spend limit stays the backstop (SPEC-deploy, "The store fails").
-  return inMemoryOps(now);
+  const store =
+    env.KV_REST_API_URL && env.KV_REST_API_TOKEN
+      ? { url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN, fetch: io.fetch ?? fetch }
+      : undefined;
+  // The interim: D11 and D12 replace the budget and the telemetry with the store's. Until then,
+  // production gets the in-memory ones, with a budget that allows every turn, and Anthropic's monthly
+  // spend limit stays the backstop (SPEC-deploy, "The store fails").
+  const interim = inMemoryOps(now);
+  return { ...interim, log: store ? upstashQuestionLog(store, now) : interim.log };
 }
 
 function inMemoryOps(now: () => Date, refusal?: "DAILY_LIMIT" | "SPEND_LIMIT"): Ops {
