@@ -1,9 +1,10 @@
 import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-// Every page's stylesheets: the design system's tokens, then the site's own rules. Start finds CSS that the root route
-// imports and links it in every page's head, so a page is styled before any script runs:
+// Every page's stylesheets: the design system's tokens, the site's own font, then the site's own rules. Start finds CSS
+// that the root route imports and links it in every page's head, so a page is styled before any script runs:
 // https://tanstack.com/start/latest/docs/framework/react/guide/css-styling#use-side-effect-imports-for-global-route-css
 import "../styles/tokens.css";
+import "../styles/fonts.css";
 import "../styles/layout.css";
 
 // The shell wraps the root route's component, its error component and its not-found component,
