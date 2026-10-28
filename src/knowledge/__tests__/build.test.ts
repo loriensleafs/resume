@@ -1,10 +1,10 @@
-// Seam 1 of SPEC-knowledge: buildKnowledge() on fixtures and on the real files, with renderCore()
-// and renderSource() on its output.
+// Seam 1 of SPEC-knowledge: buildKnowledge() on fixtures and on the real files, with renderCore(),
+// renderSource() and publicKnowledge() on its output.
 
 import { afterAll, describe, expect, test } from "bun:test";
 import { loadResume } from "../../content";
 import { holds } from "../../private-details";
-import { buildKnowledge } from "../build";
+import { buildKnowledge, publicKnowledge } from "../build";
 import { parseId } from "../ids";
 import { renderCore, renderSource } from "../render";
 import type { Source } from "../types";
@@ -275,6 +275,34 @@ describe("renderSource on buildKnowledge's output", () => {
   test("renders a fixture source as the chat reads it (snapshot; review the diff when the rendered text changes)", async () => {
     const [source] = await builds("render-snapshot", { [SAMPLE]: interviewFile({ links: '["https://github.com/loriensleafs/brain"]' }) });
     expect(renderSource(source!)).toMatchSnapshot();
+  });
+});
+
+// Everything that reaches a browser comes from publicKnowledge(): the site's pages and the device
+// index (SPEC-knowledge, "Who gets which shape"). They write it as JSON, so the tests read its JSON.
+describe("publicKnowledge on buildKnowledge's output", () => {
+  test("gives JSON that holds no Not public text", async () => {
+    const knowledge = await buildKnowledge({ root: await fixture("public-no-not-public", SOURCES) });
+    // Both approved fixture sources have Not public text, so the checks below look for real text.
+    expect(knowledge.sources.map((s) => s.notPublic)).toEqual(["Internal code.", "Colleague names."]);
+    const json = JSON.stringify(publicKnowledge(knowledge));
+    expect(json).not.toContain("Internal code.");
+    expect(json).not.toContain("Colleague names.");
+  });
+
+  test("gives the rest of buildKnowledge's output unchanged: the core, and each source without its Not public text", async () => {
+    // A logistics answer in the core, and a third source with a link, so every field has a value to keep.
+    const root = await fixture("public-rest", {
+      ...SOURCES,
+      [SAMPLE]: interviewFile({ links: '["https://github.com/loriensleafs/brain"]' }),
+      "knowledge/logistics.yaml": LOGISTICS_YAML,
+    });
+    const knowledge = await buildKnowledge({ root });
+    expect(knowledge.sources.map((s) => s.id)).toEqual(["alpha", "alpha-beta", "sample"]);
+    expect(JSON.parse(JSON.stringify(publicKnowledge(knowledge)))).toStrictEqual({
+      core: knowledge.core,
+      sources: knowledge.sources.map(({ notPublic: _notPublic, ...source }) => source),
+    });
   });
 });
 
