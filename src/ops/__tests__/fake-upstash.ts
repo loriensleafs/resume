@@ -21,8 +21,10 @@ export type FakeUpstash = {
   requests: UpstashRequest[];
   /** When a key expires, as Redis's EXPIRETIME gives it; null for a missing key or a key with no expiry. */
   expiresAt(key: string): Date | null;
-  /** Stores a string at a key, as SET does, so that a test can give a key the wrong type. */
+  /** Stores a string at a key, as SET does, so that a test can give a key the wrong type or a starting value. */
   set(key: string, value: string): void;
+  /** The string at a key, as GET gives it; null for a missing key. */
+  get(key: string): string | null;
   stop(): Promise<void>;
 };
 
@@ -39,6 +41,7 @@ const ARITY: Record<string, { min: number; max: number }> = {
   RPUSH: { min: 3, max: Infinity },
   EXPIREAT: { min: 3, max: 3 },
   LRANGE: { min: 4, max: 4 },
+  INCRBY: { min: 3, max: 3 },
 };
 
 /**
@@ -82,6 +85,19 @@ export function startFakeUpstash({ now = () => new Date() }: { now?: () => Date 
         if (expiresAtMs <= now().getTime()) keys.delete(key);
         else entry.expiresAtMs = expiresAtMs;
         return { result: 1 };
+      }
+      case "INCRBY": {
+        // A missing key counts as 0; the new value is stored as a string, as in Redis.
+        const increment = integer(args[0]);
+        if (increment === undefined) return { error: NOT_AN_INTEGER };
+        if (entry && entry.value.type !== "string") return { error: WRONGTYPE };
+        const current = entry?.value.type === "string" ? integer(entry.value.value) : 0;
+        if (current === undefined) return { error: NOT_AN_INTEGER };
+        const value: Value = { type: "string", value: String(current + increment) };
+        // The key keeps its expiry, as in Redis.
+        if (entry) entry.value = value;
+        else keys.set(key, { value });
+        return { result: current + increment };
       }
       case "LRANGE": {
         const start = integer(args[0]);
@@ -162,6 +178,11 @@ export function startFakeUpstash({ now = () => new Date() }: { now?: () => Date 
     },
     set(key, value) {
       keys.set(key, { value: { type: "string", value } });
+    },
+    get(key) {
+      const value = live(key)?.value;
+      if (value?.type === "list") throw new Error(`The key ${key} holds a list, not a string.`);
+      return value?.value ?? null;
     },
     stop: () => server.stop(true),
   };
