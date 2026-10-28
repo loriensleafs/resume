@@ -96,7 +96,7 @@ export async function finishTurn(deps: FinishDeps, turn: Turn, ending: TurnEndin
  * nothing, and writes no log entry. Its error code is null, because a rejection's ChatError code is
  * none of the codes the event holds. Call it before the response, as every write finishes first.
  */
-export async function finishRejected(deps: FinishDeps, startedAt: Date): Promise<void> {
+export async function finishRejected(deps: Pick<FinishDeps, "telemetry" | "now">, startedAt: Date): Promise<void> {
   const event: ChatTurnEvent = {
     event: "chat_turn",
     outcome: "rejected",

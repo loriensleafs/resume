@@ -360,7 +360,7 @@ type SavedConversationState = {
 
 ## Question log
 
-One entry per turn that reached the model. One function, `finishTurn()` in `src/chat/server/finish-turn.ts`, writes the turn's entry and its `chat_turn` event (see Turn telemetry). The terminal middleware hook calls it with `ctx.defer()`, and the stream wrapper calls it after a throw (see The request, "A thrown run"). It keeps per-turn state, so each turn writes each record exactly once:
+One entry per turn that reached the model. One function, `finishTurn()` in `src/chat/server/finish-turn.ts`, writes the turn's entry and its `chat_turn` event (see Turn telemetry). `finishRejected()` writes the `chat_turn` event of a rejected request, which is not a turn, so it writes no question-log entry. The terminal middleware hook calls `finishTurn()` with `ctx.defer()`, and the stream wrapper calls it after a throw (see The request, "A thrown run"). It keeps per-turn state, so each turn writes each record exactly once:
 
 ```ts
 export type QuestionLogEntry = {
@@ -751,3 +751,4 @@ All rows are in the [decision record](../docs/design/interview-2026-10-26.md).
 - 2026-10-27, after C4's review: The request's step 4 also refuses a request whose newest message is not a user message with text (400 `INVALID_REQUEST`), and the Origin check runs before the body is read. Both are the conductor's decisions, for Peter's end review ([build decisions](../docs/design/build-decisions.md)).
 - 2026-10-27, task A10: the design system moved from 0.3.2 to 0.3.3 (row 172). Rendering answers names 0.3.3: `acme-markdown` has the same record at 0.3.3, and the parts in the chat's task conventions are the same.
 - 2026-10-27, after C12's review: the two spend-limit tests run the adapter's own SDK behind a stub `fetch` with Anthropic's documented bodies, and every other stubbed turn goes through `createAnthropicChatWithClient()`. The conductor's decision, for Peter's end review ([build decisions](../docs/design/build-decisions.md)).
+- 2026-10-27, after C14's review: Question log names `finishRejected()`, which writes the `chat_turn` event of a rejected request and no question-log entry, because a rejected request is not a turn.
