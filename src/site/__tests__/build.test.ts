@@ -1,6 +1,6 @@
 // Seam 1 of SPEC-site: buildSite() writes the real build output, and these tests read its files.
-// The fixture root holds the project's files: the repository's resume.yaml with a lead and a headline of its own, and
-// a fake phone number in private.yaml.
+// The fixture root holds the project's files: the repository's resume.yaml with a name, a lead and a headline of its
+// own, and a fake phone number in private.yaml.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { $, Glob } from "bun";
@@ -11,6 +11,8 @@ import { buildSite } from "../build";
 
 const REPO = `${import.meta.dir}/../../..`;
 const FAKE_PHONE = "(555) 555-0100";
+/** Only the fixture root's resume.yaml holds this name, so a page title that shows it read that resume.yaml. */
+const FIXTURE_NAME = "The Fixture Root’s Name";
 /** Only the fixture root's resume.yaml holds this lead, so a page that shows it read resume.yaml from that root. */
 const FIXTURE_LEAD = "The fixture root’s lead, which no other resume.yaml holds.";
 /** Only the fixture root's resume.yaml holds this headline, so an app bar that shows it read that resume.yaml. */
@@ -28,8 +30,11 @@ async function htmlFiles(): Promise<string[]> {
   return (await Array.fromAsync(new Glob("**/*.html").scan({ cwd: staticDir }))).sort();
 }
 
-/** React escapes these characters in text; HTMLRewriter hands the text over as written. */
+/** React escapes these characters in text and in attribute values; HTMLRewriter hands both over as written. */
 const ESCAPES: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#x27;": "'" };
+
+/** The text that React wrote, with its escapes read back. */
+const unescaped = (written: string) => written.replace(/&(amp|lt|gt|quot|#x27);/g, (escape) => ESCAPES[escape]!);
 
 /**
  * Each element of a page that carries a knowledge id, in page order: its id and its text, with each run of white space
@@ -51,10 +56,7 @@ async function knowledgeEntriesOn(page: string): Promise<{ id: string; text: str
       },
     })
     .transform(await Bun.file(`${staticDir}/${page}`).text());
-  return entries.map(({ id, text }) => ({
-    id,
-    text: text.replace(/&(amp|lt|gt|quot|#x27);/g, (escape) => ESCAPES[escape]!).replace(/\s+/g, " ").trim(),
-  }));
+  return entries.map(({ id, text }) => ({ id, text: unescaped(text).replace(/\s+/g, " ").trim() }));
 }
 
 /**
@@ -80,10 +82,30 @@ async function elementsOn(page: string, selector: string): Promise<{ tag: string
       },
     })
     .transform(await Bun.file(`${staticDir}/${page}`).text());
-  return elements.map(({ tag, text }) => ({
-    tag,
-    text: text.replace(/&(amp|lt|gt|quot|#x27);/g, (escape) => ESCAPES[escape]!).replace(/\s+/g, " ").trim(),
-  }));
+  return elements.map(({ tag, text }) => ({ tag, text: unescaped(text).replace(/\s+/g, " ").trim() }));
+}
+
+/**
+ * One attribute of each element of a page that matches a CSS selector, in page order, with React's escapes read back.
+ * An element without the attribute gives null.
+ */
+async function attributeOn(page: string, selector: string, attribute: string): Promise<(string | null)[]> {
+  const values: (string | null)[] = [];
+  new HTMLRewriter()
+    .on(selector, {
+      element(element) {
+        const value = element.getAttribute(attribute);
+        values.push(value === null ? null : unescaped(value));
+      },
+    })
+    .transform(await Bun.file(`${staticDir}/${page}`).text());
+  return values;
+}
+
+/** Each address the sitemap lists, sorted. */
+async function sitemapAddresses(): Promise<string[]> {
+  const sitemap = await Bun.file(`${staticDir}/sitemap.xml`).text();
+  return [...sitemap.matchAll(/<loc>([^<]*)<\/loc>/g)].map(([, address]) => address!).sort();
 }
 
 /** The stylesheets a page links, by address, in page order. */
@@ -127,7 +149,10 @@ async function scriptsLoadedBy(page: string): Promise<string[]> {
 
 beforeAll(async () => {
   const source = Bun.YAML.parse(await Bun.file(`${REPO}/resume.yaml`).text()) as { basics: object };
-  const fixtureSource = { ...source, basics: { ...source.basics, summary: FIXTURE_LEAD, label: FIXTURE_HEADLINE } };
+  const fixtureSource = {
+    ...source,
+    basics: { ...source.basics, name: FIXTURE_NAME, summary: FIXTURE_LEAD, label: FIXTURE_HEADLINE },
+  };
   await Bun.write(`${root}/resume.yaml`, Bun.YAML.stringify(fixtureSource));
   await Bun.write(`${root}/private.yaml`, `basics:\n  phone: ${FAKE_PHONE}\n`);
   resume = await loadResume("public", root);
@@ -243,6 +268,46 @@ describe("the headings of resume/index.html", () => {
       { tag: "h1", text: resume.basics.name },
       { tag: "p", text: FIXTURE_LEAD },
     ]);
+  });
+});
+
+// SPEC-site, Standalone pages and Testing 1: each page's head names it for search engines and share previews, with its
+// canonical address on the site's one address, peterkloss.dev (decision 0018). The title and the description come from
+// the fixture root's resume.yaml, so no page copies a fact by hand. The workspace's title is the name alone, as the
+// installed-app board draws it in the app's title bar; /resume's is the documents' title, "<name> — Resume".
+describe.each([
+  ["index.html", FIXTURE_NAME, "https://peterkloss.dev/"],
+  ["resume/index.html", `${FIXTURE_NAME} — Resume`, "https://peterkloss.dev/resume"],
+])("the head of %s", (page, title, address) => {
+  test(`has one title, "${title}"`, async () => {
+    expect(await elementsOn(page, "head title")).toEqual([{ tag: "title", text: title }]);
+  });
+
+  test("has one description, the fixture root's lead (basics.summary)", async () => {
+    expect(await attributeOn(page, 'meta[name="description"]', "content")).toEqual([FIXTURE_LEAD]);
+  });
+
+  test(`has one canonical address, ${address}`, async () => {
+    expect(await attributeOn(page, 'link[rel="canonical"]', "href")).toEqual([address]);
+  });
+
+  // The Open Graph protocol (https://ogp.me): what a share preview shows, each tag once.
+  test("has a share preview's Open Graph tags: type, canonical address, title, description", async () => {
+    const tags: Record<string, (string | null)[]> = {};
+    new HTMLRewriter()
+      .on('meta[property^="og:"]', {
+        element(element) {
+          const content = element.getAttribute("content");
+          (tags[element.getAttribute("property")!] ??= []).push(content === null ? null : unescaped(content));
+        },
+      })
+      .transform(await Bun.file(`${staticDir}/${page}`).text());
+    expect(tags).toEqual({
+      "og:type": ["website"],
+      "og:url": [address],
+      "og:title": [title],
+      "og:description": [FIXTURE_LEAD],
+    });
   });
 });
 
@@ -384,9 +449,24 @@ describe("the static assets", () => {
 describe("the sitemap", () => {
   // A crawled /?source= or /?role= link would otherwise be listed here (SPEC-site, Tech Stack).
   test("lists / and /resume on peterkloss.dev, and no address with a query", async () => {
-    const sitemap = await Bun.file(`${staticDir}/sitemap.xml`).text();
-    const addresses = [...sitemap.matchAll(/<loc>([^<]*)<\/loc>/g)].map(([, address]) => address).sort();
-    expect(addresses).toEqual(["https://peterkloss.dev/", "https://peterkloss.dev/resume"]);
+    expect(await sitemapAddresses()).toEqual(["https://peterkloss.dev/", "https://peterkloss.dev/resume"]);
+  });
+
+  // SPEC-site, Testing 1: the sitemap lists every page. 404.html is no prerendered page: it answers every unknown path,
+  // so it has no address of its own and stays out.
+  test("lists the canonical address of every prerendered page, and no other address", async () => {
+    const pages = (await htmlFiles()).filter((page) => page !== "404.html");
+    // One canonical address per page; the head tests above check each page's.
+    const perPage = await Promise.all(pages.map((page) => attributeOn(page, 'link[rel="canonical"]', "href")));
+    const canonical = perPage.flat();
+    expect(canonical).toHaveLength(pages.length);
+    expect(canonical.toSorted()).toEqual(await sitemapAddresses());
+  });
+
+  // TanStack Start writes pages.json beside the sitemap, and nothing reads it. It would make a second public list of
+  // the pages, holding also the addresses with a query that the prerender filter drops and the sitemap leaves out.
+  test("has no page list beside it: the static folder holds no pages.json", async () => {
+    expect(await Bun.file(`${staticDir}/pages.json`).exists()).toBe(false);
   });
 });
 

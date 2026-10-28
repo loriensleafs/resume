@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import siteData from "virtual:site-data";
+import { pageHead } from "../page-head";
 import { AppBar } from "../shell/AppBar";
 import { ResumeView } from "../shell/ResumeView";
 
@@ -7,6 +8,14 @@ import { ResumeView } from "../shell/ResumeView";
 // needs no server, also after a click from another page (decision 0023).
 export const Route = createFileRoute("/resume")({
   loader: () => siteData.resume,
+  // The title is the documents' own, "<name> — Resume" (the Word file's title and the print preview's); the
+  // description is the lead. head() reads the same build-time module as the loader.
+  head: () =>
+    pageHead({
+      path: "/resume",
+      title: `${siteData.resume.basics.name} — Resume`,
+      description: siteData.resume.basics.summary,
+    }),
   component: ResumePage,
 });
 
