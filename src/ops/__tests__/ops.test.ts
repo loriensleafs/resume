@@ -93,10 +93,27 @@ describe("createOps() in production", () => {
   });
 });
 
+describe("createOps() in production, on the in-test Upstash server", () => {
+  let upstash: FakeUpstash | undefined;
+  afterEach(async () => {
+    await upstash?.stop();
+    upstash = undefined;
+  });
+
+  // The suite gives each test its own clock; the store gets the same one, as in production.
+  questionLogContract("the Upstash log", (now) => {
+    upstash = startFakeUpstash({ now });
+    return createOps(
+      { VERCEL_ENV: "production", KV_REST_API_URL: upstash.url, KV_REST_API_TOKEN: upstash.token },
+      { now },
+    ).log;
+  });
+});
+
 describe("createOps() with the store and alert variables set", () => {
   let upstash: FakeUpstash;
   beforeEach(() => {
-    upstash = startFakeUpstash();
+    upstash = startFakeUpstash({ now: noon });
   });
   afterEach(async () => {
     await upstash.stop();
@@ -105,14 +122,135 @@ describe("createOps() with the store and alert variables set", () => {
   /** The variables production has, each pointing at the in-test server, so a store call or a push shows there. */
   const storeAndAlerts = () => ({
     KV_REST_API_URL: upstash.url,
-    KV_REST_API_TOKEN: "test",
+    KV_REST_API_TOKEN: upstash.token,
     NTFY_TOPIC_URL: `${upstash.url}/topic`,
     ANTHROPIC_API_KEY: "test",
   });
 
+  /** A production function instance on the in-test store, at noon on 2026-10-27. */
+  const productionOps = () => createOps({ VERCEL_ENV: "production", ...storeAndAlerts() }, { now: noon });
+
+  test("an entry that one function instance appends comes back from another instance's list(1)", async () => {
+    await productionOps().log.append(answeredEntry);
+
+    expect(await productionOps().log.list(1)).toEqual([answeredEntry]);
+  });
+
+  // Each expiry is counted by hand: 90 days after the day, at 00:00 UTC.
+  test.each([
+    ["2026-10-27", "2027-01-25T00:00:00.000Z"],
+    ["2026-12-31", "2027-03-31T00:00:00.000Z"],
+    ["2027-12-01", "2028-02-29T00:00:00.000Z"],
+  ])("the key qlog:%s expires at %s, 00:00 UTC on the 90th day after its day", async (date, expiry) => {
+    await productionOps().log.append({ ...answeredEntry, date });
+
+    expect(upstash.expiresAt(`qlog:${date}`)).toEqual(new Date(expiry));
+  });
+
+  test("an append's commands arrive as one /multi-exec transaction that gives the day's key its expiry", async () => {
+    await productionOps().log.append(answeredEntry);
+
+    expect(upstash.requests.map((request) => request.path)).toEqual(["/multi-exec"]);
+    const commands = JSON.parse(upstash.requests[0]!.body) as string[][];
+    expect(commands.map(([name, key]) => [name, key])).toEqual([
+      ["RPUSH", "qlog:2026-10-27"],
+      ["EXPIREAT", "qlog:2026-10-27"],
+    ]);
+  });
+
+  test("the store keeps only an entry's seven fields: a threadId passed with it never reaches the store", async () => {
+    // The type keeps a threadId out, but an object with more fields still fits it at run time.
+    const withThreadId: QuestionLogEntry = Object.assign({ threadId: "thread-of-one-visitor" }, answeredEntry);
+
+    await productionOps().log.append(withThreadId);
+
+    expect(upstash.requests[0]!.body).not.toContain("thread-of-one-visitor");
+    expect(await productionOps().log.list(1)).toEqual([answeredEntry]);
+  });
+
+  test("list(365) reads only the 90 days the store keeps, with one /pipeline request of 90 commands", async () => {
+    // At noon on 2026-10-27, the key of 2026-07-30 (89 days back) lives until 00:00 tomorrow, and the
+    // key of 2026-07-29 (90 days back) expired at 00:00 today, so the store deletes it at once.
+    const oldestKept: QuestionLogEntry = { ...answeredEntry, id: "entry-oldest-kept", date: "2026-07-30" };
+    const expired: QuestionLogEntry = { ...answeredEntry, id: "entry-expired", date: "2026-07-29" };
+    for (const entry of [expired, oldestKept, answeredEntry]) await productionOps().log.append(entry);
+    const writes = upstash.requests.length;
+
+    const entries = await productionOps().log.list(365);
+
+    expect(entries).toEqual([answeredEntry, oldestKept]);
+    const reads = upstash.requests.slice(writes);
+    expect(reads.map((request) => [request.path, (JSON.parse(request.body) as unknown[]).length])).toEqual([["/pipeline", 90]]);
+  });
+
+  test("with a wrong token, append() rejects with the store's 401, and the error holds no question text or token", async () => {
+    const ops = createOps(
+      { VERCEL_ENV: "production", KV_REST_API_URL: upstash.url, KV_REST_API_TOKEN: "not-the-token" },
+      { now: noon },
+    );
+
+    const error = await ops.log.append(answeredEntry).then(
+      () => undefined,
+      (refusal: unknown) => refusal,
+    );
+
+    expect(error).toMatchObject({ name: "UpstashError", code: "HTTP_401" });
+    expect((error as Error).message).not.toContain(answeredEntry.question);
+    expect((error as Error).message).not.toContain("not-the-token");
+  });
+
+  test("append() rejects when a command in its transaction fails, although the store answers 200", async () => {
+    upstash.set("qlog:2026-10-27", "a string where the day's list belongs");
+
+    await expect(productionOps().log.append(answeredEntry)).rejects.toMatchObject({ name: "UpstashError", code: "WRONGTYPE" });
+  });
+
+  test("list() rejects when the store cannot read a day", async () => {
+    upstash.set("qlog:2026-10-26", "a string where the day's list belongs");
+
+    await expect(productionOps().log.list(7)).rejects.toMatchObject({ name: "UpstashError", code: "WRONGTYPE" });
+  });
+
+  test.each(["27 October 2026", "2026-02-30", "2026-10-27T12:00:00.000Z", ""])(
+    "an entry dated %p is refused and writes nothing, so no key lives without its expiry",
+    async (date) => {
+      await expect(productionOps().log.append({ ...answeredEntry, date })).rejects.toThrow("not a UTC day");
+
+      expect(upstash.requests).toEqual([]);
+    },
+  );
+
+  test("given io.fetch, every store call goes through it", async () => {
+    const reached: string[] = [];
+    // Bun's fetch type also carries preconnect(), which a plain function lacks.
+    const recordingFetch = ((input: string | URL | Request, init?: RequestInit) => {
+      reached.push(new URL(String(input)).pathname);
+      return fetch(input, init);
+    }) as typeof fetch;
+    const ops = createOps({ VERCEL_ENV: "production", ...storeAndAlerts() }, { now: noon, fetch: recordingFetch });
+
+    await ops.log.append(answeredEntry);
+    await ops.log.list(1);
+
+    expect(reached).toEqual(["/multi-exec", "/pipeline"]);
+  });
+
+  test.each(["KV_REST_API_URL", "KV_REST_API_TOKEN"] as const)(
+    "in production with %s missing, the log still keeps entries and calls no server",
+    async (missing) => {
+      const env = { VERCEL_ENV: "production", ...storeAndAlerts(), [missing]: undefined };
+      const ops = createOps(env, { now: noon });
+
+      await ops.log.append(answeredEntry);
+
+      expect(await ops.log.list(1)).toEqual([answeredEntry]);
+      expect(upstash.requests).toEqual([]);
+    },
+  );
+
   test.each(["day", "month", "daily"])("in production, PREVIEW_LIMIT=%s is ignored: the budget allows the turn", async (previewLimit) => {
-    // Nothing calls the server yet: production still has its in-memory interim (ops.ts). The
-    // variables are here so that this test runs on the store-backed path once D11 builds it.
+    // The budget calls no server yet: production keeps its in-memory interim budget (ops.ts) until
+    // D11. The variables are here so that this test runs on the store-backed path once D11 builds it.
     const ops = createOps({ VERCEL_ENV: "production", PREVIEW_LIMIT: previewLimit, ...storeAndAlerts() }, { now: noon });
 
     expect(await ops.budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) });
