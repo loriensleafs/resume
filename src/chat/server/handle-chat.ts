@@ -13,7 +13,7 @@ import {
 } from "@tanstack/ai";
 import type { Knowledge } from "../../knowledge/types";
 import { readAbout } from "./about-read";
-import { finishTurn, finishTurnHooks } from "./finish-turn";
+import { finishRejected, finishTurn, finishTurnHooks } from "./finish-turn";
 import { readBudget, turnLimits } from "./limits";
 import { answerMarkers } from "./markers";
 import { systemPrompts } from "./prompt";
@@ -196,7 +196,11 @@ function stoppedBy(...signals: AbortSignal[]): AbortController {
 export async function handleChat(request: Request, deps: ChatDeps): Promise<Response> {
   const startedAt = deps.now();
   const checked = await checkRequest(request, deps.origins);
-  if (typeof checked === "string") return chatError(checked);
+  if (typeof checked === "string") {
+    // A rejected request never reaches the model: it writes its chat_turn event only (Turn telemetry).
+    await finishRejected(deps, startedAt);
+    return chatError(checked);
+  }
   const { threadId, messages, question, props } = checked;
 
   // At the day's cap or the month's limit, the answer is the limit stream, and the model is not called.
