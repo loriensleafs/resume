@@ -52,11 +52,12 @@ export type Ops = {
  * - In production, `PREVIEW_LIMIT` is ignored, whatever its value, and `record()` prints each turn's
  *   chat_turn line through `io.print`, the function log by default. With `KV_REST_API_URL` and
  *   `KV_REST_API_TOKEN` both set, the log, the budget, the telemetry and the totals are the store's,
- *   and each store call goes through `io.fetch`. With `NTFY_TOPIC_URL` also set, a DAILY_LIMIT refusal
- *   and a month's estimate past 75% of the limit push their limit alerts, through `io.fetch` too, and
- *   a failed push prints an ops_error line through `io.print`. Without both store variables, the log
- *   and the budget stay in memory, the budget allows every turn, and there are no daily totals or
- *   alerts, so answers keep working (SPEC-deploy, "A setting is missing in production").
+ *   and each store call goes through `io.fetch`. The budget also holds the monthly limit's pause and
+ *   its hourly probe. With `NTFY_TOPIC_URL` also set, a DAILY_LIMIT refusal, a month's estimate past
+ *   75% of the limit and a turn that meets Anthropic's limit push their limit alerts, through
+ *   `io.fetch` too, and a failed push prints an ops_error line through `io.print`. Without both store
+ *   variables, the log and the budget stay in memory, the budget allows every turn, and there are no
+ *   daily totals or alerts, so answers keep working (SPEC-deploy, "A setting is missing in production").
  */
 export function createOps(
   env: OpsEnv,
@@ -76,7 +77,7 @@ export function createOps(
   return {
     log: upstashQuestionLog(store, now),
     budget: upstashBudget(store, now, alerts.dayCapped),
-    telemetry: printedTelemetry(print, upstashTelemetry(store, alerts.monthCost)),
+    telemetry: printedTelemetry(print, upstashTelemetry(store, now, alerts)),
     totals: upstashTotals(store, now),
   };
 }

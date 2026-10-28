@@ -1,9 +1,11 @@
 // The store's key layout and expiry rules (SPEC-deploy, the key table; decision 0022), and the parts
-// of the ops module that live in the store: the question log, the budget and the limit alerts'
-// markers. The daily totals, which use the same keys, are in daily-totals.ts; the alerts' rules and
-// their push are in alerts.ts. The calls themselves go through upstash-rest.ts.
+// of the ops module that live in the store: the question log, the budget with the monthly limit's
+// marker and probe, and the limit alerts' markers. The daily totals, which use the same keys, are in
+// daily-totals.ts; the alerts' rules and their push are in alerts.ts. The calls themselves go through
+// upstash-rest.ts.
 
 import { utcDay, type Budget, type QuestionLog, type QuestionLogEntry } from "../chat/server/question-log";
+import type { ChatTurnEvent } from "../chat/server/telemetry";
 import * as limits from "./limits";
 import { UpstashError, type Command, type UpstashStore } from "./upstash-rest";
 
@@ -96,6 +98,51 @@ export async function keepAlertMarker(store: UpstashStore, kind: string, period:
 }
 
 /**
+ * The monthly limit's marker (SPEC-deploy, "The monthly limit"): when a turn last met Anthropic's
+ * limit, as an ISO time. It expires at 00:00 UTC on the first day of the next month.
+ */
+const SPEND_LIMIT_MARKER = "limit:spend";
+
+/** How long the budget refuses every turn after a turn meets Anthropic's limit, before a probe: 1 hour. */
+const SPEND_LIMIT_PAUSE_MS = 3_600_000;
+
+/** The key of the probe claim of the UTC hour of `at`: `limit:probe:<YYYY-MM-DDTHH>`. */
+const probeClaimKey = (at: Date) => `limit:probe:${at.toISOString().slice(0, 13)}`;
+
+/** How long an hour's probe claim lives: 2 hours, so it outlives its hour. */
+const PROBE_CLAIM_SECONDS = 7_200;
+
+/** Whether a turn met Anthropic's monthly limit during its run: the handler ends it with SPEND_LIMIT (SPEC-chat, The request, "Limits"). */
+export const metSpendLimit = (event: ChatTurnEvent) => event.errorCode === "SPEND_LIMIT";
+
+/**
+ * The commands that `record()` adds to its transaction for the monthly limit (SPEC-deploy, "The
+ * monthly limit"). Call it only for a turn that holds a reservation, so a turn that reached the model:
+ *
+ * - A turn that met Anthropic's limit sets the marker to `at`, until 00:00 UTC on the first day of the
+ *   next month. A probe that met it again does the same, so the hour's pause starts again.
+ * - The probe, when at least one of its model calls finished and none met the limit, deletes the
+ *   marker, so the chat works again. A call that started and did not finish, after a server error, the
+ *   deadline, an abort or a rate limit, says nothing about the limit. Only the probe deletes: a turn
+ *   that reserved before the marker, and ends after it, says nothing about the limit now.
+ * - Any other turn adds nothing, so the next hour's probe tries again.
+ *
+ * @param turn says whether the turn is the hour's probe (readReservation()), and whether at least
+ *   one of its model calls finished: its token counts are known.
+ */
+export function spendLimitMarkerCommands(event: ChatTurnEvent, turn: { probe: boolean; callFinished: boolean }, at: Date): Command[] {
+  if (metSpendLimit(event)) {
+    const nextMonth = alertPeriodEnd(utcDay(at.getTime()).slice(0, 7));
+    return [
+      ["SET", SPEND_LIMIT_MARKER, at.toISOString()],
+      ["EXPIREAT", SPEND_LIMIT_MARKER, String(nextMonth / 1000)],
+    ];
+  }
+  if (turn.probe && turn.callFinished) return [["DEL", SPEND_LIMIT_MARKER]];
+  return [];
+}
+
+/**
  * When the keys of the month of `day`, a UTC day, expire, in Unix seconds for `EXPIREAT`: 90 days
  * after the month ends, at 00:00 UTC on the first day of the next month.
  */
@@ -115,16 +162,22 @@ export function keptDays(now: () => Date, days: number): string[] {
 }
 
 /**
- * A new reservation. It names the UTC day its cost counts on, so a turn that ends after 00:00 UTC
- * settles on the day it reserved; the rest makes each reservation unique.
+ * A new reservation: `<day>/<uuid>`, or `<day>/probe/<uuid>` for the hour's probe of the monthly
+ * limit. The day is the UTC day its cost counts on, so a turn that ends after 00:00 UTC settles on the
+ * day it reserved; the uuid makes each reservation unique. readReservation() is the one reader of
+ * this text, so the two stay side by side.
  */
-const reservationOn = (day: string) => `${day}/${crypto.randomUUID()}`;
+const reservationOn = (day: string, kind: "turn" | "probe" = "turn") =>
+  `${day}/${kind === "probe" ? "probe/" : ""}${crypto.randomUUID()}`;
 
-/** The UTC day a reservation names. A text that is not one of this budget's reservations throws. */
-export function reservationDay(reservation: string): string {
-  const day = /^(\d{4}-\d{2}-\d{2})\//.exec(reservation)?.[1];
-  if (day === undefined) throw new RangeError("The reservation is not one that this store's budget gave.");
-  return day;
+/**
+ * The UTC day a reservation names, and whether it is the hour's probe. A text that is not one of this
+ * budget's reservations throws.
+ */
+export function readReservation(reservation: string): { day: string; probe: boolean } {
+  const match = /^(\d{4}-\d{2}-\d{2})\/(probe\/)?/.exec(reservation);
+  if (match === null) throw new RangeError("The reservation is not one that this store's budget gave.");
+  return { day: match[1]!, probe: match[2] !== undefined };
 }
 
 /**
@@ -155,16 +208,27 @@ export function upstashQuestionLog(store: UpstashStore, now: () => Date): Questi
 }
 
 /**
- * The budget in the store: the daily cap (SPEC-deploy, "The daily cap").
+ * The budget in the store: the daily cap and the monthly limit (SPEC-deploy, "The daily cap" and "The
+ * monthly limit").
  *
- * - `reserve()` adds the reservation to the day's cost, `qcost:<day>`, in one transaction. The store
- *   adds atomically, so parallel calls, on one function instance or on many, never pass the cap together.
- * - When the new total passes the cap, it takes the reservation back and refuses with DAILY_LIMIT. This
- *   budget then remembers the capped day and refuses later turns that day with no store call.
+ * - `reserve()` adds the reservation to the day's cost, `qcost:<day>`, and reads the monthly limit's
+ *   marker, in one transaction. The store adds atomically, so parallel calls, on one function instance
+ *   or on many, never pass the cap together.
+ * - While the marker is less than an hour old, it takes the reservation back and refuses with
+ *   SPEND_LIMIT, so no model call is wasted. This budget then remembers when that hour ends and refuses
+ *   until then with no store call.
+ * - Once the marker is an hour old, one turn each UTC hour goes through as the probe: the first that
+ *   claims `limit:probe:<hour>` with `SET NX`. The others take their reservation back and refuse with
+ *   SPEND_LIMIT. The telemetry then deletes the marker or resets its time (spendLimitMarkerCommands()).
+ *   While the marker stands, every refusal is SPEND_LIMIT, the probe's at the cap too: the month's
+ *   limit pauses the chat for longer than the day's cap, and no daycap push goes out for it.
+ * - With no marker, when the new total passes the cap, it takes the reservation back and refuses with
+ *   DAILY_LIMIT. This budget then remembers the capped day and refuses later turns that day with no
+ *   store call.
  * - The telemetry settles each reservation after its turn (daily-totals.ts). A reservation that is
  *   never settled stays counted for the day, which errs toward pausing.
  *
- * @param now says which UTC day is today.
+ * @param now says which UTC day and hour it is.
  * @param onCapped gets the UTC day of each DAILY_LIMIT refusal, for the daycap alert (alerts.ts). It
  *   decides itself whether the refusal needs a store call.
  */
@@ -175,14 +239,27 @@ export function upstashBudget(
 ): Budget {
   /** The UTC day on which this function instance saw the cap, if any. */
   let cappedDay: string | undefined;
+  /** Until when, in Unix milliseconds, this function instance knows that the monthly limit's marker is less than an hour old. */
+  let pausedUntil = 0;
   return {
     async reserve() {
-      const day = utcDay(now().getTime());
+      const at = now();
+      const day = utcDay(at.getTime());
+      if (at.getTime() < pausedUntil) return { ok: false, errorCode: "SPEND_LIMIT" };
       if (day === cappedDay) {
         await onCapped(day);
         return { ok: false, errorCode: "DAILY_LIMIT" };
       }
-      const total = await addToDayCost(store, day, limits.reservation);
+      const { total, spendLimitAt } = await reserveOnDay(store, day);
+      if (spendLimitAt !== undefined) {
+        const pauseEnds = spendLimitAt + SPEND_LIMIT_PAUSE_MS;
+        const step = await atSpendLimit(store, at, pauseEnds, total);
+        if (step === "probe") return { ok: true, reservation: reservationOn(day, "probe") };
+        // Set before takeBack(): a turn that starts while it waits is refused with no store call.
+        if (step === "pause") pausedUntil = pauseEnds;
+        await takeBack(store, day);
+        return { ok: false, errorCode: "SPEND_LIMIT" };
+      }
       if (total <= limits.dailyCap) return { ok: true, reservation: reservationOn(day) };
       // Set before the await: a turn that starts while takeBack() waits is refused with no store call.
       cappedDay = day;
@@ -194,9 +271,57 @@ export function upstashBudget(
 }
 
 /**
- * Takes a refused turn's reservation back from the day's cost. The refusal stands when this fails:
- * the cap was passed, and the amount left counted errs toward pausing, as an unsettled reservation
- * does (SPEC-deploy, "The daily cap", step 4). D15 prints the failure as an ops_error line.
+ * The reservation's transaction (SPEC-deploy, "The daily cap", step 1): it adds the reservation to the
+ * day's cost, gives the key its expiry, and reads the monthly limit's marker. Gives the day's new
+ * total, and when the marker says a turn last met the limit, in Unix milliseconds.
+ */
+async function reserveOnDay(store: UpstashStore, day: string): Promise<{ total: number; spendLimitAt: number | undefined }> {
+  const [total, , marker] = await store.transaction([...dayCostCommands(day, limits.reservation), ["GET", SPEND_LIMIT_MARKER]]);
+  return { total: wholeNumber(total), spendLimitAt: markerTime(marker) };
+}
+
+/**
+ * The time a marker holds, in Unix milliseconds; undefined when there is no marker. A marker whose
+ * text is not a time counts as an old one, so the hour's probe can still go through and clear it.
+ */
+function markerTime(reply: unknown): number | undefined {
+  if (reply === null) return undefined;
+  if (typeof reply !== "string") throw new UpstashError("Upstash /multi-exec: GET did not answer text", "BAD_REPLY");
+  const at = Date.parse(reply);
+  return Number.isNaN(at) ? 0 : at;
+}
+
+/**
+ * What the budget does with a turn while the monthly limit's marker stands, at `at`:
+ *
+ * - "pause" until `pauseEnds`, an hour after a turn last met the limit;
+ * - "probe" when the day's new `total` is within the cap and the turn claims the hour's probe, which
+ *   is a store write (claimProbe());
+ * - "refuse" when the day is past its cap, or another turn holds the hour's probe.
+ */
+async function atSpendLimit(store: UpstashStore, at: Date, pauseEnds: number, total: number): Promise<"pause" | "probe" | "refuse"> {
+  if (at.getTime() < pauseEnds) return "pause";
+  if (total > limits.dailyCap) return "refuse";
+  const claimed = await claimProbe(store, at);
+  return claimed ? "probe" : "refuse";
+}
+
+/**
+ * Claims the probe of the UTC hour of `at` with `SET NX`, so one turn in the hour goes through on
+ * all function instances together. The claim lives 2 hours. Gives whether this call took it.
+ */
+async function claimProbe(store: UpstashStore, at: Date): Promise<boolean> {
+  const [claim] = await store.transaction([
+    ["SET", probeClaimKey(at), at.toISOString(), "NX", "EX", String(PROBE_CLAIM_SECONDS)],
+  ]);
+  return claim === "OK";
+}
+
+/**
+ * Takes a refused turn's reservation back from the day's cost, at the cap or at the monthly limit.
+ * The refusal stands when this fails, and the amount left counted errs toward pausing, as an
+ * unsettled reservation does (SPEC-deploy, "The daily cap", step 4). D15 prints the failure as an
+ * ops_error line.
  */
 async function takeBack(store: UpstashStore, day: string): Promise<void> {
   try {
@@ -211,15 +336,25 @@ async function takeBack(store: UpstashStore, day: string): Promise<void> {
  * key its expiry, so the key never exists without it. Gives the new total.
  */
 async function addToDayCost(store: UpstashStore, day: string, amount: number): Promise<number> {
+  const [total] = await store.transaction(dayCostCommands(day, amount));
+  return wholeNumber(total);
+}
+
+/** The commands that add `amount`, in millionths of a dollar, to the day's cost and give the key its expiry. */
+function dayCostCommands(day: string, amount: number): Command[] {
   const key = dayCostKey(day);
-  const [total] = await store.transaction([
+  return [
     ["INCRBY", key, String(amount)],
     ["EXPIREAT", key, dayKeysExpireAt(day)],
-  ]);
-  if (typeof total !== "number" || !Number.isSafeInteger(total)) {
+  ];
+}
+
+/** INCRBY's reply, which must be a whole number. */
+function wholeNumber(reply: unknown): number {
+  if (typeof reply !== "number" || !Number.isSafeInteger(reply)) {
     throw new UpstashError("Upstash /multi-exec: INCRBY did not answer a whole number", "BAD_REPLY");
   }
-  return total;
+  return reply;
 }
 
 /**

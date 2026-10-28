@@ -1,9 +1,9 @@
 // The limit alerts (SPEC-deploy, "Limit alerts"; decision record rows 115 and 121): urgent ntfy pushes
 // to Peter's phone, each a title and one line that names the next step. This file holds the alert
 // rules, their texts and the push; the markers' keys and expiry rules are in upstash.ts. The kinds
-// here are spend75 and daycap. The monthly limit's spendlimit (D14) and the store's storefail (D15)
-// join them as more kinds and texts, and storefail, whose marker cannot live in a failing store, as
-// a sender of its own beside push().
+// here are spend75, daycap and spendlimit. The store's storefail (D15) joins them as one more kind
+// and text, and, because its marker cannot live in a failing store, as a sender of its own beside
+// push().
 //
 // An alert holds no visitor text: its words come only from its kind, its period and limits.ts.
 
@@ -12,7 +12,7 @@ import { ALERT_CLAIM_MS, alertPeriodEnd, claimAlertMarker, keepAlertMarker } fro
 import { safeBase, type UpstashStore } from "./upstash-rest";
 
 /** The kinds of limit alert this file sends. Each is also the name in its marker's key. */
-export type AlertKind = "spend75" | "daycap";
+export type AlertKind = "spend75" | "daycap" | "spendlimit";
 
 /** One push: its kind, the period it covers (a UTC month "2026-10" or a UTC day "2026-10-27"), and its words. */
 type Alert = { kind: AlertKind; period: string; title: string; message: string };
@@ -23,6 +23,8 @@ export type LimitAlerts = {
   monthCost(day: string, monthCost: number): Promise<void>;
   /** After the daily cap refused a turn on the UTC day `day`. */
   dayCapped(day: string): Promise<void>;
+  /** After a turn met Anthropic's monthly limit on the UTC day `day`. */
+  spendLimited(day: string): Promise<void>;
 };
 
 /** What the alerts need from the function instance. */
@@ -49,7 +51,7 @@ const spendAlertAt = Math.round(limits.monthlyLimit * limits.spendAlertShare);
  * nothing; the missing variable shows in /api/status and in its ops_error line (D15, D22).
  */
 export function limitAlerts(settings: AlertSettings): LimitAlerts {
-  if (!settings.topicUrl) return { monthCost: async () => {}, dayCapped: async () => {} };
+  if (!settings.topicUrl) return { monthCost: async () => {}, dayCapped: async () => {}, spendLimited: async () => {} };
   const send = sender(settings.topicUrl, settings);
   return {
     async monthCost(day, monthCost) {
@@ -57,6 +59,7 @@ export function limitAlerts(settings: AlertSettings): LimitAlerts {
       if (monthCost > spendAlertAt) await send(spend75(day.slice(0, 7)));
     },
     dayCapped: (day) => send(daycap(day)),
+    spendLimited: (day) => send(spendlimit(day)),
   };
 }
 
@@ -74,6 +77,18 @@ const daycap = (day: string): Alert => ({
   period: day,
   title: `Chat paused at its ${dollarText(limits.dailyCap)} daily cap until 00:00 UTC`,
   message: "If bun run questions shows real spend, raise the cap in src/ops/limits.ts.",
+});
+
+/**
+ * spendlimit: a turn met Anthropic's monthly limit, once a UTC day. The text is a wording draft
+ * (docs/design/wording-drafts/D14.md). It names no amount: the limit is the one set in the Console,
+ * which limits.ts only copies.
+ */
+const spendlimit = (day: string): Alert => ({
+  kind: "spendlimit",
+  period: day,
+  title: `Chat paused at Anthropic's monthly limit for ${monthName(day.slice(0, 7))}`,
+  message: "Raise the limit in the Anthropic Console, then in src/ops/limits.ts. The chat tries again within an hour.",
 });
 
 /**
