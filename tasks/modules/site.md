@@ -341,7 +341,7 @@ Acceptance:
 - The build copies the committed icons; the icon files in the output are those files, at those sizes (Testing 1).
 - `/` and `/resume` gain `og:image` on `https://peterkloss.dev`, pointing at the committed 512 px icon, with its width and height (Peter's row 173; S6's `pageHead()` in `src/site/page-head.ts`).
 Verify: `bun run icons && git status public/icons`; `bun test src/site/__tests__/build.test.ts`; `bun test`
-Files: `scripts/icons.ts`, `public/icons/` (four files), `package.json` (the `icons` script), `src/site/build.ts`, `src/site/__tests__/build.test.ts`
+Files: `scripts/icons.ts`, `public/icons/` (four files), `package.json` (the `icons` script), `src/site/page-head.ts` (`og:image`), `src/site/__tests__/build.test.ts` (Vite copies `public/`, so `src/site/build.ts` needs no change)
 Size: M
 Needs Peter: no (the app-icon board is approved)
 

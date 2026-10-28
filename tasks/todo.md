@@ -155,7 +155,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [S23](modules/site.md#s23-the-workspace-on-phones) The workspace on phones — blocked by S15, S22
 - [ ] [S24](modules/site.md#s24-the-resume-sheet-on-phones) The resume sheet on phones — blocked by S23
 - [ ] [S25](modules/site.md#s25-the-source-sheet-on-phones) The source sheet on phones — blocked by S24, S18
-- [ ] [S26](modules/site.md#s26-the-app-icon) The app icon — blocked by S7, S8
+- [x] [S26](modules/site.md#s26-the-app-icon) The app icon — blocked by S7, S8 (done 2026-10-27; four committed icons; `og:image` on `/` and `/resume`)
 - [ ] [S27](modules/site.md#s27-the-web-manifest-and-the-install-app-button) The web manifest and the "Install app" button — blocked by S26
 - [ ] [S28](modules/site.md#s28-the-service-worker-and-its-precache) The service worker and its precache — blocked by S16, S22, S27, C16
 - [ ] [D19](modules/deploy.md#d19-the-service-worker-precaches-the-tagged-pages) The service worker precaches the tagged pages — blocked by S28, D17

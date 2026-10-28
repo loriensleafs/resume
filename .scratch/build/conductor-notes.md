@@ -165,3 +165,5 @@ Notes the reviews of finished tasks left for tasks not yet built. Each builder b
 - **Performance (from C8):** an open backtick or `<<` that never closes makes each text event rescan the held text, O(n²) over one answer (at most about 32,000 characters). Unmeasured; measure before a fix if streaming ever stalls.
 - **The conductor (from C8):** a reviewer once returned its report path and counts but never wrote the file, and the merge agent said so on line 2. Rerun that one reviewer with the Agent tool (Sonnet, the same brief, a check with `ls -la` before it replies) and read its report.
 - **Glossary gap (C8):** "marker".
+- **S27 (from S26):** `src/site/__tests__/build.test.ts` is about 860 lines; move the PNG and ICO size parsers (`pngSize`, `iconSizes`) to a `__tests__` helper when S27 grows the file. `pageHead()` serves every page, so each page that uses it gets `og:image`.
+- **S29 (from S26):** the Chrome launch helper exists in `scripts/icons.ts` and `src/site/__tests__/browser.test.ts`, with a third Chrome finder in `src/print/chrome.ts`; share one when S29 touches the browser test.

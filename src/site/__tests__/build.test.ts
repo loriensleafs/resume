@@ -259,7 +259,7 @@ describe.each([
     expect(await attributeOn(page, 'link[rel="canonical"]', "href")).toEqual([`https://peterkloss.dev/sources/${id}`]);
   });
 
-  test("has a share preview's Open Graph tags: type, canonical address, title, description", async () => {
+  test("has a share preview's Open Graph tags: type, canonical address, title, description, image", async () => {
     const { summary } = await publicSource();
     const tags: Record<string, (string | null)[]> = {};
     new HTMLRewriter()
@@ -275,6 +275,10 @@ describe.each([
       "og:url": [`https://peterkloss.dev/sources/${id}`],
       "og:title": [`${title} — ${FIXTURE_NAME}`],
       "og:description": [summary],
+      // Row 173's reason holds for a source page too: without an image, a pasted link shows a text-only preview.
+      "og:image": ["https://peterkloss.dev/icons/icon-512.png"],
+      "og:image:width": ["512"],
+      "og:image:height": ["512"],
     });
   });
 });
