@@ -1,6 +1,7 @@
 // One turn's state (SPEC-chat, One turn): handleChat() makes one for each request, each middleware
 // writes the facts it learns into it, and finishTurn() reads it once, at the end of the turn.
 
+import type { ReadResult } from "../../knowledge/types";
 import type { RunErrorCode } from "./wire";
 
 /** The summed token counts of a turn's model calls that finished, as SPEC-deploy maps them. */
@@ -37,4 +38,13 @@ export type Turn = {
 /** A turn that has read, cited and called nothing yet. */
 export function startTurn(turn: Pick<Turn, "question" | "startedAt" | "reservation">): Turn {
   return { ...turn, readIds: [], reads: 0, citations: [], removed: 0, modelCalls: 0, tokens: null, errorCode: null };
+}
+
+/**
+ * Records one read in the turn: one more read, and each id it read that the turn has not read yet.
+ * The question log keeps the ids, and the citation check keeps a citation of a passage they name.
+ */
+export function recordRead(turn: Turn, result: Pick<ReadResult, "read">): void {
+  turn.reads++;
+  for (const id of result.read) if (!turn.readIds.includes(id)) turn.readIds.push(id);
 }

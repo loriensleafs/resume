@@ -5,6 +5,7 @@
 import {
   chat,
   chatParamsFromRequestBody,
+  maxIterations,
   toServerSentEventsResponse,
   type AnyTextAdapter,
   type ChatMiddleware,
@@ -12,7 +13,7 @@ import {
 } from "@tanstack/ai";
 import type { Knowledge } from "../../knowledge/types";
 import { finishTurn, finishTurnHooks } from "./finish-turn";
-import { turnLimits } from "./limits";
+import { readBudget, turnLimits } from "./limits";
 import { citationMarkers } from "./markers";
 import { systemPrompt } from "./prompt";
 import { ChatMessages, ChatProps } from "./props";
@@ -218,6 +219,8 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
     messages,
     // The handler's own tools only: the request's tools never reach chat() (The request).
     tools: chatTools(deps.knowledge, turn),
+    // At most six model calls; readBudget() makes the sixth answer (Limits, "Model calls").
+    agentLoopStrategy: maxIterations(turnLimits.modelCalls),
     // Sonnet 5.5 always thinks (Limits, "Thinking"; row 156). The adapter sends adaptive thinking at effort
     // medium with the summarized display, so the thinking summary streams; the wire sends it as chat.thinking.
     reasoning: { level: "medium", summary: true },
@@ -228,13 +231,16 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
     abortController: run,
     // The library's own log lines hold the error alone, as the chat's do.
     debug: libraryLogging,
-    // The wire middleware sees every event the others leave. The terminal hooks come last: the run
-    // awaits their deferred writes before the stream ends (One turn, step 9).
+    // The wire middleware sees every event the others leave. The read budget's guard runs last of
+    // the guards, so it counts only reads that run, and its onConfig last, so no other middleware
+    // gives the last call its tools back. The terminal hooks come last: the run awaits their
+    // deferred writes before the stream ends (One turn, step 9).
     middleware: [
       citationMarkers(deps.knowledge, turn),
       turnUsage(turn),
       ...(deps.testMiddleware ?? []),
       wireEvents(turn),
+      readBudget(turn),
       finishTurnHooks(deps, turn),
     ],
   });
