@@ -1,0 +1,46 @@
+/* The site's own rules, on the design system's tokens (SPEC-site, Code Style: layout uses the tokens and parts). */
+
+/* The app bar's name box, as the first-view board draws it. The design system has no part for a name box, so the link
+   itself is the box. The board's own sizes: no token holds a 28 px box, a 15 px label or an 8 px corner. */
+.app-bar-name {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--ds-blue-700);
+  color: var(--ds-contrast-fg);
+  font-size: 15px;
+  line-height: 1;
+  font-weight: var(--acme-font-weight-600);
+  white-space: nowrap;
+}
+
+/* The headline after the name box. A headline wider than the bar ends in an ellipsis. */
+.app-bar-headline {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ds-gray-900);
+}
+
+/* Text for screen readers only. The design system documents no such class (0.3.2), so the site keeps its own. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The app bar's end slot: what the page's route puts there, in one row. */
+.app-bar-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

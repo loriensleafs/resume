@@ -1,6 +1,6 @@
 // Seam 1 of SPEC-site: buildSite() writes the real build output, and these tests read its files.
-// The fixture root holds the project's files: the repository's resume.yaml with a lead of its own, and a fake phone
-// number in private.yaml.
+// The fixture root holds the project's files: the repository's resume.yaml with a lead and a headline of its own, and
+// a fake phone number in private.yaml.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { $, Glob } from "bun";
@@ -13,6 +13,8 @@ const REPO = `${import.meta.dir}/../../..`;
 const FAKE_PHONE = "(555) 555-0100";
 /** Only the fixture root's resume.yaml holds this lead, so a page that shows it read resume.yaml from that root. */
 const FIXTURE_LEAD = "The fixture root’s lead, which no other resume.yaml holds.";
+/** Only the fixture root's resume.yaml holds this headline, so an app bar that shows it read that resume.yaml. */
+const FIXTURE_HEADLINE = "The fixture root’s headline, which no other resume.yaml holds";
 const tmp = `${Bun.env.TMPDIR ?? "/tmp"}/site-test-${crypto.randomUUID()}`;
 const root = `${tmp}/root`;
 const outDir = `${tmp}/out`;
@@ -56,6 +58,35 @@ async function knowledgeEntriesOn(page: string): Promise<{ id: string; text: str
 }
 
 /**
+ * Each element of a page that matches a CSS selector, in page order: its tag and its text, which is all the text
+ * inside it, with each run of white space made one space.
+ */
+async function elementsOn(page: string, selector: string): Promise<{ tag: string; text: string }[]> {
+  const elements: { tag: string; text: string }[] = [];
+  let open: { tag: string; text: string }[] = [];
+  new HTMLRewriter()
+    .on(selector, {
+      element(element) {
+        const entry = { tag: element.tagName, text: "" };
+        elements.push(entry);
+        if (element.selfClosing || !element.canHaveContent) return;
+        open.push(entry);
+        element.onEndTag(() => void (open = open.filter((other) => other !== entry)));
+      },
+      // HTMLRewriter calls this once for each piece of text, however many open elements match, so each open element
+      // gets the text here.
+      text(chunk) {
+        for (const entry of open) entry.text += chunk.text;
+      },
+    })
+    .transform(await Bun.file(`${staticDir}/${page}`).text());
+  return elements.map(({ tag, text }) => ({
+    tag,
+    text: text.replace(/&(amp|lt|gt|quot|#x27);/g, (escape) => ESCAPES[escape]!).replace(/\s+/g, " ").trim(),
+  }));
+}
+
+/**
  * The JavaScript files a page loads before any interaction, by address: its scripts and module preloads, and every
  * file they import statically. A dynamic import waits for a navigation, so it stays out.
  */
@@ -81,7 +112,7 @@ async function scriptsLoadedBy(page: string): Promise<string[]> {
 
 beforeAll(async () => {
   const source = Bun.YAML.parse(await Bun.file(`${REPO}/resume.yaml`).text()) as { basics: object };
-  const fixtureSource = { ...source, basics: { ...source.basics, summary: FIXTURE_LEAD } };
+  const fixtureSource = { ...source, basics: { ...source.basics, summary: FIXTURE_LEAD, label: FIXTURE_HEADLINE } };
   await Bun.write(`${root}/resume.yaml`, Bun.YAML.stringify(fixtureSource));
   await Bun.write(`${root}/private.yaml`, `basics:\n  phone: ${FAKE_PHONE}\n`);
   resume = await loadResume("public", root);
@@ -162,6 +193,91 @@ describe.each(["index.html", "resume/index.html"])("the resume view in %s", (pag
     const resumeEntryIds = core.filter((entry) => entry.kind === "resume").map((entry) => entry.id);
     const ids = (await knowledgeEntriesOn(page)).map((entry) => entry.id);
     expect(ids.toSorted()).toEqual(resumeEntryIds.toSorted());
+  });
+});
+
+// SPEC-site, Views: App bar. Every page opens with the design system's acme-app-bar: the name box, then the headline.
+describe.each(["index.html", "resume/index.html"])("the app bar in %s", (page) => {
+  test("is the first element of the page's body", async () => {
+    const [first] = await elementsOn(page, "body > *");
+    expect(first?.tag).toBe("acme-app-bar");
+  });
+
+  test("holds the name box with basics.name, then the headline, basics.label, from the fixture root", async () => {
+    const texts = (await elementsOn(page, "acme-app-bar *")).map((element) => element.text);
+    const nameBox = texts.indexOf(resume.basics.name);
+    expect(nameBox).toBeGreaterThanOrEqual(0);
+    expect(texts.indexOf(FIXTURE_HEADLINE)).toBeGreaterThan(nameBox);
+  });
+});
+
+// The page's one h1 names what the page is about. On /resume that is Peter, as the documents open with his name; the
+// app bar above it is the site's banner, not the page's heading. The workspace's h1 is its first view's heading (S11).
+describe("the headings of resume/index.html", () => {
+  test("one h1, basics.name, comes before the lead", async () => {
+    const headingThenLead = await elementsOn("resume/index.html", "h1, [data-knowledge-id=basics]");
+    expect(headingThenLead).toEqual([
+      { tag: "h1", text: resume.basics.name },
+      { tag: "p", text: FIXTURE_LEAD },
+    ]);
+  });
+});
+
+/**
+ * Each design-system part the pages use, with the text the prerender writes inside its tag. A task that adds a part
+ * adds it here.
+ */
+const PARTS: Record<string, (resume: Resume) => string[]> = {
+  "acme-app-bar": (resume) => [resume.basics.name, resume.basics.label],
+};
+
+// SPEC-site, Tech Stack and Testing 1. The wrappers render in the browser only (decision 0007), so the prerender writes
+// each part as its tag with its light-DOM content, and never its shadow DOM; in the browser the part upgrades (seam 2).
+describe.each(["index.html", "resume/index.html"])("the design-system parts in %s", (page) => {
+  test("each part is its tag, with its light-DOM text", async () => {
+    const parts = (await elementsOn(page, "*")).filter((element) => element.tag.startsWith("acme-"));
+    expect(parts.length).toBeGreaterThan(0);
+    for (const part of parts) {
+      expect(Object.keys(PARTS)).toContain(part.tag);
+      for (const text of PARTS[part.tag]!(resume)) expect(part.text).toContain(text);
+    }
+  });
+
+  test("no page holds a declarative shadow root", async () => {
+    const html = await Bun.file(`${staticDir}/${page}`).text();
+    expect(html).not.toMatch(/<template[^>]*\sshadowroot(mode)?=/i);
+  });
+
+  // A tag that no loaded script defines would never upgrade. A part's module registers its tag as a string, which the
+  // minifier writes in any of the three quote marks.
+  test("the JavaScript the page loads defines each part the page holds", async () => {
+    const tags = new Set(
+      (await elementsOn(page, "*")).map((element) => element.tag).filter((tag) => tag.startsWith("acme-")),
+    );
+    const scripts = await Promise.all(
+      (await scriptsLoadedBy(page)).map((script) => Bun.file(`${staticDir}${script}`).text()),
+    );
+    const named = (tag: string) => new RegExp(`["'\`]${tag}["'\`]`);
+    const undefinedTags = [...tags].filter((tag) => !scripts.some((script) => named(tag).test(script)));
+    expect(tags.size).toBeGreaterThan(0);
+    expect(undefinedTags).toEqual([]);
+  });
+});
+
+// SPEC-site, Tech Stack: each design-system part is imported from its own wrapper module, not from one bundle. An
+// import of the package root makes the build emit files that no page loads, such as the flow diagram's web worker and
+// the book's image (seen with @acmelabs/design-system-react 0.3.2), even when the bundler drops the unused wrappers.
+describe("the static assets", () => {
+  test("each file under assets/ is a script or a stylesheet that a page loads", async () => {
+    const loaded = new Set<string>();
+    for (const page of await htmlFiles()) {
+      for (const script of await scriptsLoadedBy(page)) loaded.add(script);
+      new HTMLRewriter()
+        .on('link[rel="stylesheet"]', { element: (element) => void loaded.add(element.getAttribute("href")!) })
+        .transform(await Bun.file(`${staticDir}/${page}`).text());
+    }
+    const assets = await Array.fromAsync(new Glob("assets/**").scan({ cwd: staticDir }));
+    expect(assets.map((asset) => `/${asset}`).filter((asset) => !loaded.has(asset))).toEqual([]);
   });
 });
 

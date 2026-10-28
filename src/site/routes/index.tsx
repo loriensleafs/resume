@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import siteData from "virtual:site-data";
+import { AppBar } from "../shell/AppBar";
 import { ResumeView } from "../shell/ResumeView";
 
 // The workspace (SPEC-site, Views). Until the workspace's own views arrive, it shows the resume view. The loader reads
@@ -10,9 +11,13 @@ export const Route = createFileRoute("/")({
 });
 
 function Workspace() {
+  const resume = Route.useLoaderData();
   return (
-    <main>
-      <ResumeView resume={Route.useLoaderData()} />
-    </main>
+    <>
+      <AppBar name={resume.basics.name} headline={resume.basics.label} />
+      <main>
+        <ResumeView resume={resume} />
+      </main>
+    </>
   );
 }
