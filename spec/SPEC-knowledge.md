@@ -133,7 +133,7 @@ bun run knowledge --root <folder> ...   # any of the three, on the files under <
 
 - `--root <folder>` goes with any of the three. The script then reads `resume.yaml`, `knowledge/` and the drafts under `<folder>`, as `bun run build:site --root` does. A relative folder starts at the repository, because `bun run` sets the working folder there. Seam 4 runs the script on its fixture roots this way.
 - Standard output gets only the text the chat reads. Standard error gets everything else: the sizes, the broken rules, the unknown and skipped ids.
-- Exit 0: the command did what it was asked. Exit 1: a broken rule in a knowledge file, a draft that breaks a rule, a `--draft` id that no source file has, an unknown or skipped id, or a core at or over its budget. Exit 2: a flag error, such as an unknown flag, `--root` with a path that is not a folder, or `--draft` with other ids; the script stops before it reads the knowledge.
+- Exit 0: the command did what it was asked. Exit 1: a broken rule in a knowledge file, a missing or broken `resume.yaml` (one line of fixed text, which quotes nothing from the file), a draft that breaks a rule, a `--draft` id that no source file has, an unknown or skipped id, or a core at or over its budget. Exit 2: a flag error, such as an unknown flag, `--root` with an empty value or a path that is not a folder, or `--draft` with other ids; the script stops before it reads the knowledge.
 
 ## Project Structure
 
@@ -286,7 +286,8 @@ Roles: <role ids>. Highlights: <highlight ids>. Links: <links>.
    - the core on standard output, and its size and each source's size on standard error; a core at or over its budget; a relative `--root`; the repository with no `--root`;
    - a source id, and passage ids as one read; an unknown id, a draft's id among them; a Skipped id;
    - `--draft <id>` with a clean draft, with a draft that breaks a rule, and with a broken shape, whose message never shows the rest of its line; an id that no file of `knowledge/sources/` has, `../secret` and `deeper/secret` among them;
-   - each flag error: a misspelt flag, `--draft` or `--root` with no value, `--root` with a path that is not a folder, and `--draft` with another id;
+   - a root with no `resume.yaml`, and one with a broken `resume.yaml`, whose message quotes nothing from the file;
+   - each flag error: a misspelt flag, `--draft` or `--root` with no value, `--root` with an empty value or a path that is not a folder, and `--draft` with another id;
    - the exit code of each case, and that no output holds the fixture `private.yaml`'s fake phone number.
 
 No test can check three rules: that `Not public` names kinds only, that headings follow Peter's wording rule, and the edit rule. Peter checks them at approval, with the redaction list and the passage-id snapshot in front of him.

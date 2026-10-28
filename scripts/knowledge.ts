@@ -16,9 +16,9 @@
 // <folder> instead of the repository, as `bun run build:site --root` does (the tests' fixture
 // roots). A relative folder starts at the working folder, which `bun run` sets to the repository.
 //
-// The flags are read before the ids: an unknown flag, `--root` with no folder or with a path that
-// is not a folder, or `--draft` with no id or with more ids, exits with 2. A broken rule in a
-// knowledge file prints its message and exits with 1.
+// The flags are read before the ids: an unknown flag, `--root` with no folder, an empty value or a
+// path that is not a folder, or `--draft` with no id or with more ids, exits with 2. A broken rule
+// in a knowledge file, or a missing or broken resume.yaml, prints its message and exits with 1.
 //
 // The text goes to standard output and everything else to standard error, so
 // `bun run knowledge > core.txt` writes the core alone.
@@ -120,6 +120,8 @@ async function isFolder(path: string): Promise<boolean> {
 
 const { values, positionals: ids } = readArgs();
 if (values.draft !== undefined && ids.length) exitWithUsage("--draft takes one source id and no other ids");
+// resolve("") is the working folder, so an empty value would read the repository instead.
+if (values.root === "") exitWithUsage("--root takes a folder, not an empty value");
 const root = resolve(values.root ?? REPO);
 if (values.root !== undefined && !(await isFolder(root))) exitWithUsage(`--root ${JSON.stringify(root)} is not a folder`);
 try {

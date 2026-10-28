@@ -162,9 +162,20 @@ function checkSource(source: Source, resumeIds: ReadonlySet<string>): string[] {
   return problems;
 }
 
-/** The resume entries of `root`'s resume.yaml, public variant, once its role ids and skills groups give slugs. */
+/**
+ * The resume entries of `root`'s resume.yaml, public variant, once its role ids and skills groups
+ * give slugs. A missing or broken resume.yaml stops the build with one line of fixed text: the
+ * content module's own message runs over several lines and can quote the file, such as a key it
+ * does not know.
+ */
 async function loadResumeEntries(root: string): Promise<Entry[]> {
-  const resume = await loadResume("public", root);
+  let resume: Resume;
+  try {
+    resume = await loadResume("public", root);
+  } catch (e) {
+    if ((e as { code?: string }).code === "ENOENT") throw new KnowledgeError("resume.yaml", "the file is missing");
+    throw new KnowledgeError("resume.yaml", "the file is not valid; `bun run build` names each problem in the repository's resume.yaml");
+  }
   checkResumeSlugs(resume);
   return resumeEntries(resume);
 }

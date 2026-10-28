@@ -34,8 +34,9 @@ const SHORT_BODY = "## Why Bun?\n\nIt is fast.\n\n## Not public\n\nColleague nam
 
 /**
  * The main fixture root: two approved sources, a clean draft, a draft that breaks one rule, an
- * approved logistics answer, and two draft files outside knowledge/sources/' own files, which
- * `--draft ../secret` and `--draft deeper/secret` would read if the id were joined into a path.
+ * approved logistics answer, and two draft files that `--draft ../secret` and `--draft deeper/secret`
+ * would read if the id were joined into a path: `knowledge/secret.md` and
+ * `knowledge/sources/deeper/secret.md`.
  */
 const FILES = {
   "knowledge/sources/alpha.md": deepDiveFile({ id: "alpha", title: "The first thing" }),
@@ -127,6 +128,20 @@ const DRAFT_CLEAN = [
   "Roles: acme.",
   "",
   "## [draft-clean.1] Why Bun?",
+  "It is fast.",
+  "",
+  "## Not public: decline to describe these kinds of material",
+  "Colleague names.",
+  "",
+].join("\n");
+
+/** The broken draft as the chat will read it once approved. */
+const DRAFT_BROKEN = [
+  "# [draft-broken] A broken draft",
+  "Interview: Peter's own words, in the first person.",
+  "Roles: nope.",
+  "",
+  "## [draft-broken.1] Why Bun?",
   "It is fast.",
   "",
   "## Not public: decline to describe these kinds of material",
@@ -247,7 +262,7 @@ describe("bun run knowledge --root <folder> --draft <source id>", () => {
   test("prints a draft that breaks a rule, names the rule with its file and field, and exits with 1", async () => {
     expect(await knowledge("--root", root, "--draft", "draft-broken")).toEqual({
       exitCode: 1,
-      stdout: DRAFT_CLEAN.replaceAll("draft-clean", "draft-broken").replace("A clean draft", "A broken draft").replace("Roles: acme.", "Roles: nope."),
+      stdout: DRAFT_BROKEN,
       stderr: 'knowledge/sources/draft-broken.md: roles[0] "nope" is not a role id in resume.yaml\n"draft-broken" breaks 1 rule of an approved source.\n',
     });
   });
@@ -287,8 +302,37 @@ describe("bun run knowledge --root <folder> on a draft with a broken shape", () 
   });
 });
 
+describe("bun run knowledge --root <folder> on a missing or broken resume.yaml", () => {
+  /** A clean draft beside a resume.yaml with a key the content module does not know. The content module's own message quotes that key. */
+  let broken: string;
+  beforeAll(async () => {
+    broken = await fixture("script-broken-resume", {
+      "resume.yaml": RESUME_YAML.replace("label: Engineer", "label: Engineer\n  RESUME-SECRET: 1"),
+      "knowledge/sources/draft-clean.md": FILES["knowledge/sources/draft-clean.md"],
+    });
+  });
+
+  test("with no resume.yaml, the core prints no text, says in one line that the file is missing, and exits with 1", async () => {
+    const missing = await fixture("script-no-resume");
+    await Bun.file(`${missing}/resume.yaml`).delete();
+    expect(await knowledge("--root", missing)).toEqual({ exitCode: 1, stdout: "", stderr: "resume.yaml: the file is missing\n" });
+  });
+
+  test.each([
+    ["the core", []],
+    ["--draft draft-clean", ["--draft", "draft-clean"]],
+  ])("%s on a broken resume.yaml prints no text, says in one line that the file is not valid, quotes none of it, and exits with 1", async (_mode, args) => {
+    expect(await knowledge("--root", broken, ...args)).toEqual({
+      exitCode: 1,
+      stdout: "",
+      stderr: "resume.yaml: the file is not valid; `bun run build` names each problem in the repository's resume.yaml\n",
+    });
+  });
+});
+
 describe("bun run knowledge with a flag error", () => {
   test.each([
+    // parseArgs writes these messages. It quotes a flag that takes a value as '--draft <value>', so '--draft and '--root match only the start of it.
     ["a misspelt flag", ["--drfat", "draft-clean"], "'--drfat'"],
     ["--draft with no id", ["--draft"], "'--draft"],
     ["--root with no folder", ["alpha", "--root"], "'--root"],
@@ -307,6 +351,14 @@ describe("bun run knowledge with a flag error", () => {
     // The message names the resolved path: TMPDIR can end in a slash, which gives the fixture root a "//".
     const path = `${root}/${name}`;
     expect(await knowledge("--root", path)).toEqual({ exitCode: 2, stdout: "", stderr: `--root ${JSON.stringify(resolve(path))} is not a folder\n${USAGE}` });
+  });
+
+  test.each([
+    ["--root=", ["--root="]],
+    ['--root ""', ["--root", ""]],
+  ])("%s, an empty value, prints nothing, says --root takes a folder, then the usage, and exits with 2", async (_form, args) => {
+    // resolve("") is the working folder, so an empty value would read the repository instead.
+    expect(await knowledge(...args)).toEqual({ exitCode: 2, stdout: "", stderr: `--root takes a folder, not an empty value\n${USAGE}` });
   });
 
   test.each([
