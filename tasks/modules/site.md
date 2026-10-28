@@ -471,6 +471,19 @@ Files: `src/site/shell/InstallOffer.tsx`, `src/site/workspace.ts`, `src/site/rou
 Size: M
 Needs Peter: no
 
+### S37: Google Sans Code served from the site itself
+
+Delivers: labels, numbers and code use a committed Latin subset of Google Sans Code from the site's own address, as the design system's `--acme-font-mono` and the mockups ask (Peter's row 179).
+Blocked by: S7
+Acceptance:
+- `scripts/site-fonts.ts` also cuts a Latin subset of Google Sans Code, the weights the tokens use, with `harfbuzzjs`, in the same format as the Flex file; the file is committed in `public/fonts/`, and the build copies it and downloads nothing.
+- `src/site/styles/fonts.css` names it for `--acme-font-mono`; no output file names a font on another host.
+- SPEC-site's Tech Stack names Google Sans Code beside Google Sans Flex; the report gives the file's size and `/`'s first-load size against its budget.
+Verify: `bun run scripts/site-fonts.ts`; `bun test src/site/__tests__/build.test.ts`; `bun test`
+Files: `scripts/site-fonts.ts`, `public/fonts/` (the cut file), `src/site/styles/fonts.css`, `src/site/__tests__/build.test.ts`, `spec/SPEC-site.md`
+Size: S
+Needs Peter: no (row 179). The format follows his choice for S7's wording draft before D37.
+
 ## Checkpoints
 
 ### Checkpoint site: the build output

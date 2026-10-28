@@ -64,8 +64,8 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [K7](modules/knowledge.md#k7-readpassages-reads-approved-sources-by-id) `readPassages()` reads approved sources by id — blocked by K6 (done 2026-10-27; ids looked up in a `Map`; `skipped` waits for K8)
 - [x] [K8](modules/knowledge.md#k8-readlimits-bound-every-read) `readLimits` bound every read — blocked by K7 (done 2026-10-27; 20 ids, 64 characters an id, 24,000 characters)
 - [x] [K9](modules/knowledge.md#k9-publicknowledge-leaves-out-every-not-public-section) `publicKnowledge()` leaves out every `Not public` section — blocked by K3 (runs after K5: same files) (done 2026-10-27; `PublicKnowledge` in `types.ts`)
-- [ ] [K10](modules/knowledge.md#k10-bun-run-knowledge---draft-shows-a-draft-as-the-chat-will-read-it) `bun run knowledge --draft` shows a draft as the chat will read it — blocked by K5, K6
-- [ ] [Checkpoint knowledge: contract complete](modules/knowledge.md#checkpoint-knowledge-contract-complete) — after K5 to K10; Peter: review before the moves
+- [x] [K10](modules/knowledge.md#k10-bun-run-knowledge---draft-shows-a-draft-as-the-chat-will-read-it) `bun run knowledge --draft` shows a draft as the chat will read it — blocked by K5, K6 (done 2026-10-27; every broken rule named; no error quotes line text)
+- [x] [Checkpoint knowledge: contract complete](modules/knowledge.md#checkpoint-knowledge-contract-complete) — after K5 to K10; Peter: review before the moves (checks passed 2026-10-27: every contract function exists under its spec name, `bun test` passes (588), `bun run knowledge` prints 37 core entries in 7,202 of 80,000 characters; Peter's review is open and does not stop the run)
 - [ ] [A7](modules/agents.md#a7-the-write-source-repo-skill) The `write-source` repo skill — blocked by A2, K10
 - [ ] [13](modules/knowledge.md#task-13-long-form-interviews-one-subject-at-a-time-career-working-style-stories-opinions-side-projects-skills) Long-form interviews, one subject at a time: career, working style, stories, opinions, side projects, skills — blocked by A7, K10 (ongoing); Peter: the interviews; the kind line for interview sources, before the first interview source is approved; each source's approval
 - [ ] [A8](modules/agents.md#a8-the-agents-module-lands) The agents module lands — blocked by A1 to A7 and A9; Peter: read the fresh-session result
@@ -96,8 +96,9 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [S4](modules/site.md#s4-the-app-bar-and-design-system-parts-in-prerendered-pages) The app bar, and design-system parts in prerendered pages — blocked by S3 (done 2026-10-27; `@acmelabs/design-system-react` 0.3.2, row 166; the name box keeps the board's colors, row 171; `/` loads 134.3 KB gzip)
 - [x] [S5](modules/site.md#s5-the-static-not-found-page) The static not-found page — blocked by S4 (done 2026-10-27; no script; the build script tags it)
 - [x] [S6](modules/site.md#s6-page-titles-descriptions-canonical-addresses-and-share-previews) Page titles, descriptions, canonical addresses and share previews — blocked by S3 (done 2026-10-27; `pageHead()`; no public `pages.json`; the share image comes in S26, row 173)
-- [ ] [S7](modules/site.md#s7-google-sans-flex-served-from-the-site-itself) Google Sans Flex served from the site itself — blocked by S4; Peter: its wording draft goes to his one review before D37 (row 153)
+- [x] [S7](modules/site.md#s7-google-sans-flex-served-from-the-site-itself) Google Sans Flex served from the site itself — blocked by S4; Peter: its wording draft goes to his one review before D37 (row 153) (done 2026-10-27; one 45.2 KB WOFF; WOFF2 with Bun's Brotli is in the draft)
 - [ ] [S8](modules/site.md#s8-seam-1-runs-the-build-script) Seam 1 runs the build script — blocked by S2 to S7, D16
+- [ ] [S37](modules/site.md#s37-google-sans-code-served-from-the-site-itself) Google Sans Code served from the site itself — blocked by S7 (row 179)
 - [ ] [Checkpoint site: the build output](modules/site.md#checkpoint-site-the-build-output) — after S1 to S8, D16; Peter: look at `/` and `/resume` in `bun run dev`
 - [ ] [K14](modules/knowledge.md#k14-the-knowledge-scripts-own-test-seam) The knowledge script's own test seam — blocked by K10 (row 176; before K11, because every move runs the script)
 - [ ] [K11](modules/knowledge.md#k11-move-three-deep-dives-to-sources-fednow-architecture-fednow-bundle-size-fednow-design-system) Move three deep dives to sources: `fednow-architecture`, `fednow-bundle-size`, `fednow-design-system` — blocked by K5 to K7 and Peter's approval; Peter: approve the three summaries and the moved files
@@ -110,7 +111,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [D8](modules/deploy.md#d8-build-settings-in-code-and-no-env-files) Build settings in code, and no `.env` files — blocked by D6 (done 2026-10-27; no spike push: `bun.lock` is version 2 again since A10)
 - [ ] [D17](modules/deploy.md#d17-the-routes-redirects-clean-addresses-three-api-routes-and-the-not-found-page) The routes: redirects, clean addresses, three API routes and the not-found page — blocked by D16, D6
 - [ ] [D18](modules/deploy.md#d18-security-and-cache-headers) Security and cache headers — blocked by D17
-- [ ] [D10](modules/deploy.md#d10-the-question-log-in-upstash-deleted-by-the-store-after-90-days) The question log in Upstash, deleted by the store after 90 days — blocked by D9, D6
+- [x] [D10](modules/deploy.md#d10-the-question-log-in-upstash-deleted-by-the-store-after-90-days) The question log in Upstash, deleted by the store after 90 days — blocked by D9, D6 (done 2026-10-27; REST with `fetch`, one `/multi-exec` per write)
 - [ ] [S9](modules/site.md#s9-the-preview-and-the-real-browser-test) The preview and the real-browser test — blocked by S8, D17
 - [ ] [S10](modules/site.md#s10-the-career-timeline-band) The career timeline band — blocked by S9, T1
 - [ ] [S11](modules/site.md#s11-the-workspace-and-its-first-view-on-wide-screens) The workspace and its first view on wide screens — blocked by S10; Peter: its wording draft goes to his one review before D37 (row 153)
