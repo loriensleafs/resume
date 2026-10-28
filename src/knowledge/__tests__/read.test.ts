@@ -154,6 +154,33 @@ describe("readPassages on buildKnowledge's output", () => {
     expect(readPassages(knowledge, ["alpha.4", "alpha"])).toEqual({ text: ALPHA_WHOLE, read: ["alpha.4", "alpha"], unknown: [], skipped: [] });
   });
 
+  test("widens a source's group when a later source id names all of it, keeping the source where it first appears, with no passage twice", () => {
+    expect(readPassages(knowledge, ["alpha.2", "beta", "alpha"])).toEqual({
+      text: [
+        ALPHA_WHOLE,
+        "# [beta] Why platform work",
+        "Interview: Peter's own words, in the first person.",
+        "Roles: acme.",
+        "",
+        "## [beta.1] Why front-end platform work?",
+        "I like building what other engineers use.",
+        "",
+        "## [beta.2] Why front-end platform work? (continued)",
+        "And I like seeing a whole team move faster.",
+        "",
+        "## [beta.3] How did you help with the migration?",
+        "I helped plan it.",
+        "",
+        "## Not public: decline to describe these kinds of material",
+        "Colleague names.",
+        "",
+      ].join("\n"),
+      read: ["alpha.2", "beta", "alpha"],
+      unknown: [],
+      skipped: [],
+    });
+  });
+
   test("gives an empty text and empty lists when no id is asked for", () => {
     expect(readPassages(knowledge, [])).toEqual({ text: "", read: [], unknown: [], skipped: [] });
   });

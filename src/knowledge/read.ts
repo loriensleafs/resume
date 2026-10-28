@@ -49,9 +49,7 @@ export function readPassages(knowledge: Knowledge, ids: string[]): ReadResult {
     asked.set(found.source, passageIds);
     read.add(id);
   }
-  // renderSource() renders every passage for no list and none for an empty one. Each list here
-  // holds the passages its ids name, so it is empty only for a source with no passage to render.
-  // One blank line parts two sources, as it parts the sections of one.
+  // One blank line parts two sources.
   const text = [...asked].map(([source, passageIds]) => renderSource(source, [...passageIds])).join("\n");
   return { text, read: [...read], unknown: [...unknown], skipped: [] };
 }
