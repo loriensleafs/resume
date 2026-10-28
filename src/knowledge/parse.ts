@@ -97,8 +97,9 @@ const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
  * public heading stops it, and text before the first section is not allowed. Inside a fenced code
  * block every line is text, as in Markdown, and a fence that is never closed stops it. A code block
  * line that looks like the Not public heading stops it too: the rendered text keeps the fence, but
- * the chat could still read the line as the start of that section. Its message gives the line number
- * in the file (the body starts on `firstLine`) and the heading it matched, never the rest of the line.
+ * the chat could still read the line as the start of that section. The message for a look-alike, in a
+ * code block or not, gives its line number in the file (the body starts on `firstLine`) and the
+ * heading it matched, never the rest of the line: the rest can hold the material Not public keeps out.
  */
 function splitSections(body: string, file: string, firstLine: number): { heading: string; text: string }[] {
   const sections: { heading: string; lines: string[] }[] = [];
@@ -109,13 +110,12 @@ function splitSections(body: string, file: string, firstLine: number): { heading
   for (const [i, line] of body.split("\n").entries()) {
     const text = sections.at(-1)?.lines ?? preamble;
     const marks = line.match(FENCE);
+    /** The part of the line that looks like the Not public heading, if any. */
+    const lookAlike = line.match(LIKE_NOT_PUBLIC)?.[0];
     if (fence) {
       // A closing fence uses the same mark, at least as many of them, and nothing after them.
       if (marks && marks[1]![0] === fence.marks[0] && marks[1]!.length >= fence.marks.length && !marks[2]!.trim()) fence = undefined;
-      else {
-        const heading = line.match(LIKE_NOT_PUBLIC)?.[0];
-        if (heading) fencedNotPublic ??= { line: firstLine + i, heading };
-      }
+      else if (lookAlike) fencedNotPublic ??= { line: firstLine + i, heading: lookAlike };
       text.push(line);
       continue;
     }
@@ -125,8 +125,11 @@ function splitSections(body: string, file: string, firstLine: number): { heading
       text.push(line);
       continue;
     }
-    if (line !== `## ${NOT_PUBLIC}` && LIKE_NOT_PUBLIC.test(line)) {
-      throw new KnowledgeError(file, `${JSON.stringify(line)} looks like the ${NOT_PUBLIC} heading: write it exactly "## ${NOT_PUBLIC}"`);
+    if (lookAlike && line !== `## ${NOT_PUBLIC}`) {
+      throw new KnowledgeError(
+        file,
+        `line ${firstLine + i} starts with ${JSON.stringify(lookAlike)}, which looks like the ${NOT_PUBLIC} heading: write it exactly "## ${NOT_PUBLIC}"`,
+      );
     }
     const heading = line.match(/^## (.*)$/)?.[1]?.trim();
     if (heading === "") throw new KnowledgeError(file, 'a "## " heading has no text');
@@ -136,7 +139,6 @@ function splitSections(body: string, file: string, firstLine: number): { heading
   if (preamble.join("").trim()) throw new KnowledgeError(file, "text before the first section is not allowed");
   // An open fence comes first: it can swallow the real Not public heading, and then the fence is what to fix.
   if (fence) throw new KnowledgeError(file, `the code fence ${fence.marks} in section "${fence.section}" is never closed`);
-  // No message shows the rest of the line: it can hold the material Not public keeps out.
   if (fencedNotPublic) {
     throw new KnowledgeError(
       file,

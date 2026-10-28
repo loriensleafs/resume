@@ -194,15 +194,33 @@ describe("parseSource", () => {
     expect(failure(interviewFile({}, middle))).toContain("the last section, and only the last, must be Not public");
   });
 
-  test.each(["## not public", "## Not Public", "## NOT PUBLIC", "## Not public ", "##  Not public", "## Not  public", "## Not public", "## Not\tpublic", " ## Not public", "##Not public", "### Not public", "## Not public ##"])(
-    "stops on %p, a line that looks like the Not public heading, and never makes it a passage",
-    (line) => {
-      const body = `## Why platform work?\n\nAn answer.\n\n${line}\n\nSECRET.\n\n## Not public\n\nColleague names.\n`;
-      const message = failure(interviewFile({}, body));
-      expect(message).toContain(`${JSON.stringify(line)} looks like the Not public heading: write it exactly "## Not public"`);
-      expect(message).not.toContain("SECRET");
-    },
-  );
+  test.each([
+    ["## not public", "## not public"],
+    ["## Not Public", "## Not Public"],
+    ["## NOT PUBLIC", "## NOT PUBLIC"],
+    ["## Not public ", "## Not public"],
+    ["##  Not public", "##  Not public"],
+    ["## Not  public", "## Not  public"],
+    ["## Not public", "## Not public"],
+    ["## Not\tpublic", "## Not\tpublic"],
+    [" ## Not public", " ## Not public"],
+    ["##Not public", "##Not public"],
+    ["### Not public", "### Not public"],
+    ["## Not public ##", "## Not public"],
+  ])("stops on %p, a line that looks like the Not public heading, and never makes it a passage", (line, heading) => {
+    // The fixture's front matter takes lines 1 to 12, so the look-alike line is line 18.
+    const body = `## Why platform work?\n\nAn answer.\n\n${line}\n\nSECRET.\n\n## Not public\n\nColleague names.\n`;
+    const message = failure(interviewFile({}, body));
+    expect(message).toContain(`line 18 starts with ${JSON.stringify(heading)}, which looks like the Not public heading: write it exactly "## Not public"`);
+    expect(message).not.toContain("SECRET");
+  });
+
+  test("names a line that looks like the Not public heading by its line number and that heading only, never the rest of the line", () => {
+    const body = "## Why platform work?\n\nAn answer.\n\n## Not public: SECRET colleague names\n\nColleague names.\n\n## Not public\n\nColleague names.\n";
+    expect(failure(interviewFile({}, body))).toBe(
+      'knowledge/sources/sample.md: line 18 starts with "## Not public", which looks like the Not public heading: write it exactly "## Not public"',
+    );
+  });
 
   test.each([
     ["## Not public", "```markdown", "## Not public"],
