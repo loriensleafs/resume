@@ -34,6 +34,59 @@ const NOT_FOUND_PAGE = "/404.html";
 /** The Vercel health job: Vercel Cron calls it daily at 15:17 UTC (SPEC-deploy, "Smoke check and health checks"). */
 const CRON = { path: "/api/cron/health", schedule: "17 15 * * *" } as const;
 
+/**
+ * The headers on every response (SPEC-deploy, "Headers"). Each name is in lower case, as the deploy spike's header
+ * routes wrote them, so no two routes set one header under two spellings; whether two spellings would merge is not
+ * tested (research 12, check 4). The route's HSTS value replaces the one Vercel adds on its own (spike check 4).
+ */
+const SECURITY_HEADERS = {
+  // .dev is already on the browsers' preload list, so no `preload`.
+  "strict-transport-security": "max-age=63072000; includeSubDomains",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+  "cross-origin-opener-policy": "same-origin",
+  // For browsers without the policy's frame-ancestors.
+  "x-frame-options": "DENY",
+} as const;
+
+/**
+ * The header policy, on every path but the worker files and the documents (SPEC-deploy, "Headers"). It has no
+ * default-src and no script-src: each HTML file carries those in its own policy tag (src/deploy/policy.ts), and the
+ * browser enforces both policies. frame-ancestors lives here, because a tag cannot carry it.
+ */
+const HEADER_POLICY = [
+  "style-src 'self'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "manifest-src 'self'",
+  "worker-src 'self'",
+  "frame-src 'none'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
+/**
+ * The worker policy, on the service worker and Workbox's file, the worker files. They are scripts, so they carry no
+ * policy tag: the header policy plus their script rule.
+ */
+const WORKER_POLICY = `${HEADER_POLICY}; script-src 'self'`;
+
+/** The service worker, `/sw.js`, and Workbox's file, `/workbox-<hash>.js`, inside a route's `src`. */
+const WORKBOX_FILE = "workbox-[0-9a-f]+\\.js";
+const WORKER_FILES = `(?:sw\\.js|${WORKBOX_FILE})`;
+
+/**
+ * The three documents, at the names SPEC-site serves them under: the committed files in documents/, which
+ * `bun run documents` names after src/build.ts's BASENAME. The config test checks these names against that folder.
+ * They get no policy: `object-src 'none'` on a PDF can blank it in a browser's PDF viewer, and a document runs no
+ * script. Spike check 10 saw Chrome show the PDF with the six headers and no policy.
+ */
+const DOCUMENTS = ["Peter-Kloss-Resume.pdf", "Peter-Kloss-Resume.docx", "Peter-Kloss-Resume.txt"] as const;
+
 /** One route of config.json. */
 type Route = Record<string, unknown>;
 
@@ -61,6 +114,46 @@ function hostRedirect(host: string, src: string): Route {
 
 /** A literal path inside a route's `src`, which is a regular expression (PCRE). */
 const literal = (path: string) => path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * The header routes (SPEC-deploy, "Headers"), each with continue: true. A route's `headers` is an object, so when two
+ * matching routes set one header, the response gets one value, the last route's (spike check 4, with a control run).
+ *
+ * The cache and policy routes match by exact letter case, so their paths are the files themselves. Vercel serves a
+ * file only by its exact name, so any other spelling is the not-found page, which then keeps the header policy and
+ * revalidates. Sources: Vercel's answer that deployments use a case-sensitive file system
+ * (https://community.vercel.com/t/video-asset-works-locally-but-not-when-deployed/2470), not checked on a deployment;
+ * spike check 3 proved caseSensitive on the API routes, not on a header route.
+ */
+function headerRoutes(): Route[] {
+  return [
+    // The cache rule for hashed names, whose content never changes: Nitro's rule for /assets/, which this step
+    // replaces with Nitro's other routes, plus Workbox's file. Every other file keeps Vercel's default,
+    // `public, max-age=0, must-revalidate`, so it revalidates; a function sets its own (/api/ sets no-store).
+    {
+      src: `^/(?:assets/.*|${WORKBOX_FILE})$`,
+      headers: { "cache-control": "public, max-age=31536000, immutable" },
+      continue: true,
+      caseSensitive: true,
+    },
+    { src: "^/(.*)$", headers: { ...SECURITY_HEADERS }, continue: true },
+    // Every path but the three documents gets the header policy.
+    {
+      src: `^/(?!(?:${DOCUMENTS.map(literal).join("|")})$).*$`,
+      headers: { "content-security-policy": HEADER_POLICY },
+      continue: true,
+      caseSensitive: true,
+    },
+    // The worker files match the route above too. This route comes after it, so they get the worker policy alone;
+    // the config test fails when it moves before it.
+    {
+      src: `^/${WORKER_FILES}$`,
+      headers: { "content-security-policy": WORKER_POLICY },
+      continue: true,
+      caseSensitive: true,
+    },
+  ];
+}
 
 /** What a symbolic link points to. A link to a missing path stops the build and names the link. */
 async function linkTarget(link: string): Promise<Stats> {
@@ -141,7 +234,9 @@ export async function writeVercelConfig(
     // 1. Host redirects. The .vercel.app route leaves /api/ alone, so the API stays reachable on that address.
     ...REDIRECT_HOSTS.map((host) => hostRedirect(host, "^/(.*)$")),
     ...(vercelAppHost ? [hostRedirect(vercelAppHost, "^/(?!api/)(.*)$")] : []),
-    // 2. Headers, each route with continue: true: task D18.
+    // 2. Headers, each route with continue: true, so every later route still runs. They come before the function
+    //    folders' routes, so the not-found page that those routes give gets the headers too (spike check 4).
+    ...headerRoutes(),
     // 3. Function folders. Each one that no API route names gets the not-found page at its own path, before the
     //    filesystem phase would serve the function there (spike check 3). A route's dest still reaches the folder.
     ...unnamedFolders.map((path) => ({ src: `^${literal(path)}(?:/.*)?$`, dest: NOT_FOUND_PAGE, status: 404 })),

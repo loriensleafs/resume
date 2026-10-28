@@ -93,6 +93,70 @@ async function routesOf(output: string): Promise<Route[]> {
   return (await Bun.file(`${output}/config.json`).json()).routes;
 }
 
+/** The headers that one route sets, by name; none for a route without headers. */
+const headersOf = (route: Route) => (route.headers ?? {}) as Record<string, string>;
+
+/**
+ * The response headers that the routes before the filesystem give a request for `path` on peterkloss.dev, merged as
+ * the deploy spike saw Vercel merge them (spike check 4, with a control): every matching route adds its headers, and
+ * for one header name the last matching route wins. A route matches without regard to case unless it sets
+ * caseSensitive (research 12, vercel.json reference). A route without continue ends the list, and a route with a host
+ * condition matches no request for peterkloss.dev.
+ */
+function servedHeaders(routes: Route[], path: string): Record<string, string> {
+  const headers: Record<string, string> = {};
+  for (const route of routes) {
+    if (route.handle !== undefined) break;
+    if (route.has !== undefined || !new RegExp(route.src!, route.caseSensitive ? "" : "i").test(path)) continue;
+    Object.assign(headers, headersOf(route));
+    if (route.continue !== true) break;
+  }
+  return headers;
+}
+
+// SPEC-deploy, "Headers": the table's six headers and the two policies, as literals. The names are in lower case, as
+// the spike's header routes wrote them.
+// SIX_HEADERS names the same set as SECURITY_HEADERS in src/deploy/routes.ts.
+const SIX_HEADERS = {
+  "strict-transport-security": "max-age=63072000; includeSubDomains",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+  "cross-origin-opener-policy": "same-origin",
+  "x-frame-options": "DENY",
+};
+const HEADER_POLICY =
+  "style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; " +
+  "worker-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+const WORKER_POLICY =
+  "style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; " +
+  "worker-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; " +
+  "frame-ancestors 'none'; script-src 'self'";
+
+/**
+ * One path of each kind the site serves: pages, the not-found page from the last route and from a function folder's
+ * route, a function, the hashed files, the service worker and Workbox's file, the files with fixed names, and the
+ * three documents. The fixture's output has the function folders `__server` and `api/chat`.
+ */
+const SERVED_PATHS = [
+  "/",
+  "/resume",
+  "/sources/agent-workflows",
+  "/no-such-page",
+  "/__server",
+  "/api/chat",
+  "/assets/main-CtqVfDmn.js",
+  "/assets/main-B2yPHKaX.css",
+  "/sw.js",
+  "/workbox-1ce433d4.js",
+  "/manifest.webmanifest",
+  "/device-index.json",
+  "/icons/icon-192.png",
+  "/Peter-Kloss-Resume.pdf",
+  "/Peter-Kloss-Resume.docx",
+  "/Peter-Kloss-Resume.txt",
+];
+
 afterAll(async () => {
   await $`rm -rf ${tmp}`.quiet().nothrow();
 });
@@ -266,8 +330,8 @@ describe("addPolicyTags()", () => {
   });
 });
 
-// The expected routes are SPEC-deploy's, "Routes", in the form that the deploy spike ran on Vercel (research 12,
-// "Deploy spike verdicts", checks 2, 3, 5 and 6).
+// The expected routes are SPEC-deploy's, "Routes", "Headers" and "Caching", in the form that the deploy spike ran on
+// Vercel (research 12, "Deploy spike verdicts", checks 2 to 6).
 describe("writeVercelConfig()", () => {
   test("redirects pkloss.dev, pwk.dev and www.peterkloss.dev first, each by its exact host, with 308 to peterkloss.dev", async () => {
     const output = await nitroOutput("redirects");
@@ -321,6 +385,141 @@ describe("writeVercelConfig()", () => {
     const src = new RegExp(route.src!, "i");
     expect(["/", "/resume", "/sources/agent-workflows", "/api"].filter((path) => !src.test(path))).toEqual([]);
     expect(["/api/chat", "/api/status", "/api/cron/health"].filter((path) => src.test(path))).toEqual([]);
+  });
+
+  // SPEC-deploy, "Headers": on every response, from a route on /(.*). Spike check 4 saw the six headers reach a page, a
+  // function's response and the not-found page from both its routes, with the header routes before both.
+  test("sets the six headers on every path, from one route on /(.*) with continue: true", async () => {
+    const output = await nitroOutput("six-headers", { functions: ["__server", "api/chat"] });
+
+    await writeVercelConfig(output);
+
+    const routes = await routesOf(output);
+    expect(routes.filter((route) => route.src === "^/(.*)$" && route.continue === true)).toEqual([
+      { src: "^/(.*)$", headers: SIX_HEADERS, continue: true },
+    ]);
+    expect(SERVED_PATHS.filter((path) => !Bun.deepMatch(SIX_HEADERS, servedHeaders(routes, path)))).toEqual([]);
+  });
+
+  // SPEC-deploy, "Headers": "object-src 'none'" on a PDF can blank it in a browser's PDF viewer, so the documents get
+  // no policy (spike check 10 passed with none). Vercel serves files by their exact names, so a document's name in
+  // other letter case is the not-found page, which keeps the header policy.
+  test("gives every path the header policy, except the worker files, which get the worker policy, and the documents, which get none", async () => {
+    const output = await nitroOutput("policies", { functions: ["__server", "api/chat"] });
+
+    await writeVercelConfig(output);
+
+    const routes = await routesOf(output);
+    const policyOf = (path: string) => servedHeaders(routes, path)["content-security-policy"] ?? "none";
+    const paths = [...SERVED_PATHS, "/peter-kloss-resume.pdf"];
+    expect(Object.fromEntries(paths.map((path) => [path, policyOf(path)]))).toEqual({
+      "/": HEADER_POLICY,
+      "/resume": HEADER_POLICY,
+      "/sources/agent-workflows": HEADER_POLICY,
+      "/no-such-page": HEADER_POLICY,
+      "/__server": HEADER_POLICY,
+      "/api/chat": HEADER_POLICY,
+      "/assets/main-CtqVfDmn.js": HEADER_POLICY,
+      "/assets/main-B2yPHKaX.css": HEADER_POLICY,
+      "/sw.js": WORKER_POLICY,
+      "/workbox-1ce433d4.js": WORKER_POLICY,
+      "/manifest.webmanifest": HEADER_POLICY,
+      "/device-index.json": HEADER_POLICY,
+      "/icons/icon-192.png": HEADER_POLICY,
+      "/Peter-Kloss-Resume.pdf": "none",
+      "/Peter-Kloss-Resume.docx": "none",
+      "/Peter-Kloss-Resume.txt": "none",
+      "/peter-kloss-resume.pdf": HEADER_POLICY,
+    });
+  });
+
+  // A route's headers is an object, so the worker files, which match both policy routes, get the policy of the last
+  // one. Spike check 4's control run put the worker policy route first, and the worker files got the header policy.
+  test("puts the worker policy route after the header policy route, because the last matching route wins", async () => {
+    const output = await nitroOutput("policy-order");
+
+    await writeVercelConfig(output);
+
+    const routes = await routesOf(output);
+    const routeIndexOf = (policy: string) =>
+      routes.findIndex((route) => headersOf(route)["content-security-policy"] === policy);
+    expect(routeIndexOf(HEADER_POLICY)).toBeGreaterThan(-1);
+    expect(routeIndexOf(WORKER_POLICY)).toBeGreaterThan(routeIndexOf(HEADER_POLICY));
+  });
+
+  test("has no 'unsafe-inline' and no 'unsafe-eval' in any policy", async () => {
+    const output = await nitroOutput("no-unsafe");
+
+    await writeVercelConfig(output);
+
+    const policies = (await routesOf(output)).flatMap((route) =>
+      Object.entries(headersOf(route))
+        .filter(([name]) => name.toLowerCase() === "content-security-policy")
+        .map(([, value]) => value),
+    );
+    expect(policies.toSorted()).toEqual([HEADER_POLICY, WORKER_POLICY]);
+    expect(policies.filter((policy) => /'unsafe-(?:inline|eval)'/.test(policy))).toEqual([]);
+  });
+
+  // SPEC-deploy, "Caching". Hashed names never change their content, so they are kept a year; every other file
+  // revalidates with Vercel's default, `public, max-age=0, must-revalidate` (research 12), which spike check 4 saw on
+  // the pages, /sw.js, the PDF and the not-found page. The function sets its own no-store, which spike check 4 saw kept
+  // when no route set a cache rule. Vercel serves a file only by its exact name, so /ASSETS/ is the not-found page.
+  test("keeps /assets/ files and Workbox's file a year, and leaves every other path to Vercel's default, which revalidates", async () => {
+    const output = await nitroOutput("cache", { functions: ["__server", "api/chat"] });
+
+    await writeVercelConfig(output);
+
+    const routes = await routesOf(output);
+    const cacheOf = (path: string) => servedHeaders(routes, path)["cache-control"] ?? "Vercel's default";
+    const paths = [...SERVED_PATHS, "/ASSETS/main-CtqVfDmn.js"];
+    expect(Object.fromEntries(paths.map((path) => [path, cacheOf(path)]))).toEqual({
+      "/": "Vercel's default",
+      "/resume": "Vercel's default",
+      "/sources/agent-workflows": "Vercel's default",
+      "/no-such-page": "Vercel's default",
+      "/__server": "Vercel's default",
+      "/api/chat": "Vercel's default",
+      "/assets/main-CtqVfDmn.js": "public, max-age=31536000, immutable",
+      "/assets/main-B2yPHKaX.css": "public, max-age=31536000, immutable",
+      "/sw.js": "Vercel's default",
+      "/workbox-1ce433d4.js": "public, max-age=31536000, immutable",
+      "/manifest.webmanifest": "Vercel's default",
+      "/device-index.json": "Vercel's default",
+      "/icons/icon-192.png": "Vercel's default",
+      "/Peter-Kloss-Resume.pdf": "Vercel's default",
+      "/Peter-Kloss-Resume.docx": "Vercel's default",
+      "/Peter-Kloss-Resume.txt": "Vercel's default",
+      "/ASSETS/main-CtqVfDmn.js": "Vercel's default",
+    });
+  });
+
+  // SPEC-deploy, "Headers": no two routes set one header under two spellings, because whether two spellings merge is
+  // not tested (research 12, check 4).
+  test("writes every header name of the header routes in lower case", async () => {
+    const output = await nitroOutput("lower-case");
+
+    await writeVercelConfig(output);
+
+    const names = (await routesOf(output))
+      .filter((route) => route.continue === true)
+      .flatMap((route) => Object.keys(headersOf(route)));
+    expect(names).toContain("cache-control");
+    expect(names.filter((name) => name !== name.toLowerCase())).toEqual([]);
+  });
+
+  // The routes name the documents; `bun run documents` names the committed files (src/build.ts, BASENAME). A renamed
+  // document would otherwise get the header policy and could show blank in a browser's PDF viewer.
+  test("gives no policy to each committed document in documents/", async () => {
+    const output = await nitroOutput("committed-documents");
+    const documents = (await readdir(`${REPO}/documents`)).filter((name) => name !== "inputs.sha256");
+
+    await writeVercelConfig(output);
+
+    const routes = await routesOf(output);
+    expect(documents).toHaveLength(3);
+    const withPolicy = documents.filter((name) => servedHeaders(routes, `/${name}`)["content-security-policy"]);
+    expect(withPolicy).toEqual([]);
   });
 
   // In the filesystem phase Vercel serves each function folder at its own path, before any later route (spike check 3:
