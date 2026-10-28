@@ -9,3 +9,5 @@ export type { Passage, Source, Subject } from "./parse";
 export type Entry = { id: string; kind: "resume" | "logistics" | "catalog"; title: string; text: string };
 /** Server only: it holds each source's Not public text. The chat's function gets it through virtual:knowledge. */
 export type Knowledge = { core: Entry[]; sources: Source[] };
+/** Everything that reaches a browser: the site's pages and the device index. It holds no Not public text. */
+export type PublicKnowledge = { core: Entry[]; sources: Omit<Source, "notPublic">[] };

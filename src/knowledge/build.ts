@@ -8,7 +8,7 @@ import { displayUrl, formatLocation, formatRange, formatTitle, loadResume, type 
 import { highlightId, isSlug, isSourceId, logisticsId, PASSAGE_ID_RULE, parseId, roleId, skillsId, SLUG_RULE, SOURCE_ID_RULE, toSlug } from "./ids";
 import { KnowledgeError, LINE_BREAK, parseSource } from "./parse";
 import { PASSAGE_CHARACTERS, renderSource, SOURCE_CHARACTERS, SUMMARY_CHARACTERS } from "./render";
-import type { Entry, Knowledge, Source } from "./types";
+import type { Entry, Knowledge, PublicKnowledge, Source } from "./types";
 
 const REPO = `${import.meta.dir}/../..`;
 const SOURCES = "knowledge/sources";
@@ -216,4 +216,28 @@ export async function buildKnowledge(options: { root?: string } = {}): Promise<K
   const core = [...resumeCore, ...(await logisticsEntries(root)), ...sources.map(catalogEntry)];
   checkIds(core, sources);
   return { core, sources };
+}
+
+/**
+ * The knowledge base as a browser may hold it: the core, and each approved source without its Not
+ * public text (SPEC-knowledge, "Who gets which shape"). The type alone does not keep that text out:
+ * a Source is also an `Omit<Source, "notPublic">`. So each source is built anew from the fields a
+ * browser may see. The callback's return type makes the type check reject any other field, and a
+ * field added to Source stops the type check here until someone decides whether a browser may see it.
+ */
+export function publicKnowledge(knowledge: Knowledge): PublicKnowledge {
+  return {
+    core: knowledge.core,
+    sources: knowledge.sources.map((s): PublicKnowledge["sources"][number] => ({
+      id: s.id,
+      title: s.title,
+      kind: s.kind,
+      subject: s.subject,
+      roles: s.roles,
+      highlights: s.highlights,
+      summary: s.summary,
+      links: s.links,
+      passages: s.passages,
+    })),
+  };
 }
