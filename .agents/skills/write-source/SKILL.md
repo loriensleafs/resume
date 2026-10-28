@@ -18,13 +18,13 @@ The private clone is the folder `resume-private` beside the main checkout. The m
 ```sh
 gh repo clone loriensleafs/resume-private <clone>
 git -C <clone> pull --ff-only
-gh api repos/loriensleafs/resume-private --jq .permissions.push
+gh api repos/loriensleafs/resume-private --jq '.private, .permissions.push'
 ls <clone>/interviews
 ```
 
-Leave out `gh repo clone` when the clone exists. When a command fails, or the `gh api` command prints anything but `true`, stop and tell Peter that the private repo is not attached. The interview starts only once it is, because step 4 saves every answer there before anything is written from it.
+Leave out `gh repo clone` when the clone exists. The `gh api` command prints two lines: whether the repo is private, then whether you can push to it. When a command fails, or a line prints anything but `true`, stop: write no answer anywhere, and tell Peter what failed. A first line that is not `true` means the repo is not private, so its `interviews/` folder may be public now; tell him that first. Any other failure means the private repo is not attached. The interview starts only once both lines print `true`, because step 4 saves every answer there before anything is written from it.
 
-Done when `ls <clone>/interviews` succeeds and the `gh api` command prints `true`.
+Done when `ls <clone>/interviews` succeeds and the `gh api` command prints `true` twice: the repo is private and you can push to it.
 
 ## 2. Agree the subject
 
@@ -79,7 +79,7 @@ bun run knowledge --draft <id>
 
 The command prints the source as the chat will read it once approved, then one line for each rule it breaks, `knowledge/sources/<id>.md: <rule>`, and exits with 1. A source with no broken rule ends on `"<id>" renders to <n> of 24,000 characters and breaks no rule of an approved source.` and exits with 0. Broken front matter or a broken section prints no text, only the problems. Fix those first: until then, `bun run knowledge` and `bun test` fail for every source.
 
-Done when `bun run knowledge --draft <id>` exits with 0 and says the source breaks no rule, and the redaction list is on the private repo's remote.
+Done when `bun run knowledge --draft <id>` exits with 0 and says the source breaks no rule, and the redaction list is on the private repo's remote: after its push, `git -C <clone> ls-remote origin refs/heads/main` and `git -C <clone> rev-parse HEAD` print the same commit.
 
 ## 6. Ask Peter to approve
 
@@ -96,7 +96,7 @@ Done when he approved, named changes, or declined; changes go back to step 5.
 
 1. Set `status: approved` and `approved:` to the date Peter approved.
 2. Add a row to the decision record, the newest `docs/design/interview-<date>.md`: the source id, that date, and Peter's answer, quoted. The release skill's approval check lets a new approved source go only with this row.
-3. Run the before-commit checks ([AGENTS.md](../../../AGENTS.md), "Verify"). Two snapshots in `src/knowledge/__tests__/` then fail: the core gains the source's catalog entry, and the list of passage ids gains its passages. Read the diff: it adds these lines and changes no other. Then run `bun test src/knowledge --update-snapshots` and `bun test` again.
+3. Run the before-commit checks ([AGENTS.md](../../../AGENTS.md), "Verify"). The snapshots in `src/knowledge/__tests__/` then fail. Read the snapshot diff: it only adds lines for this source. Then run `bun test src/knowledge --update-snapshots` and `bun test` again.
 4. Commit the source, the decision record and the snapshot file, each staged by name, as `feat(knowledge): the <id> source`.
 5. The site build reads every approved source, so the push to `main` is a release. Push with the [release skill](../release/SKILL.md).
 
