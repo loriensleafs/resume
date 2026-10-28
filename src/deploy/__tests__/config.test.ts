@@ -116,6 +116,7 @@ function servedHeaders(routes: Route[], path: string): Record<string, string> {
 
 // SPEC-deploy, "Headers": the table's six headers and the two policies, as literals. The names are in lower case, as
 // the spike's header routes wrote them.
+// SIX_HEADERS names the same set as SECURITY_HEADERS in src/deploy/routes.ts.
 const SIX_HEADERS = {
   "strict-transport-security": "max-age=63072000; includeSubDomains",
   "x-content-type-options": "nosniff",
@@ -440,10 +441,10 @@ describe("writeVercelConfig()", () => {
     await writeVercelConfig(output);
 
     const routes = await routesOf(output);
-    const routeSetting = (policy: string) =>
+    const routeIndexOf = (policy: string) =>
       routes.findIndex((route) => headersOf(route)["content-security-policy"] === policy);
-    expect(routeSetting(HEADER_POLICY)).toBeGreaterThan(-1);
-    expect(routeSetting(WORKER_POLICY)).toBeGreaterThan(routeSetting(HEADER_POLICY));
+    expect(routeIndexOf(HEADER_POLICY)).toBeGreaterThan(-1);
+    expect(routeIndexOf(WORKER_POLICY)).toBeGreaterThan(routeIndexOf(HEADER_POLICY));
   });
 
   test("has no 'unsafe-inline' and no 'unsafe-eval' in any policy", async () => {
