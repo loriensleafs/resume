@@ -501,6 +501,229 @@ describe("the last call", () => {
   });
 });
 
+/** A question from "Ask about this", as the browser sends it: `about` is the line's knowledge id (SPEC-chat, The request, "About"). */
+const askAbout = (text: string, about: string) => postChat(chatBody([question(text)], { about }));
+
+describe("about", () => {
+  test("an about passage id is read before the first model call: the stream starts with that read_sources call, its topic the source's title, and its id-only result, and the passage can be cited", async () => {
+    const { fake, requests } = recordingFake([{ text: "Test Person planned the first thing [sample.2] and tested it [sample.3]." }]);
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(fake, { telemetry });
+
+    const events = await readEvents(await handleChat(askAbout("Tell me more about this.", "sample.2"), deps));
+
+    // After the run's start, the About read comes first: its call, then its result as ids only.
+    expect(events.slice(0, 5).map((e) => e.type)).toEqual(["RUN_STARTED", "TOOL_CALL_START", "TOOL_CALL_ARGS", "TOOL_CALL_END", "TOOL_CALL_RESULT"]);
+    const [, start, args, end, result] = events;
+    const input = { ids: ["sample.2"], topic: "A sample deep dive" };
+    expect(start?.toolCallName).toBe("read_sources");
+    expect(JSON.parse(String(args?.delta))).toEqual(input);
+    expect(JSON.parse(String(result?.content))).toEqual({ read: ["sample.2"], unknown: [], skipped: [] });
+    expect(new Set([start, args, end, result].map((e) => e?.toolCallId)).size).toBe(1);
+    const wire = JSON.stringify(events);
+    for (const text of SAMPLE_TEXT) expect(wire).not.toContain(text);
+    // The model's first call already holds the read after the question: the call, then the whole result.
+    expect(fake.state.callCount).toBe(1);
+    const [call, read] = requests[0]?.messages.slice(-2) ?? [];
+    expect(call?.toolCalls?.map(({ function: f }) => ({ name: f.name, input: JSON.parse(f.arguments) }))).toEqual([{ name: "read_sources", input }]);
+    expect(read?.toolCallId).toBe(call?.toolCalls?.[0]?.id);
+    for (const text of ["Text for What Peter did.", "Internal code."]) expect(JSON.stringify(read?.content)).toContain(text);
+    // The passage the turn read is kept; one it did not read is removed.
+    expect(streamedText(events)).toBe("Test Person planned the first thing [sample.2] and tested it .");
+    expect(citationEvents(events)).toEqual([{ citations: ["sample.2"], removed: 1 }]);
+    expect((await deps.log.list(1)).map(({ read, outcome }) => ({ read, outcome }))).toEqual([{ read: ["sample.2"], outcome: "answered" }]);
+    expect(telemetry.events.map(({ reads }) => reads)).toEqual([1]);
+  });
+
+  test("the About read counts as read 1 of 3: of three scripted reads after it, the third is skipped with an error result, and the call after the second has toolChoice none", async () => {
+    // readBudget() copies the turn's reads once, when handleChat() builds it, so the About read must be
+    // recorded before that: otherwise all three scripted reads would run.
+    const { fake, requests } = recordingFake([
+      readCall({ ids: ["sample.1"], topic: "the problem" }),
+      readCall({ ids: ["sample.3"], topic: "how it worked" }),
+      readCall({ ids: ["sample.4"], topic: "the result" }),
+      { text: "Test Person planned it [sample.2], built it [sample.3] and measured it [sample.4]." },
+    ]);
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(fake, { telemetry });
+
+    const events = await readEvents(await handleChat(askAbout("Tell me more about this.", "sample.2"), deps));
+
+    expect(toolChoices(requests)).toEqual([undefined, undefined, "none", "none"]);
+    expect(new Set(toolLists(requests)).size).toBe(1);
+    const third = toolMessages(requests[3]).at(-1);
+    expect(third).toContain(READ_LIMIT_ERROR);
+    expect(third).not.toContain("Text for Result.");
+    expect(readResults(events).map((e) => JSON.parse(String(e.content)).read)).toEqual([["sample.2"], ["sample.1"], ["sample.3"], []]);
+    expect(streamedText(events)).toBe("Test Person planned it [sample.2], built it [sample.3] and measured it .");
+    expect((await deps.log.list(1)).map(({ read }) => read)).toEqual([["sample.2", "sample.1", "sample.3"]]);
+    expect(telemetry.events.map(({ reads, modelCalls }) => ({ reads, modelCalls }))).toEqual([{ reads: 3, modelCalls: 4 }]);
+  });
+
+  test("on the real Anthropic adapter, the first call holds the About read after the question: a tool_use block with no thinking block before it, then its tool_result with the whole read", async () => {
+    const stub = stubAnthropic([{ thinking: "The passage answers it.", text: "Test Person planned the first thing [sample.2]." }]);
+
+    const events = await readEvents(await handleChat(askAbout("Tell me more about this.", "sample.2"), seamDeps(stub.adapter)));
+
+    expect(stub.requests).toHaveLength(1);
+    // The Messages API's shapes, as far as this test reads them.
+    const messages = (stub.requests[0]?.messages ?? []) as { role: string; content: string | { type: string; id?: string; tool_use_id?: string }[] }[];
+    expect(messages.map(({ role }) => role)).toEqual(["user", "assistant", "user"]);
+    const [, call, read] = messages;
+    // The assistant turn holds the tool_use block alone: adaptive thinking takes a turn with no thinking block.
+    expect(call?.content).toEqual([expect.objectContaining({ type: "tool_use", name: "read_sources", input: { ids: ["sample.2"], topic: "A sample deep dive" } })]);
+    const toolUseId = Array.isArray(call?.content) ? call.content[0]?.id : undefined;
+    expect(read?.content).toEqual([expect.objectContaining({ type: "tool_result", tool_use_id: toolUseId })]);
+    for (const text of ["Text for What Peter did.", "Internal code."]) expect(JSON.stringify(read?.content)).toContain(text);
+    expect(streamedText(events)).toBe("Test Person planned the first thing [sample.2].");
+    expect(citationEvents(events)).toEqual([{ citations: ["sample.2"], removed: 0 }]);
+  });
+
+  test("an about source id reads the whole source, its topic the source's title, and each of its passages can be cited", async () => {
+    const { fake, requests } = recordingFake([{ text: "Test Person found the problem [sample.1] and measured the result [sample.4]." }]);
+
+    const events = await readEvents(await handleChat(askAbout("Tell me more about this.", "sample"), seamDeps(fake)));
+
+    const [call] = events.filter((e) => e.type === "TOOL_CALL_ARGS");
+    expect(JSON.parse(String(call?.delta))).toEqual({ ids: ["sample"], topic: "A sample deep dive" });
+    expect(readResults(events).map((e) => JSON.parse(String(e.content)))).toEqual([{ read: ["sample"], unknown: [], skipped: [] }]);
+    for (const text of SAMPLE_TEXT) expect(toolMessages(requests[0]).join("\n")).toContain(text);
+    expect(streamedText(events)).toBe("Test Person found the problem [sample.1] and measured the result [sample.4].");
+    expect(citationEvents(events)).toEqual([{ citations: ["sample.1", "sample.4"], removed: 0 }]);
+  });
+
+  test.each([
+    ["of 60 characters is the topic as it is", "T".repeat(60), "T".repeat(60)],
+    ["of 62 characters is cut to a topic of 60, ending with …", "Cutting the first thing's bundle from over 15 MB to under 1 MB", "Cutting the first thing's bundle from over 15 MB to under 1…"],
+  ])("a source title %s, so the About call passes the read tool's own topic rule", async (_name, title, topic) => {
+    const root = await fixture(`chat-about-title-${title.length}`, { "knowledge/sources/sample.md": deepDiveFile({ title }) });
+    const titled = await buildKnowledge({ root });
+    const { fake } = recordingFake([{ text: "Test Person planned the first thing [sample.2]." }]);
+
+    const events = await readEvents(await handleChat(askAbout("Tell me more about this.", "sample.2"), seamDeps(fake, { knowledge: titled })));
+
+    const [call] = events.filter((e) => e.type === "TOOL_CALL_ARGS");
+    expect(JSON.parse(String(call?.delta))).toEqual({ ids: ["sample.2"], topic });
+  });
+
+  test.each([
+    ["a passage id of no approved source", "nothing.1"],
+    ["a logistics answer's id", "logistics:work-arrangement"],
+    // readPassages() throws past 64 characters; an id that names nothing never reaches it.
+    ["an id of 120 characters, past the read's id limit", "a".repeat(120)],
+  ])("an about that is %s reads nothing and adds no request line: the model gets the question last, and the turn has 0 reads", async (_name, about) => {
+    const { fake, requests } = recordingFake([{ text: "Test Person built the first thing [highlight:acme.1]." }]);
+    const telemetry = inMemoryTelemetry();
+
+    const events = await readEvents(await handleChat(askAbout("Tell me more about this.", about), seamDeps(fake, { telemetry })));
+
+    expect(events.filter((e) => e.type.startsWith("TOOL_CALL"))).toEqual([]);
+    expect(requests[0]?.messages.at(-1)).toEqual(expect.objectContaining({ role: "user", content: "Tell me more about this." }));
+    expect(requests[0]?.systemPrompts).toHaveLength(1);
+    expect(telemetry.events.map(({ reads }) => reads)).toEqual([0]);
+  });
+
+  /** The text of each system prompt of a model request, in order. */
+  const systemPromptTexts = (request: TextOptions | undefined) =>
+    (request?.systemPrompts ?? []).map((prompt) => (typeof prompt === "string" ? prompt : prompt.content));
+
+  test.each([
+    ["basics", "Test Person: Engineer"],
+    ["role:acme", "Acme"],
+    ["highlight:acme.1", "Acme, highlight 1"],
+    ["skills:platform-and-tooling", "Skills: Platform and tooling"],
+    ["education", "Education"],
+  ])(
+    "an about resume entry id %s adds one request line that names the entry, after the unchanged system prompt with the core, and reads nothing",
+    async (about, title) => {
+      const { fake, requests } = recordingFake([{ text: "Test Person built the first thing [highlight:acme.1]." }, { text: "Test Person works at Acme [role:acme]." }]);
+      const telemetry = inMemoryTelemetry();
+      const deps = seamDeps(fake, { telemetry });
+
+      await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), deps));
+      const events = await readEvents(await handleChat(askAbout("Tell me more about this.", about), deps));
+
+      const [plain, asked] = requests.map(systemPromptTexts);
+      expect(asked).toHaveLength(2);
+      // The first prompt, with the core, is the same text as for a question with no about, so the prompt cache keeps it.
+      expect(asked?.[0]).toBe(plain?.[0]);
+      expect(plain).toHaveLength(1);
+      expect(asked?.[1]).toContain(`[${about}] ${title}`);
+      expect(events.filter((e) => e.type.startsWith("TOOL_CALL"))).toEqual([]);
+      expect(requests[1]?.messages.at(-1)).toEqual(expect.objectContaining({ role: "user", content: "Tell me more about this." }));
+      expect(telemetry.events.map(({ reads }) => reads)).toEqual([0, 0]);
+    },
+  );
+
+  test("on the real Anthropic adapter, the request line is a system block of its own after the core's, and both keep the short cache marker, so the core stays cached", async () => {
+    const stub = stubAnthropic([{ thinking: "The visitor asks about a highlight.", text: "Test Person built the first thing [highlight:acme.1]." }]);
+
+    await readEvents(await handleChat(askAbout("Tell me more about this.", "highlight:acme.1"), seamDeps(stub.adapter)));
+
+    const system = stub.requests[0]?.system ?? [];
+    expect(system).toHaveLength(2);
+    expect(system[0]?.text).toContain(renderCore(knowledge));
+    expect(system[1]?.text).toContain("[highlight:acme.1] Acme, highlight 1");
+    expect(system.map((block) => block.cache_control)).toEqual([{ type: "ephemeral" }, { type: "ephemeral" }]);
+  });
+
+  test("through the real @tanstack/ai-client stream processor, the About read gives the answer the same parts as a model's read, with ids only, and the next request passes the request check", async () => {
+    const fake = fakeText();
+    fake.setResponses([
+      { text: "Test Person planned the first thing [sample.2]." },
+      readCall({ ids: ["sample.3"], topic: "how it worked" }),
+      { text: "Test Person built it [sample.3]." },
+    ]);
+    const deps = seamDeps(fake);
+    /** Each request the browser's client sends, and the status the handler answers it with. */
+    const sent: { body: string; status: number }[] = [];
+    const toHandler = async (url: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(url, init);
+      const body = await request.clone().text();
+      const response = await handleChat(request, deps);
+      sent.push({ body, status: response.status });
+      return response;
+    };
+    const browser = new ChatClient({
+      threadId: THREAD_ID,
+      connection: fetchServerSentEvents(CHAT_URL, { fetchClient: Object.assign(toHandler, { preconnect: fetch.preconnect }) }),
+    });
+
+    await browser.sendMessage("Tell me more about this.", { about: "sample.2" });
+    await browser.sendMessage("How did Test Person build it?");
+
+    expect(sent.map(({ status }) => status)).toEqual([200, 200]);
+    expect(JSON.parse(sent[0]?.body ?? "{}").forwardedProps).toEqual({ about: "sample.2" });
+    // The parts of each turn's answer, over its assistant messages: the About read's are those of the
+    // model's read, with only the ids changed.
+    const turns: UIMessage["parts"][] = [];
+    for (const message of browser.getMessages()) {
+      if (message.role === "user") turns.push([]);
+      else turns.at(-1)?.push(...message.parts);
+    }
+    const shape = (parts: UIMessage["parts"] | undefined) =>
+      parts?.map((part) => (part.type === "tool-call" ? { type: part.type, name: part.name, state: part.state, output: part.output } : { type: part.type }));
+    const readTurn = (read: string): ReturnType<typeof shape> => [
+      { type: "tool-call", name: "read_sources", state: "complete", output: { read: [read], unknown: [], skipped: [] } },
+      { type: "tool-result" },
+      { type: "text" },
+    ];
+    expect(turns.map(shape)).toEqual([readTurn("sample.2"), readTurn("sample.3")]);
+    // The next request carries the About read back as its ids only.
+    for (const text of SAMPLE_TEXT) expect(sent[1]?.body).not.toContain(text);
+  });
+
+  test("a budget that refuses the turn leaves the about passage unread: the read comes after budget.reserve()", async () => {
+    const fake = fakeText();
+    const telemetry = inMemoryTelemetry();
+
+    const events = await readEvents(await handleChat(askAbout("Tell me more about this.", "sample.2"), seamDeps(fake, { telemetry, budget: inMemoryBudget("DAILY_LIMIT") })));
+
+    expect(events.map((e) => e.type)).toEqual(["RUN_ERROR"]);
+    expect(telemetry.events.map(({ outcome, reads }) => ({ outcome, reads }))).toEqual([{ outcome: "limit", reads: 0 }]);
+  });
+});
+
 describe("events on the wire", () => {
   /** The 11 event types the browser needs (SPEC-chat, The request, "Events on the wire"; research 07, finding 9). */
   const ALLOWED = [
