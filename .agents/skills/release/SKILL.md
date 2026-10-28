@@ -41,7 +41,7 @@ bun .agents/skills/release/scripts/private-detail-check.ts <push range>; echo "e
 ```
 
 - Exit 0: go on.
-- Exit 1: a commit to push holds a private detail. Stop, and push nothing. Ask Peter through `brain:ask-user-question`: give the number and the push range, name no value, and recommend rewriting the unpushed commits without the detail. The commits stay local until he answers.
+- Exit 1: a commit to push holds a private detail. Stop, and push nothing. Ask Peter through `ask-user-question:ask-user-question`: give the number and the push range, name no value, and recommend rewriting the unpushed commits without the detail. The commits stay local until he answers.
 - Exit 2: the script cannot check. Stop, and push nothing. Tell Peter the reason it printed, which holds no value. When the reason is a missing `private.yaml`, copy the file into this clone from Peter's main checkout, then start step 1 again.
 - Any other exit code: stop, push nothing, and tell Peter.
 
@@ -52,7 +52,7 @@ bun .agents/skills/release/scripts/approval-check.ts <push range>; echo "exit $?
 ```
 
 - Exit 0: go on.
-- Exit 1: each printed line needs Peter's approval. Go on only when the decision record (`docs/design/interview-*.md`) holds a row for that change that quotes his answer from the question dialog. An agent never writes an approval row from its own judgment. When a row is missing, ask him through `brain:ask-user-question`, with the lines and the commits. Record his answer, quoted, in a new row, commit it, and start step 1 again. A decline ends the push, and the commits stay local.
+- Exit 1: each printed line needs Peter's approval. Go on only when the decision record (`docs/design/interview-*.md`) holds a row for that change that quotes his answer from the question dialog. An agent never writes an approval row from its own judgment. When a row is missing, ask him through `ask-user-question:ask-user-question`, with the lines and the commits. Record his answer, quoted, in a new row, commit it, and start step 1 again. A decline ends the push, and the commits stay local.
 - Exit 2, or any other exit code: stop, push nothing, and tell Peter the reason it printed.
 
 **Site changes** (on `main` only). Run the second command only when the first one finds the script:

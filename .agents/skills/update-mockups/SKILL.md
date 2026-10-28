@@ -23,7 +23,7 @@ Run the checkout check. Read the design request against the approved specs, [SPE
 
 - A change that makes a board match an approved spec is settled.
 - A change Peter asked for is his decision. Add it as a row in the decision record (the newest `docs/design/interview-<date>.md`), and ask only about what his request leaves open.
-- Any other change of product behavior needs Peter's decision first: what a view shows or does, a text, a new state. Ask him through `brain:ask-user-question`, and add his answer as a row in the decision record.
+- Any other change of product behavior needs Peter's decision first: what a view shows or does, a text, a new state. Ask him through `ask-user-question:ask-user-question`, and add his answer as a row in the decision record.
 - A decided change of behavior also changes the spec text that describes it.
 
 Write the rows and the spec changes in the main checkout and leave them uncommitted: step 5 commits them with the images. Then prove that this session reaches the canvas: one `read` on the canvas address. When the session has no Artifact tool, or the read fails, stop here. Tell Peter the settled change, its row numbers, the read's error when there is one, and that a session whose `read` of the canvas succeeds runs steps 2 to 5 from these uncommitted changes.
@@ -83,7 +83,7 @@ Done when `git ls-remote origin refs/heads/prototype/site-mockups` prints the sa
 Peter approves the new images before they reach `main`, because the images on `main` are the approved look that the specs are written from.
 
 1. Open each new image with the Read tool. Check that it shows the change, and that it shows no private detail, such as the phone number. The private-detail check cannot read text drawn in an image, so this look is the only check of the pixels.
-2. Ask through `brain:ask-user-question` whether Peter approves the changed boards. Put in the question the canvas link and version, each changed board with what changed on it, the paths of its new images in the render folder, and that you looked at each image and found no private detail.
+2. Ask through `ask-user-question:ask-user-question` whether Peter approves the changed boards. Put in the question the canvas link and version, each changed board with what changed on it, the paths of its new images in the render folder, and that you looked at each image and found no private detail.
 3. Run the checkout check, and add his answer as a row in the decision record.
 
 When Peter names changes, they are the change for step 2.

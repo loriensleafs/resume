@@ -13,7 +13,7 @@ For each fact you add or change, name where it came from: Peter's own words in t
 
 Keep Peter's scope words. "Helped" stays "helped". "Led" appears only where he led. A number appears only when Peter gave it.
 
-A fact with no source goes to Peter as a question through `brain:ask-user-question`; it never goes into the file as a plausible value.
+A fact with no source goes to Peter as a question through `ask-user-question:ask-user-question`; it never goes into the file as a plausible value.
 
 Done when every new or changed fact has a source.
 
@@ -31,7 +31,7 @@ Each role has `x-short`, its short label on the career timeline:
 - The schema requires it, so a new role needs one.
 - A short value fits the role's span; [SPEC-site](../../../spec/SPEC-site.md), Views, "Labels", says how a longer one shows.
 - While [T1's wording draft](../../../docs/design/wording-drafts/T1.md) has the status `wording draft`, write each new or changed value into its table, and keep that status. Peter approves the draft in his one review before D37 (row 153).
-- Once that draft is approved, ask Peter about each new or changed value through `brain:ask-user-question`. Record his answer, quoted, in a new row of the decision record, `docs/design/interview-<date>.md`.
+- Once that draft is approved, ask Peter about each new or changed value through `ask-user-question:ask-user-question`. Record his answer, quoted, in a new row of the decision record, `docs/design/interview-<date>.md`.
 
 Done when `git diff resume.yaml` shows each traced change and nothing else, and each new or changed `x-short` value is in T1's wording draft or quoted in a new decision record row.
 
@@ -42,7 +42,7 @@ bun run build
 pdfinfo dist/private/Peter-Kloss-Resume.pdf | grep Pages
 ```
 
-Open `dist/private/resume.html` in a browser, or render the PDF pages, and look at every page you changed. When an edit adds a third page, shorten wording; the spacing scale stays fixed. When the line to cut changes meaning, ask Peter through `brain:ask-user-question`.
+Open `dist/private/resume.html` in a browser, or render the PDF pages, and look at every page you changed. When an edit adds a third page, shorten wording; the spacing scale stays fixed. When the line to cut changes meaning, ask Peter through `ask-user-question:ask-user-question`.
 
 Done when the PDF is exactly 2 pages and no line breaks badly.
 
@@ -70,7 +70,7 @@ Done when `bun test` passes and the snapshot diff matches the edit.
 
 ## 6. Report
 
-Put the edit to Peter through `brain:ask-user-question`: each changed line of `resume.yaml`, before and after, with its source. Recommend the commit.
+Put the edit to Peter through `ask-user-question:ask-user-question`: each changed line of `resume.yaml`, before and after, with its source. Recommend the commit.
 
 Done when Peter approved the commit, or named changes; changes go back to step 1.
 
