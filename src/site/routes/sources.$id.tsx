@@ -17,17 +17,12 @@ export const Route = createFileRoute("/sources/$id")({
     const loadJson = sourceJsonFiles.get(params.id);
     if (!source || !loadJson) throw notFound();
     const { kind, summary, passages } = await loadJson();
-    // The build checks that each role of an approved source is in resume.yaml (SPEC-knowledge, Sources: Roles).
-    const roles = source.roles.map((roleId) => {
-      const role = siteData.resume.work.find((work) => work.id === roleId);
-      if (!role) throw new Error(`source ${source.id}: the role ${roleId} is not in resume.yaml`);
-      return { short: role.short, years: role.years };
-    });
     return {
       basics: siteData.resume.basics,
       source: { id: source.id, title: source.title, kind, passages },
+      // Beside the source, not in it: only the head's description shows it, and SourceView's source prop type omits it.
       summary,
-      roles,
+      roles: source.roles,
     };
   },
   // The title names the source, then Peter; the description is the source's summary, which Peter approves with it.
