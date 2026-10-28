@@ -3,7 +3,7 @@
 // Each test sends a request the way the browser does and reads the server-sent events, the log and
 // the telemetry events.
 
-import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, jest, spyOn, test } from "bun:test";
 import { EventType, uiMessagesToWire, type ChatMiddleware, type StreamChunk, type TextOptions, type UIMessage } from "@tanstack/ai";
 import { fakeText, type FakeResponse } from "@tanstack/ai/testing";
 // The browser's client, through the framework package that re-exports @tanstack/ai-client (skill ai-core).
@@ -1735,6 +1735,68 @@ describe("endings", () => {
     ]);
     expect(telemetry.events.map(({ outcome, errorCode }) => ({ outcome, errorCode }))).toEqual([{ outcome: "error", errorCode: "MAX_TOKENS" }]);
   });
+
+  test.each([
+    ["before its response arrives", { neverEnds: "before its response" }],
+    [
+      "after its thinking and part of its text",
+      { thinking: "The visitor asks what was built.", text: "Test Person built the first thing [highlight:acme.1] and then", neverEnds: "after its events" },
+    ],
+  ] as const)(
+    "a model call that never ends, %s: at 120 s the deadline aborts it, the stream ends with the handler's own RUN_ERROR DEADLINE before it closes, and the turn writes one error entry",
+    async (_name, call) => {
+      // Bun's fake timers: the 120 seconds pass at once, and only when the test moves the clock.
+      jest.useFakeTimers();
+      try {
+        const stub = stubAnthropic([call]);
+        const telemetry = inMemoryTelemetry();
+        const deps = seamDeps(stub.adapter, { telemetry });
+
+        const reading = readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), deps));
+        const modelCall = await stub.started(1);
+        jest.advanceTimersByTime(119_999);
+        expect(modelCall?.aborted).toBe(false);
+        jest.advanceTimersByTime(1);
+        const events = await reading;
+
+        expect(modelCall?.aborted).toBe(true);
+        // The browser takes a stream that closes with no error event as a finished answer, so the last
+        // event is the handler's own RUN_ERROR, and no RUN_FINISHED or chat.citations comes before it.
+        expect(events.at(-1)).toEqual({ type: "RUN_ERROR", code: "DEADLINE", message: "The answer didn't arrive.", timestamp: expect.any(Number) });
+        expect(events.filter((e) => e.type === "RUN_ERROR")).toHaveLength(1);
+        expect(events.filter((e) => e.type === "RUN_FINISHED" || (e.type === "CUSTOM" && e.name === "chat.citations"))).toEqual([]);
+        expect(JSON.stringify(events)).not.toContain("Request was aborted.");
+        expect((await deps.log.list(1)).map(({ question, outcome }) => ({ question, outcome }))).toEqual([
+          { question: "What did Test Person build?", outcome: "error" },
+        ]);
+        expect(telemetry.events.map(({ outcome, errorCode }) => ({ outcome, errorCode }))).toEqual([{ outcome: "error", errorCode: "DEADLINE" }]);
+      } finally {
+        jest.useRealTimers();
+      }
+    },
+  );
+
+  test("a turn that answers before the deadline leaves no timer of its own running after its response ends", async () => {
+    jest.useFakeTimers();
+    try {
+      const stub = stubAnthropic([
+        { thinking: "The visitor asks where Test Person works.", text: "Test Person works at Acme [role:acme]." },
+        { thinking: "The visitor asks what was built.", text: "Test Person built the first thing [highlight:acme.1]." },
+      ]);
+      const deps = seamDeps(stub.adapter);
+      // TanStack AI's devtools client starts its own connect timer once per process, at its first event.
+      // The first turn makes sure that timer exists, so the second turn's count holds that turn's timers only.
+      await readEvents(await handleChat(chatRequest([question("Where does Test Person work?")]), deps));
+      const timersBefore = jest.getTimerCount();
+
+      const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), deps));
+
+      expect(events.at(-1)?.type).toBe("RUN_FINISHED");
+      expect(jest.getTimerCount()).toBe(timersBefore);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });
 
 describe("a thrown run", () => {
@@ -1828,6 +1890,33 @@ describe("a thrown run", () => {
       expect(line).not.toContain(asked);
     }
     expect((await deps.log.list(1)).map(({ question, outcome }) => ({ question, outcome }))).toEqual([{ question: asked, outcome: "error" }]);
+  });
+
+  test("a Stop before handleChat() runs, then a chat() stream that throws before its run starts, so no terminal hook runs: the stream closes with no error event, and one stopped chat_turn event settles the reservation", async () => {
+    const fake = fakeText();
+    fake.setResponses([{ text: "Test Person built the first thing [highlight:acme.1]." }]);
+    // chat() reads the adapter's model when its stream starts, before it builds the run's engine: this
+    // adapter throws there, so no middleware hook runs.
+    const adapter = new Proxy(fake, {
+      get: (target, key, receiver) => {
+        if (key === "model") throw new Error(`${MARKER}: the adapter has no model`);
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(adapter, { telemetry });
+    const visitor = new AbortController();
+    visitor.abort();
+
+    const events = await readEvents(await handleChat(postChat(chatBody([question("What did Test Person build?")]), {}, CHAT_URL, visitor.signal), deps));
+
+    expect(events.filter((e) => e.type === "RUN_ERROR" || e.type === "RUN_FINISHED")).toEqual([]);
+    expect(JSON.stringify(events)).not.toContain(MARKER);
+    expect(fake.state.callCount).toBe(0);
+    expect(telemetry.events.map(({ outcome, modelCalls, errorCode }) => ({ outcome, modelCalls, errorCode }))).toEqual([
+      { outcome: "stopped", modelCalls: 0, errorCode: null },
+    ]);
+    expect(await deps.log.list(1)).toEqual([]);
   });
 });
 

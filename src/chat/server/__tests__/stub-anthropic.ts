@@ -34,7 +34,25 @@ export type StubCall = {
   toolUse?: { name: string; input: unknown };
   /** Why the call stops. Not set: tool_use for a call with a tool call, else end_turn. */
   stopReason?: "end_turn" | "tool_use" | "max_tokens";
+  /**
+   * A call that never ends: it ends only when its request is aborted, as the SDK's own does.
+   * "before its response": the response never arrives, and the abort rejects create(), as the SDK's
+   * fetch does. "after its events": the call streams its scripted content and then nothing, and the
+   * abort ends its stream quietly, as the SDK's stream does (core/streaming.ts, "If the user calls
+   * stream.controller.abort(), we should exit without throwing").
+   */
+  neverEnds?: "before its response" | "after its events";
 };
+
+/** Resolves when `signal` aborts. With no signal it never resolves: nothing can end the call. */
+const abortOf = (signal: AbortSignal | undefined) =>
+  new Promise<void>((resolve) => {
+    if (signal?.aborted) resolve();
+    else signal?.addEventListener("abort", () => resolve(), { once: true });
+  });
+
+/** The text of the SDK's APIUserAbortError, which create() throws when its request is aborted before the response. */
+const REQUEST_ABORTED = "Request was aborted.";
 
 /** The parts of a Messages request that seam 1 reads: what the adapter sent to Anthropic. */
 export type StubRequest = {
@@ -55,8 +73,8 @@ function piecesOf(text: string, size: number): string[] {
   return pieces;
 }
 
-/** The Messages API's stream events for one scripted call, the `n`th of the turn. */
-async function* streamOf(call: StubCall, n: number) {
+/** The Messages API's stream events for one scripted call, the `n`th of the turn, whose request has `signal`. */
+async function* streamOf(call: StubCall, n: number, signal: AbortSignal | undefined) {
   yield {
     type: "message_start",
     message: {
@@ -92,6 +110,10 @@ async function* streamOf(call: StubCall, n: number) {
     yield { type: "content_block_delta", index, delta: { type: "input_json_delta", partial_json: JSON.stringify(input) } };
     yield { type: "content_block_stop", index };
   }
+  if (call.neverEnds === "after its events") {
+    await abortOf(signal);
+    return;
+  }
   const written = (call.thinking ?? "").length + (call.text ?? "").length;
   yield {
     type: "message_delta",
@@ -103,23 +125,32 @@ async function* streamOf(call: StubCall, n: number) {
 
 /**
  * An adapter on the stub Messages client: the turn's model calls take `calls` in order. `requests`
- * holds each model call's request as the adapter sent it.
+ * holds each model call's request as the adapter sent it. `started(n)` resolves when the turn's `n`th
+ * model call starts, with the abort signal that the adapter gave its request.
  */
 export function stubAnthropic(calls: StubCall[]) {
   const requests: StubRequest[] = [];
+  const starts = calls.map(() => Promise.withResolvers<AbortSignal | undefined>());
   const client = {
     beta: {
       messages: {
-        create: async (request: StubRequest) => {
+        create: async (request: StubRequest, options?: { signal?: AbortSignal }) => {
           requests.push(request);
-          const call = calls[requests.length - 1];
-          if (call === undefined) throw new Error(`The stub has no model call number ${requests.length}.`);
-          return streamOf(call, requests.length);
+          const n = requests.length;
+          const call = calls[n - 1];
+          if (call === undefined) throw new Error(`The stub has no model call number ${n}.`);
+          starts[n - 1]?.resolve(options?.signal);
+          if (call.neverEnds === "before its response") {
+            await abortOf(options?.signal);
+            throw new Error(REQUEST_ABORTED);
+          }
+          return streamOf(call, n, options?.signal);
         },
       },
     },
   } satisfies AnthropicMessagesClient;
-  return { adapter: createAnthropicChatWithClient(MODEL, client), requests };
+  const started = (n: number) => starts[n - 1]?.promise ?? Promise.reject(new Error(`The stub scripts no model call number ${n}.`));
+  return { adapter: createAnthropicChatWithClient(MODEL, client), requests, started };
 }
 
 /** An HTTP error answer of the Messages API: its status and its JSON body. */
