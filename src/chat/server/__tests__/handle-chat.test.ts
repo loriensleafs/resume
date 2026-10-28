@@ -321,6 +321,9 @@ const toolChoices = (requests: TextOptions[]) => requests.map((request) => reque
 /** The tools of each model call as the model gets them: names, descriptions and input schemas. */
 const toolLists = (requests: TextOptions[]) => requests.map((request) => JSON.stringify(request.tools));
 
+/** The chat's three tools, in the order the model gets them (SPEC-chat, Tools); the list is the same on every model call. */
+const CHAT_TOOLS = ["read_sources", "open_resume", "open_source"];
+
 /** The result the model gets for a read past the budget (SPEC-chat, Code Style, readBudget()). */
 const READ_LIMIT_ERROR = "The read limit for this question is reached.";
 
@@ -340,7 +343,7 @@ describe("the read budget", () => {
 
     expect(toolChoices(requests)).toEqual([undefined, undefined, undefined, "none", "none"]);
     expect(new Set(toolLists(requests)).size).toBe(1);
-    expect(requests[0]?.tools?.map((tool) => tool.name)).toEqual(["read_sources"]);
+    expect(requests[0]?.tools?.map((tool) => tool.name)).toEqual(CHAT_TOOLS);
     // The fourth read's result is the budget's error, with no passage text.
     const fourth = toolMessages(requests[4]).at(-1);
     expect(fourth).toContain(READ_LIMIT_ERROR);
@@ -457,7 +460,7 @@ describe("the read budget", () => {
 
     expect(stub.requests.map((request) => request.tool_choice)).toEqual([undefined, undefined, undefined, { type: "none" }]);
     expect(new Set(stub.requests.map((request) => JSON.stringify(request.tools))).size).toBe(1);
-    expect(stub.requests[3]?.tools?.map((tool) => tool.name)).toEqual(["read_sources"]);
+    expect(stub.requests[3]?.tools?.map((tool) => tool.name)).toEqual(CHAT_TOOLS);
     expect(stub.requests[3]?.tools?.at(-1)?.cache_control).toEqual({ type: "ephemeral" });
     expect(streamedText(events)).toBe("Test Person planned it [sample.2] and built it [sample.3].");
   });
@@ -724,6 +727,216 @@ describe("about", () => {
   });
 });
 
+/** A model call that calls one tool with this input, as the model sends it. */
+const toolCall = (name: string, input: unknown): FakeResponse => ({ toolCalls: [{ name, input }] });
+
+/** What the model reads of each tool result of a model request, parsed: the tool's output, or the engine's `{ error }`. */
+const toolOutputs = (request: TextOptions | undefined) =>
+  (request?.messages ?? []).filter((message) => message.role === "tool").map((message) => JSON.parse(String(message.content)));
+
+/** The results on the wire of the calls of one tool: each result's content, parsed, and its metadata. */
+function wireResultsOf(events: WireEvent[], tool: string) {
+  const calls = new Set(events.filter((e) => e.type === "TOOL_CALL_START" && e.toolCallName === tool).map((e) => e.toolCallId));
+  return events
+    .filter((e) => e.type === "TOOL_CALL_RESULT" && calls.has(e.toolCallId))
+    .map((e) => ({ content: JSON.parse(String(e.content)), metadata: e.metadata }));
+}
+
+describe("the open tools", () => {
+  test("open_resume returns { opened: true } to the model and to the browser, and writes nothing: the turn reads and cites nothing, and the next call may still read", async () => {
+    const { fake, requests } = recordingFake([toolCall("open_resume", {}), { text: "Here is Test Person's resume, open beside the chat." }]);
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(fake, { telemetry });
+
+    const events = await readEvents(await handleChat(chatRequest([question("Can I see Test Person's resume?")]), deps));
+
+    expect(toolOutputs(requests[1])).toEqual([{ opened: true }]);
+    expect(wireResultsOf(events, "open_resume")).toEqual([{ content: { opened: true }, metadata: undefined }]);
+    expect(streamedText(events)).toBe("Here is Test Person's resume, open beside the chat.");
+    expect(toolChoices(requests)).toEqual([undefined, undefined]);
+    expect((await deps.log.list(1)).map(({ read, citations, outcome }) => ({ read, citations, outcome }))).toEqual([
+      { read: [], citations: [], outcome: "answered" },
+    ]);
+    expect(telemetry.events.map(({ reads, citations }) => ({ reads, citations }))).toEqual([{ reads: 0, citations: 0 }]);
+  });
+
+  /** "Show me where that came from." after an earlier answer with this text (SPEC-chat, Answers the chat gives). */
+  const whereFrom = (earlier: string) =>
+    chatRequest([question("How did Test Person build the first thing?"), answer(earlier), question("Show me where that came from.")]);
+
+  test("open_source with a passage that an earlier answer's text cites with a kept marker returns { opened: true } to the model and to the browser, and writes nothing", async () => {
+    const { fake, requests } = recordingFake([toolCall("open_source", { passageId: "sample.2" }), { text: "The passage is open beside the chat." }]);
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(fake, { telemetry });
+
+    const events = await readEvents(await handleChat(whereFrom("Test Person planned the first thing [sample.2] at Acme [highlight:acme.1]."), deps));
+
+    expect(toolOutputs(requests[1])).toEqual([{ opened: true }]);
+    expect(wireResultsOf(events, "open_source")).toEqual([{ content: { opened: true }, metadata: undefined }]);
+    expect(streamedText(events)).toBe("The passage is open beside the chat.");
+    expect(toolChoices(requests)).toEqual([undefined, undefined]);
+    expect((await deps.log.list(1)).map(({ read, citations, outcome }) => ({ read, citations, outcome }))).toEqual([
+      { read: [], citations: [], outcome: "answered" },
+    ]);
+    expect(telemetry.events.map(({ reads }) => reads)).toEqual([0]);
+  });
+
+  test.each([
+    ["the passage itself", ["sample.2"], "sample.2"],
+    ["its whole source, which reads each of its passages", ["sample"], "sample.4"],
+  ])("open_source with a passage that this turn read, through %s, returns { opened: true }", async (_name, ids, passageId) => {
+    const { fake, requests } = recordingFake([readCall({ ids, topic: "the first thing" }), toolCall("open_source", { passageId }), { text: "The passage is open beside the chat." }]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("Where does that come from?")]), seamDeps(fake)));
+
+    expect(toolOutputs(requests[2]).at(-1)).toEqual({ opened: true });
+    expect(wireResultsOf(events, "open_source")).toEqual([{ content: { opened: true }, metadata: undefined }]);
+  });
+
+  /** open_source's two errors, as the model reads them (tools.ts). */
+  const NOT_CITED = "Only a passage that an earlier answer cited, or that this turn read, can be opened.";
+  const NOT_A_PASSAGE = "This id is not a passage of an approved source, so it cannot be opened.";
+  /** A failed tool call's metadata on the wire: the browser's client marks the call's part as an error. */
+  const FAILED = { tanstack: { state: "output-error" } };
+
+  /** An earlier answer that read `read` through read_sources, then said `text`, as the browser keeps it: the read as its ids only. */
+  function answerAfterRead(read: string, text: string): UIMessage {
+    const ids = { read: [read], unknown: [], skipped: [] };
+    return {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      parts: [
+        { type: "tool-call", id: "call-earlier-read", name: "read_sources", arguments: JSON.stringify({ ids: [read], topic: "how it worked" }), state: "complete", output: ids },
+        { type: "tool-result", toolCallId: "call-earlier-read", content: JSON.stringify(ids), state: "complete" },
+        { type: "text", content: text },
+      ],
+    };
+  }
+
+  test.each<[string, () => Request]>([
+    ["no message names", () => whereFrom("Test Person planned the first thing [sample.2].")],
+    ["only the visitor's question names", () => chatRequest([question("Where does [sample.3] come from?")])],
+    ["an earlier answer names only inside inline code", () => whereFrom("Test Person wrote `[sample.3]` in the docs [sample.2].")],
+    ["an earlier answer names only inside fenced code", () => whereFrom("Test Person wrote this:\n\n```md\n[sample.3]\n```\n\nIt shipped [sample.2].")],
+    ["an earlier answer names only as link text", () => whereFrom("Test Person's [sample.3](https://peterkloss.dev/sources/sample) is online [sample.2].")],
+    [
+      "an earlier turn read, though no answer's text cites it",
+      () =>
+        chatRequest([
+          question("How did Test Person build the first thing?"),
+          answerAfterRead("sample.3", "Test Person planned the first thing [sample.2]."),
+          question("Show me where that came from."),
+        ]),
+    ],
+  ])("open_source with a passage that %s returns an error to the model and to the browser, and the run goes on to the answer", async (_name, request) => {
+    const { fake, requests } = recordingFake([toolCall("open_source", { passageId: "sample.3" }), { text: "That passage is not one this conversation cites." }]);
+    const deps = seamDeps(fake);
+
+    const events = await readEvents(await handleChat(request(), deps));
+
+    expect(toolOutputs(requests[1]).at(-1)).toEqual({ error: NOT_CITED });
+    expect(wireResultsOf(events, "open_source")).toEqual([{ content: { error: NOT_CITED }, metadata: FAILED }]);
+    expect(streamedText(events)).toBe("That passage is not one this conversation cites.");
+    expect(events.filter((e) => e.type === "RUN_ERROR")).toEqual([]);
+    expect((await deps.log.list(1)).map(({ outcome }) => outcome)).toEqual(["answered"]);
+  });
+
+  test.each([
+    ["a resume entry", "highlight:acme.1"],
+    ["a whole source", "sample"],
+    ["a passage that its source does not have", "sample.9"],
+    ["a passage of no approved source", "nothing.1"],
+  ])("open_source with %s is always an error, also when an earlier answer cites it and this turn read the whole source", async (_name, passageId) => {
+    const { fake, requests } = recordingFake([
+      readCall({ ids: ["sample"], topic: "the first thing" }),
+      toolCall("open_source", { passageId }),
+      { text: "Only a passage can open beside the chat." },
+    ]);
+
+    const events = await readEvents(await handleChat(whereFrom(`Test Person said so [${passageId}].`), seamDeps(fake)));
+
+    expect(toolOutputs(requests[2]).at(-1)).toEqual({ error: NOT_A_PASSAGE });
+    expect(wireResultsOf(events, "open_source")).toEqual([{ content: { error: NOT_A_PASSAGE }, metadata: FAILED }]);
+    expect(streamedText(events)).toBe("Only a passage can open beside the chat.");
+  });
+
+  test.each<[string, string, unknown, unknown]>([
+    ["open_source with no passageId", "open_source", {}, { error: expect.stringContaining("Input validation failed for tool open_source") }],
+    ["open_source with a key of its own", "open_source", { passageId: "sample.2", note: "x" }, { error: expect.stringContaining("Input validation failed for tool open_source") }],
+    ["open_resume with a key of its own", "open_resume", { passageId: "sample.2" }, {}],
+  ])("%s gets a tool error from its input schema, opens nothing, and the run goes on to the answer", async (_name, tool, input, onTheWire) => {
+    const { fake, requests } = recordingFake([toolCall(tool, input), { text: "Test Person built the first thing [highlight:acme.1]." }]);
+
+    const events = await readEvents(await handleChat(whereFrom("Test Person planned the first thing [sample.2]."), seamDeps(fake)));
+
+    expect(toolOutputs(requests[1]).at(-1)).toEqual({ error: expect.stringContaining(`Input validation failed for tool ${tool}`) });
+    expect(wireResultsOf(events, tool)).toEqual([{ content: onTheWire, metadata: FAILED }]);
+    expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1].");
+  });
+
+  test("on the real Anthropic adapter, an open_source error reaches the model as a tool_result marked is_error, with the tool's fixed text", async () => {
+    const stub = stubAnthropic([
+      { thinking: "The visitor asks for the passage.", toolUse: { name: "open_source", input: { passageId: "sample.3" } } },
+      { thinking: "The passage cannot open.", text: "That passage is not one this conversation cites." },
+    ]);
+
+    const events = await readEvents(await handleChat(whereFrom("Test Person planned the first thing [sample.2]."), seamDeps(stub.adapter)));
+
+    // The Messages API's shapes, as far as this test reads them.
+    const messages = (stub.requests[1]?.messages ?? []) as { role: string; content: string | { type: string }[] }[];
+    const result = messages.at(-1)?.content;
+    expect(result).toEqual([expect.objectContaining({ type: "tool_result", is_error: true })]);
+    expect(JSON.stringify(result)).toContain(NOT_CITED);
+    expect(streamedText(events)).toBe("That passage is not one this conversation cites.");
+  });
+
+  test("through the real @tanstack/ai-client stream processor, open_source opens the passage that the browser's own copy of an earlier answer cites, each open tool's part holds { opened: true }, and each next request passes the request check", async () => {
+    const fake = fakeText();
+    fake.setResponses([
+      readCall({ ids: ["sample.2"], topic: "the first thing" }),
+      { text: "Test Person planned the first thing [sample.2]." },
+      toolCall("open_source", { passageId: "sample.2" }),
+      { text: "The passage is open beside the chat." },
+      toolCall("open_resume", {}),
+      { text: "Here is Test Person's resume, open beside the chat." },
+    ]);
+    const deps = seamDeps(fake);
+    /** Each request the browser's client sends, and the status the handler answers it with. */
+    const sent: { body: string; status: number }[] = [];
+    const toHandler = async (url: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(url, init);
+      const body = await request.clone().text();
+      const response = await handleChat(request, deps);
+      sent.push({ body, status: response.status });
+      return response;
+    };
+    const browser = new ChatClient({
+      threadId: THREAD_ID,
+      connection: fetchServerSentEvents(CHAT_URL, { fetchClient: Object.assign(toHandler, { preconnect: fetch.preconnect }) }),
+    });
+
+    await browser.sendMessage("How did Test Person build the first thing?");
+    await browser.sendMessage("Show me where that came from.");
+    await browser.sendMessage("Can I see Test Person's resume?");
+
+    expect(sent.map(({ status }) => status)).toEqual([200, 200, 200]);
+    // The second turn did not read sample.2: the browser's copy of the first answer, kept marker included, cites it.
+    expect(sent[1]?.body).toContain("Test Person planned the first thing [sample.2].");
+    const openCalls = browser
+      .getMessages()
+      .flatMap((message) => message.parts)
+      .flatMap((part) =>
+        part.type === "tool-call" && part.name !== "read_sources"
+          ? [{ name: part.name, input: JSON.parse(part.arguments), state: part.state, output: part.output }]
+          : [],
+      );
+    expect(openCalls).toEqual([
+      { name: "open_source", input: { passageId: "sample.2" }, state: "complete", output: { opened: true } },
+      { name: "open_resume", input: {}, state: "complete", output: { opened: true } },
+    ]);
+  });
+});
+
 describe("events on the wire", () => {
   /** The 11 event types the browser needs (SPEC-chat, The request, "Events on the wire"; research 07, finding 9). */
   const ALLOWED = [
@@ -805,7 +1018,8 @@ describe("events on the wire", () => {
     const fake = fakeText();
     fake.setResponses([{ text: "Test Person built the first thing [highlight:acme.1]." }, { text: "Test Person built the second thing [highlight:acme.2]." }]);
     const callId = "call-shared-1";
-    // The first request starts the call as a tool whose result would pass whole; the second sends a result for that id.
+    // The first request starts the call as an open tool, whose result keeps more fields than a read's;
+    // the second sends a result for that id, which the second request's wire takes as a read.
     const startsOtherTool = addingAfterText({ type: "TOOL_CALL_START", toolCallId: callId, toolCallName: "open_resume" });
     const sendsResult = addingAfterText({ type: "TOOL_CALL_RESULT", messageId: "m-1", toolCallId: callId, role: "tool", content: "Internal code." });
     const deps = seamDeps(fake);
@@ -817,21 +1031,29 @@ describe("events on the wire", () => {
     expect(JSON.stringify(later)).not.toContain("Internal code.");
   });
 
-  test("a result of a call this run started as a tool other than read_sources leaves with no field of its own: its content is {}, so no tool's result passes whole", async () => {
+  test.each<[string, string, unknown, unknown]>([
+    ["an open_resume result with a field of its own", "open_resume", { opened: true, text: "Internal code." }, { opened: true }],
+    ["an open_source result with a field of its own", "open_source", { opened: true, text: "Internal code." }, { opened: true }],
+    ["an open_source error with a field of its own", "open_source", { error: "No such passage.", text: "Internal code." }, { error: "No such passage." }],
+    ["an open_resume result that is not { opened: true }", "open_resume", { opened: "Internal code." }, {}],
+    ["an open_source result that is no JSON", "open_source", "Internal code.", {}],
+    ["a result of a tool the chat does not have", "fetch_url", { opened: true, text: "Internal code." }, {}],
+  ])("%s leaves with only the fields that the spec gives its tool, so no tool's result passes whole", async (_name, tool, result, onTheWire) => {
     const fake = fakeText();
     fake.setResponses([{ text: "Test Person built the first thing [highlight:acme.1]." }]);
     const callId = "call-open-1";
+    const content = typeof result === "string" ? result : JSON.stringify(result);
     const opensAndAnswers = addingAfterText(
-      { type: "TOOL_CALL_START", toolCallId: callId, toolCallName: "open_resume" },
-      { type: "TOOL_CALL_RESULT", messageId: "m-1", toolCallId: callId, role: "tool", content: JSON.stringify({ opened: true, text: "Internal code." }) },
+      { type: "TOOL_CALL_START", toolCallId: callId, toolCallName: tool },
+      { type: "TOOL_CALL_RESULT", messageId: "m-1", toolCallId: callId, role: "tool", content },
     );
 
     const events = await readEvents(
       await handleChat(chatRequest([question("What did Test Person build?")]), seamDeps(fake, { testMiddleware: [opensAndAnswers] })),
     );
 
-    expect(events.filter((e) => e.type === "TOOL_CALL_RESULT").map((e) => ({ toolCallId: e.toolCallId, content: e.content }))).toEqual([
-      { toolCallId: callId, content: "{}" },
+    expect(events.filter((e) => e.type === "TOOL_CALL_RESULT").map((e) => ({ toolCallId: e.toolCallId, content: JSON.parse(String(e.content)) }))).toEqual([
+      { toolCallId: callId, content: onTheWire },
     ]);
     expect(JSON.stringify(events)).not.toContain("Internal code.");
   });
@@ -844,7 +1066,7 @@ describe("events on the wire", () => {
     // A provider-run tool, such as Anthropic's web search, has a versioned type and no input schema of
     // ours, and its result arrives in the tool call's own events, past the id-only rewrite.
     const tools = stub.requests[0]?.tools ?? [];
-    expect(tools.map((tool) => tool.name)).toEqual(["read_sources"]);
+    expect(tools.map((tool) => tool.name)).toEqual(CHAT_TOOLS);
     for (const tool of tools) {
       expect(tool.input_schema).toBeDefined();
       expect(tool.type === undefined || tool.type === "custom").toBe(true);

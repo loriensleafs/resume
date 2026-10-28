@@ -6,6 +6,7 @@
 // The readBudget middleware below enforces the reads and the last call; C13 adds the deadline.
 
 import type { ChatMiddleware } from "@tanstack/ai";
+import { READ_SOURCES } from "./tool-names";
 import type { Turn } from "./turn";
 
 export const turnLimits = {
@@ -24,12 +25,6 @@ export const turnLimits = {
                               // (a typical one is 1 to 3 KB; the conductor's value, for Peter's end review)
   fitCheckRequirements: 10,   // a prompt rule: the fit check lists at most this many requirements; the evals check it
 } as const;
-
-/**
- * The read tool's name, as tools.ts gives it. This module imports nothing from tools.ts, because
- * tools.ts reads turnLimits when it loads; the read-budget tests fail when the two names differ.
- */
-const READ_TOOL = "read_sources";
 
 /**
  * The read budget of one turn (Limits, "Reads" and "The last call"): code, not the prompt, stops the
@@ -52,7 +47,7 @@ export function readBudget(turn: Pick<Turn, "reads">): ChatMiddleware {
   return {
     name: "read-budget",
     onGuardToolCall: (_ctx, call) => {
-      if (call.toolName !== READ_TOOL) return undefined;
+      if (call.toolName !== READ_SOURCES) return undefined;
       if (reads >= turnLimits.reads) return { type: "skip", result: { error: "The read limit for this question is reached." } };
       reads++;
       return undefined;

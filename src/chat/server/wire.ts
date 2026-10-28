@@ -2,9 +2,10 @@
 // results on the wire; Thinking): one table of fixed messages, one per code, and wireError(code), which
 // builds every RUN_ERROR event the handler sends. The event holds its code and fixed message only. The
 // wire middleware, a new instance per request, sends each allowlisted event with its named fields only,
-// each read result as its ids only and any other tool's result as {}, the thinking summary as
-// chat.thinking events of at most turnLimits.thinkingCharacters characters a turn, and every RUN_ERROR
-// of the run as wireError(code), Anthropic's spend limit as SPEND_LIMIT.
+// each tool's result with the fields that the spec gives it (a read as its ids only, an open tool as
+// { opened: true }), the thinking summary as chat.thinking events of at most
+// turnLimits.thinkingCharacters characters a turn, and every RUN_ERROR of the run as wireError(code),
+// Anthropic's spend limit as SPEND_LIMIT.
 
 import {
   EventType,
@@ -18,7 +19,7 @@ import { z } from "zod";
 import type { ReadResult } from "../../knowledge/types";
 import { turnLimits } from "./limits";
 import { logServerError } from "./server-log";
-import { READ_SOURCES } from "./tools";
+import { OPEN_RESUME, OPEN_SOURCE, READ_SOURCES, type ToolName } from "./tool-names";
 
 /**
  * The handler's own codes, each with its fixed message. The browser shows its own text for each code
@@ -154,18 +155,48 @@ export type ReadIds = Omit<ReadResult, "text">;
 
 /** A list of ids, or none when the value is not a list of strings. */
 const Ids = z.array(z.string()).catch([]);
-/** The three lists of ids, and no other field: an object schema drops every key it does not name, `text` among them. */
-const ReadIdsSchema = z.object({ read: Ids, unknown: Ids, skipped: Ids }).catch({ read: [], unknown: [], skipped: [] });
+/**
+ * The three lists of ids, and no other field: an object schema drops every key it does not name, `text`
+ * among them. A content that is no read result, such as a tool error, has no ids.
+ */
+const ReadIdsSchema = z.object({ read: Ids, unknown: Ids, skipped: Ids }).catch({ read: [], unknown: [], skipped: [] }) satisfies z.ZodType<ReadIds>;
 
-/** The ids of a read result's content. A content that is no read result, such as a tool error, has none. */
-function readIdsOf(content: ToolCallResultEvent["content"]): ReadIds {
-  let result: unknown;
+/** An open tool's result when it opened (Tools). */
+const Opened = z.object({ opened: z.literal(true) });
+
+/**
+ * What the browser gets of each tool's result (Tools): the fields that the spec gives it, and no other,
+ * as an object schema drops every key it does not name. A read leaves as its ids. An open tool leaves
+ * as `{ opened: true }`, and open_source's error as `{ error }`: the tool's own fixed text, or the
+ * engine's text when the call fails the tool's input check. Neither holds read text: open_source reads
+ * nothing, and the input check names the schema's rule. The table has one entry per tool name, so the
+ * type check finds a tool missing here.
+ */
+const RESULT_FIELDS: Record<ToolName, z.ZodType> = {
+  [READ_SOURCES]: ReadIdsSchema,
+  [OPEN_RESUME]: Opened,
+  [OPEN_SOURCE]: z.union([Opened, z.object({ error: z.string() })]),
+};
+
+const isToolName = (name: string): name is ToolName => Object.hasOwn(RESULT_FIELDS, name);
+
+/** No field of its own: what the browser gets of a result that is not in its tool's shape, or of a tool the chat does not have. */
+const NO_FIELDS = {};
+
+/** The JSON value of a result's content, or undefined when the content is no JSON text. */
+function jsonOf(content: ToolCallResultEvent["content"]): unknown {
   try {
-    result = typeof content === "string" ? JSON.parse(content) : undefined;
+    return typeof content === "string" ? JSON.parse(content) : undefined;
   } catch {
-    result = undefined;
+    return undefined;
   }
-  return ReadIdsSchema.parse(result) satisfies ReadIds;
+}
+
+/** The fields of a result that the browser gets: those its tool's entry names, or none. */
+function resultFieldsOf(tool: string, content: ToolCallResultEvent["content"]): unknown {
+  if (!isToolName(tool)) return NO_FIELDS;
+  const fields = RESULT_FIELDS[tool].safeParse(jsonOf(content));
+  return fields.success ? fields.data : NO_FIELDS;
 }
 
 /**
@@ -193,10 +224,10 @@ const finishReasonOf = (event: RunFinishedEvent) => event.finishReason ?? event.
 /**
  * The wire middleware for one turn. Only the allowlisted events pass, each as a new event built from
  * its named fields. Each read_sources result leaves as its ids only, so no read text and no Not public
- * section reaches the browser, and any other tool's result as {}. The thinking summary leaves as
- * chat.thinking events. Every RUN_ERROR of the run leaves as wireError(code), so no rawEvent, metadata,
- * usage, nested error or other provider detail reaches the browser, and the turn keeps the code it sent
- * for finishTurn().
+ * section reaches the browser, and each other tool's result with the fields that RESULT_FIELDS names
+ * for it. The thinking summary leaves as chat.thinking events. Every RUN_ERROR of the run leaves as
+ * wireError(code), so no rawEvent, metadata, usage, nested error or other provider detail reaches the
+ * browser, and the turn keeps the code it sent for finishTurn().
  */
 export function wireEvents(turn: { errorCode: RunErrorCode | null }): ChatMiddleware {
   /** The tool of each call this run started, by the call's id. */
@@ -254,12 +285,12 @@ export function wireEvents(turn: { errorCode: RunErrorCode | null }): ChatMiddle
       case EventType.TOOL_CALL_END:
         return { type: chunk.type, toolCallId: chunk.toolCallId, ...(chunk.input === undefined ? {} : { input: chunk.input }), timestamp };
       case EventType.TOOL_CALL_RESULT: {
-        // No tool's result passes whole. A read leaves as its ids, and a result of a call this run did not
-        // start is taken as a read. Any other tool's result leaves as {}, with no field of its own: a tool
-        // that a later task adds sends nothing of its result until this case names the fields that the
-        // spec gives the browser for it (Tools).
+        // No tool's result passes whole: each leaves with the fields that its entry in RESULT_FIELDS
+        // names. A result of a call this run did not start is taken as a read. A tool the chat does not
+        // have, and a tool that a later task adds, sends no field of its result until RESULT_FIELDS
+        // names the fields that the spec gives the browser for it (Tools).
         const tool = toolOf.get(chunk.toolCallId) ?? READ_SOURCES;
-        return resultEvent(chunk, tool === READ_SOURCES ? JSON.stringify(readIdsOf(chunk.content)) : "{}");
+        return resultEvent(chunk, JSON.stringify(resultFieldsOf(tool, chunk.content)));
       }
       case EventType.CUSTOM:
         return chunk.name.startsWith(CHAT_EVENT_PREFIX) ? { type: chunk.type, name: chunk.name, value: chunk.value, timestamp } : null;
