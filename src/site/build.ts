@@ -1,7 +1,11 @@
 // buildSite(): the site's production build (SPEC-site, Project Structure). It runs the Vite app build of
-// vite.config.ts, which prerenders the pages into Nitro's Vercel output under the folder the caller names.
+// vite.config.ts, which prerenders the pages into Nitro's Vercel output under the folder the caller names, then writes
+// the not-found page, 404.html, beside them.
 import { join, resolve } from "node:path";
+import { Glob } from "bun";
 import { createBuilder } from "vite";
+import { loadResume } from "../content";
+import { renderNotFoundPage } from "./not-found";
 
 /** The site's Vite config. It sets Vite's root to its own folder, the repository, which holds src/site. */
 const VITE_CONFIG = join(import.meta.dir, "../../vite.config.ts");
@@ -43,4 +47,41 @@ export async function buildSite({ root, outDir }: BuildSiteOptions): Promise<voi
     if (callersNodeEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = callersNodeEnv;
   }
+  await writeNotFoundPage(resolve(root), resolve(outDir, ".vercel/output/static"));
+}
+
+/**
+ * Writes 404.html, the not-found page, into the static folder, outside the route tree. It takes the pages' own data and
+ * stylesheets: the name and the headline from the same resume.yaml through the same public loader, and each
+ * stylesheet that every prerendered page links.
+ */
+async function writeNotFoundPage(root: string, staticDir: string): Promise<void> {
+  const { basics } = await loadResume("public", root);
+  const stylesheets = await stylesheetsOfEveryPage(staticDir);
+  const page = renderNotFoundPage({ basics: { name: basics.name, label: basics.label }, stylesheets });
+  await Bun.write(join(staticDir, "404.html"), page);
+}
+
+/**
+ * The stylesheets that every prerendered page links, in page order: the root route's, which hold the design system's
+ * tokens and the site's own rules. A stylesheet that only some pages link belongs to their routes, so it stays out.
+ */
+async function stylesheetsOfEveryPage(staticDir: string): Promise<string[]> {
+  // 404.html stays out: a copy from an earlier build into the same folder would hold that build's stylesheets.
+  const pages = (await Array.fromAsync(new Glob("**/*.html").scan({ cwd: staticDir })))
+    .filter((page) => page !== "404.html")
+    .sort();
+  let shared: string[] | undefined;
+  for (const page of pages) {
+    const links: string[] = [];
+    // The selector matches only links that have an href, so getAttribute() returns a string.
+    new HTMLRewriter()
+      .on('link[rel="stylesheet"][href]', { element: (link) => void links.push(link.getAttribute("href")!) })
+      .transform(await Bun.file(join(staticDir, page)).text());
+    shared = shared === undefined ? links : shared.filter((href) => links.includes(href));
+  }
+  if (!shared?.length) {
+    throw new Error(`buildSite: no stylesheet is linked by every page under ${staticDir}, so 404.html would have no style`);
+  }
+  return shared;
 }

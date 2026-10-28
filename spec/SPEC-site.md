@@ -105,7 +105,7 @@ The address follows the view, with `history.replaceState`, so it adds no history
 - `/?role=<id>` while a role is selected and no source is open;
 - `/` otherwise.
 
-So a visitor shares a role or a source by copying the address. An unknown source or role id in a query (`?source=`, `?role=`) gives the first view, not an error. An unknown path, `/sources/<unknown id>` included, gets the not-found page with status 404: "Page not found" with links to the chat and to the resume, and no script. Its wording (Peter, row 138): "404", the heading "Page not found", "There is no page at this address. The link may be mistyped, or the page may have moved.", and the links "Ask the chat about Peter's work" (`/`) and "Read Peter's resume" (`/resume`). It follows the system's light or dark setting, because a page with no script cannot read the visitor's stored theme. A citation to an id that no longer exists shows as plain text (SPEC-knowledge).
+So a visitor shares a role or a source by copying the address. An unknown source or role id in a query (`?source=`, `?role=`) gives the first view, not an error. An unknown path, `/sources/<unknown id>` included, gets the not-found page with status 404: "Page not found" with links to the chat and to the resume, and no script. Its wording (Peter, row 138): "404", the heading "Page not found", "There is no page at this address. The link may be mistyped, or the page may have moved.", and the links "Ask the chat about Peter's work" (`/`) and "Read Peter's resume" (`/resume`). A `nav` with the label "Where to go next" holds the two links, so a screen reader names them as a group. The page prints "Peter’s" with the curly apostrophe (’), as `resume.yaml` does. It follows the system's light or dark setting, because a page with no script cannot read the visitor's stored theme. It opens with the app bar's name box and headline in a plain `header`, as the not-found boards draw it, not in `acme-app-bar`: with no script, the part never upgrades, and its bar and banner landmark live in its shadow DOM (S5). A citation to an id that no longer exists shows as plain text (SPEC-knowledge).
 
 ## Saved views
 
@@ -221,6 +221,7 @@ src/site/data.ts             the pages' data: a Vite module made at build time f
                              shape from publicKnowledge(knowledge), never the full knowledge; one lazy JSON file per source
 src/site/styles/             tokens import, fonts, layout
 src/site/build.ts            buildSite({ root, outDir }): the Vite build with prerendering, documents/ and 404.html
+src/site/not-found.tsx       renderNotFoundPage(): the text of 404.html, a React tree with no script
 src/site/service-worker.ts   writeServiceWorker(staticDir): Workbox generateSW over the static folder
 scripts/build-site.ts        `bun run build:site`: the build-time composition root (owned by SPEC-deploy)
 scripts/icons.ts             `bun run icons`: renders the icons with Chrome into public/icons/

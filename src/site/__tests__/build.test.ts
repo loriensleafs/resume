@@ -86,6 +86,21 @@ async function elementsOn(page: string, selector: string): Promise<{ tag: string
   }));
 }
 
+/** The stylesheets a page links, by address, in page order. */
+async function stylesheetsOf(page: string): Promise<string[]> {
+  const hrefs: string[] = [];
+  new HTMLRewriter()
+    .on('link[rel="stylesheet"][href]', { element: (element) => void hrefs.push(element.getAttribute("href")!) })
+    .transform(await Bun.file(`${staticDir}/${page}`).text());
+  return hrefs;
+}
+
+/** The text of the stylesheets a page links, in page order. */
+async function cssOf(page: string): Promise<string> {
+  const sheets = (await stylesheetsOf(page)).map((href) => Bun.file(`${staticDir}${href}`).text());
+  return (await Promise.all(sheets)).join("\n");
+}
+
 /**
  * The JavaScript files a page loads before any interaction, by address: its scripts and module preloads, and every
  * file they import statically. A dynamic import waits for a navigation, so it stays out.
@@ -131,9 +146,11 @@ afterAll(async () => {
   await $`rm -rf ${tmp}`.quiet().nothrow();
 });
 
-describe("the prerendered pages", () => {
-  test("are / and /resume, and no other page", async () => {
-    expect(await htmlFiles()).toEqual(["index.html", "resume/index.html"]);
+describe("the HTML files", () => {
+  // The not-found page is not a prerendered page: buildSite() writes it outside the route tree (SPEC-site, Project
+  // Structure), so it is in no sitemap.
+  test("are the prerendered pages / and /resume, and the not-found page 404.html", async () => {
+    expect(await htmlFiles()).toEqual(["404.html", "index.html", "resume/index.html"]);
   });
 });
 
@@ -226,6 +243,83 @@ describe("the headings of resume/index.html", () => {
       { tag: "h1", text: resume.basics.name },
       { tag: "p", text: FIXTURE_LEAD },
     ]);
+  });
+});
+
+// SPEC-site, Workspace addresses: every unknown path gets the not-found page, with status 404. Its wording is Peter's,
+// as the not-found boards draw it (decision record row 138), with the curly apostrophe of the boards and of resume.yaml.
+describe("the not-found page 404.html", () => {
+  test('shows "404", the heading "Page not found" and the line that says why', async () => {
+    expect(await elementsOn("404.html", "main p, main h1")).toEqual([
+      { tag: "p", text: "404" },
+      { tag: "h1", text: "Page not found" },
+      { tag: "p", text: "There is no page at this address. The link may be mistyped, or the page may have moved." },
+    ]);
+  });
+
+  test("links to the chat at / and to the resume at /resume, and nowhere else", async () => {
+    expect(await elementsOn("404.html", "main a")).toEqual([
+      { tag: "a", text: "Ask the chat about Peter’s work" },
+      { tag: "a", text: "Read Peter’s resume" },
+    ]);
+    expect(await elementsOn("404.html", 'main a[href="/"]')).toEqual([
+      { tag: "a", text: "Ask the chat about Peter’s work" },
+    ]);
+    expect(await elementsOn("404.html", 'main a[href="/resume"]')).toEqual([{ tag: "a", text: "Read Peter’s resume" }]);
+  });
+
+  // WCAG 2.2, 2.4.2 Page Titled. The title is the approved heading, so the page adds no wording.
+  test('has the title "Page not found"', async () => {
+    expect(await elementsOn("404.html", "head title")).toEqual([{ tag: "title", text: "Page not found" }]);
+  });
+
+  // SPEC-site, Saved views: the not-found page has no script, so it follows the system's light or dark setting.
+  test("holds no script and loads none", async () => {
+    expect(await elementsOn("404.html", "script")).toEqual([]);
+    expect(await scriptsLoadedBy("404.html")).toEqual([]);
+  });
+
+  // The app bar's name box and headline, with the app bar's own rules (layout.css), in a plain header as the not-found
+  // boards draw it: with no script, acme-app-bar would never upgrade, and its bar and banner landmark live in its
+  // shadow DOM.
+  test("opens with a header that holds the app bar's name box, a link to /, and the fixture root's headline", async () => {
+    const [first] = await elementsOn("404.html", "body > *");
+    expect(first?.tag).toBe("header");
+    expect(await elementsOn("404.html", 'header a.app-bar-name[href="/"]')).toEqual([
+      { tag: "a", text: resume.basics.name },
+    ]);
+    expect(await elementsOn("404.html", "header .app-bar-headline")).toEqual([{ tag: "span", text: FIXTURE_HEADLINE }]);
+  });
+
+  test("holds no design-system part, because no script would define it", async () => {
+    const parts = (await elementsOn("404.html", "*")).filter((element) => element.tag.startsWith("acme-"));
+    expect(parts).toEqual([]);
+  });
+
+  // One stylesheet for every page: the design system's tokens and the site's own rules, the app bar's among them.
+  test("links only stylesheets that / and /resume link too", async () => {
+    const pagesLink = [...(await stylesheetsOf("index.html")), ...(await stylesheetsOf("resume/index.html"))];
+    const notFoundLinks = await stylesheetsOf("404.html");
+    expect(notFoundLinks.length).toBeGreaterThan(0);
+    expect(notFoundLinks.filter((href) => !pagesLink.includes(href))).toEqual([]);
+  });
+
+  test("has a rule for each class it uses in the stylesheets it links", async () => {
+    const classes = new Set<string>();
+    new HTMLRewriter()
+      .on("[class]", { element: (element) => element.getAttribute("class")!.split(/\s+/).forEach((c) => classes.add(c)) })
+      .transform(await Bun.file(`${staticDir}/404.html`).text());
+    const css = await cssOf("404.html");
+    // A class name is followed by a character that cannot continue it: ".not-found" is not ".not-found-bar".
+    const unstyled = [...classes].filter((name) => !new RegExp(`\\.${name}(?![-\\w])`).test(css));
+    expect(classes.size).toBeGreaterThan(0);
+    expect(unstyled).toEqual([]);
+  });
+
+  // SPEC-site, Workspace addresses: with no script to read the stored theme, the page follows the system's setting.
+  // The token stylesheet does that with its own media query, before any part or script runs.
+  test("follows the system's light or dark setting through the stylesheets it links", async () => {
+    expect(await cssOf("404.html")).toMatch(/@media\s*\(prefers-color-scheme:\s*dark\)/);
   });
 });
 
