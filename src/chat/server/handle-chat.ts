@@ -7,14 +7,14 @@ import {
   chatParamsFromRequestBody,
   toServerSentEventsResponse,
   type AnyTextAdapter,
-  type ModelMessage,
   type StreamChunk,
-  type UIMessage,
 } from "@tanstack/ai";
 import type { Knowledge } from "../../knowledge/types";
 import { finishTurn } from "./finish-turn";
+import { turnLimits } from "./limits";
 import { citationMarkers } from "./markers";
 import { systemPrompt } from "./prompt";
+import { ChatMessages, ChatProps } from "./props";
 import type { Budget, QuestionLog, Telemetry } from "./question-log";
 import { turnUsage } from "./telemetry";
 import { startTurn } from "./turn";
@@ -31,25 +31,126 @@ export type ChatDeps = {
   now(): Date;
 };
 
-/**
- * The newest question's text as sent. The browser sends a question of text parts as one string
- * (TanStack AI's uiMessagesToWire), and C4's request check passes no other user message.
- */
-function questionText(messages: ReadonlyArray<UIMessage | ModelMessage>): string {
-  const newest = messages.findLast((message) => message.role === "user");
-  const content = newest && "content" in newest ? newest.content : undefined;
-  return typeof content === "string" ? content : "";
-}
-
 /** A stream of one event, for an answer the model does not give. */
 async function* only(event: StreamChunk): AsyncGenerator<StreamChunk> {
   yield event;
 }
 
+/**
+ * The codes of a rejected request, each with its HTTP status and its fixed message. The message says
+ * what the rule is and nothing of the server's insides; the browser shows its own text for each status.
+ */
+const CHAT_ERRORS = {
+  INVALID_REQUEST: { status: 400, message: "The request is not a chat request." },
+  QUESTION_TOO_LONG: {
+    status: 413,
+    message: `The question is longer than ${turnLimits.questionCharacters.toLocaleString("en-US")} characters.`,
+  },
+  REQUEST_TOO_LARGE: { status: 413, message: `The request is larger than ${turnLimits.requestBytes / 1024} KB.` },
+  FORBIDDEN_ORIGIN: { status: 403, message: "The chat answers requests from its own site only." },
+} as const;
+
+export type ChatErrorCode = keyof typeof CHAT_ERRORS;
+
+/** The one shape of a rejected request's body (SPEC-chat, The request). */
+export type ChatError = { error: { code: ChatErrorCode; message: string } };
+
+/** The response to a rejected request: the ChatError JSON with the code's status. */
+function chatError(code: ChatErrorCode): Response {
+  const { status, message } = CHAT_ERRORS[code];
+  return Response.json({ error: { code, message } } satisfies ChatError, { status });
+}
+
+/**
+ * The request body's bytes. The read stops as soon as the bytes pass `limit`, so a larger body is
+ * never read to its end: it is "too-large".
+ */
+async function readBody(request: Request, limit: number): Promise<Uint8Array | "too-large"> {
+  if (request.body === null) return new Uint8Array();
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (let read = await reader.read(); !read.done; read = await reader.read()) {
+    size += read.value.byteLength;
+    if (size > limit) {
+      // The size decides; a cancel that fails changes nothing the visitor gets.
+      await reader.cancel().catch(() => undefined);
+      return "too-large";
+    }
+    chunks.push(read.value);
+  }
+  return new Uint8Array(Bun.concatArrayBuffers(chunks));
+}
+
+/** The value of `step`, or undefined when it throws. No step below returns undefined itself. */
+async function unlessThrown<T>(step: () => T | Promise<T>): Promise<T | undefined> {
+  try {
+    return await step();
+  } catch {
+    return undefined;
+  }
+}
+
+/** JSON is UTF-8 (RFC 8259), so bytes that are not UTF-8 are bad JSON. */
+const utf8 = new TextDecoder("utf-8", { fatal: true });
+
+type ChatParams = Awaited<ReturnType<typeof chatParamsFromRequestBody>>;
+
+/**
+ * What the turn takes from a request that passed every check: the thread id, the messages, the question
+ * and the props only. The body's tools, context, state and resume stay behind, so they cannot reach
+ * chat(): it gets only the handler's own tools. The scope, audience and about lines (C7, C15) read `props`.
+ */
+type CheckedRequest = {
+  threadId: ChatParams["threadId"];
+  messages: ChatParams["messages"];
+  question: string;
+  props: ChatProps;
+};
+
+/**
+ * Whether the request's page may use the chat (The request, "Origin"): its Origin is one of `origins`,
+ * or, when the list is empty, the request's own origin. A request with no Origin header passes; the
+ * rate limits and the cap still apply to it. Any other Origin, "null" included, fails.
+ */
+function originAllowed(request: Request, origins: readonly string[]): boolean {
+  const origin = request.headers.get("origin");
+  if (origin === null) return true;
+  return origins.length === 0 ? origin === new URL(request.url).origin : origins.includes(origin);
+}
+
+/** The request checks, in SPEC-chat's order (The request). Each failure is one ChatError code. */
+async function checkRequest(request: Request, origins: readonly string[]): Promise<CheckedRequest | ChatErrorCode> {
+  // The origin first, so another site's page cannot make the server read its body.
+  if (!originAllowed(request, origins)) return "FORBIDDEN_ORIGIN";
+  // 1. The body as bytes, read no further than the limit. A body that fails to arrive is no chat request.
+  const bytes = await unlessThrown(() => readBody(request, turnLimits.requestBytes));
+  if (bytes === undefined) return "INVALID_REQUEST";
+  if (bytes === "too-large") return "REQUEST_TOO_LARGE";
+  // 2. The bytes as JSON.
+  const body: unknown = await unlessThrown(() => JSON.parse(utf8.decode(bytes)));
+  if (body === undefined) return "INVALID_REQUEST";
+  // 3. TanStack AI's check of the body. Not chatParamsFromRequest(): it reads the body itself and answers a plain-text 400.
+  const params = await unlessThrown(() => chatParamsFromRequestBody(body));
+  if (params === undefined) return "INVALID_REQUEST";
+  // 4. The messages: the roles user, assistant and tool only, a user message of text only, and the newest
+  // message the question, with text. Then the question's length; earlier turns are bounded by the bytes
+  // and by the conversation sent.
+  const messages = ChatMessages.safeParse(params.messages);
+  if (!messages.success) return "INVALID_REQUEST";
+  const { question } = messages.data;
+  if (question.length > turnLimits.questionCharacters) return "QUESTION_TOO_LONG";
+  // 5. The question's own request properties.
+  const props = ChatProps.safeParse(params.forwardedProps);
+  if (!props.success) return "INVALID_REQUEST";
+  return { threadId: params.threadId, messages: params.messages, question, props: props.data };
+}
+
 export async function handleChat(request: Request, deps: ChatDeps): Promise<Response> {
   const startedAt = deps.now();
-  const params = await chatParamsFromRequestBody(await request.json());
-  const question = questionText(params.messages);
+  const checked = await checkRequest(request, deps.origins);
+  if (typeof checked === "string") return chatError(checked);
+  const { threadId, messages, question } = checked;
 
   // At the day's cap or the month's limit, the answer is the limit stream, and the model is not called.
   // The browser reads no body of a response that is not 200, so the refusal is a 200 stream (The request, "Limits").
@@ -62,9 +163,9 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
 
   const stream = chat({
     adapter: deps.adapter,
-    threadId: params.threadId,
+    threadId,
     systemPrompts: [systemPrompt(deps.knowledge)],
-    messages: params.messages,
+    messages,
     middleware: [
       citationMarkers(deps.knowledge, turn),
       turnUsage(turn),

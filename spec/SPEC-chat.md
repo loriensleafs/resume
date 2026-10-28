@@ -95,12 +95,12 @@ export const turnLimits = {
 
 ## The request
 
-The browser sends TanStack AI's request (the messages and `threadId`) and three properties in `forwardedProps`: the question's own `scope`, `audience` and `about`, from its message metadata (see Saved conversation). They go per question through `sendMessage`'s `body`. The server reads the request in this order and maps every failure to a `ChatError`:
+The browser sends TanStack AI's request (the messages and `threadId`) and three properties in `forwardedProps`: the question's own `scope`, `audience` and `about`, from its message metadata (see Saved conversation). They go per question through `sendMessage`'s `body`. The server checks the `Origin` header first, before it reads the body, so another site's page cannot make the server read a body (see Origin, below; after C4's review). It then reads the request in this order and maps every failure to a `ChatError`:
 
 1. It reads the body as bytes and stops at `turnLimits.requestBytes`. A larger body gets 413 `REQUEST_TOO_LARGE`.
 2. It parses the bytes with `JSON.parse`. A failure gets 400 `INVALID_REQUEST`.
 3. It calls `chatParamsFromRequestBody()` inside `try`/`catch`. A throw gets 400 `INVALID_REQUEST`. The handler does not use `chatParamsFromRequest()`, because that reads the body itself and answers a plain-text 400.
-4. It checks the messages with zod. Only the roles `user`, `assistant` and `tool` pass, and a user message holds text parts only. Any other role (`system`, `developer`, `reasoning`) or part (an image, a document) gets 400 `INVALID_REQUEST`. When the newest question is over 10,000 characters, it gets 413 `QUESTION_TOO_LONG`.
+4. It checks the messages with zod. Only the roles `user`, `assistant` and `tool` pass, and a user message holds text parts only. Any other role (`system`, `developer`, `reasoning`) or part (an image, a document) gets 400 `INVALID_REQUEST`. The newest message must be the question: a user message with at least one character that is not white space. Any other newest message gets 400 `INVALID_REQUEST`, because a request with no question is not a turn (after C4's review). When the newest question is over 10,000 characters, it gets 413 `QUESTION_TOO_LONG`.
 5. It checks `forwardedProps` with `ChatProps`. A failure gets 400 `INVALID_REQUEST`.
 
 The body's `tools`, `context`, `state` and `resume` are ignored. `chat()` gets only the handler's own tools.
