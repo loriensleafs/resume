@@ -3,7 +3,8 @@
 // body, the title in `X-Title` or its aliases `Title`, `ti` and `t`, and the priority in `X-Priority`
 // or its aliases `Priority`, `prio` and `p`, as a number from 1 to 5 or by name (`urgent` and `max`
 // are 5). It records each push it accepts, and a test can make it refuse the next ones, as ntfy.sh
-// refuses with 429 past its daily limit of messages from one address.
+// refuses with 429 past its daily limit of messages from one address, or hold them with no answer, as
+// a hung server does.
 
 /** One push that the server accepted, as ntfy reads it. */
 export type Push = {
@@ -24,6 +25,10 @@ export type FakeNtfy = {
   refused(): number;
   /** Refuses the next `count` publishes with `status`, 429 by default, as ntfy.sh does past its daily limit. */
   refuseNext(count: number, status?: number): void;
+  /** How many publishes the server held. */
+  held(): number;
+  /** Holds the next `count` publishes with no answer, as a hung server does, until the server stops. */
+  holdNext(count: number): void;
   stop(): Promise<void>;
 };
 
@@ -38,6 +43,9 @@ export function startFakeNtfy(): FakeNtfy {
   const pushes: Push[] = [];
   let refusals: { count: number; status: number } = { count: 0, status: 429 };
   let refused = 0;
+  let holds = 0;
+  /** The answers of the held publishes, which stop() gives at last, so no handler is left waiting. */
+  const heldAnswers: (() => void)[] = [];
 
   const server = Bun.serve({
     hostname: "127.0.0.1",
@@ -47,6 +55,11 @@ export function startFakeNtfy(): FakeNtfy {
       const message = await request.text();
       if ((request.method !== "POST" && request.method !== "PUT") || !TOPIC.test(topic)) {
         return Response.json({ code: 40401, http: 404, error: "page not found" }, { status: 404 });
+      }
+      if (holds > 0) {
+        holds--;
+        await new Promise<void>((answer) => heldAnswers.push(answer));
+        return Response.json({ code: 50301, http: 503, error: "held until the server stopped" }, { status: 503 });
       }
       if (refusals.count > 0) {
         refusals.count--;
@@ -70,6 +83,13 @@ export function startFakeNtfy(): FakeNtfy {
     refuseNext(count, status = 429) {
       refusals = { count, status };
     },
-    stop: () => server.stop(true),
+    held: () => heldAnswers.length,
+    holdNext(count) {
+      holds = count;
+    },
+    stop() {
+      for (const answer of heldAnswers) answer();
+      return server.stop(true);
+    },
   };
 }

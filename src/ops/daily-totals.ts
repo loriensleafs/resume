@@ -88,6 +88,8 @@ export function upstashTelemetry(
               ["EXPIREAT", dayCostKey(day), expiresAt],
             ] satisfies Command[])),
       ];
+      // The index of the month's INCRBY reply below: the transaction answers in command order, so the
+      // order must stay as it is, with the month's two commands pushed last.
       const monthReply = commands.length;
       commands.push(["INCRBY", month, String(cost)], ["EXPIREAT", month, monthKeysExpireAt(day)]);
       const monthCost = (await store.transaction(commands))[monthReply];

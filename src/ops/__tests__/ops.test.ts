@@ -873,6 +873,50 @@ describe("the limit alerts, in production on the in-test Upstash and ntfy server
     },
   );
 
+  test(
+    "with the ntfy server holding its answers, reserve() at the daily cap and record() past 75% each return within about 3 s; each push counts as failed, and a later event pushes again",
+    async () => {
+      // October at exactly 75% of its limit, and the day 8 reservations in: one more $0.90 takes each past its limit.
+      upstash.set("qcost:2026-10", "15000000");
+      const ops = functionInstance();
+      const reservations: string[] = [];
+      for (let turn = 0; turn < 8; turn++) reservations.push(await reserveOn(ops));
+      ntfy.holdNext(2);
+      const timed = async (event: () => Promise<unknown>) => {
+        const started = performance.now();
+        await event();
+        return performance.now() - started;
+      };
+
+      // Both events run at once, so the test waits out one time limit, not two.
+      const durations = await Promise.all([
+        timed(async () => expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" })),
+        timed(() => ops.telemetry.record(deadlineTurn, reservations[0])),
+      ]);
+
+      // SPEC-deploy, "Store calls": each push, 3 s. Without the limit neither event returns, and the test times out.
+      expect(ntfy.held()).toBe(2);
+      for (const duration of durations) expect(duration).toBeLessThan(4_000);
+      // A push that timed out is a failed push: its marker expires in 10 minutes, and its line holds one word.
+      expect(upstash.expiresAt("alert:daycap:2026-10-27")).toEqual(new Date("2026-10-27T12:10:00.000Z"));
+      expect(upstash.expiresAt("alert:spend75:2026-10")).toEqual(new Date("2026-10-27T12:10:00.000Z"));
+      const opsErrors = printed.map((line) => JSON.parse(line) as Record<string, unknown>).filter((line) => line.event === "ops_error");
+      expect(opsErrors).toHaveLength(2);
+      expect(opsErrors).toContainEqual({ event: "ops_error", step: "alert_push", alert: "daycap", code: "TimeoutError" });
+      expect(opsErrors).toContainEqual({ event: "ops_error", step: "alert_push", alert: "spend75", code: "TimeoutError" });
+      expect(printed.join("\n")).not.toContain(topic);
+
+      clock = new Date("2026-10-27T12:10:00.001Z");
+      expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
+      await ops.telemetry.record(deadlineTurn, reservations[1]);
+      expect(ntfy.pushes.map((push) => push.title)).toEqual([
+        "Chat paused at its $8 daily cap until 00:00 UTC",
+        "Chat at 75% of its $20 limit for October",
+      ]);
+    },
+    15_000,
+  );
+
   test("no push holds question text: not its title, its line or any header", async () => {
     const question = "Our confidential Example Corp posting pays $250k; does Peter fit it?";
     upstash.set("qcost:2026-10", "15000000");

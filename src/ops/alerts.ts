@@ -134,9 +134,17 @@ function sender(topicUrl: string, { store, fetch, now, print }: AlertSettings): 
 }
 
 /**
+ * How long a push may take, in milliseconds (SPEC-deploy, "Store calls": each push, 3 s). The daycap
+ * push runs inside reserve() and the spend75 push inside record(), so a hung ntfy server holds a
+ * visitor's answer no longer than this.
+ */
+const PUSH_LIMIT_MS = 3_000;
+
+/**
  * Pushes one alert to the topic with priority urgent (ntfy, "Message priority": urgent is 5, the
  * highest). Gives undefined when ntfy took it, or one short word for the failure: the HTTP status, or
- * a thrown error's code or name. Never the error's message, which can hold the topic's address.
+ * a thrown error's code or name. Never the error's message, which can hold the topic's address. A
+ * push that passes its time limit fails with the name TimeoutError.
  */
 async function push(topicUrl: string, fetchFn: typeof fetch, alert: Alert): Promise<string | undefined> {
   try {
@@ -146,6 +154,7 @@ async function push(topicUrl: string, fetchFn: typeof fetch, alert: Alert): Prom
       body: alert.message,
       // ntfy answers a publish itself; a redirect would send the alert to another address.
       redirect: "error",
+      signal: AbortSignal.timeout(PUSH_LIMIT_MS),
     });
     await response.body?.cancel();
     return response.ok ? undefined : `HTTP_${response.status}`;
