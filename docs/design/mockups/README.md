@@ -2,7 +2,7 @@
 
 The approved look of the site, as images. Peter reviewed the mockups on 2026-10-27: "I think this all looks pretty good." [SPEC-site](../../../spec/SPEC-site.md) and [SPEC-chat](../../../spec/SPEC-chat.md) are written from them. The changes since that review are under "Updating".
 
-The mockups were made on a private Claude Design canvas, "Resume site mockups", with Peter's ACME design system 0.3.2. These images are rendered from the canvas boards. The board sources are on the branch [`prototype/site-mockups`](https://github.com/loriensleafs/resume/tree/prototype/site-mockups/prototypes/site-mockups), not on `main`, because they open only inside the canvas.
+The mockups were made on a private Claude Design canvas, "Resume site mockups", with Peter's ACME design system, now at 0.3.3. These images are rendered from the canvas boards. The board sources are on the branch [`prototype/site-mockups`](https://github.com/loriensleafs/resume/tree/prototype/site-mockups/prototypes/site-mockups), not on `main`, because they open only inside the canvas.
 
 The choices behind each view are in the [decision record](../interview-2026-10-26.md), rows 21 to 75, and in decisions [0015](../../decisions/0015-sources-on-demand.md) to [0019](../../decisions/0019-wider-chat-scope.md).
 
@@ -45,3 +45,4 @@ One dated line per change, with the canvas version and the [decision record](../
 
 - 2026-10-27, canvas version 44, rows 81 and 85 to 105: queued questions with Send now, Edit and Remove; the compact "Answers for" trigger with its popover, a select on phones; the anonymous-log line beside the trigger; the resume's ⋯ menu for the downloads; the resume card; no "Welcome back" notice.
 - 2026-10-27, canvas version 46, rows 133, 136, 138 and 139: each answer numbers its own citations; the resume shows the cited highlights' numbers; the audience lines "Manager:" and "Recruiter:"; the "Answers for" select and the anonymous-log line on phones; phone sheets with no grab handle; the limit and "Too many questions" input states; the not-found page, desktop and phone; the logistics answers in the steps' citation line. Peter approved the texts in row 138 and the boards in row 139.
+- 2026-10-27, canvas version 46, row 172: the boards use the design system 0.3.3. The bundle built at 0.3.3 is byte-identical to the 0.3.2 bundle, so the canvas keeps version 46. A new render of all 30 boards matches the approved images, so the images stay. The "First mockups" page keeps its title note "ACME design system 0.3.2", because that page was made with 0.3.2.
