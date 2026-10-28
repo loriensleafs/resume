@@ -205,15 +205,23 @@ describe("parseSource", () => {
   );
 
   test.each([
-    ["## Not public", "```markdown"],
-    ["## Not public: decline to describe these kinds of material", "```"],
-    ["### not public", "~~~"],
-    ["# Not Public", "````text"],
-  ])("stops on %p in a code block, a line that looks like the Not public heading, which the chat could read as that section", (line, fence) => {
+    ["## Not public", "```markdown", "## Not public"],
+    ["## Not public: decline to describe these kinds of material", "```", "## Not public"],
+    ["### not public", "~~~", "### not public"],
+    ["# Not Public", "````text", "# Not Public"],
+  ])("stops on %p in a code block, a line that looks like the Not public heading, which the chat could read as that section", (line, fence, heading) => {
+    // The fixture's front matter takes lines 1 to 12, so the line after the opening fence is line 19.
     const body = `## How is a source laid out?\n\nLike this:\n\n${fence}\n${line}\nSECRET.\n${fence.match(/^[`~]+/)![0]}\n\n## Not public\n\nColleague names.\n`;
     const message = failure(interviewFile({}, body));
-    expect(message).toContain(`${JSON.stringify(line)}, in a code block, looks like the Not public heading, and the chat could read it as that section: write the line another way`);
+    expect(message).toContain(`line 19, in a code block, starts with ${JSON.stringify(heading)}, which looks like the Not public heading, and the chat could read it as that section: write the line another way`);
     expect(message).not.toContain("SECRET");
+  });
+
+  test("names a code block line that looks like the Not public heading by its line number and that heading only, never the rest of the line", () => {
+    const body = "## How is a source laid out?\n\nLike this:\n\n```\n## Not public: SECRET colleague names\n```\n\n## Not public\n\nColleague names.\n";
+    expect(failure(interviewFile({}, body))).toBe(
+      'knowledge/sources/sample.md: line 19, in a code block, starts with "## Not public", which looks like the Not public heading, and the chat could read it as that section: write the line another way',
+    );
   });
 
   test("keeps a ## line inside a fenced code block as text of its passage, as Markdown does", () => {

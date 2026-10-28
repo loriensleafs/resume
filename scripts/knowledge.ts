@@ -78,17 +78,24 @@ async function printDraft(id: string): Promise<void> {
   if (problems.length) process.exitCode = 1;
 }
 
-let args: { values: { draft?: string }; positionals: string[] };
-try {
-  // strict refuses an unknown or misspelt flag, so `--drfat x` never reads as two ids (https://bun.com/docs/guides/process/argv).
-  args = parseArgs({ args: Bun.argv.slice(2), options: { draft: { type: "string" } }, allowPositionals: true, strict: true });
-  if (args.values.draft !== undefined && args.positionals.length) throw new Error("--draft takes one source id and no other ids");
-} catch (e) {
-  console.error(`${(e as Error).message}\n${USAGE}`);
+/** A command line the script cannot run: the message and the usage go to standard error, and it exits with 2. */
+function exitWithUsage(message: string): never {
+  console.error(`${message}\n${USAGE}`);
   process.exit(2);
 }
 
-const { values, positionals: ids } = args;
+/** The flags and the ids, read before anything else runs. */
+function readArgs() {
+  try {
+    // strict refuses an unknown or misspelt flag, so `--drfat x` never reads as two ids (https://bun.com/docs/guides/process/argv).
+    return parseArgs({ args: Bun.argv.slice(2), options: { draft: { type: "string" } }, allowPositionals: true, strict: true });
+  } catch (e) {
+    exitWithUsage((e as Error).message);
+  }
+}
+
+const { values, positionals: ids } = readArgs();
+if (values.draft !== undefined && ids.length) exitWithUsage("--draft takes one source id and no other ids");
 try {
   if (values.draft !== undefined) await printDraft(values.draft);
   else {
