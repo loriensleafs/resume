@@ -143,6 +143,9 @@ const citationEvents = (events: WireEvent[]) => events.filter((e) => e.type === 
 /** A model call that reads through read_sources with this input, as the model sends it. */
 const readCall = (input: unknown): FakeResponse => ({ toolCalls: [{ name: "read_sources", input }] });
 
+/** A stub model call that reads through read_sources, after it thinks. */
+const thinkingRead = (thinking: string, ids: string[]) => ({ thinking, toolUse: { name: "read_sources", input: { ids, topic: "the first thing" } } });
+
 /**
  * The fixture deep dive `sample` (knowledge/__tests__/fixtures.ts): its five passages, sample.1 to
  * sample.5, each hold "Text for <heading>.", and its Not public section holds "Internal code.".
@@ -329,11 +332,11 @@ describe("events on the wire", () => {
     expect(events.filter((e) => e.type === "CUSTOM" && !String(e.name).startsWith("chat."))).toEqual([]);
   });
 
-  /** A test middleware that adds `added` after the answer's TEXT_MESSAGE_END, before the wire middleware sees it. */
-  const addingAfterText = (added: Record<string, unknown>): ChatMiddleware => ({
+  /** A test middleware that adds each `added` event, in order, after the answer's TEXT_MESSAGE_END, before the wire middleware sees it. */
+  const addingAfterText = (...added: Record<string, unknown>[]): ChatMiddleware => ({
     name: "adds-an-event",
     onChunk: (_ctx, chunk) =>
-      chunk.type === EventType.TEXT_MESSAGE_END ? [chunk, { timestamp: Date.now(), ...added } as unknown as StreamChunk] : undefined,
+      chunk.type === EventType.TEXT_MESSAGE_END ? [chunk, ...added.map((event) => ({ timestamp: Date.now(), ...event }) as unknown as StreamChunk)] : undefined,
   });
 
   test.each<[string, Record<string, unknown>]>([
@@ -390,6 +393,25 @@ describe("events on the wire", () => {
 
     expect(later.filter((e) => e.type === "TOOL_CALL_RESULT").map((e) => JSON.parse(String(e.content)))).toEqual([{ read: [], unknown: [], skipped: [] }]);
     expect(JSON.stringify(later)).not.toContain("Internal code.");
+  });
+
+  test("a result of a call this run started as a tool other than read_sources leaves with no field of its own: its content is {}, so no tool's result passes whole", async () => {
+    const fake = fakeText();
+    fake.setResponses([{ text: "Test Person built the first thing [highlight:acme.1]." }]);
+    const callId = "call-open-1";
+    const opensAndAnswers = addingAfterText(
+      { type: "TOOL_CALL_START", toolCallId: callId, toolCallName: "open_resume" },
+      { type: "TOOL_CALL_RESULT", messageId: "m-1", toolCallId: callId, role: "tool", content: JSON.stringify({ opened: true, text: "Internal code." }) },
+    );
+
+    const events = await readEvents(
+      await handleChat(chatRequest([question("What did Test Person build?")]), seamDeps(fake, { testMiddleware: [opensAndAnswers] })),
+    );
+
+    expect(events.filter((e) => e.type === "TOOL_CALL_RESULT").map((e) => ({ toolCallId: e.toolCallId, content: e.content }))).toEqual([
+      { toolCallId: callId, content: "{}" },
+    ]);
+    expect(JSON.stringify(events)).not.toContain("Internal code.");
   });
 
   test("the chat has no provider-run tool: every tool the model gets is the handler's own, with its input schema, so every tool result comes back as a TOOL_CALL_RESULT that the wire rewrites", async () => {
@@ -1160,9 +1182,6 @@ const streamedThinking = (events: WireEvent[]) =>
     .map((e) => (e.value as { delta?: string }).delta ?? "")
     .join("");
 
-/** A stub model call that reads through read_sources, after it thinks. */
-const thinkingRead = (thinking: string, ids: string[]) => ({ thinking, toolUse: { name: "read_sources", input: { ids, topic: "the first thing" } } });
-
 describe("thinking", () => {
   test("the stub client sees adaptive thinking at effort medium with the summarized display, max_tokens 8,000 and the short prompt cache on every model call", async () => {
     const stub = stubAnthropic([
@@ -1245,6 +1264,28 @@ describe("thinking", () => {
     expect(arrived).toHaveLength(20_000);
     expect(arrived).toBe(`${thinking.slice(0, 19_999)}…`);
     expect(thinkingEvents(events).map((e) => e.value).filter((value) => !("delta" in (value as object)))).toEqual([{ active: true }, { active: false }]);
+    expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1].");
+  });
+
+  test("a thinking summary of exactly 20,000 characters reaches the wire as 20,000, with … in place of its last character, as a stream cannot see ahead", async () => {
+    const thinking = longThinking(20_000);
+    const stub = stubAnthropic([{ thinking, text: "Test Person built the first thing [highlight:acme.1]." }]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), seamDeps(stub.adapter)));
+
+    const arrived = streamedThinking(events);
+    expect(arrived).toHaveLength(20_000);
+    expect(arrived).toBe(`${thinking.slice(0, 19_999)}…`);
+    expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1].");
+  });
+
+  test("one thinking delta of 25,000 characters, larger than the limit, reaches the wire as one delta of 20,000, ending with …", async () => {
+    const thinking = longThinking(25_000);
+    const stub = stubAnthropic([{ thinking, thinkingPiece: 25_000, text: "Test Person built the first thing [highlight:acme.1]." }]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), seamDeps(stub.adapter)));
+
+    expect(thinkingEvents(events).map((e) => e.value)).toEqual([{ active: true }, { delta: `${thinking.slice(0, 19_999)}…` }, { active: false }]);
     expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1].");
   });
 

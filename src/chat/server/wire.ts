@@ -2,9 +2,9 @@
 // results on the wire; Thinking): one table of fixed messages, one per code, and wireError(code), which
 // builds every RUN_ERROR event the handler sends. The event holds its code and fixed message only. The
 // wire middleware, a new instance per request, sends each allowlisted event with its named fields only,
-// each read result as its ids only, the thinking summary as chat.thinking events of at most
-// turnLimits.thinkingCharacters characters a turn, and every RUN_ERROR of the run as wireError(code),
-// Anthropic's spend limit as SPEND_LIMIT.
+// each read result as its ids only and any other tool's result as {}, the thinking summary as
+// chat.thinking events of at most turnLimits.thinkingCharacters characters a turn, and every RUN_ERROR
+// of the run as wireError(code), Anthropic's spend limit as SPEND_LIMIT.
 
 import {
   EventType,
@@ -101,35 +101,11 @@ function wireCodeOf(event: RunErrorEvent): RunErrorCode {
 }
 
 /**
- * The event types the browser needs (The request, "Events on the wire"): the 11 that research 07,
- * finding 9, checked against the installed source. The wire drops every other type, so an event type
- * that a later version of TanStack AI adds never reaches the browser: every REASONING_* event, every
- * snapshot, every *_CHUNK form and every STEP_* event among them.
- */
-const WIRE_TYPES: ReadonlySet<string> = new Set<StreamChunk["type"]>([
-  EventType.RUN_STARTED,
-  EventType.RUN_FINISHED,
-  EventType.RUN_ERROR,
-  EventType.TEXT_MESSAGE_START,
-  EventType.TEXT_MESSAGE_CONTENT,
-  EventType.TEXT_MESSAGE_END,
-  EventType.TOOL_CALL_START,
-  EventType.TOOL_CALL_ARGS,
-  EventType.TOOL_CALL_END,
-  EventType.TOOL_CALL_RESULT,
-  EventType.CUSTOM,
-]);
-
-/**
  * The chat's own CUSTOM events are each named `chat.<name>`: chat.citations, chat.thinking and the
  * marker middleware's refusal and follow-up events. Every other name, the engine's own among them
  * (structured-output.*, sandbox.file*, ui-resource), is dropped.
  */
 const CHAT_EVENT_PREFIX = "chat.";
-
-/** Whether an event may reach the browser: its type is on the allowlist, and a CUSTOM event is the chat's own. */
-const onTheWire = (chunk: StreamChunk) =>
-  WIRE_TYPES.has(chunk.type) && (chunk.type !== EventType.CUSTOM || chunk.name.startsWith(CHAT_EVENT_PREFIX));
 
 /**
  * The value of a chat.thinking event (Thinking, rule 2): a thinking block's start or end, or a piece of
@@ -215,54 +191,12 @@ function resultEvent(event: ToolCallResultEvent, content: ToolCallResultEvent["c
 const finishReasonOf = (event: RunFinishedEvent) => event.finishReason ?? event.metadata?.tanstack?.finishReason;
 
 /**
- * A new event with the fields that the browser's client reads, and no other (The request, "Events on
- * the wire"). The adapter and the engine put the provider's detail on each event: its `rawEvent`, the
- * `metadata` that names the provider, its API and the model, the `model`, Anthropic's response id and
- * the `usage`. After the middleware, the engine moves each field it does not know into `metadata`
- * (normalizeStreamChunk), turns a TOOL_CALL_END's `result` into a TOOL_CALL_RESULT and a
- * TOOL_CALL_START's `metadata.thoughtSignature` into a REASONING_ENCRYPTED_VALUE, and neither new event
- * passes this middleware. So no event leaves as it came: a field left out here never reaches the
- * browser. A type with no builder here is dropped.
- */
-function namedFieldsOnly(chunk: StreamChunk): StreamChunk | null {
-  const timestamp = chunk.timestamp ?? Date.now();
-  switch (chunk.type) {
-    case EventType.RUN_STARTED:
-      return { type: chunk.type, runId: chunk.runId, threadId: chunk.threadId, timestamp };
-    case EventType.RUN_FINISHED: {
-      const finishReason = finishReasonOf(chunk);
-      return { type: chunk.type, runId: chunk.runId, threadId: chunk.threadId, timestamp, ...(finishReason === undefined ? {} : { finishReason }) };
-    }
-    case EventType.TEXT_MESSAGE_START:
-      return { type: chunk.type, messageId: chunk.messageId, role: chunk.role, timestamp };
-    case EventType.TEXT_MESSAGE_CONTENT:
-      return { type: chunk.type, messageId: chunk.messageId, delta: chunk.delta, timestamp };
-    case EventType.TEXT_MESSAGE_END:
-      return { type: chunk.type, messageId: chunk.messageId, timestamp };
-    case EventType.TOOL_CALL_START:
-      return {
-        type: chunk.type,
-        toolCallId: chunk.toolCallId,
-        toolCallName: chunk.toolCallName,
-        ...(chunk.parentMessageId === undefined ? {} : { parentMessageId: chunk.parentMessageId }),
-        timestamp,
-      };
-    case EventType.TOOL_CALL_ARGS:
-      return { type: chunk.type, toolCallId: chunk.toolCallId, delta: chunk.delta, timestamp };
-    case EventType.TOOL_CALL_END:
-      return { type: chunk.type, toolCallId: chunk.toolCallId, ...(chunk.input === undefined ? {} : { input: chunk.input }), timestamp };
-    case EventType.CUSTOM:
-      return { type: chunk.type, name: chunk.name, value: chunk.value, timestamp };
-  }
-  return null;
-}
-
-/**
  * The wire middleware for one turn. Only the allowlisted events pass, each as a new event built from
  * its named fields. Each read_sources result leaves as its ids only, so no read text and no Not public
- * section reaches the browser. The thinking summary leaves as chat.thinking events. Every RUN_ERROR of
- * the run leaves as wireError(code), so no rawEvent, metadata, usage, nested error or other provider
- * detail reaches the browser, and the turn keeps the code it sent for finishTurn().
+ * section reaches the browser, and any other tool's result as {}. The thinking summary leaves as
+ * chat.thinking events. Every RUN_ERROR of the run leaves as wireError(code), so no rawEvent, metadata,
+ * usage, nested error or other provider detail reaches the browser, and the turn keeps the code it sent
+ * for finishTurn().
  */
 export function wireEvents(turn: { errorCode: RunErrorCode | null }): ChatMiddleware {
   /** The tool of each call this run started, by the call's id. */
@@ -270,11 +204,67 @@ export function wireEvents(turn: { errorCode: RunErrorCode | null }): ChatMiddle
   /** The thinking summary's text that this run may still send. */
   const summary = thinkingSummary();
 
-  /** Returns a new event, which replaces `chunk` on the wire, or null, which drops it; it never returns the chunk unchanged. */
+  /**
+   * The wire's one allowlist (The request, "Events on the wire"): each case is an event type that the
+   * browser needs, and it returns a new event that replaces `chunk` on the wire, with the fields that
+   * the browser's client reads and no other. Every other type is dropped, so an event type that a later
+   * version of TanStack AI adds never reaches the browser: every snapshot, every *_CHUNK form and every
+   * STEP_* event among them. Research 07, finding 9, checked the 11 types against the installed source.
+   * The REASONING_* events leave as chat.thinking events in their place.
+   *
+   * The adapter and the engine put the provider's detail on each event: its `rawEvent`, the `metadata`
+   * that names the provider, its API and the model, the `model`, Anthropic's response id and the
+   * `usage`. After the middleware, the engine moves each field it does not know into `metadata`
+   * (normalizeStreamChunk), turns a TOOL_CALL_END's `result` into a TOOL_CALL_RESULT and a
+   * TOOL_CALL_START's `metadata.thoughtSignature` into a REASONING_ENCRYPTED_VALUE, and neither new event
+   * passes this middleware. So no event leaves as it came: a field left out here never reaches the
+   * browser. It never returns the chunk unchanged.
+   */
   function rewrite(chunk: StreamChunk): StreamChunk | null {
-    // The thinking summary leaves as chat.thinking events in place of the REASONING_* events, which the
-    // allowlist drops, the signature's REASONING_ENCRYPTED_VALUE among them (Thinking, rules 1 and 2).
+    const timestamp = chunk.timestamp ?? Date.now();
     switch (chunk.type) {
+      case EventType.RUN_STARTED:
+        return { type: chunk.type, runId: chunk.runId, threadId: chunk.threadId, timestamp };
+      case EventType.RUN_FINISHED: {
+        const finishReason = finishReasonOf(chunk);
+        return { type: chunk.type, runId: chunk.runId, threadId: chunk.threadId, timestamp, ...(finishReason === undefined ? {} : { finishReason }) };
+      }
+      case EventType.RUN_ERROR: {
+        const code = wireCodeOf(chunk);
+        turn.errorCode = code;
+        return wireError(code);
+      }
+      case EventType.TEXT_MESSAGE_START:
+        return { type: chunk.type, messageId: chunk.messageId, role: chunk.role, timestamp };
+      case EventType.TEXT_MESSAGE_CONTENT:
+        return { type: chunk.type, messageId: chunk.messageId, delta: chunk.delta, timestamp };
+      case EventType.TEXT_MESSAGE_END:
+        return { type: chunk.type, messageId: chunk.messageId, timestamp };
+      case EventType.TOOL_CALL_START:
+        toolOf.set(chunk.toolCallId, chunk.toolCallName);
+        return {
+          type: chunk.type,
+          toolCallId: chunk.toolCallId,
+          toolCallName: chunk.toolCallName,
+          ...(chunk.parentMessageId === undefined ? {} : { parentMessageId: chunk.parentMessageId }),
+          timestamp,
+        };
+      case EventType.TOOL_CALL_ARGS:
+        return { type: chunk.type, toolCallId: chunk.toolCallId, delta: chunk.delta, timestamp };
+      case EventType.TOOL_CALL_END:
+        return { type: chunk.type, toolCallId: chunk.toolCallId, ...(chunk.input === undefined ? {} : { input: chunk.input }), timestamp };
+      case EventType.TOOL_CALL_RESULT: {
+        // No tool's result passes whole. A read leaves as its ids, and a result of a call this run did not
+        // start is taken as a read. Any other tool's result leaves as {}, with no field of its own: a tool
+        // that a later task adds sends nothing of its result until this case names the fields that the
+        // spec gives the browser for it (Tools).
+        const tool = toolOf.get(chunk.toolCallId) ?? READ_SOURCES;
+        return resultEvent(chunk, tool === READ_SOURCES ? JSON.stringify(readIdsOf(chunk.content)) : "{}");
+      }
+      case EventType.CUSTOM:
+        return chunk.name.startsWith(CHAT_EVENT_PREFIX) ? { type: chunk.type, name: chunk.name, value: chunk.value, timestamp } : null;
+      // The thinking summary leaves as chat.thinking events. Every other REASONING_* event is dropped,
+      // the signature's REASONING_ENCRYPTED_VALUE among them (Thinking, rules 1 and 2).
       case EventType.REASONING_START:
         return thinkingEvent({ active: true });
       case EventType.REASONING_MESSAGE_CONTENT: {
@@ -283,25 +273,9 @@ export function wireEvents(turn: { errorCode: RunErrorCode | null }): ChatMiddle
       }
       case EventType.REASONING_END:
         return thinkingEvent({ active: false });
+      default:
+        return null;
     }
-    if (!onTheWire(chunk)) return null;
-    switch (chunk.type) {
-      case EventType.TOOL_CALL_START:
-        toolOf.set(chunk.toolCallId, chunk.toolCallName);
-        return namedFieldsOnly(chunk);
-      case EventType.TOOL_CALL_RESULT: {
-        // A result of a call this run did not start is taken as a read, so a read never passes whole.
-        const tool = toolOf.get(chunk.toolCallId);
-        const read = tool === undefined || tool === READ_SOURCES;
-        return resultEvent(chunk, read ? JSON.stringify(readIdsOf(chunk.content)) : chunk.content);
-      }
-      case EventType.RUN_ERROR: {
-        const code = wireCodeOf(chunk);
-        turn.errorCode = code;
-        return wireError(code);
-      }
-    }
-    return namedFieldsOnly(chunk);
   }
 
   return {

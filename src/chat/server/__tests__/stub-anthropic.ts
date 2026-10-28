@@ -24,6 +24,8 @@ export const SIGNATURE = "EqQBCkgIBxABGAIiQHN0dWItc2lnbmF0dXJl-stub-signature";
 export type StubCall = {
   /** The thinking summary: the text of one thinking block. */
   thinking?: string;
+  /** The thinking summary streams in pieces of this many characters. THINKING_PIECE when not set. */
+  thinkingPiece?: number;
   /** The thinking block's signature, the encrypted thinking. SIGNATURE when not set. */
   signature?: string;
   /** The answer text. */
@@ -71,7 +73,7 @@ async function* streamOf(call: StubCall, n: number) {
   let index = 0;
   if (call.thinking !== undefined) {
     yield { type: "content_block_start", index, content_block: { type: "thinking", thinking: "", signature: "" } };
-    for (const thinking of piecesOf(call.thinking, THINKING_PIECE)) {
+    for (const thinking of piecesOf(call.thinking, call.thinkingPiece ?? THINKING_PIECE)) {
       yield { type: "content_block_delta", index, delta: { type: "thinking_delta", thinking } };
     }
     yield { type: "content_block_delta", index, delta: { type: "signature_delta", signature: call.signature ?? SIGNATURE } };
