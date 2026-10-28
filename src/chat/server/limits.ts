@@ -57,6 +57,10 @@ export function readBudget(turn: Pick<Turn, "reads">): ChatMiddleware {
       reads++;
       return undefined;
     },
-    onConfig: (ctx) => (reads >= turnLimits.reads || ctx.iteration >= turnLimits.modelCalls - 1 ? { toolChoice: "none" } : undefined),
+    onConfig: (ctx) => {
+      const readsUsedUp = reads >= turnLimits.reads;
+      const lastCall = ctx.iteration >= turnLimits.modelCalls - 1;
+      return readsUsedUp || lastCall ? { toolChoice: "none" } : undefined;
+    },
   };
 }

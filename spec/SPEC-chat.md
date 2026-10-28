@@ -557,19 +557,23 @@ export type ChatDeps = {
 export function handleChat(request: Request, deps: ChatDeps): Promise<Response>;
 
 /** The read budget: code, not the prompt, stops the fourth read and gives the last call no tools to call.
- *  The tool stays listed, so the cached tools never change. `readsBefore` is 1 after the About read. */
-export function readBudget(max = turnLimits.reads, readsBefore = 0): ChatMiddleware {
-  let reads = readsBefore;
+ *  The tool stays listed, so the cached tools never change. It reads `turn.reads` (the turn record of
+ *  turn.ts) once, when the handler builds it: the reads the turn made before the run, 1 after the About read. */
+export function readBudget(turn: Pick<Turn, "reads">): ChatMiddleware {
+  let reads = turn.reads;
   return {
     name: "read-budget",
     // Every read that runs has passed this guard (Limits, "Reads").
     onGuardToolCall: (_ctx, call) =>
-      call.toolName === "read_sources" && ++reads > max
+      call.toolName === "read_sources" && ++reads > turnLimits.reads
         ? { type: "skip", result: { error: "The read limit for this question is reached." } }
         : undefined,
     // After the third read, and at the sixth model call (iteration 5), the next call can only answer.
-    onConfig: (ctx) =>
-      reads >= max || ctx.iteration >= turnLimits.modelCalls - 1 ? { toolChoice: "none" } : undefined,
+    onConfig: (ctx) => {
+      const readsUsedUp = reads >= turnLimits.reads;
+      const lastCall = ctx.iteration >= turnLimits.modelCalls - 1;
+      return readsUsedUp || lastCall ? { toolChoice: "none" } : undefined;
+    },
   };
 }
 ```
