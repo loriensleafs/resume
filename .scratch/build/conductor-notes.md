@@ -41,6 +41,23 @@ Notes the reviews of finished tasks left for tasks not yet built. Each builder b
 - **C5, C8, C11 (from C3):** the middleware order is markers, usage, finish-turn; the wire middleware goes between markers and finish-turn. C8: a removed marker leaves a stray space ("migration ."), and link text such as `[basics](url)` is still checked as a citation. C11: `onError`, `onAbort`, the stream wrapper and the `abortController` are not built; a visitor who disconnects does not yet stop the model call. Only `onFinish` writes today, so a stop or an error leaves no entry or event until C11, C12 and C14.
 - **D15 (from C3):** the deferred log and telemetry writes have no timeout and hold the stream's close; the ops module's 1 s and 2 s limits cover it.
 - **C17:** `createOps()` is built once at module scope; the review checks it (no third seam).
+- **C17 (from C4):** pass a non-empty `origins` list in production. The empty-list branch compares with `request.url`'s origin, which a proxy that rewrites the scheme or host can change.
+- **C10 (from C4):** `props.ts` takes `assistant` and `tool` messages as loose objects with no content check, so a visitor can send image parts or extra fields; the history rules bound and strip them.
+- **C14 and D10 (from C4):** `params.threadId` is unbounded (up to 256 KB); check that neither the question log nor telemetry stores it.
+- **C13 (from C4):** the request checks fill about 110 of `handle-chat.ts`'s lines; if the file passes about 250 lines, move them to their own module (SPEC-chat's Project Structure then needs a line). Reconsider `unlessThrown()` against the `{ ok }` style there too.
+- **Glossary gap (C4):** "request check" has no entry in `CONTEXT.md`.
+- **S9 (from S4, row 171):** Peter kept the board's name box colors (4.44:1). The axe check skips the color-contrast rule for `.app-bar-name` only, with a comment citing row 171; every other element and rule stays checked.
+- **S7 (from S4):** a new external host for fonts or styles needs its `font-src` or `style-src` entry in the policy tag. The full token stylesheet blocks first paint (18.6 KB gzip), so S7 or S30 measures the largest content paint. `/` loads 132.7 KB gzip of its 200 KB budget after S4.
+- **S11 (from S4):** `/` has no `h1` yet; `/resume` has a visually hidden one. A part with no light-DOM text needs an empty array in the build test's `PARTS`.
+- **K7 (from K6):** `renderSource()` renders no passage for an empty `passageIds` array and every passage for `undefined`; `readPassages()` must never pass `[]` by mistake.
+- **K8 (from K6):** define `readLimits.characters` from `SOURCE_CHARACTERS` in `render.ts`, so the 24,000 limit lives once.
+- **K10 (from K6 and K9):** a passage's text can hold a line that starts with `## Not public:`, which reads like the real section in a rendered source; K9's builder judges whether the check belongs to K9 or K10.
+- **K11 (from K6):** the real-files passage-id snapshot is `[]` until the first source is approved; K11 adds its first three lists.
+- **Glossary gaps (S4):** "app bar" appears only inside the Workspace entry, and "name box" has no entry.
+- **K10 (from K9):** the parser stops a passage line that looks like the `Not public` heading, except inside a fenced code block, where it stays passage text and reads like the real section once rendered. K9 recommends that the parser also checks for that heading inside fences, as a shape rule, so `previewDraft()` names it too.
+- **S16 and C16 (from K9):** no type names one public source; consumers write `PublicKnowledge["sources"][number]`. The first consumer adds `PublicSource` to `types.ts` if it needs one. `publicKnowledge()` shares the input's arrays by reference; copy them only if a long-lived caller appears.
+- **Glossary gap (K9):** no word for the public form of the knowledge base; the spec says "the public shape" and the code `PublicKnowledge`.
+- **D8 (from D6):** Peter keeps the spike project until D32, so D8's lockfile check pushes one commit to `prototype/deploy-spike` through the release skill's step 1.
 - **C18, C23, S30:** the first-load JavaScript on `/` is already 107.6 KB gzip before any view (54% of the 200 KB budget; S1's review). The chat's browser code (about 63 to 67 KB gzip) loads on demand.
 - **S2:** `buildSite()` sets the output folder through Vite's build API; it makes `vite.config.ts` a factory only if Nitro's output cannot move. Add a gzip size guard for `/` to the site's build test.
 - **S5:** the static `404.html` is rendered outside the route tree, so it carries no scripts (`shellComponent` always renders `<Scripts />`).
