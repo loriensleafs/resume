@@ -68,6 +68,9 @@ exports[`buildKnowledge on the real files renders the core the chat sees (snapsh
 [fednow-architecture] FedNow's front-end architecture and its migration: deep-dive, roles fednow. How Peter led the design of FedNow's routing-based front-end architecture, with its shared packages, and how the whole application moved to it without delaying any features or the launch.
 [fednow-bundle-size] Cutting FedNow's initial bundle from over 15 MB to under 1 MB: deep-dive, roles fednow. How Peter audited FedNow's application and led the work that cut its initial bundle from over 15 MB to under 1 MB through code splitting, a new build setup and tree-shakeable ES modules.
 [fednow-design-system] The FedNow design system and shared npm packages: deep-dive, roles fednow. How Peter led the team that built the FedNow design system to 1.0, with custom accessible components on Chakra UI, and then FedNow's shared routing, query, form and build utilities packages.
+[fednow-standards-mentoring] FedNow front-end standards, the testing harness, and mentoring: deep-dive, roles fednow. How Peter wrote and introduced front-end standards that 5+ teams adopted, developed a testing harness, mentored 20+ developers one-on-one and ran weekly office hours open to every development team.
+[highspot-agent-workflow] The agent workflow system for Highspot's platform team: deep-dive, roles highspot. How Peter designed the team's agent workflow, wrote its agents and skills, built its tooling in TypeScript on Bun, and how the team used it to build a streaming Markdown component and a data table.
+[highspot-ai-standards] The AI development standards Peter introduced at Highspot: deep-dive, roles highspot. How Peter introduced many of the team's AI development standards: spec-driven development, shared skills and agents, agent context files, and rules that keep agents on Polar UI components.
 "
 `;
 
@@ -88,5 +91,20 @@ exports[`buildKnowledge on the real files lists every approved source's passage 
   "[fednow-design-system.3] How it worked",
   "[fednow-design-system.4] Result",
   "[fednow-design-system.5] Tools",
+  "[fednow-standards-mentoring.1] Problem",
+  "[fednow-standards-mentoring.2] What Peter did",
+  "[fednow-standards-mentoring.3] How it worked",
+  "[fednow-standards-mentoring.4] Result",
+  "[fednow-standards-mentoring.5] Tools",
+  "[highspot-agent-workflow.1] Problem",
+  "[highspot-agent-workflow.2] What Peter did",
+  "[highspot-agent-workflow.3] How it worked",
+  "[highspot-agent-workflow.4] Result",
+  "[highspot-agent-workflow.5] Tools",
+  "[highspot-ai-standards.1] Problem",
+  "[highspot-ai-standards.2] What Peter did",
+  "[highspot-ai-standards.3] How it worked",
+  "[highspot-ai-standards.4] Result",
+  "[highspot-ai-standards.5] Tools",
 ]
 `;

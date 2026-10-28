@@ -1,10 +1,14 @@
 ---
 id: highspot-agent-workflow
 title: The agent workflow system for Highspot's platform team
-role: highspot
-highlights: [3, 4]
+kind: deep-dive
+subject: project
+roles: [highspot]
+highlights: [highlight:highspot.3, highlight:highspot.4]
+summary: How Peter designed the team's agent workflow, wrote its agents and skills, built its tooling in TypeScript on Bun, and how the team used it to build a streaming Markdown component and a data table.
+links: []
 status: approved
-approved: 2026-10-26
+approved: 2026-10-27
 source: Interview with Peter, 2026-10-26
 ---
 
