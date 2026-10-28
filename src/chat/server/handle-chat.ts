@@ -225,8 +225,9 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
     threadId,
     systemPrompts: systemPrompts(deps.knowledge, props),
     messages: [...messages, ...about.messages],
-    // The handler's own tools only: the request's tools never reach chat() (The request).
-    tools: chatTools(deps.knowledge, turn),
+    // The handler's own tools only: the request's tools never reach chat() (The request). open_source
+    // reads the request's earlier answers for the passages they cite.
+    tools: chatTools(deps.knowledge, turn, messages),
     // At most six model calls; readBudget() makes the sixth answer (Limits, "Model calls").
     agentLoopStrategy: maxIterations(turnLimits.modelCalls),
     // Sonnet 5.5 always thinks (Limits, "Thinking"; row 156). The adapter sends adaptive thinking at effort
