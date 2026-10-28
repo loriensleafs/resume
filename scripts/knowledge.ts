@@ -12,12 +12,18 @@
 // it breaks. A broken rule exits with 1. It reads only resume.yaml and that file, so another broken
 // source file never hides the draft.
 //
-// The flags are read before the ids: an unknown flag, or `--draft` with no id or with more ids,
-// exits with 2. A broken rule in a knowledge file prints its message and exits with 1.
+// `--root <folder>`, with any of the three: reads the knowledge, resume.yaml and the drafts under
+// <folder> instead of the repository, as `bun run build:site --root` does (the tests' fixture
+// roots). A relative folder starts at the working folder, which `bun run` sets to the repository.
+//
+// The flags are read before the ids: an unknown flag, `--root` with no folder or with a path that
+// is not a folder, or `--draft` with no id or with more ids, exits with 2. A broken rule in a
+// knowledge file prints its message and exits with 1.
 //
 // The text goes to standard output and everything else to standard error, so
 // `bun run knowledge > core.txt` writes the core alone.
 
+import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { buildKnowledge, previewDraft } from "../src/knowledge/build";
 import { KnowledgeError } from "../src/knowledge/parse";
@@ -25,7 +31,9 @@ import { readLimits, readPassages } from "../src/knowledge/read";
 import { CORE_CHARACTERS, renderCore, renderSource, SOURCE_CHARACTERS } from "../src/knowledge/render";
 import type { Entry, Knowledge } from "../src/knowledge/types";
 
-const USAGE = "Usage: bun run knowledge [<source or passage id> ...]\n       bun run knowledge --draft <source id>";
+const REPO = resolve(import.meta.dir, "..");
+const USAGE =
+  "Usage: bun run knowledge [--root <folder>] [<source or passage id> ...]\n       bun run knowledge [--root <folder>] --draft <source id>";
 
 const formatCount = (n: number) => n.toLocaleString("en-US");
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -62,8 +70,8 @@ async function printRead(knowledge: Knowledge, ids: string[]): Promise<void> {
   if (unknown.length || skipped.length) process.exitCode = 1;
 }
 
-async function printDraft(id: string): Promise<void> {
-  const { text, problems } = await previewDraft({ id });
+async function printDraft(root: string, id: string): Promise<void> {
+  const { text, problems } = await previewDraft({ root, id });
   await Bun.write(Bun.stdout, text);
   for (const problem of problems) console.error(problem);
   const quotedId = JSON.stringify(id);
@@ -88,18 +96,36 @@ function exitWithUsage(message: string): never {
 function readArgs() {
   try {
     // strict refuses an unknown or misspelt flag, so `--drfat x` never reads as two ids (https://bun.com/docs/guides/process/argv).
-    return parseArgs({ args: Bun.argv.slice(2), options: { draft: { type: "string" } }, allowPositionals: true, strict: true });
+    return parseArgs({
+      args: Bun.argv.slice(2),
+      options: { draft: { type: "string" }, root: { type: "string" } },
+      allowPositionals: true,
+      strict: true,
+    });
   } catch (e) {
     exitWithUsage((e as Error).message);
   }
 }
 
+/** Whether `path` is a folder. A path that does not exist, or that runs through a file, is none; any other failure throws. */
+async function isFolder(path: string): Promise<boolean> {
+  try {
+    return (await Bun.file(path).stat()).isDirectory();
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return false;
+    throw e;
+  }
+}
+
 const { values, positionals: ids } = readArgs();
 if (values.draft !== undefined && ids.length) exitWithUsage("--draft takes one source id and no other ids");
+const root = resolve(values.root ?? REPO);
+if (values.root !== undefined && !(await isFolder(root))) exitWithUsage(`--root ${JSON.stringify(root)} is not a folder`);
 try {
-  if (values.draft !== undefined) await printDraft(values.draft);
+  if (values.draft !== undefined) await printDraft(root, values.draft);
   else {
-    const knowledge = await buildKnowledge();
+    const knowledge = await buildKnowledge({ root });
     await (ids.length ? printRead(knowledge, ids) : printCore(knowledge));
   }
 } catch (e) {

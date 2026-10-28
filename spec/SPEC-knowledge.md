@@ -124,11 +124,16 @@ Bun 1.4.4 and TypeScript; `Bun.YAML` for front matter and `logistics.yaml`; `zod
 ## Commands
 
 ```sh
-bun test src/knowledge
+bun test src/knowledge scripts/__tests__/knowledge.test.ts   # seams 1 to 3, then seam 4 (Testing Strategy)
 bun run knowledge                       # prints the core as the chat sees it, its size, and each source's size
 bun run knowledge <source id>           # prints one approved source as readPassages() returns it
 bun run knowledge --draft <source id>   # prints a draft source file as the chat will read it once approved, and names every rule it breaks
+bun run knowledge --root <folder> ...   # any of the three, on the files under <folder> instead of the repository's
 ```
+
+- `--root <folder>` goes with any of the three. The script then reads `resume.yaml`, `knowledge/` and the drafts under `<folder>`, as `bun run build:site --root` does. A relative folder starts at the repository, because `bun run` sets the working folder there. Seam 4 runs the script on its fixture roots this way.
+- Standard output gets only the text the chat reads. Standard error gets everything else: the sizes, the broken rules, the unknown and skipped ids.
+- Exit 0: the command did what it was asked. Exit 1: a broken rule in a knowledge file, a draft that breaks a rule, a `--draft` id that no source file has, an unknown or skipped id, or a core at or over its budget. Exit 2: a flag error, such as an unknown flag, `--root` with a path that is not a folder, or `--draft` with other ids; the script stops before it reads the knowledge.
 
 ## Project Structure
 
@@ -142,7 +147,8 @@ src/knowledge/build.ts     buildKnowledge({ root }), publicKnowledge() and previ
 src/knowledge/render.ts    renderCore() and renderSource(): text with [id] markers
 src/knowledge/read.ts      readPassages(knowledge, ids) and readLimits: what the chat's read tool returns
 scripts/knowledge.ts       `bun run knowledge`
-src/knowledge/__tests__/   tests, fixtures and snapshots
+src/knowledge/__tests__/   tests, fixtures and snapshots (seams 1 to 3)
+scripts/__tests__/knowledge.test.ts   seam 4: `bun run knowledge` as a child process on fixture roots
 ```
 
 ## Code Style
@@ -258,7 +264,7 @@ Roles: <role ids>. Highlights: <highlight ids>. Links: <links>.
 
 ## Testing Strategy
 
-`bun test`, at the two seams Peter confirmed on 2026-10-26, extended on 2026-10-27, and a third seam for the id grammar that he added on 2026-10-27 ([decision record](../docs/design/interview-2026-10-26.md) row 146):
+`bun test`, at the two seams Peter confirmed on 2026-10-26, extended on 2026-10-27, a third seam for the id grammar that he added on 2026-10-27 ([decision record](../docs/design/interview-2026-10-26.md) row 146), and a fourth for the knowledge script that he added on 2026-10-27 (row 176):
 
 1. **`buildKnowledge()`**, on fixtures and on the real files, with **`readPassages()`**, **`publicKnowledge()`**, **`renderCore()`**, **`renderSource()`** and **`previewDraft()`** on its output. The tests check:
    - the core's order, and the catalog in source-id order with one entry per approved source;
@@ -276,6 +282,12 @@ Roles: <role ids>. Highlights: <highlight ids>. Links: <links>.
    The rendered core and one rendered source have snapshots. A third snapshot lists every approved source's passage ids with their headings. A new passage adds lines at the end of its source's list; a reviewer accepts no other change to that snapshot (append-only).
 2. **Unit tests on the source parser:** front matter for both kinds, highlight ids, deep-dive section order, interview passages, a "(continued)" heading only directly after the heading it continues, `Not public` last, and missing or unknown sections. The parser checks the shape only, for a draft and an approved source alike; the build checks the other rules of an approved source, passage size among them, so seam 1 tests them.
 3. **Unit tests on the id grammar** (`src/knowledge/__tests__/ids.test.ts`): `parseId()` on a table of ids, each with the form it gives or with none. The table holds every form at its length limits, numbers from 1 with no leading zero and none past `Number.MAX_SAFE_INTEGER`, and forms the build never makes, such as `basics.1`, `highlight:acme.0`, `role:acme:two` and an empty id. The id builders give ids that `parseId()` reads back. The site and the chat call `parseId()` with ids from the model and from browsers, and seam 1 never reaches the paths that reject an id.
+4. **`bun run knowledge`** (`scripts/__tests__/knowledge.test.ts`): the script as a child process, run from the repository with `--root` on fixture roots made by `src/knowledge/__tests__/fixtures.ts`. Seams 1 to 3 call the module's functions, so they never reach the script's own code. Each expected text is written out in full. The tests check:
+   - the core on standard output, and its size and each source's size on standard error; a core at or over its budget; a relative `--root`; the repository with no `--root`;
+   - a source id, and passage ids as one read; an unknown id, a draft's id among them; a Skipped id;
+   - `--draft <id>` with a clean draft, with a draft that breaks a rule, and with a broken shape, whose message never shows the rest of its line; an id that no file of `knowledge/sources/` has, `../secret` and `deeper/secret` among them;
+   - each flag error: a misspelt flag, `--draft` or `--root` with no value, `--root` with a path that is not a folder, and `--draft` with another id;
+   - the exit code of each case, and that no output holds the fixture `private.yaml`'s fake phone number.
 
 No test can check three rules: that `Not public` names kinds only, that headings follow Peter's wording rule, and the edit rule. Peter checks them at approval, with the redaction list and the passage-id snapshot in front of him.
 
