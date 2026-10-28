@@ -34,7 +34,7 @@ const staticDir = join(outputDir, "static");
 // This script is the production build however it starts. A child of `bun test` inherits NODE_ENV "test", and with it
 // Vite makes a development build (https://vite.dev/guide/env-and-mode#node-env-and-modes); Workbox's generateSW takes
 // its default mode from NODE_ENV too (https://developer.chrome.com/docs/workbox/modules/workbox-build). The pin covers
-// every step. buildSite() also pins NODE_ENV for its own run, for a caller that runs it in its own process.
+// every step; buildSite() sets no NODE_ENV of its own.
 process.env.NODE_ENV = "production";
 
 // The five steps run in this order (SPEC-deploy, "The build script"). The module that provides a step wires it in.
