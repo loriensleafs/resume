@@ -52,6 +52,8 @@ const ARITY: Record<string, { min: number; max: number }> = {
   HGETALL: { min: 2, max: 2 },
   ZADD: { min: 4, max: Infinity },
   ZRANGE: { min: 4, max: 5 },
+  SET: { min: 3, max: Infinity },
+  PTTL: { min: 2, max: 2 },
 };
 
 /**
@@ -168,6 +170,32 @@ export function startFakeUpstash({ now = () => new Date() }: { now?: () => Date 
         const ranked = [...entry.value.scores].sort(([a, x], [b, y]) => x - y || a.localeCompare(b));
         const members = byIndex(ranked, start, stop);
         return { result: withScores ? members.flatMap(([member, score]) => [member, String(score)]) : members.map(([member]) => member) };
+      }
+      case "SET": {
+        // SET key value [NX] [EX seconds]: NX sets only a missing key, and answers null otherwise; EX
+        // gives the key an expiry. Without NX, SET replaces a key of any type and its expiry, as in
+        // Redis. The other options are not used, so this server refuses them.
+        const [value, ...options] = args as [string, ...string[]];
+        let onlyIfMissing = false;
+        let expiresAtMs: number | undefined;
+        for (let index = 0; index < options.length; index++) {
+          const option = options[index]!.toUpperCase();
+          if (option === "NX" && !onlyIfMissing) onlyIfMissing = true;
+          else if (option === "EX" && expiresAtMs === undefined) {
+            const seconds = integer(options[++index]);
+            if (seconds === undefined) return { error: NOT_AN_INTEGER };
+            if (seconds <= 0) return { error: "ERR invalid expire time in 'set' command" };
+            expiresAtMs = now().getTime() + seconds * 1000;
+          } else return { error: SYNTAX };
+        }
+        if (onlyIfMissing && entry) return { result: null };
+        keys.set(key, { value: { type: "string", value }, expiresAtMs });
+        return { result: "OK" };
+      }
+      case "PTTL": {
+        // The milliseconds left before the key expires: -2 for a missing key, -1 for a key with no expiry.
+        if (!entry) return { result: -2 };
+        return { result: entry.expiresAtMs === undefined ? -1 : entry.expiresAtMs - now().getTime() };
       }
       default:
         return { error: `ERR unknown command '${name}'` };

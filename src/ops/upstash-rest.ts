@@ -57,8 +57,12 @@ export function upstashStore(settings: UpstashSettings): UpstashStore {
 
 type Endpoint = "/multi-exec" | "/pipeline";
 
-/** The address that the endpoints follow, without its trailing slashes; undefined when the token would cross a network in clear text. */
-function safeBase(url: string): string | undefined {
+/**
+ * The address without its trailing slashes; undefined when a secret that a request to it carries
+ * would cross a network in clear text: the store's token, or the ntfy topic, whose name is a secret
+ * (alerts.ts).
+ */
+export function safeBase(url: string): string | undefined {
   let parsed: URL;
   try {
     parsed = new URL(url);
