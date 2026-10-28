@@ -8,8 +8,12 @@ import { parseId, passageId } from "./ids";
 
 /** One or more broken rules in a knowledge file: the message gives each on a new line, starting with the file, then naming the field. */
 export class KnowledgeError extends Error {
+  /** Each broken rule, as its line of the message. */
+  readonly problems: string[];
   constructor(file: string, ...details: string[]) {
-    super(details.map((detail) => `${file}: ${detail}`).join("\n"));
+    const problems = details.map((detail) => `${file}: ${detail}`);
+    super(problems.join("\n"));
+    this.problems = problems;
   }
 }
 
@@ -38,7 +42,8 @@ export type SourceFile = { status: "draft" | "approved"; source: Source };
 const NOT_PUBLIC = "Not public";
 /**
  * A line that looks like the Not public heading at any level, case or spacing. Only the exact
- * "## Not public" is that heading; a near miss would make its text a passage.
+ * "## Not public" is that heading; a near miss would make its text a passage. In a code block,
+ * the exact heading is a look-alike too.
  */
 const LIKE_NOT_PUBLIC = /^\s*#+\s*not\s+public\b/i;
 /** The end of an interview heading whose answer goes on from the passage before it. */
@@ -90,18 +95,27 @@ const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 /**
  * Splits the body into "## " sections. A heading needs text, a line that only looks like the Not
  * public heading stops it, and text before the first section is not allowed. Inside a fenced code
- * block every line is text, as in Markdown, and a fence that is never closed stops it.
+ * block every line is text, as in Markdown, and a fence that is never closed stops it. A code block
+ * line that looks like the Not public heading stops it too: the rendered text keeps the fence, but
+ * the chat could still read the line as the start of that section. The message for a look-alike, in a
+ * code block or not, gives its line number in the file (the body starts on `firstLine`) and the
+ * heading it matched, never the rest of the line: the rest can hold the material Not public keeps out.
  */
-function splitSections(body: string, file: string): { heading: string; text: string }[] {
+function splitSections(body: string, file: string, firstLine: number): { heading: string; text: string }[] {
   const sections: { heading: string; lines: string[] }[] = [];
   const preamble: string[] = [];
   let fence: { marks: string; section: string | undefined } | undefined;
-  for (const line of body.split("\n")) {
+  /** The first code block line that looks like the Not public heading: its line number in the file and the heading it matched. */
+  let fencedNotPublic: { line: number; heading: string } | undefined;
+  for (const [i, line] of body.split("\n").entries()) {
     const text = sections.at(-1)?.lines ?? preamble;
     const marks = line.match(FENCE);
+    /** The part of the line that looks like the Not public heading, if any. */
+    const lookAlike = line.match(LIKE_NOT_PUBLIC)?.[0];
     if (fence) {
       // A closing fence uses the same mark, at least as many of them, and nothing after them.
       if (marks && marks[1]![0] === fence.marks[0] && marks[1]!.length >= fence.marks.length && !marks[2]!.trim()) fence = undefined;
+      else if (lookAlike) fencedNotPublic ??= { line: firstLine + i, heading: lookAlike };
       text.push(line);
       continue;
     }
@@ -111,8 +125,11 @@ function splitSections(body: string, file: string): { heading: string; text: str
       text.push(line);
       continue;
     }
-    if (line !== `## ${NOT_PUBLIC}` && LIKE_NOT_PUBLIC.test(line)) {
-      throw new KnowledgeError(file, `${JSON.stringify(line)} looks like the ${NOT_PUBLIC} heading: write it exactly "## ${NOT_PUBLIC}"`);
+    if (lookAlike && line !== `## ${NOT_PUBLIC}`) {
+      throw new KnowledgeError(
+        file,
+        `line ${firstLine + i} starts with ${JSON.stringify(lookAlike)}, which looks like the ${NOT_PUBLIC} heading: write it exactly "## ${NOT_PUBLIC}"`,
+      );
     }
     const heading = line.match(/^## (.*)$/)?.[1]?.trim();
     if (heading === "") throw new KnowledgeError(file, 'a "## " heading has no text');
@@ -120,7 +137,14 @@ function splitSections(body: string, file: string): { heading: string; text: str
     else text.push(line);
   }
   if (preamble.join("").trim()) throw new KnowledgeError(file, "text before the first section is not allowed");
+  // An open fence comes first: it can swallow the real Not public heading, and then the fence is what to fix.
   if (fence) throw new KnowledgeError(file, `the code fence ${fence.marks} in section "${fence.section}" is never closed`);
+  if (fencedNotPublic) {
+    throw new KnowledgeError(
+      file,
+      `line ${fencedNotPublic.line}, in a code block, starts with ${JSON.stringify(fencedNotPublic.heading)}, which looks like the ${NOT_PUBLIC} heading, and the chat could read it as that section: write the line another way`,
+    );
+  }
   return sections.map((s) => ({ heading: s.heading, text: s.lines.join("\n").trim() }));
 }
 
@@ -175,7 +199,8 @@ export function parseSource(text: string, file: string): SourceFile {
   const name = `${front.id}.md`;
   if (file.slice(file.lastIndexOf("/") + 1) !== name) throw new KnowledgeError(file, `the file name must be ${name}, to match its id`);
 
-  const sections = splitSections(body, file);
+  // The body starts on the line after the closing ---: the opening ---, the front matter and the closing --- come first.
+  const sections = splitSections(body, file, yaml.split("\n").length + 3);
   checkSections(front.kind, sections.map((s) => s.heading), file);
   // checkSections() leaves Not public as the last section, so every section before it is a passage.
   const passages = sections.slice(0, -1).map((s, i) => ({ id: passageId(front.id, i + 1), heading: s.heading, text: s.text }));

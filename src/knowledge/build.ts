@@ -162,21 +162,37 @@ function checkSource(source: Source, resumeIds: ReadonlySet<string>): string[] {
   return problems;
 }
 
+/** The resume entries of `root`'s resume.yaml, public variant, once its role ids and skills groups give slugs. */
+async function loadResumeEntries(root: string): Promise<Entry[]> {
+  const resume = await loadResume("public", root);
+  checkResumeSlugs(resume);
+  return resumeEntries(resume);
+}
+
+/**
+ * The names of the source files in knowledge/sources/, in file-name order; none when the folder
+ * does not exist. The listing holds only the folder's own files: no file in a subfolder, no hidden
+ * file and no symbolic link.
+ */
+async function sourceFileNames(root: string): Promise<string[]> {
+  const names: string[] = [];
+  try {
+    for await (const name of new Bun.Glob("*.md").scan({ cwd: `${root}/${SOURCES}` })) names.push(name);
+  } catch (e) {
+    if ((e as { code?: string }).code === "ENOENT") return [];
+    throw e;
+  }
+  return names.sort();
+}
+
 /**
  * The approved sources in knowledge/sources/, in source-id order; none when the folder does not
  * exist. Every file is parsed, so a draft's shape is checked too, and then a draft is left out.
  * An approved source that breaks a rule stops the build with every rule it breaks.
  */
 async function approvedSources(root: string, resumeIds: ReadonlySet<string>): Promise<Source[]> {
-  const files: string[] = [];
-  try {
-    for await (const f of new Bun.Glob("*.md").scan({ cwd: `${root}/${SOURCES}` })) files.push(f);
-  } catch (e) {
-    if ((e as { code?: string }).code === "ENOENT") return [];
-    throw e;
-  }
   // Checked one at a time in file-name order, so the same broken file is always the one reported.
-  files.sort();
+  const files = await sourceFileNames(root);
   const texts = await Promise.all(files.map((f) => Bun.file(`${root}/${SOURCES}/${f}`).text()));
   const sources: Source[] = [];
   files.forEach((f, i) => {
@@ -209,13 +225,42 @@ function checkIds(core: Entry[], sources: Source[]): void {
 
 export async function buildKnowledge(options: { root?: string } = {}): Promise<Knowledge> {
   const root = options.root ?? REPO;
-  const resume = await loadResume("public", root);
-  checkResumeSlugs(resume);
-  const resumeCore = resumeEntries(resume);
+  const resumeCore = await loadResumeEntries(root);
   const sources = await approvedSources(root, new Set(resumeCore.map((e) => e.id)));
   const core = [...resumeCore, ...(await logisticsEntries(root)), ...sources.map(catalogEntry)];
   checkIds(core, sources);
   return { core, sources };
+}
+
+/**
+ * What `bun run knowledge --draft <source id>` prints: the source file with that id, rendered as
+ * the chat will read it once approved (renderSource()), and each rule it breaks, one line each, as
+ * the build will name it then. An approved file gives the same, so a change to one on its branch
+ * can be read with its problems too. It reads resume.yaml and that one file, so another broken
+ * source file never hides it, and it stops when no file in knowledge/sources/ is `<id>.md`.
+ *
+ * A file with a broken shape (front matter or sections) gives the parser's problem and no text:
+ * nothing can be rendered, and the rules of an approved source need the parsed source. The parser
+ * stops at the first broken shape rule, because the later ones read what the earlier ones check
+ * (the sections depend on the kind, the passage ids on the id); its front-matter problem lists
+ * every field at once.
+ */
+export async function previewDraft(options: { root?: string; id: string }): Promise<{ text: string; problems: string[] }> {
+  const root = options.root ?? REPO;
+  const resumeIds = new Set((await loadResumeEntries(root)).map((e) => e.id));
+  // Found among the folder's own files, never by joining the id into a path, so no id reads a file outside the folder.
+  const name = (await sourceFileNames(root)).find((n) => n === `${options.id}.md`);
+  if (!name) throw new KnowledgeError(SOURCES, `no source file has the id ${JSON.stringify(options.id)}`);
+  const file = `${SOURCES}/${name}`;
+  let source: Source;
+  try {
+    ({ source } = parseSource(await Bun.file(`${root}/${file}`).text(), file));
+  } catch (e) {
+    if (e instanceof KnowledgeError) return { text: "", problems: e.problems };
+    throw e;
+  }
+  // Each line as the build's KnowledgeError prints it once the draft is approved.
+  return { text: renderSource(source), problems: checkSource(source, resumeIds).map((problem) => `${file}: ${problem}`) };
 }
 
 /**
