@@ -432,8 +432,26 @@ describe("the static assets", () => {
   });
 });
 
-/** The site's one font file, at its address on the site (scripts/site-fonts.ts cuts it into public/fonts/). */
-const FONT = "/fonts/google-sans-flex-latin.woff";
+/**
+ * The site's font files, at their addresses on the site (scripts/site-fonts.ts cuts them into public/fonts/), each with
+ * the token that names its family and the families that the token names before it. The design system's mono stack
+ * names the Nerd Font build first, a font only a device can have (its Typeface page, 0.3.3).
+ */
+const FONTS = [
+  { family: "Google Sans Flex", token: "--acme-font-sans", before: [], address: "/fonts/google-sans-flex-latin.woff" },
+  {
+    family: "Google Sans Code",
+    token: "--acme-font-mono",
+    before: ["GoogleSansCode Nerd Font Mono"],
+    address: "/fonts/google-sans-code-latin.woff",
+  },
+];
+
+/** The families a token's font stack names, in order, with their quote marks dropped; a var() stays as written. */
+function stackOf(css: string, token: string): string[] {
+  const value = css.match(new RegExp(`${token}:([^;}]*)`))?.[1] ?? "";
+  return value.split(",").map((family) => family.trim().replace(/^["']|["']$/g, ""));
+}
 
 /**
  * The TrueType font inside a WOFF 1.0 file, rebuilt as a browser rebuilds it (https://www.w3.org/TR/WOFF/). It throws
@@ -505,12 +523,17 @@ async function charactersShownBy(page: string): Promise<Set<number>> {
   return shown;
 }
 
-// SPEC-site, Tech Stack, and SPEC-deploy, Documents: the site serves Google Sans Flex from its own address. The cut font
-// files are committed in public/fonts/, so the build copies them and downloads nothing.
+/** The font in a file under the static folder, as HarfBuzz reads it after a browser's WOFF decoding. */
+async function faceOf(address: string): Promise<Face> {
+  return new Face(new HarfBuzzBlob(await sfntOf(await Bun.file(`${staticDir}${address}`).bytes())), 0);
+}
+
+// SPEC-site, Tech Stack, and SPEC-deploy, Documents: the site serves Google Sans Flex and Google Sans Code from its own
+// address. The cut font files are committed in public/fonts/, so the build copies them and downloads nothing.
 describe("the site's fonts", () => {
-  test("the static folder holds each committed file of public/fonts/, byte for byte: the font and its license", async () => {
+  test("the static folder holds each committed file of public/fonts/, byte for byte: the fonts and their license", async () => {
     const committed = (await Array.fromAsync(new Glob("*").scan({ cwd: `${REPO}/public/fonts` }))).sort();
-    expect(committed).toEqual(["OFL.txt", FONT.slice("/fonts/".length)].sort());
+    expect(committed).toEqual(["OFL.txt", ...FONTS.map(({ address }) => address.slice("/fonts/".length))].sort());
     for (const file of committed) {
       const copy = Bun.file(`${staticDir}/fonts/${file}`);
       expect(await copy.exists()).toBe(true);
@@ -518,33 +541,67 @@ describe("the site's fonts", () => {
     }
   });
 
-  // The design system's weights, 400 to 700, on the variable font's weight axis (its Typeface page, 0.3.3).
-  test("the font is a WOFF file of Google Sans Flex with one variation axis, weight, from 400 to 700", async () => {
-    const face = new Face(new HarfBuzzBlob(await sfntOf(await Bun.file(`${staticDir}${FONT}`).bytes())), 0);
-    const axes = Object.values(face.getAxisInfos()).map(({ tag, min, default: start, max }) => ({ tag, min, start, max }));
-    expect(axes).toEqual([{ tag: "wght", min: 400, start: 400, max: 700 }]);
-    expect(face.getName(1, "en")).toBe("Google Sans Flex");
+  // The design system's weights, 400 to 700, on the variable font's weight axis: its Typeface page (0.3.3) loads both
+  // families at wght@400..700, and its weight tokens run from 400 to 700.
+  test.each(FONTS)(
+    "$address is a WOFF file of $family with one variation axis, weight, from 400 to 700",
+    async ({ family, address }) => {
+      const face = await faceOf(address);
+      const axes = Object.values(face.getAxisInfos()).map(({ tag, min, default: start, max }) => {
+        return { tag, min, start, max };
+      });
+      expect(axes).toEqual([{ tag: "wght", min: 400, start: 400, max: 700 }]);
+      expect(face.getName(1, "en")).toBe(family);
+    },
+  );
+
+  // OFL 1.1, condition 2: each copy of the font holds its copyright notice and the license. The license file beside the
+  // fonts holds the notice of each family, as the OFL.txt of that family in google/fonts states it.
+  test("OFL.txt holds the copyright notice of each family and the SIL Open Font License 1.1", async () => {
+    const license = await Bun.file(`${staticDir}/fonts/OFL.txt`).text();
+    const notices = [
+      "Copyright 2015 The Google Sans Flex Authors (https://github.com/googlefonts/googlesans-flex)",
+      "Copyright 2025 The Google Sans Code Project Authors (github.com/googlefonts/googlesans-code)",
+    ];
+    expect(notices.filter((notice) => !license.includes(notice))).toEqual([]);
+    expect(license).toContain("SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007");
   });
 
-  // The token stylesheet names the family first in its text stack, --acme-font-sans, and holds no @font-face of its own:
-  // the page gives the family its file. font-display swap is the design system's own (its Typeface page loads the
-  // family with display=swap), so the text shows at once in the fallback font.
+  // The token stylesheet names each family in its stack and holds no @font-face of its own: the page gives the family
+  // its file. font-display swap is the design system's own (its Typeface page loads the families with display=swap),
+  // so the text shows at once in the fallback font.
   test.each(["index.html", "resume/index.html", "404.html"])(
-    "the stylesheets of %s give the tokens' text family one @font-face: weights 400 to 700, from the site's WOFF file",
+    "the stylesheets of %s give each token's family one @font-face: weights 400 to 700, from the site's WOFF file",
     async (page) => {
       const css = await cssOf(page);
-      expect(css.match(/--acme-font-sans:\s*"([^"]+)"/)?.[1]).toBe("Google Sans Flex");
-      const [face, ...others] = fontFaces(css);
-      expect(others).toEqual([]);
-      const { src, ...descriptors } = face ?? {};
-      expect(descriptors).toEqual({
-        "font-family": "Google Sans Flex",
-        "font-style": "normal",
-        "font-weight": "400 700",
-        "font-display": "swap",
-      });
-      // The file's address on the site, and its format. The minifier may drop the space between the two.
-      expect(src?.match(/^url\((.+)\)\s*format\((.+)\)$/)?.slice(1)).toEqual([FONT, "woff"]);
+      const stacks: Record<string, string[]> = {};
+      const faces: Record<string, Record<string, string | undefined>[]> = {};
+      const expectedStacks: typeof stacks = {};
+      const expectedFaces: typeof faces = {};
+      for (const { family, token, before, address } of FONTS) {
+        const stack = stackOf(css, token);
+        stacks[token] = stack.slice(0, stack.indexOf(family) + 1);
+        expectedStacks[token] = [...before, family];
+        faces[family] = fontFaces(css)
+          .filter((face) => face["font-family"] === family)
+          .map(({ src, ...descriptors }) => ({
+            ...descriptors,
+            // The file's address on the site, and its format. The minifier may drop the space between the two.
+            src: src?.match(/^url\((.+)\)\s*format\((.+)\)$/)?.slice(1).join(" as "),
+          }));
+        expectedFaces[family] = [
+          {
+            "font-family": family,
+            "font-style": "normal",
+            "font-weight": "400 700",
+            "font-display": "swap",
+            src: `${address} as woff`,
+          },
+        ];
+      }
+      expect(stacks).toEqual(expectedStacks);
+      expect(faces).toEqual(expectedFaces);
+      expect(fontFaces(css)).toHaveLength(FONTS.length);
     },
   );
 
@@ -562,10 +619,10 @@ describe("the site's fonts", () => {
     expect(naming).toEqual([]);
   });
 
-  // A character the font lacks would show in the fallback font, the next one in the tokens' stack.
-  test("the font has a glyph for each character that the pages show", async () => {
-    const face = new Face(new HarfBuzzBlob(await sfntOf(await Bun.file(`${staticDir}${FONT}`).bytes())), 0);
-    const inFont = new Set(face.collectUnicodes());
+  // A character the font lacks would show in the fallback font, the next one in the token's stack. Any text can take
+  // the mono family (labels, numbers and code), so each font covers every character the pages show.
+  test.each(FONTS)("$address has a glyph for each character that the pages show", async ({ address }) => {
+    const inFont = new Set((await faceOf(address)).collectUnicodes());
     const missing = new Set<string>();
     for (const page of await htmlFiles()) {
       for (const codePoint of await charactersShownBy(page)) {
