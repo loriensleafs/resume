@@ -59,5 +59,6 @@ export function renderSource(source: Source, passageIds?: string[]): string {
   const about = parts.filter(([, values]) => values.length).map(([label, values]) => `${label}: ${values.join(", ")}.`);
   const header = [`# [${source.id}] ${source.title}`, KIND_LINES[source.kind], ...(about.length ? [about.join(" ")] : [])];
   const passages = source.passages.filter((p) => !asked || asked.has(p.id)).map((p) => `## [${p.id}] ${p.heading}\n${p.text}`);
-  return `${[header.join("\n"), ...passages, `${NOT_PUBLIC_HEADING}\n${source.notPublic || "Nothing listed."}`].join("\n\n")}\n`;
+  const notPublic = `${NOT_PUBLIC_HEADING}\n${source.notPublic || "Nothing listed."}`;
+  return `${[header.join("\n"), ...passages, notPublic].join("\n\n")}\n`;
 }

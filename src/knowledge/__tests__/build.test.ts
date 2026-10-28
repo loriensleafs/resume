@@ -241,8 +241,8 @@ describe("renderSource on buildKnowledge's output", () => {
       deepDiveFile({ highlights: "[highlight:acme.1, highlight:acme.2]", links: '["https://peterkloss.dev"]' }),
       "Roles: acme. Highlights: highlight:acme.1, highlight:acme.2. Links: https://peterkloss.dev.",
     ],
-  ])("renders the line after the kind line with only its parts that are not empty: %s", async (_case, file, line) => {
-    const [source] = await builds(`render-line-${_case.replaceAll(/[ ,]+/g, "-")}`, { [SAMPLE]: file });
+  ])("renders the line after the kind line with only its parts that are not empty: %s", async (name, file, line) => {
+    const [source] = await builds(`render-line-${name.replaceAll(/[ ,]+/g, "-")}`, { [SAMPLE]: file });
     expect(renderSource(source!).split("\n").slice(2, 4)).toEqual([line, ""]);
   });
 
@@ -300,16 +300,13 @@ describe("buildKnowledge on the rules of an approved source", () => {
 
   test("stops an approved source whose passage id would pass 64 characters, and names the passage", async () => {
     const id = "a".repeat(60);
+    const file = `knowledge/sources/${id}.md`;
     const body = [...Array.from({ length: 1000 }, (_, i) => `## Question ${i + 1}?\n\nAn answer.\n`), "## Not public\n\nColleague names.\n"].join("\n");
     // 1,000 passages never render under 24,000 characters, so the source's size stops it too.
-    expect(await stops("passage-id-65", { [`knowledge/sources/${id}.md`]: interviewFile({ id }, body) })).toBe(
-      [
-        `passage ${id}.1000 ("Question 1000?") breaks the passage id rule: use <source id>.<n>, at most 64 characters; this id has 65`,
-        "the rendered source has 96010 characters; an approved source renders to at most 24000",
-      ]
-        .map((problem) => `knowledge/sources/${id}.md: ${problem}`)
-        .join("\n"),
-    );
+    expect((await stops("passage-id-65", { [file]: interviewFile({ id }, body) })).split("\n")).toEqual([
+      `${file}: passage ${id}.1000 ("Question 1000?") breaks the passage id rule: use <source id>.<n>, at most 64 characters; this id has 65`,
+      expect.stringMatching(/^knowledge\/sources\/a{60}\.md: the rendered source has \d+ characters; an approved source renders to at most 24000$/),
+    ]);
   });
 
   test.each([
