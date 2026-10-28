@@ -22,7 +22,7 @@ import { z } from "zod";
 import { turnLimits } from "./limits";
 import { questionText, UserMessage } from "./props";
 import type { CheckedRequest } from "./request-checks";
-import { READ_SOURCES, type ToolName } from "./tool-names";
+import { isToolName, READ_SOURCES, type ToolName } from "./tool-names";
 import { TOOL_INPUTS } from "./tools";
 import { ReadIdsSchema, resultFieldsOf } from "./wire";
 
@@ -38,8 +38,6 @@ const EarlierAnswer = z.object({ role: z.literal("assistant"), content: z.string
 const EarlierCall = z.object({ id: z.string(), function: z.object({ name: z.string(), arguments: z.string() }) });
 /** The fields of an earlier tool result: the id of the call it answers, and its content. */
 const EarlierResult = z.object({ role: z.literal("tool"), toolCallId: z.string(), content: z.string() });
-
-const isToolName = (name: string): name is ToolName => Object.hasOwn(TOOL_INPUTS, name);
 
 /** An earlier call's arguments as its tool's input schema reads them, or undefined when they fail it. */
 function inputOf(tool: ToolName, args: string): unknown {
@@ -96,7 +94,7 @@ function turnSent(turn: readonly RequestMessage[], callId: () => string): ModelM
       if (!call.success) continue;
       const { id, function: called } = call.data;
       const result = results.get(id);
-      // A result answers one call: a second call with the same id has none.
+      // One result per call: this call takes its result, so a later call with the same id has none and stays behind.
       results.delete(id);
       if (result === undefined || !isToolName(called.name)) continue;
       const input = inputOf(called.name, called.arguments);
@@ -106,7 +104,8 @@ function turnSent(turn: readonly RequestMessage[], callId: () => string): ModelM
         result: resultSent(called.name, input, result),
       });
     }
-    const text = answer.data.content || null;
+    // Anthropic refuses a text block of white space only, so an answer of white space goes as no text.
+    const text = answer.data.content?.trim() ? answer.data.content : null;
     if (text === null && calls.length === 0) continue;
     sent.push({ role: "assistant", content: text, ...(calls.length > 0 ? { toolCalls: calls.map(({ call }) => call) } : {}) });
     for (const { call, result } of calls) sent.push({ role: "tool", toolCallId: call.id, content: result });

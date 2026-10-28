@@ -43,7 +43,7 @@ const OpenSourceInput = z.strictObject({
 
 /**
  * Each tool's input schema, by the tool's name. The engine checks a call's arguments with it before
- * the tool runs, and the conversation sent checks an earlier call's arguments with it (history.ts).
+ * the tool runs, and the conversation sent checks an earlier call's arguments with it (conversation-sent.ts).
  */
 export const TOOL_INPUTS = {
   [READ_SOURCES]: ReadInput,

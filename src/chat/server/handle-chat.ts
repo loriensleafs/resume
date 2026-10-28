@@ -13,7 +13,7 @@ import {
 import type { Knowledge } from "../../knowledge/types";
 import { readAbout } from "./about-read";
 import { finishRejected, finishTurn, finishTurnHooks, type EndTurn } from "./finish-turn";
-import { conversationSent } from "./history";
+import { conversationSent } from "./conversation-sent";
 import { deadline, readBudget, turnLimits } from "./limits";
 import { answerMarkers } from "./markers";
 import { systemPrompts } from "./prompt";

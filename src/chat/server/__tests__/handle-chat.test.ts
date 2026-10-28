@@ -1630,6 +1630,22 @@ describe("history", () => {
     expect(JSON.stringify(messages)).not.toContain("visitor-");
   });
 
+  test("an earlier answer of white space only reaches the model as no text, as Anthropic refuses a text block of white space only: an answer with no call stays behind, and an answer with a call keeps its call", async () => {
+    const { fake, requests } = recordingFake([{ text: "Test Person built the second thing [highlight:acme.2]." }]);
+    const earlier = [...uiMessagesToWire(earlierTurn(1, " \n\t ")), ...earlierRead({ call: { content: " \n\t " } })];
+
+    await readEvents(await handleChat(postAfter(earlier), seamDeps(fake)));
+
+    expect(requests[0]?.messages.map(({ role, content }) => ({ role, content }))).toEqual([
+      { role: "user", content: "Question 1?" },
+      { role: "user", content: "How did Test Person build the first thing?" },
+      { role: "assistant", content: null },
+      { role: "tool", content: JSON.stringify(READ_IDS) },
+      { role: "assistant", content: "Test Person planned it [sample.2]." },
+      { role: "user", content: QUESTION },
+    ]);
+  });
+
   test.each([
     ["the newest of 21 earlier turns, which the model receives, cites: it opens", 21, { opened: true }],
     ["only the oldest of 21 earlier turns, which the model does not receive, cites: it is an error", 1, { error: "Only a passage that an earlier answer cited, or that this turn read, can be opened." }],

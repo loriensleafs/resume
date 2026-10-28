@@ -499,8 +499,8 @@ src/chat/server/run.ts             the run's controller, which a Stop aborts, an
 src/chat/server/about-read.ts      readAbout(): the About read of a passage or a source, its read_sources call and whole result
                                    for the model, and the middleware that sends the call and its id-only result first
 src/chat/server/props.ts           ChatProps and the messages schema
-src/chat/server/history.ts         conversationSent(): the earlier turns within turnsSent and historyCharacters, each message rebuilt
-                                   from the fields the model needs, earlier reads as ids only; then the question
+src/chat/server/conversation-sent.ts  conversationSent(): the earlier turns within turnsSent and historyCharacters, each message
+                                   rebuilt from the fields the model needs, earlier reads as ids only; then the question
 src/chat/server/prompt.ts          the system prompt, with the core from SPEC-knowledge's renderCore(knowledge), and the scope, audience and about lines
 src/chat/server/tools.ts           read_sources (its input checks readLimits), open_resume, open_source
 src/chat/server/tool-names.ts      the three tool names, in a leaf module that imports nothing
@@ -766,4 +766,4 @@ All rows are in the [decision record](../docs/design/interview-2026-10-26.md).
 - 2026-10-27, after C14's review: Question log names `finishRejected()`, which writes the `chat_turn` event of a rejected request and no question-log entry, because a rejected request is not a turn.
 - 2026-10-27, after C9's review: Project Structure lists `src/chat/server/tool-names.ts`, which C9 added. The browser gets one fixed `open_source` error text, whatever the error said (Tools). The fixed text is the conductor's decision, for Peter's end review.
 - 2026-10-27, task C13: Project Structure gains `request-checks.ts` and `run.ts`, which take the request checks and the stream wrapper out of `handle-chat.ts` (the carry-forward notes of C4 and C11). The Question log names the deadline middleware as a caller of `finishTurn()`, and Limits, "Deadline", says when the timer starts and stops. After C13's review, the `finish-turn.ts` line also names `finishRejected()`, and the `request-checks.ts` line says that `checkRequest()` gives an `{ ok }` result.
-- 2026-10-27, task C10: Project Structure gains `history.ts`. Limits, "Conversation sent", says how a turn's characters count and that `conversationSent()` rebuilds each earlier message from the fields the model needs. The Tools row of `open_source` reads the conversation sent, not the whole request. The rebuild's details and the `open_source` reading are C10's decisions, for Peter's end review.
+- 2026-10-27, task C10: Project Structure gains `conversation-sent.ts`. Limits, "Conversation sent", says how a turn's characters count and that `conversationSent()` rebuilds each earlier message from the fields the model needs. The Tools row of `open_source` reads the conversation sent, not the whole request. The rebuild's details and the `open_source` reading are C10's decisions, for Peter's end review.

@@ -14,7 +14,7 @@ export const UserMessage = z.looseObject({ role: z.literal("user"), content: z.u
 
 /**
  * A user message's text as sent: the question's, and an earlier question's in the conversation sent
- * (history.ts). Its text parts join with no separator, as chat() joins them for the model.
+ * (conversation-sent.ts). Its text parts join with no separator, as chat() joins them for the model.
  */
 export function questionText(message: z.infer<typeof UserMessage>): string {
   return typeof message.content === "string" ? message.content : message.content.map((part) => part.text).join("");
