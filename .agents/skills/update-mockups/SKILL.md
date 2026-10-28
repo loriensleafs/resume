@@ -42,7 +42,9 @@ git -C ../resume-mockups pull --ff-only
 
 Leave out `git worktree add` when `../resume-mockups` exists. In `../resume-mockups/prototypes/site-mockups/`, install the render tools and build the bundle as the branch README's "Render the images again" says.
 
-The boards are plain HTML pages built with `@acmelabs/design-system-browser` 0.3.2. Run the capability check ([AGENTS.md](../../../AGENTS.md), "Work through brain") for this work: load the design system's `choose-and-compose` and `html-artifacts` skills with `bun run intent load @acmelabs/design-system#<skill>`, and ask the `acme-design-system` docs server about each component with the version `0.3.2` and the framework `html`.
+The boards are plain HTML pages built with `@acmelabs/design-system-browser`. Its version is written in one place: the `devDependencies` entry of `prototypes/site-mockups/package.json` on the branch. It moves together with the design-system packages in `package.json` on `main` (decision record row 172). Run the capability check ([AGENTS.md](../../../AGENTS.md), "Work through brain") for this work: load the design system's `choose-and-compose` and `html-artifacts` skills with `bun run intent load @acmelabs/design-system#<skill>`, and ask the `acme-design-system` docs server about each component with that version and the framework `html`.
+
+A version move changes only that entry and `bun.lock`. Before you publish it, build the bundle at the old and the new version and compare the two files. When they differ, render every board at both versions on this machine and compare each pair. A board that looks different goes to Peter (step 4) before the canvas changes.
 
 Find the canvas with the Artifact tool's `list` action: its title is "Resume site mockups". Read it with the `read` action, and follow the type instructions that the result gives. Read each file you change by its `path`, `canvas.json` included, then edit only the files the change needs:
 
@@ -60,7 +62,7 @@ In `../resume-mockups/prototypes/site-mockups/`:
 
 1. Read the changed boards and `canvas.json` back from the canvas (the Artifact tool's `read` with `paths`), and copy them into `boards/`. A new board also needs its entry, with its slug, in the `boards` list of `export.ts`.
 2. Make a new empty render folder outside both checkouts with `mktemp -d`, and render only the changed boards into it: `bun export.ts boards <render folder> <slug> …`. A change that touches every board, such as a new design-system version, renders all 30 images in about 65 s: run it in the background, and give Peter its progress as the count of images in the render folder.
-3. Set the canvas version and the date in the branch's `README.md`. Stage it by name with the changed boards and `canvas.json`, plus `export.ts` or `design-system-bundle.ts` when they changed. Commit as "Update the mockup sources to canvas version <n>".
+3. Set the canvas version and the date in the branch's `README.md`. Stage it by name with the changed boards and `canvas.json`, plus `export.ts`, `design-system-bundle.ts`, `package.json` or `bun.lock` when they changed. Commit as "Update the mockup sources to canvas version <n>".
 4. Push the branch by step 1 of the [release skill](../release/SKILL.md), the path for a branch other than `main`. The branch has no `.agents/skills/release/scripts/`, so run the two checks from the branch checkout by their path in the main checkout.
 
 Done when `git ls-remote origin refs/heads/prototype/site-mockups` prints the same commit as `git rev-parse HEAD` in the branch checkout, or the release skill stopped the push and Peter has its reason.
