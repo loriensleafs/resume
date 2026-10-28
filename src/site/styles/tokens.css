@@ -1,0 +1,4 @@
+/* The design system's token stylesheet: its colors, type styles, materials, and light and dark themes (SPEC-site, Tech
+   Stack). The root route imports this file, so every page holds the tokens before any part upgrades. The stylesheet
+   names no font file and no other host; the site serves its own fonts (S7). */
+@import "@acmelabs/design-system/styles/tokens.css";

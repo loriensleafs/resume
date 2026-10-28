@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@acmelabs/design-system": "0.3.2",
+    "@acmelabs/design-system-react": "0.3.2",
     "@tanstack/ai": "1.0.0",
     "@tanstack/ai-anthropic": "1.0.0",
     "@tanstack/ai-react": "1.0.0",

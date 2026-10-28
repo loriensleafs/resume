@@ -20,11 +20,11 @@ export type SiteRole = Pick<Job, "id" | "name" | "position" | "earlier" | "highl
 };
 
 /**
- * The resume facts that the resume view shows, and no other field. A field added to resume.yaml reaches no page until a
- * view needs it and this type names it.
+ * The resume facts that the pages show, and no other field. A field added to resume.yaml reaches no page until a view
+ * needs it and this type names it. The app bar shows the name and the headline (label); the resume view the rest.
  */
 export type SiteResume = {
-  basics: Pick<Resume["basics"], "summary">;
+  basics: Pick<Resume["basics"], "name" | "label" | "summary">;
   work: SiteRole[];
   skills: Pick<Resume["skills"][number], "name" | "keywords">[];
   education: Pick<Resume["education"][number], "institution">[];
@@ -36,7 +36,7 @@ export type SiteData = { resume: SiteResume };
 /** Each field by name: a spread would carry every field that the schema gains into the pages. */
 function siteResume(resume: Resume): SiteResume {
   return {
-    basics: { summary: resume.basics.summary },
+    basics: { name: resume.basics.name, label: resume.basics.label, summary: resume.basics.summary },
     work: resume.work.map((job) => ({
       id: job.id,
       name: job.name,
