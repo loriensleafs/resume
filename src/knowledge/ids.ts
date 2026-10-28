@@ -4,8 +4,8 @@
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const NUMBER_FROM_1 = /^[1-9][0-9]*$/;
 const SLUG_CHARACTERS = 60;
-/** A 60-character source id, a dot and a passage number up to 999. */
-const PASSAGE_ID_CHARACTERS = 64;
+/** A 60-character source id, a dot and a passage number up to 999. A read takes ids up to this long (`readLimits`). */
+export const PASSAGE_ID_CHARACTERS = 64;
 
 /** How a slug is written, for error messages. */
 export const SLUG_RULE = `lowercase letters and digits, with single hyphens between them, at most ${SLUG_CHARACTERS} characters`;
