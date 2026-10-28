@@ -4,20 +4,22 @@
 // set, so a preview never reaches the store or sends an alert (decision record row 108). In
 // production the telemetry prints each turn's chat_turn line, and with the store set, the log, the
 // budget, the telemetry and the totals are the store's (upstash.ts, daily-totals.ts), and the budget
-// and the telemetry raise the limit alerts (alerts.ts).
+// and the telemetry raise the limit alerts (alerts.ts). A failing or slow store never breaks an
+// answer: each store call has a time limit, and each failure becomes an ops_error line and a fallback.
 
 import {
   inMemoryBudget,
   inMemoryQuestionLog,
   inMemoryTelemetry,
+  utcDay,
   type Budget,
   type QuestionLog,
   type Telemetry,
 } from "../chat/server/question-log";
 import type { ChatTurnEvent } from "../chat/server/telemetry";
-import { limitAlerts } from "./alerts";
+import { limitAlerts, opsError, type LimitAlerts, type StoreStep } from "./alerts";
 import { upstashTelemetry, upstashTotals, type DailyTotals } from "./daily-totals";
-import { upstashBudget, upstashQuestionLog } from "./upstash";
+import { uncountedReservationOn, upstashBudget, upstashQuestionLog } from "./upstash";
 import { upstashStore } from "./upstash-rest";
 
 export type { DailyTotals } from "./daily-totals";
@@ -51,6 +53,15 @@ export type Ops = {
 };
 
 /**
+ * How long a store call may take, in milliseconds (SPEC-deploy, "Store calls"): 2 s, so a slow store
+ * never holds a visitor's answer longer. Each push has its own 3 s (alerts.ts).
+ */
+const STORE_CALL_LIMIT_MS = 2_000;
+
+/** How long each of reserve()'s store calls may take, in milliseconds: 1 s (SPEC-deploy, "Store calls"). */
+const RESERVE_LIMIT_MS = 1_000;
+
+/**
  * Builds the ops parts from the environment. Each call gives new, empty parts, so the route file
  * builds them once per function instance.
  *
@@ -60,12 +71,15 @@ export type Ops = {
  * - In production, `PREVIEW_LIMIT` is ignored, whatever its value, and `record()` prints each turn's
  *   chat_turn line through `io.print`, the function log by default. With `KV_REST_API_URL` and
  *   `KV_REST_API_TOKEN` both set, the log, the budget, the telemetry and the totals are the store's,
- *   and each store call goes through `io.fetch`. The budget also holds the monthly limit's pause and
- *   its hourly probe. With `NTFY_TOPIC_URL` also set, a DAILY_LIMIT refusal, a month's estimate past
- *   75% of the limit and a turn that meets Anthropic's limit push their limit alerts, through
- *   `io.fetch` too, and a failed push prints an ops_error line through `io.print`. Without both store
- *   variables, the log and the budget stay in memory, the budget allows every turn, and there are no
- *   daily totals or alerts, so answers keep working (SPEC-deploy, "A setting is missing in production").
+ *   and each store call goes through `io.fetch`, with a time limit of 2 s, 1 s in `reserve()`. The
+ *   budget also holds the monthly limit's pause and its hourly probe. When a store call fails,
+ *   `reserve()` allows the turn, `append()` and `record()` resolve, and the step prints an ops_error
+ *   line through `io.print`. With `NTFY_TOPIC_URL` also set, a DAILY_LIMIT refusal, a month's
+ *   estimate past 75% of the limit, a turn that meets Anthropic's limit and a failed store call push
+ *   their limit alerts, through `io.fetch` too, and a failed push prints an ops_error line. Without
+ *   both store variables, the log and the budget stay in memory, the budget allows every turn, and
+ *   there are no daily totals or alerts, so answers keep working. A missing store or ntfy variable
+ *   prints the missing_config line on every turn (SPEC-deploy, "A setting is missing in production").
  */
 export function createOps(
   env: OpsEnv,
@@ -76,17 +90,90 @@ export function createOps(
     return inMemoryOps(now, previewRefusal(env.PREVIEW_LIMIT));
   }
   const print = io.print ?? console.log;
+  const missing = MONITORING_VARIABLES.filter((name) => !env[name]);
   if (!env.KV_REST_API_URL || !env.KV_REST_API_TOKEN) {
-    return { ...inMemoryOps(now), telemetry: printedTelemetry(print) };
+    return reportingMissing({ ...inMemoryOps(now), telemetry: printedTelemetry(print) }, missing, print);
   }
   const fetchFn = io.fetch ?? fetch;
-  const store = upstashStore({ url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN, fetch: fetchFn });
+  const settings = { url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN, fetch: fetchFn };
+  const store = upstashStore({ ...settings, limitMs: STORE_CALL_LIMIT_MS });
+  // reserve() runs before the turn's first model call, so the visitor waits on its store calls.
+  const budgetStore = upstashStore({ ...settings, limitMs: RESERVE_LIMIT_MS });
   const alerts = limitAlerts({ topicUrl: env.NTFY_TOPIC_URL, store, fetch: fetchFn, now, print });
-  return {
+  const parts: Ops = {
     log: upstashQuestionLog(store, now),
-    budget: upstashBudget(store, now, alerts.dayCapped),
+    budget: upstashBudget(budgetStore, now, alerts.dayCapped, alerts.storeFailed),
     telemetry: printedTelemetry(print, upstashTelemetry(store, now, alerts)),
     totals: upstashTotals(store, now),
+  };
+  return reportingMissing(answersGoOn(parts, now, alerts), missing, print);
+}
+
+/**
+ * The production variables without which answers still work, with no store or no alerts. Each one
+ * that is missing shows in the missing_config line (SPEC-deploy, "A setting is missing in production").
+ */
+const MONITORING_VARIABLES = ["KV_REST_API_URL", "KV_REST_API_TOKEN", "NTFY_TOPIC_URL"] as const;
+
+/**
+ * With a store or ntfy variable missing in production, each turn's `reserve()` first prints the
+ * ops_error line with missing_config, which names the missing variables and holds no value. Every turn
+ * calls `reserve()` once, and a rejected request never does, so the line comes once a turn.
+ */
+function reportingMissing(ops: Ops, missing: readonly string[], print: (line: string) => void): Ops {
+  if (missing.length === 0) return ops;
+  const line = opsError({ step: "config", code: "missing_config", missing });
+  return {
+    ...ops,
+    budget: {
+      reserve() {
+        print(line);
+        return ops.budget.reserve();
+      },
+    },
+  };
+}
+
+/**
+ * The store's log, budget and telemetry, each with a fallback for every failure (SPEC-deploy, "The
+ * store fails"): `reserve()` allows the turn, and `append()` and `record()` resolve. So a store error
+ * never breaks an answer, and the chat module needs no catch of its own.
+ *
+ * `reserve()` allows the turn because Anthropic's monthly limit is still the hard cap, and refusing
+ * every visitor during a store outage is worse. Its reservation is an uncounted one (upstash.ts), so
+ * the turn's cost reaches the day in full once the store answers again.
+ *
+ * Each step returns at its own time limit, and the storefail push that a failure starts goes on beside
+ * the turn (SPEC-deploy, "Store calls"). `record()` and `append()` are the end-of-turn writes, which
+ * the response waits for, so each also waits for any storefail push, within the push's own 3 s. The
+ * push then runs while the answer streams and ends before the response ends (row 168).
+ */
+function answersGoOn(ops: Ops, now: () => Date, alerts: Pick<LimitAlerts, "storeFailed" | "pushesEnded">): Ops {
+  /**
+   * Runs one store step. When it fails, the step reports the failure, its ops_error line and the
+   * storefail push, which starts here and is not waited for, and gives the fallback.
+   */
+  const reportingFailure = async <T>(step: StoreStep, call: () => Promise<T>, fallback: () => T): Promise<T> => {
+    try {
+      return await call();
+    } catch (error) {
+      alerts.storeFailed(step, error);
+      return fallback();
+    }
+  };
+  /** Runs one end-of-turn write as reportingFailure() does, then waits for any storefail push. */
+  const endOfTurn = async (step: "record" | "append", write: () => Promise<void>): Promise<void> => {
+    await reportingFailure(step, write, () => undefined);
+    await alerts.pushesEnded();
+  };
+  return {
+    ...ops,
+    log: { ...ops.log, append: (entry) => endOfTurn("append", () => ops.log.append(entry)) },
+    budget: {
+      reserve: () =>
+        reportingFailure("reserve", () => ops.budget.reserve(), () => ({ ok: true, reservation: uncountedReservationOn(utcDay(now().getTime())) })),
+    },
+    telemetry: { record: (event, reservation) => endOfTurn("record", () => ops.telemetry.record(event, reservation)) },
   };
 }
 

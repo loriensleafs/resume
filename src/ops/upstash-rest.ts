@@ -1,14 +1,18 @@
 // The store calls (SPEC-deploy, "Store calls"; decision 0022): Upstash's REST API through `fetch`
 // with `Authorization: Bearer`, and no package. Each write runs its commands as one transaction
 // through `/multi-exec`. Each read runs through `/pipeline`, which the read-only token may also use;
-// Upstash refuses `/multi-exec` to that token, even for reads (spike check 9, row 167). The key layout
-// and the expiry rules are in upstash.ts.
+// Upstash refuses `/multi-exec` to that token, even for reads (spike check 9, row 167). Each call has
+// a time limit, and every failure, no answer included, is an UpstashError with a short code. The key
+// layout and the expiry rules are in upstash.ts.
 
 /** One Redis command, its name first. */
 export type Command = [string, ...string[]];
 
-/** Where the store is: its REST address, its token, and the fetch that reaches it. */
-export type UpstashSettings = { url: string; token: string; fetch: typeof fetch };
+/**
+ * Where the store is: its REST address, its token, the fetch that reaches it, and how long each call
+ * may take, in milliseconds (SPEC-deploy, "Store calls": each store call 2 s, `reserve()` 1 s).
+ */
+export type UpstashSettings = { url: string; token: string; fetch: typeof fetch; limitMs: number };
 
 /** The store. Each call gives each command's result, in order. */
 export type UpstashStore = {
@@ -85,17 +89,32 @@ function isLoopback(hostname: string): boolean {
 /**
  * Sends the commands to one endpoint and gives each command's result, in order. It throws an
  * UpstashError when the store refuses the call, and when any command fails: in a transaction the
- * other commands still run and the store answers 200, so each reply is read.
+ * other commands still run and the store answers 200, so each reply is read. It also throws one when
+ * no answer comes: TIMEOUT once the call's time limit passes, so a slow store never holds an answer
+ * longer, and NETWORK when the request itself fails.
  */
 async function call(store: UpstashSettings, endpoint: Endpoint, commands: Command[]): Promise<unknown[]> {
-  const response = await store.fetch(`${store.url}${endpoint}`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${store.token}`, "content-type": "application/json" },
-    body: JSON.stringify(commands),
-    // The store never redirects, and a redirect must never carry the token to another address.
-    redirect: "error",
-  });
-  const replies: unknown = await response.json().catch(() => undefined);
+  const signal = AbortSignal.timeout(store.limitMs);
+  let response: Response;
+  try {
+    response = await store.fetch(`${store.url}${endpoint}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${store.token}`, "content-type": "application/json" },
+      body: JSON.stringify(commands),
+      // The store never redirects, and a redirect must never carry the token to another address.
+      redirect: "error",
+      signal,
+    });
+  } catch {
+    throw noAnswer(endpoint, signal);
+  }
+  let replies: unknown;
+  try {
+    replies = await response.json();
+  } catch {
+    // The time limit also covers the body. A body that is not JSON is a bad reply, read below.
+    if (signal.aborted) throw noAnswer(endpoint, signal);
+  }
   if (!response.ok) {
     const code = `HTTP_${response.status}`;
     throw new UpstashError(`Upstash ${endpoint} answered ${code}`, code);
@@ -108,6 +127,17 @@ async function call(store: UpstashSettings, endpoint: Endpoint, commands: Comman
     const code = errorWord(reply);
     throw new UpstashError(`Upstash ${endpoint}: ${commands[index]![0]} failed with ${code}`, code);
   });
+}
+
+/**
+ * The error of a call that got no answer: TIMEOUT when its time limit passed, NETWORK when the request
+ * failed. The fetch's own error is dropped, because Bun's connection error holds the whole address in
+ * its message, and a store address is not a value for a log line.
+ */
+function noAnswer(endpoint: Endpoint, signal: AbortSignal): UpstashError {
+  return signal.aborted
+    ? new UpstashError(`Upstash ${endpoint} did not answer within its time limit`, "TIMEOUT")
+    : new UpstashError(`Upstash ${endpoint} could not be reached`, "NETWORK");
 }
 
 /** Redis's error word from a reply `{ "error": "WRONGTYPE Operation against …" }`, or BAD_REPLY. */

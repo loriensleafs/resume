@@ -1,21 +1,38 @@
 // The limit alerts (SPEC-deploy, "Limit alerts"; decision record rows 115 and 121): urgent ntfy pushes
 // to Peter's phone, each a title and one line that names the next step. This file holds the alert
 // rules, their texts and the push; the markers' keys and expiry rules are in upstash.ts. The kinds
-// here are spend75, daycap and spendlimit. The store's storefail (D15) joins them as one more kind
-// and text, and, because its marker cannot live in a failing store, as a sender of its own beside
-// push().
+// here are spend75, daycap, spendlimit and storefail. This file also builds every ops_error line, and
+// prints the line of each failed store step, because a failed store call raises storefail. The
+// storefail marker cannot live in a failing store, so it lives on the function instance only. The
+// storefail push goes on beside the turn, and the turn's end-of-turn writes wait for it (ops.ts).
 //
 // An alert holds no visitor text: its words come only from its kind, its period and limits.ts.
 
+import { utcDay } from "../chat/server/question-log";
 import * as limits from "./limits";
 import { ALERT_CLAIM_MS, alertPeriodEnd, claimAlertMarker, keepAlertMarker } from "./upstash";
-import { safeBase, type UpstashStore } from "./upstash-rest";
+import { UpstashError, safeBase, type UpstashStore } from "./upstash-rest";
 
 /** The kinds of limit alert this file sends. Each is also the name in its marker's key. */
-export type AlertKind = "spend75" | "daycap" | "spendlimit";
+export type AlertKind = "spend75" | "daycap" | "spendlimit" | "storefail";
 
-/** One push: its kind, the period it covers (a UTC month "2026-10" or a UTC day "2026-10-27"), and its words. */
-type Alert = { kind: AlertKind; period: string; title: string; message: string };
+/**
+ * One push: its kind, the period it covers (a UTC month "2026-10" or a UTC day "2026-10-27"), when
+ * that period ends in Unix milliseconds, and its words. The end is worked out once, where the alert
+ * is made, so no later step parses the period again.
+ */
+type Alert = { kind: AlertKind; period: string; endsAt: number; title: string; message: string };
+
+/**
+ * The steps that call the store, each a word in its ops_error line: a turn's reservation, its
+ * take-back of a refused turn's $0.90 and its claim of the hour's probe of the monthly limit, its
+ * record and its append, and an alert's claim of its marker and the keep of the marker after a
+ * successful push.
+ */
+export type StoreStep = "reserve" | "take_back" | "probe_claim" | "record" | "append" | "alert_claim" | "alert_keep";
+
+/** The steps whose failure prints an ops_error line: a store step, an alert's push, and the check of the production variables. */
+export type OpsErrorStep = StoreStep | "alert_push" | "config";
 
 /** The events that can raise a limit alert. Each resolves, also when the push or the store fails. */
 export type LimitAlerts = {
@@ -25,6 +42,20 @@ export type LimitAlerts = {
   dayCapped(day: string): Promise<void>;
   /** After a turn met Anthropic's monthly limit on the UTC day `day`. */
   spendLimited(day: string): Promise<void>;
+  /**
+   * After `step` failed (SPEC-deploy, "The store fails"): prints the step's ops_error line, with one
+   * word for the error and nothing else. When a store call failed, it also starts the storefail push,
+   * at most once a UTC day from this function instance, and does not wait for it: pushesEnded() does.
+   * Another failure, such as an entry whose date is not a UTC day, is no store failure, so it pushes
+   * nothing.
+   */
+  storeFailed(step: StoreStep, error: unknown): void;
+  /**
+   * Resolves once each storefail push that has started has ended, within the push's own 3 s
+   * (SPEC-deploy, "Store calls"). The end-of-turn writes wait for it, because Vercel freezes the
+   * function after the response, and a push left running then is lost (row 168).
+   */
+  pushesEnded(): Promise<void>;
 };
 
 /** What the alerts need from the function instance. */
@@ -34,7 +65,7 @@ export type AlertSettings = {
   store: UpstashStore;
   fetch: typeof fetch;
   now: () => Date;
-  /** The function log, for the ops_error line of a failed push. */
+  /** The function log, for the ops_error line of a failed push or a failed store step. */
   print: (line: string) => void;
 };
 
@@ -47,19 +78,30 @@ export type AlertSettings = {
 const spendAlertAt = Math.round(limits.monthlyLimit * limits.spendAlertShare);
 
 /**
- * The limit alerts of one function instance. With no topic, every event resolves at once and sends
- * nothing; the missing variable shows in /api/status and in its ops_error line (D15, D22).
+ * The limit alerts of one function instance. With no topic, every event sends nothing, and a failed
+ * store step still prints its ops_error line; the missing variable shows in /api/status and in the
+ * missing_config line of each turn (ops.ts; D22).
  */
 export function limitAlerts(settings: AlertSettings): LimitAlerts {
-  if (!settings.topicUrl) return { monthCost: async () => {}, dayCapped: async () => {}, spendLimited: async () => {} };
-  const send = sender(settings.topicUrl, settings);
+  const send = settings.topicUrl ? sender(settings.topicUrl, settings) : undefined;
   return {
     async monthCost(day, monthCost) {
       // "Passes", as the daily cap's total passes $8: at exactly $15 nothing goes out.
-      if (monthCost > spendAlertAt) await send(spend75(day.slice(0, 7)));
+      if (send && monthCost > spendAlertAt) await send.claimed(spend75(day.slice(0, 7)));
     },
-    dayCapped: (day) => send(daycap(day)),
-    spendLimited: (day) => send(spendlimit(day)),
+    async dayCapped(day) {
+      await send?.claimed(daycap(day));
+    },
+    async spendLimited(day) {
+      await send?.claimed(spendlimit(day));
+    },
+    storeFailed(step, error) {
+      settings.print(opsError({ step, code: errorWord(error) }));
+      send?.storeFailed(error);
+    },
+    pushesEnded: async () => {
+      await send?.pushesEnded();
+    },
   };
 }
 
@@ -67,6 +109,7 @@ export function limitAlerts(settings: AlertSettings): LimitAlerts {
 const spend75 = (month: string): Alert => ({
   kind: "spend75",
   period: month,
+  endsAt: alertPeriodEnd(month),
   title: `Chat at ${percent(limits.spendAlertShare)} of its ${dollarText(limits.monthlyLimit)} limit for ${monthName(month)}`,
   message: "Raise it in the Anthropic Console, then in src/ops/limits.ts.",
 });
@@ -75,6 +118,7 @@ const spend75 = (month: string): Alert => ({
 const daycap = (day: string): Alert => ({
   kind: "daycap",
   period: day,
+  endsAt: alertPeriodEnd(day),
   title: `Chat paused at its ${dollarText(limits.dailyCap)} daily cap until 00:00 UTC`,
   message: "If bun run questions shows real spend, raise the cap in src/ops/limits.ts.",
 });
@@ -87,22 +131,42 @@ const daycap = (day: string): Alert => ({
 const spendlimit = (day: string): Alert => ({
   kind: "spendlimit",
   period: day,
+  endsAt: alertPeriodEnd(day),
   title: `Chat paused at Anthropic's monthly limit for ${monthName(day.slice(0, 7))}`,
   message: "Raise the limit in the Anthropic Console, then in src/ops/limits.ts. The chat tries again within an hour.",
 });
 
 /**
- * Sends each alert at most once in its period, across all function instances (SPEC-deploy, "Limit
- * alerts"): it first claims the alert's marker in the store for 10 minutes, then pushes. After a
- * successful push the marker lasts to the end of the period. After a failed push it expires in 10
- * minutes, and a later event claims it and pushes again. A failed step prints an ops_error line and
- * never throws, so an alert never breaks an answer.
- *
- * The function instance remembers until when each marker is known to live, and asks the store again
- * only after that. So an instance at the daily cap still refuses turns with no store call (SPEC-deploy,
- * "The daily cap"), and a flood of refusals cannot spend the store's budget on claims.
+ * storefail: a store call failed, so the daily cap and the totals are blind while answers go on. The
+ * text is a wording draft (docs/design/wording-drafts/D15.md).
  */
-function sender(topicUrl: string, { store, fetch, now, print }: AlertSettings): (alert: Alert) => Promise<void> {
+const storefail = (day: string): Alert => ({
+  kind: "storefail",
+  period: day,
+  endsAt: alertPeriodEnd(day),
+  title: `Chat store failed: answers go on without the ${dollarText(limits.dailyCap)} daily cap`,
+  message: "Check the Upstash console for an outage or a spent budget.",
+});
+
+/**
+ * The pushes of one function instance (SPEC-deploy, "Limit alerts"). A failed step prints an
+ * ops_error line and never throws, so an alert never breaks an answer.
+ *
+ * - `claimed` sends spend75, daycap and spendlimit at most once in their period, across all function
+ *   instances: it first claims the alert's marker in the store for 10 minutes, then pushes. After a
+ *   successful push the marker lasts to the end of the period. After a failed push it expires in 10
+ *   minutes, and a later event claims it and pushes again.
+ * - `storeFailed` starts storefail after a failed store call, at most once a UTC day from this
+ *   instance. Its marker cannot live in the store that failed, so it lives here only, with the same
+ *   rules: 10 minutes after a failed push or one that passed its 3 s, the end of the day after a
+ *   successful one. The push goes on beside the step that failed, which returns at its own time
+ *   limit; `pushesEnded` waits for it.
+ *
+ * The instance remembers until when each marker is known to live, and asks the store again only after
+ * that. So an instance at the daily cap still refuses turns with no store call (SPEC-deploy, "The
+ * daily cap"), and a flood of refusals cannot spend the store's budget on claims.
+ */
+function sender(topicUrl: string, { store, fetch, now, print }: AlertSettings) {
   /**
    * The topic's address, when a request to it keeps the topic's name, a secret, off the network in
    * clear text: https, or loopback for the in-test server, as for the store's token (upstash-rest.ts).
@@ -110,48 +174,97 @@ function sender(topicUrl: string, { store, fetch, now, print }: AlertSettings): 
   const topic = safeBase(topicUrl);
   /** By marker: the time, in Unix milliseconds, before which the marker is known to live. */
   const quietUntil = new Map<string, number>();
-  /** Runs one step that calls the store; a failure prints its ops_error line and gives undefined. */
-  const storeStep = async <T>(step: string, alert: Alert, call: () => Promise<T>): Promise<T | undefined> => {
+  const markerOf = (alert: Alert) => `${alert.kind}:${alert.period}`;
+
+  /**
+   * Starts an alert on this instance. Gives the time and the topic, or undefined when nothing goes
+   * out: the marker is known to live, or the topic's address is not safe.
+   */
+  const start = (alert: Alert): { at: number; topic: string } | undefined => {
+    const at = now().getTime();
+    if (at < (quietUntil.get(markerOf(alert)) ?? 0)) return undefined;
+    // Set before any await, so another event on this instance meanwhile asks the store nothing.
+    // 10 minutes is how long a claim holds the store's marker. It also stands after a failed push,
+    // whose marker expires then, and after a failed store call, which a later event tries again.
+    quietUntil.set(markerOf(alert), at + ALERT_CLAIM_MS);
+    // No push can go out, so no marker is claimed; the line comes again at most every 10 minutes.
+    if (topic === undefined) {
+      print(opsError({ step: "alert_push", alert: alert.kind, code: "NOT_HTTPS" }));
+      return undefined;
+    }
+    return { at, topic };
+  };
+
+  /** Pushes the alert. After a success, the instance stays quiet on it to the end of its period. Gives whether ntfy took it. */
+  const deliver = async (to: string, alert: Alert): Promise<boolean> => {
+    const failure = await push(to, fetch, alert);
+    if (failure !== undefined) {
+      print(opsError({ step: "alert_push", alert: alert.kind, code: failure }));
+      return false;
+    }
+    quietUntil.set(markerOf(alert), alert.endsAt);
+    return true;
+  };
+
+  /** The storefail pushes that have started and not yet ended. */
+  const pending = new Set<Promise<void>>();
+
+  /**
+   * Starts storefail after a failed store call, and gives no promise to wait for: the push stays in
+   * `pending` until it ends. Any other error is no store failure, so it pushes nothing.
+   */
+  const storeFailed = (error: unknown): void => {
+    if (!(error instanceof UpstashError)) return;
+    const alert = storefail(utcDay(now().getTime()));
+    const started = start(alert);
+    if (started === undefined) return;
+    // deliver() never throws; the catch keeps any slip from reaching the writes that wait for it.
+    const delivery: Promise<void> = deliver(started.topic, alert)
+      .catch(() => false)
+      .then(() => {
+        pending.delete(delivery);
+      });
+    pending.add(delivery);
+  };
+
+  /** Waits for each storefail push that has started, each within its own 3 s (PUSH_LIMIT_MS). */
+  const pushesEnded = async () => {
+    await Promise.all(pending);
+  };
+
+  /** Runs one store step of an alert; a failure prints its ops_error line, starts storefail and gives undefined. */
+  const storeStep = async <T>(step: StoreStep, alert: Alert, call: () => Promise<T>): Promise<T | undefined> => {
     try {
       return await call();
     } catch (error) {
-      print(opsError(step, alert.kind, errorWord(error)));
+      print(opsError({ step, alert: alert.kind, code: errorWord(error) }));
+      storeFailed(error);
       return undefined;
     }
   };
-  return async (alert) => {
-    const marker = `${alert.kind}:${alert.period}`;
-    const at = now().getTime();
-    if (at < (quietUntil.get(marker) ?? 0)) return;
-    // Set before the claim's await, so another event on this instance meanwhile asks the store
-    // nothing. 10 minutes is how long this claim holds the marker. It also stands after a failed
-    // push, whose marker expires then, and after a failed store call, which a later event tries again.
-    quietUntil.set(marker, at + ALERT_CLAIM_MS);
-    // No push can go out, so no marker is claimed; the line comes again at most every 10 minutes.
-    if (topic === undefined) {
-      print(opsError("alert_push", alert.kind, "NOT_HTTPS"));
-      return;
-    }
-    const claim = await storeStep("alert_claim", alert, () => claimAlertMarker(store, alert.kind, alert.period, new Date(at)));
+
+  /** Sends an alert whose marker lives in the store. */
+  const claimed = async (alert: Alert) => {
+    const started = start(alert);
+    if (started === undefined) return;
+    const claim = await storeStep("alert_claim", alert, () => claimAlertMarker(store, alert.kind, alert.period, new Date(started.at)));
     if (claim === undefined) return;
     if (!claim.claimed) {
-      quietUntil.set(marker, at + claim.heldForMs);
+      quietUntil.set(markerOf(alert), started.at + claim.heldForMs);
       return;
     }
-    const failure = await push(topic, fetch, alert);
-    if (failure !== undefined) {
-      print(opsError("alert_push", alert.kind, failure));
-      return;
-    }
-    quietUntil.set(marker, alertPeriodEnd(alert.period));
-    await storeStep("alert_keep", alert, () => keepAlertMarker(store, alert.kind, alert.period));
+    if (!(await deliver(started.topic, alert))) return;
+    await storeStep("alert_keep", alert, () => keepAlertMarker(store, alert.kind, alert.period, alert.endsAt));
   };
+
+  return { claimed, storeFailed, pushesEnded };
 }
 
 /**
  * How long a push may take, in milliseconds (SPEC-deploy, "Store calls": each push, 3 s). The daycap
- * push runs inside reserve() and the spend75 push inside record(), so a hung ntfy server holds a
- * visitor's answer no longer than this.
+ * push runs inside reserve() and the spend75 push inside record(). The storefail push runs beside the
+ * turn, from the step whose store call failed, and the end-of-turn writes wait for it (ops.ts). So a
+ * hung ntfy server holds a visitor's answer no longer than this.
  */
 const PUSH_LIMIT_MS = 3_000;
 
@@ -179,8 +292,13 @@ async function push(topicUrl: string, fetchFn: typeof fetch, alert: Alert): Prom
   }
 }
 
-/** The ops_error line of a failed alert step: the step, the alert's kind and one short word, and nothing else. */
-const opsError = (step: string, alert: AlertKind, code: string) => JSON.stringify({ event: "ops_error", step, alert, code });
+/**
+ * The ops_error line of a failed step, the one builder of every such line: the step, the alert's kind
+ * for an alert's step, one short word for the failure, and for missing_config the names of the missing
+ * variables, never their values. Nothing else.
+ */
+export const opsError = (fields: { step: OpsErrorStep; alert?: AlertKind; code: string; missing?: readonly string[] }) =>
+  JSON.stringify({ event: "ops_error", ...fields });
 
 /** A word that cannot carry text: a code or a name. */
 const WORD = /^[A-Za-z0-9_]{1,32}$/;

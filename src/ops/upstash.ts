@@ -92,9 +92,12 @@ export async function claimAlertMarker(
   return { claimed: claim === "OK", heldForMs };
 }
 
-/** After a successful push, keeps the alert's marker until the end of its period, so no other push of its kind goes out in it. */
-export async function keepAlertMarker(store: UpstashStore, kind: string, period: string): Promise<void> {
-  await store.transaction([["EXPIREAT", alertMarkerKey(kind, period), String(alertPeriodEnd(period) / 1000)]]);
+/**
+ * After a successful push, keeps the alert's marker until `endsAt`, the end of its period in Unix
+ * milliseconds, so no other push of its kind goes out in it.
+ */
+export async function keepAlertMarker(store: UpstashStore, kind: string, period: string, endsAt: number): Promise<void> {
+  await store.transaction([["EXPIREAT", alertMarkerKey(kind, period), String(endsAt / 1000)]]);
 }
 
 /**
@@ -162,22 +165,35 @@ export function keptDays(now: () => Date, days: number): string[] {
 }
 
 /**
- * A new reservation: `<day>/<uuid>`, or `<day>/probe/<uuid>` for the hour's probe of the monthly
- * limit. The day is the UTC day its cost counts on, so a turn that ends after 00:00 UTC settles on the
- * day it reserved; the uuid makes each reservation unique. readReservation() is the one reader of
- * this text, so the two stay side by side.
+ * A new reservation: `<day>/<uuid>`, `<day>/probe/<uuid>` for the hour's probe of the monthly limit,
+ * or `<day>/uncounted/<uuid>` for an uncounted reservation (uncountedReservationOn()). The day is the
+ * UTC day its cost counts on, so a turn that ends after 00:00 UTC settles on the day it reserved; the
+ * uuid makes each reservation unique. RESERVATION and readReservation() are the one reader of this
+ * text, so the writer and the reader stay side by side.
  */
-const reservationOn = (day: string, kind: "turn" | "probe" = "turn") =>
-  `${day}/${kind === "probe" ? "probe/" : ""}${crypto.randomUUID()}`;
+const reservationOn = (day: string, kind: "turn" | "probe" | "uncounted" = "turn") =>
+  `${day}/${kind === "turn" ? "" : `${kind}/`}${crypto.randomUUID()}`;
 
 /**
- * The UTC day a reservation names, and whether it is the hour's probe. A text that is not one of this
- * budget's reservations throws.
+ * The reservation of a turn that reserve() allowed although the store failed (SPEC-deploy, "The store
+ * fails"). Its $0.90 never reached the day's cost, so the telemetry adds the turn's whole cost to the
+ * day, not the cost less the $0.90 (daily-totals.ts). A `<day>/<uuid>` reservation here would take
+ * $0.90 off the day that was never added, and the day's cost would come out low.
  */
-export function readReservation(reservation: string): { day: string; probe: boolean } {
-  const match = /^(\d{4}-\d{2}-\d{2})\/(probe\/)?/.exec(reservation);
+export const uncountedReservationOn = (day: string) => reservationOn(day, "uncounted");
+
+/** The start of every reservation: its UTC day, then its kind when it is not a plain turn's. */
+const RESERVATION = /^(\d{4}-\d{2}-\d{2})\/(?:(probe|uncounted)\/)?/;
+
+/**
+ * The UTC day a reservation names, whether it is the hour's probe, and whether the day's cost counts
+ * its $0.90: false only for an uncounted reservation. A text that is not one of this budget's
+ * reservations throws.
+ */
+export function readReservation(reservation: string): { day: string; probe: boolean; counted: boolean } {
+  const match = RESERVATION.exec(reservation);
   if (match === null) throw new RangeError("The reservation is not one that this store's budget gave.");
-  return { day: match[1]!, probe: match[2] !== undefined };
+  return { day: match[1]!, probe: match[2] === "probe", counted: match[2] !== "uncounted" };
 }
 
 /**
@@ -222,6 +238,9 @@ export function upstashQuestionLog(store: UpstashStore, now: () => Date): Questi
  *   SPEND_LIMIT. The telemetry then deletes the marker or resets its time (spendLimitMarkerCommands()).
  *   While the marker stands, every refusal is SPEND_LIMIT, the probe's at the cap too: the month's
  *   limit pauses the chat for longer than the day's cap, and no daycap push goes out for it.
+ * - A claim that fails is a store failure like the others (SPEC-deploy, "The store fails"): the turn
+ *   goes on, as a plain turn, not the probe. Its $0.90 is already on the day, so its reservation is a
+ *   counted one, and the telemetry settles it with the turn's cost.
  * - With no marker, when the new total passes the cap, it takes the reservation back and refuses with
  *   DAILY_LIMIT. This budget then remembers the capped day and refuses later turns that day with no
  *   store call.
@@ -231,11 +250,15 @@ export function upstashQuestionLog(store: UpstashStore, now: () => Date): Questi
  * @param now says which UTC day and hour it is.
  * @param onCapped gets the UTC day of each DAILY_LIMIT refusal, for the daycap alert (alerts.ts). It
  *   decides itself whether the refusal needs a store call.
+ * @param onStoreFailed gets each store failure that reserve() itself absorbs, a take-back's or a probe
+ *   claim's, for its ops_error line and the storefail alert (alerts.ts). It returns at once, so
+ *   reserve() never waits for the push.
  */
 export function upstashBudget(
   store: UpstashStore,
   now: () => Date,
   onCapped: (day: string) => Promise<void> = async () => {},
+  onStoreFailed: (step: "take_back" | "probe_claim", error: unknown) => void = () => {},
 ): Budget {
   /** The UTC day on which this function instance saw the cap, if any. */
   let cappedDay: string | undefined;
@@ -253,17 +276,18 @@ export function upstashBudget(
       const { total, spendLimitAt } = await reserveOnDay(store, day);
       if (spendLimitAt !== undefined) {
         const pauseEnds = spendLimitAt + SPEND_LIMIT_PAUSE_MS;
-        const step = await atSpendLimit(store, at, pauseEnds, total);
+        const step = await atSpendLimit(store, at, pauseEnds, total, onStoreFailed);
         if (step === "probe") return { ok: true, reservation: reservationOn(day, "probe") };
+        if (step === "go on") return { ok: true, reservation: reservationOn(day) };
         // Set before takeBack(): a turn that starts while it waits is refused with no store call.
         if (step === "pause") pausedUntil = pauseEnds;
-        await takeBack(store, day);
+        await takeBack(store, day, onStoreFailed);
         return { ok: false, errorCode: "SPEND_LIMIT" };
       }
       if (total <= limits.dailyCap) return { ok: true, reservation: reservationOn(day) };
       // Set before the await: a turn that starts while takeBack() waits is refused with no store call.
       cappedDay = day;
-      await takeBack(store, day);
+      await takeBack(store, day, onStoreFailed);
       await onCapped(day);
       return { ok: false, errorCode: "DAILY_LIMIT" };
     },
@@ -297,13 +321,25 @@ function markerTime(reply: unknown): number | undefined {
  * - "pause" until `pauseEnds`, an hour after a turn last met the limit;
  * - "probe" when the day's new `total` is within the cap and the turn claims the hour's probe, which
  *   is a store write (claimProbe());
+ * - "go on" when that claim fails: a store failure, which goes to `failed` for its ops_error line, and
+ *   the turn goes on as a plain turn, as reserve() lets a turn go on when its own store call fails;
  * - "refuse" when the day is past its cap, or another turn holds the hour's probe.
  */
-async function atSpendLimit(store: UpstashStore, at: Date, pauseEnds: number, total: number): Promise<"pause" | "probe" | "refuse"> {
+async function atSpendLimit(
+  store: UpstashStore,
+  at: Date,
+  pauseEnds: number,
+  total: number,
+  failed: (step: "probe_claim", error: unknown) => void,
+): Promise<"pause" | "probe" | "go on" | "refuse"> {
   if (at.getTime() < pauseEnds) return "pause";
   if (total > limits.dailyCap) return "refuse";
-  const claimed = await claimProbe(store, at);
-  return claimed ? "probe" : "refuse";
+  try {
+    return (await claimProbe(store, at)) ? "probe" : "refuse";
+  } catch (error) {
+    failed("probe_claim", error);
+    return "go on";
+  }
 }
 
 /**
@@ -320,14 +356,15 @@ async function claimProbe(store: UpstashStore, at: Date): Promise<boolean> {
 /**
  * Takes a refused turn's reservation back from the day's cost, at the cap or at the monthly limit.
  * The refusal stands when this fails, and the amount left counted errs toward pausing, as an
- * unsettled reservation does (SPEC-deploy, "The daily cap", step 4). D15 prints the failure as an
- * ops_error line.
+ * unsettled reservation does (SPEC-deploy, "The daily cap", step 4). The failure goes to `failed`,
+ * for its ops_error line, and the refusal does not wait for the storefail push.
  */
-async function takeBack(store: UpstashStore, day: string): Promise<void> {
+async function takeBack(store: UpstashStore, day: string, failed: (step: "take_back", error: unknown) => void): Promise<void> {
   try {
     await addToDayCost(store, day, -limits.reservation);
-  } catch {
-    // Nothing more to do here until D15: a refusal never becomes an allowed turn.
+  } catch (error) {
+    // A refusal never becomes an allowed turn, so the failure is reported and nothing more.
+    failed("take_back", error);
   }
 }
 
