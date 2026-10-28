@@ -4,6 +4,7 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { $, Glob } from "bun";
+import { Face, Blob as HarfBuzzBlob } from "harfbuzzjs";
 import { formatRange, formatTitle, loadResume, type Resume } from "../../content";
 import { buildKnowledge } from "../../knowledge/build";
 import { holds } from "../../private-details";
@@ -443,6 +444,150 @@ describe("the static assets", () => {
     }
     const assets = await Array.fromAsync(new Glob("assets/**").scan({ cwd: staticDir }));
     expect(assets.map((asset) => `/${asset}`).filter((asset) => !loaded.has(asset))).toEqual([]);
+  });
+});
+
+/** The site's one font file, at its address on the site (scripts/site-fonts.ts cuts it into public/fonts/). */
+const FONT = "/fonts/google-sans-flex-latin.woff";
+
+/**
+ * The TrueType font inside a WOFF 1.0 file, rebuilt as a browser rebuilds it (https://www.w3.org/TR/WOFF/). It throws
+ * where the specification says a browser must not load the file.
+ */
+async function sfntOf(woff: Uint8Array<ArrayBuffer>): Promise<Uint8Array> {
+  const header = new DataView(woff.buffer, woff.byteOffset, woff.byteLength);
+  if (header.getUint32(0) !== 0x774f4646) throw new Error('the file does not start with the signature "wOFF"');
+  if (header.getUint32(8) !== woff.byteLength) throw new Error("the header's length is not the file's length");
+  const numTables = header.getUint16(12);
+  const sfnt = new Uint8Array(header.getUint32(16));
+  const out = new DataView(sfnt.buffer);
+  out.setUint32(0, header.getUint32(4));
+  out.setUint16(4, numTables);
+  let offset = 12 + 16 * numTables;
+  for (let i = 0; i < numTables; i++) {
+    const [tag, start, compLength, origLength, checksum] = [0, 4, 8, 12, 16].map((at) => header.getUint32(44 + i * 20 + at));
+    if (i > 0 && tag! <= header.getUint32(44 + (i - 1) * 20)) throw new Error("the tables are not in tag order");
+    if (compLength! > origLength!) throw new Error(`table ${i} is longer compressed than its own length`);
+    const stored = woff.subarray(start, start! + compLength!);
+    const data =
+      compLength === origLength
+        ? stored
+        : new Uint8Array(
+            await new Response(new Blob([stored]).stream().pipeThrough(new DecompressionStream("deflate"))).arrayBuffer(),
+          );
+    if (data.byteLength !== origLength) throw new Error(`table ${i} does not inflate to its own length`);
+    [tag!, checksum!, offset, origLength!].forEach((value, at) => out.setUint32(12 + i * 16 + at * 4, value));
+    sfnt.set(data, offset);
+    offset += (origLength! + 3) & ~3;
+  }
+  return sfnt;
+}
+
+/** Each @font-face rule in a stylesheet's text: its descriptors by name, each value with its quote marks dropped. */
+function fontFaces(css: string): Record<string, string>[] {
+  return [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)].map(([, body]) =>
+    Object.fromEntries(
+      body!
+        .split(";")
+        .filter((descriptor) => descriptor.includes(":"))
+        .map((descriptor) => {
+          const colon = descriptor.indexOf(":");
+          const value = descriptor.slice(colon + 1).replace(/["']/g, "").replace(/\s+/g, " ");
+          return [descriptor.slice(0, colon).trim(), value.trim()];
+        }),
+    ),
+  );
+}
+
+/** Each character that the text of a page's body shows, as a code point; script text stays out. */
+async function charactersShownBy(page: string): Promise<Set<number>> {
+  const shown = new Set<number>();
+  let inScript = false;
+  new HTMLRewriter()
+    .on("script", {
+      element(script) {
+        inScript = true;
+        script.onEndTag(() => void (inScript = false));
+      },
+    })
+    .on("body", {
+      text(chunk) {
+        if (inScript) return;
+        for (const character of unescaped(chunk.text)) if (character >= " ") shown.add(character.codePointAt(0)!);
+      },
+    })
+    .transform(await Bun.file(`${staticDir}/${page}`).text());
+  return shown;
+}
+
+// SPEC-site, Tech Stack, and SPEC-deploy, Documents: the site serves Google Sans Flex from its own address. The cut font
+// files are committed in public/fonts/, so the build copies them and downloads nothing.
+describe("the site's fonts", () => {
+  test("the static folder holds each committed file of public/fonts/, byte for byte: the font and its license", async () => {
+    const committed = (await Array.fromAsync(new Glob("*").scan({ cwd: `${REPO}/public/fonts` }))).sort();
+    expect(committed).toEqual(["OFL.txt", FONT.slice("/fonts/".length)].sort());
+    for (const file of committed) {
+      const copy = Bun.file(`${staticDir}/fonts/${file}`);
+      expect(await copy.exists()).toBe(true);
+      expect(Buffer.compare(await copy.bytes(), await Bun.file(`${REPO}/public/fonts/${file}`).bytes())).toBe(0);
+    }
+  });
+
+  // The design system's weights, 400 to 700, on the variable font's weight axis (its Typeface page, 0.3.3).
+  test("the font is a WOFF file of Google Sans Flex with one variation axis, weight, from 400 to 700", async () => {
+    const face = new Face(new HarfBuzzBlob(await sfntOf(await Bun.file(`${staticDir}${FONT}`).bytes())), 0);
+    const axes = Object.values(face.getAxisInfos()).map(({ tag, min, default: start, max }) => ({ tag, min, start, max }));
+    expect(axes).toEqual([{ tag: "wght", min: 400, start: 400, max: 700 }]);
+    expect(face.getName(1, "en")).toBe("Google Sans Flex");
+  });
+
+  // The token stylesheet names the family first in its text stack, --acme-font-sans, and holds no @font-face of its own:
+  // the page gives the family its file. font-display swap is the design system's own (its Typeface page loads the
+  // family with display=swap), so the text shows at once in the fallback font.
+  test.each(["index.html", "resume/index.html", "404.html"])(
+    "the stylesheets of %s give the tokens' text family one @font-face: weights 400 to 700, from the site's WOFF file",
+    async (page) => {
+      const css = await cssOf(page);
+      expect(css.match(/--acme-font-sans:\s*"([^"]+)"/)?.[1]).toBe("Google Sans Flex");
+      const [face, ...others] = fontFaces(css);
+      expect(others).toEqual([]);
+      const { src, ...descriptors } = face ?? {};
+      expect(descriptors).toEqual({
+        "font-family": "Google Sans Flex",
+        "font-style": "normal",
+        "font-weight": "400 700",
+        "font-display": "swap",
+      });
+      // The file's address on the site, and its format. The minifier may drop the space between the two.
+      expect(src?.match(/^url\((.+)\)\s*format\((.+)\)$/)?.slice(1)).toEqual([FONT, "woff"]);
+    },
+  );
+
+  // SPEC-site, Boundaries: no request to a third party. The header policy's font-src 'self' would block such a font
+  // (SPEC-deploy, Headers); this check finds it at build time, in every file under the output, the functions included.
+  test("no file under the output names a font on another host", async () => {
+    const fontHost = /fonts\.googleapis\.com|fonts\.gstatic\.com|use\.typekit\.net|fonts\.bunny\.net/;
+    const remoteFont = /(?:https?:)?\/\/[^\s"'()<>]+\.(?:woff2?|ttf|otf|eot)\b/i;
+    const naming: string[] = [];
+    for await (const path of new Glob("**/*").scan({ cwd: outDir, dot: true })) {
+      if (path.endsWith(".woff")) continue; // the site's own font file holds no text to read
+      const text = await Bun.file(`${outDir}/${path}`).text();
+      if (fontHost.test(text) || remoteFont.test(text)) naming.push(path);
+    }
+    expect(naming).toEqual([]);
+  });
+
+  // A character the font lacks would show in the fallback font, the next one in the tokens' stack.
+  test("the font has a glyph for each character that the pages show", async () => {
+    const face = new Face(new HarfBuzzBlob(await sfntOf(await Bun.file(`${staticDir}${FONT}`).bytes())), 0);
+    const inFont = new Set(face.collectUnicodes());
+    const missing = new Set<string>();
+    for (const page of await htmlFiles()) {
+      for (const codePoint of await charactersShownBy(page)) {
+        if (!inFont.has(codePoint)) missing.add(`U+${codePoint.toString(16).toUpperCase().padStart(4, "0")} in ${page}`);
+      }
+    }
+    expect([...missing]).toEqual([]);
   });
 });
 
