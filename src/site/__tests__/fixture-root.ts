@@ -1,9 +1,9 @@
 // The fixture root of seam 1 (SPEC-site, Testing 1): a folder that holds the project's files, as the build script's
 // --root reads them. Its resume.yaml is the repository's, with a name, a lead and a headline of its own, so a page that
-// shows them read this root. Its private.yaml holds a fake phone number, so a file that holds it leaks a private
-// detail. Its knowledge/sources/ holds two approved sources and a draft, each with Not public text (S16). Its
-// knowledge/logistics.yaml holds an approved answer and a draft one, which only the device index can show (C16). A task
-// whose build step reads another project file adds that file here.
+// shows them read this root, and two roles of its own for the career timeline's date rules. Its private.yaml holds a
+// fake phone number, so a file that holds it leaks a private detail. Its knowledge/sources/ holds two approved sources
+// and a draft, each with Not public text (S16). Its knowledge/logistics.yaml holds an approved answer and a draft one,
+// which only the device index can show (C16). A task whose build step reads another project file adds that file here.
 
 const REPO = `${import.meta.dir}/../../..`;
 
@@ -140,15 +140,54 @@ The fixture draft’s Not public kinds of material.
 `,
 };
 
+/** A role in resume.yaml, as the file writes it. */
+export type FixtureRole = Record<string, unknown> & { id: string; startDate: string; endDate?: string };
+
+/**
+ * The build date of seam 1's build (build-output.ts gives it to the build as SOURCE_DATE_EPOCH): noon UTC, the middle
+ * of June 2028 in every time zone. A role with no end date runs through June 2028, whenever the test runs.
+ */
+export const FIXTURE_BUILD_DATE = Date.UTC(2028, 5, 15, 12);
+
+/**
+ * The fixture root's two roles of its own, for the career timeline's date rules (SPEC-site, Views: Career timeline
+ * band). They come after the repository's last role, which ends in August 2026, so they overlap no role, and the
+ * board's gaps keep their space. Each is 5 months or more, so each span stays a 24 px target at 390 px (about 70 px a
+ * year). A role that resume.yaml gains after August 2026 needs these two moved after it.
+ * - The one-year role starts and ends in 2027, so it spans that year: "2027".
+ * - The open role has no end date, so it runs through the build's month: January to June 2028, "2028 – Present".
+ */
+export const FIXTURE_ONE_YEAR_ROLE: FixtureRole = {
+  id: "fixture-one-year",
+  name: "The Fixture Root’s One-Year Employer",
+  "x-short": "One-Year Employer",
+  position: "Fixture Engineer",
+  startDate: "2027",
+  endDate: "2027",
+};
+export const FIXTURE_OPEN_ROLE: FixtureRole = {
+  id: "fixture-open",
+  name: "The Fixture Root’s Open Employer",
+  "x-short": "Open Employer",
+  position: "Fixture Lead",
+  startDate: "2028-01",
+};
+
 /**
  * Writes the fixture root into the folder `root`: its resume.yaml, its private.yaml, its logistics answers and its
- * knowledge sources.
+ * knowledge sources. Its roles are the repository's, after the fixture's two own roles, newest first, as resume.yaml
+ * lists them; `changeRoles` changes them, for a fixture root that a build must refuse.
  */
-export async function writeFixtureRoot(root: string): Promise<void> {
-  const source = Bun.YAML.parse(await Bun.file(`${REPO}/resume.yaml`).text()) as { basics: object };
+export async function writeFixtureRoot(
+  root: string,
+  changeRoles: (roles: FixtureRole[]) => FixtureRole[] = (roles) => roles,
+): Promise<void> {
+  type Source = { basics: object; work: FixtureRole[] };
+  const source = Bun.YAML.parse(await Bun.file(`${REPO}/resume.yaml`).text()) as Source;
   const fixtureSource = {
     ...source,
     basics: { ...source.basics, name: FIXTURE_NAME, summary: FIXTURE_LEAD, label: FIXTURE_HEADLINE },
+    work: changeRoles([FIXTURE_OPEN_ROLE, FIXTURE_ONE_YEAR_ROLE, ...source.work]),
   };
   await Bun.write(`${root}/resume.yaml`, Bun.YAML.stringify(fixtureSource));
   await Bun.write(`${root}/private.yaml`, `basics:\n  phone: ${FAKE_PHONE}\n`);

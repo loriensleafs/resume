@@ -57,7 +57,9 @@ export type SourceJsonFile = Pick<PublicSource, "kind" | "summary" | "passages">
  * timeline band). Its place on the year axis is a class of the timeline stylesheet, because a page may hold no style
  * attribute (SPEC-deploy, Headers).
  */
-export type TimelineSpan = Pick<SiteRole, "id" | "short" | "name" | "position" | "years"> & {
+export type TimelineSpan = Pick<SiteRole, "id" | "short" | "name" | "years"> & {
+  /** The role's title, the `position` field of resume.yaml: "Senior Front-End Engineer". */
+  title: string;
   /** The class that places the span on the year axis: "career-timeline-span-fednow". */
   className: string;
 };
@@ -115,10 +117,12 @@ function firstMonth(date: string): Month {
  */
 function monthAfter(job: Pick<Job, "id" | "startDate" | "endDate">, today: Date): Month {
   if (!job.endDate) return today.getFullYear() * 12 + today.getMonth() + 1;
-  const end = job.endDate.includes("-") ? firstMonth(job.endDate) + 1 : firstMonth(job.endDate);
+  // "2024-12" names a month; "2024" names a year alone.
+  const endsInMonth = job.endDate.includes("-");
+  const end = endsInMonth ? firstMonth(job.endDate) + 1 : firstMonth(job.endDate);
   const start = firstMonth(job.startDate);
   if (end > start) return end;
-  if (!job.endDate.includes("-") && job.endDate === job.startDate.slice(0, 4)) return end + 12;
+  if (!endsInMonth && job.endDate === job.startDate.slice(0, 4)) return end + 12;
   throw new Error(`resume.yaml: work ${job.id}: endDate ${job.endDate} is before startDate ${job.startDate}`);
 }
 
@@ -128,11 +132,23 @@ function monthAfter(job: Pick<Job, "id" | "startDate" | "endDate">, today: Date)
  * and a gap between roles shows as space. The stylesheet sets the axis's months on the band, and the grid columns of
  * each span and year label. Its year labels are those of the first-view board: every second year from the first, and
  * the last year at the axis's end; a year that begins less than two years before the axis's end gets no label.
+ * Two roles that share a month would put two spans in one place, and one button would hide the other, so they stop the
+ * build.
  */
 function careerTimeline(work: Job[], today: Date): { timeline: SiteTimeline; stylesheet: string } {
   const roles = work
     .map((job) => ({ job, start: firstMonth(job.startDate), end: monthAfter(job, today) }))
     .sort((a, b) => a.start - b.start);
+  // In start order, a role that starts before the one before it ends overlaps it. With no overlap before it, the one
+  // before it ends last, so one check per pair finds every overlap.
+  roles.forEach(({ job, start }, i) => {
+    const before = roles[i - 1];
+    if (before && start < before.end) {
+      throw new Error(
+        `resume.yaml: work ${before.job.id} and work ${job.id} overlap: two roles on the career timeline share a month`,
+      );
+    }
+  });
   const axisStart = Math.floor(roles[0]!.start / 12) * 12;
   const axisEnd = Math.max(...roles.map(({ end }) => end));
   const months = axisEnd - axisStart;
@@ -143,7 +159,7 @@ function careerTimeline(work: Job[], today: Date): { timeline: SiteTimeline; sty
     id: job.id,
     short: job["x-short"],
     name: job.name,
-    position: job.position,
+    title: job.position,
     years: formatYears(job),
     className: `career-timeline-span-${job.id}`,
   }));
@@ -154,11 +170,11 @@ function careerTimeline(work: Job[], today: Date): { timeline: SiteTimeline; sty
   }
   // The last year that the axis holds a month of, at the axis's end, over its last two years.
   const lastYear = String(Math.floor((axisEnd - 1) / 12));
-  const lastLabel = Math.max(axisStart, axisEnd - 24);
+  const lastLabelStart = Math.max(axisStart, axisEnd - 24);
   yearLabels.push({
     year: lastYear,
     className: `career-timeline-year-${lastYear}`,
-    rule: `${columns(lastLabel, axisEnd)} text-align: end;`,
+    rule: `${columns(lastLabelStart, axisEnd)} text-align: end;`,
   });
 
   const stylesheet = [
@@ -174,14 +190,27 @@ function careerTimeline(work: Job[], today: Date): { timeline: SiteTimeline; sty
 }
 
 /**
+ * The build's date: the time in SOURCE_DATE_EPOCH, in seconds since 1970, when the build gets it, or now. The variable
+ * is the reproducible-builds convention for a build's time (https://reproducible-builds.org/specs/source-date-epoch/).
+ * Seam 1 sets it, so a role with no end date runs through the same month whenever the test runs (build-output.ts).
+ */
+function buildDate(): Date {
+  const epoch = process.env.SOURCE_DATE_EPOCH;
+  if (epoch === undefined) return new Date();
+  if (!/^\d+$/.test(epoch)) throw new Error(`SOURCE_DATE_EPOCH ${epoch} is not a whole number of seconds`);
+  return new Date(Number(epoch) * 1000);
+}
+
+/**
  * The pages' data from the project's files under `root`: the module's data, each approved source's JSON file by
  * source id, in source-id order, and the career timeline's stylesheet. The resume comes through
  * loadResume("public", root) and the sources through publicKnowledge(), so neither a private detail nor a Not public
- * section reaches it. Each field is named, as in siteResume(). `today` ends a role that has no end date.
+ * section reaches it. Each field is named, as in siteResume(). `today`, the build's date, ends a role that has no end
+ * date.
  */
 export async function buildSiteData(
   root: string,
-  today = new Date(),
+  today = buildDate(),
 ): Promise<{ data: SiteData; sourceJsonFiles: Map<string, SourceJsonFile>; timelineStylesheet: string }> {
   const fullResume = await loadResume("public", root);
   const resume = siteResume(fullResume);

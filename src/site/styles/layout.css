@@ -51,8 +51,9 @@
    draw it, with the boards' own sizes: no token holds them. The stylesheet that the build writes from resume.yaml
    (careerTimeline() in src/site/site-data.ts) sets --career-timeline-months, the year axis's months, and the grid
    columns of each span and year label. One column per month makes each span as long as its role, and a gap between
-   roles shows as space. */
+   roles shows as space. --career-timeline-bar is the height of a span's bar, which the axis line's place follows. */
 .career-timeline {
+  --career-timeline-bar: 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -89,12 +90,13 @@
   grid-template-columns: repeat(var(--career-timeline-months), minmax(0, 1fr));
 }
 
-/* The axis line runs behind the bars, through each gap: 1 px at the middle of the 8 px bar, which ends the row. */
+/* The axis line runs behind the bars, through each gap: 1 px at the middle of the bar, which ends the row. */
 .career-timeline-spans {
   margin: 0;
   padding: 0;
   list-style: none;
-  background: linear-gradient(var(--ds-gray-400), var(--ds-gray-400)) 0 calc(100% - 4px) / 100% 1px no-repeat;
+  background: linear-gradient(var(--ds-gray-400), var(--ds-gray-400)) 0 calc(100% - var(--career-timeline-bar) / 2) /
+    100% 1px no-repeat;
 }
 
 /* Every span and year label sits on the one row; the last year label may share columns with the one before it. */
@@ -134,7 +136,8 @@
 }
 
 /* Design-system gap: the prerendered page holds the tooltip's content slot as light-DOM text (SPEC-site, Tech Stack),
-   which would show beside the button until the part upgrades and moves it into its surface. */
+   which would show beside the button until the part upgrades and moves it into its surface. The part's definition
+   loads on the first interaction with the page (CareerTimeline.tsx), so until then the band shows this state. */
 .career-timeline-span > acme-tooltip:not(:defined) > [slot="content"] {
   display: none;
 }
@@ -150,12 +153,14 @@
   color: var(--ds-gray-900);
 }
 
-/* The button is the whole span: its short label, then its bar. */
+/* The button is the whole span: its short label, then its bar. Its width fills the span both before acme-tooltip
+   upgrades, as a block's child, and after, as the flex item of the part's "root". */
 .career-timeline-button {
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -176,8 +181,8 @@
 }
 
 .career-timeline-bar {
-  height: 8px;
-  border-radius: 4px;
+  height: var(--career-timeline-bar);
+  border-radius: calc(var(--career-timeline-bar) / 2);
   background: var(--ds-gray-700);
 }
 
