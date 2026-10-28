@@ -13,7 +13,7 @@ All six module specs are approved ([capability map](../spec/README.md)). This pl
 
 ## Running the plan
 
-The conductor runs the tasks with `/brain:build auto`, in up to 3 lanes (rows 149 and 150). The run stops for Peter only for:
+The conductor runs the tasks with `/brain:build auto`, in up to 7 lanes (rows 149, 150, 164 and 177). The run stops for Peter only for:
 
 1. a set-up item that only he can do: a key, a secret, an account, a paid service, or a check in his own browser, such as D3's PDF check (row 152);
 2. source work: the knowledge interviews (task 13), and any change to an approved source, such as K11 to K13's moves with their summaries (row 152);

@@ -1,10 +1,14 @@
 ---
 id: highspot-streaming-markdown
 title: The streaming Markdown component in the Polar UI design system
-role: highspot
-highlights: [4]
+kind: deep-dive
+subject: project
+roles: [highspot]
+highlights: [highlight:highspot.4]
+summary: How Peter designed the API of Polar UI's streaming Markdown component, built its streaming renderer, and how it gave Highspot one consistent Markdown experience, streamed or not.
+links: []
 status: approved
-approved: 2026-10-26
+approved: 2026-10-27
 source: Interview with Peter, 2026-10-26
 ---
 

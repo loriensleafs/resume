@@ -1,10 +1,14 @@
 ---
 id: fednow-design-system
 title: The FedNow design system and shared npm packages
-role: fednow
-highlights: [3]
+kind: deep-dive
+subject: project
+roles: [fednow]
+highlights: [highlight:fednow.3]
+summary: How Peter led the team that built the FedNow design system to 1.0, with custom accessible components on Chakra UI, and then FedNow's shared routing, query, form and build utilities packages.
+links: []
 status: approved
-approved: 2026-10-26
+approved: 2026-10-27
 source: Interview with Peter, 2026-10-26
 ---
 

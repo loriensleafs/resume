@@ -229,7 +229,7 @@ The session that runs `/brain:build auto`: it starts each task's sub-agent, runs
 _Avoid_: orchestrator
 
 **Lane**:
-One task building in its own git worktree; up to 3 build at once (row 150).
+One task building in its own git worktree; up to 7 build at once (row 177).
 _Avoid_: slot, worker
 
 **Mockup**:

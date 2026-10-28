@@ -404,6 +404,7 @@ export function createOpsReader(env: { KV_REST_API_URL: string; KV_REST_API_READ
 **Store calls.**
 
 - All store calls go through Upstash's REST API with `fetch` and `Authorization: Bearer`. No package is added.
+- The token goes only to an `https` address, or to a loopback address, where it never leaves the machine (the in-test server). With any other `KV_REST_API_URL`, each store call fails before any request, as a store failure (task D11).
 - Each call that writes runs its commands as one transaction, through Upstash's `/multi-exec` endpoint, so a key never exists without its expiry. A pipeline is not atomic: one failed command could leave a key that never expires.
 - Per turn: the reservation's transaction before the run, then `log.append()` and `telemetry.record()`, one transaction each, after the last chunk.
 - Every write finishes before the response ends (Peter, row 168). Vercel freezes a function between requests, so a write after the response's end lands only when the next request reaches that instance (spike check 7).
@@ -699,7 +700,8 @@ scripts/build-site.ts              `bun run build:site`: the build script, the c
 src/deploy/routes.ts               writeVercelConfig(outputDir): the redirects, headers, policies, cache rules, API routes, the not-found route, the cron
 src/deploy/policy.ts               addPolicyTags(staticDir): each HTML file's policy tag and its script hashes
 src/ops/ops.ts                     createOps(), createOpsReader()
-src/ops/upstash.ts                 the REST calls, the transactions, the key layout and the expiry rules
+src/ops/upstash-rest.ts            the REST calls and the transactions; the token goes only to an https or loopback address
+src/ops/upstash.ts                 the key layout, the expiry rules, and the store's question log and budget
 src/ops/alerts.ts                  the alert rules, the markers and the ntfy push
 src/ops/limits.ts                  the size caps' worst-case turn, the reservation, the daily cap, the monthly limit, the 75% threshold, the prices
 src/ops/smoke.ts                   the checks shared by `bun run smoke` and the Vercel health job

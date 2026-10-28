@@ -143,6 +143,19 @@ const citationEvents = (events: WireEvent[]) => events.filter((e) => e.type === 
 /** A model call that reads through read_sources with this input, as the model sends it. */
 const readCall = (input: unknown): FakeResponse => ({ toolCalls: [{ name: "read_sources", input }] });
 
+/** A fake model that gives `responses` in order, one per model call, and keeps each call's request. */
+function recordingFake(responses: FakeResponse[]) {
+  const fake = fakeText();
+  const requests: TextOptions[] = [];
+  fake.setResponses(
+    responses.map((response) => ({ request }) => {
+      requests.push(request);
+      return response;
+    }),
+  );
+  return { fake, requests };
+}
+
 /** A stub model call that reads through read_sources, after it thinks. */
 const thinkingRead = (thinking: string, ids: string[]) => ({ thinking, toolUse: { name: "read_sources", input: { ids, topic: "the first thing" } } });
 
@@ -299,6 +312,192 @@ describe("read limits", () => {
 
     const [result] = readResults(events).map((e) => JSON.parse(String(e.content)));
     expect([...result.read, ...result.unknown]).toEqual(ids);
+  });
+});
+
+/** The tool choice of each model call: undefined when the call may use its tools as it likes. */
+const toolChoices = (requests: TextOptions[]) => requests.map((request) => request.toolChoice);
+
+/** The tools of each model call as the model gets them: names, descriptions and input schemas. */
+const toolLists = (requests: TextOptions[]) => requests.map((request) => JSON.stringify(request.tools));
+
+/** The result the model gets for a read past the budget (SPEC-chat, Code Style, readBudget()). */
+const READ_LIMIT_ERROR = "The read limit for this question is reached.";
+
+describe("the read budget", () => {
+  test("four scripted reads: the fourth is skipped with an error result, every model call in the turn has the same tools, and the call after the third read has toolChoice none", async () => {
+    const { fake, requests } = recordingFake([
+      readCall({ ids: ["sample.1"], topic: "the problem" }),
+      readCall({ ids: ["sample.2"], topic: "what was done" }),
+      readCall({ ids: ["sample.3"], topic: "how it worked" }),
+      readCall({ ids: ["sample.4"], topic: "the result" }),
+      { text: "Test Person planned it [sample.2] and measured it [sample.4]." },
+    ]);
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(fake, { telemetry });
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), deps));
+
+    expect(toolChoices(requests)).toEqual([undefined, undefined, undefined, "none", "none"]);
+    expect(new Set(toolLists(requests)).size).toBe(1);
+    expect(requests[0]?.tools?.map((tool) => tool.name)).toEqual(["read_sources"]);
+    // The fourth read's result is the budget's error, with no passage text.
+    const fourth = toolMessages(requests[4]).at(-1);
+    expect(fourth).toContain(READ_LIMIT_ERROR);
+    expect(fourth).not.toContain("Text for Result.");
+    expect(readResults(events).map((e) => JSON.parse(String(e.content)).read)).toEqual([["sample.1"], ["sample.2"], ["sample.3"], []]);
+    // The turn never read sample.4, so its citation is removed.
+    expect(streamedText(events)).toBe("Test Person planned it [sample.2] and measured it .");
+    expect(events.at(-1)?.type).toBe("RUN_FINISHED");
+    expect((await deps.log.list(1)).map(({ read, outcome }) => ({ read, outcome }))).toEqual([
+      { read: ["sample.1", "sample.2", "sample.3"], outcome: "answered" },
+    ]);
+    expect(telemetry.events.map(({ reads, modelCalls }) => ({ reads, modelCalls }))).toEqual([{ reads: 3, modelCalls: 5 }]);
+  });
+
+  test("four reads in one model call: three run, the fourth is skipped with an error result before any of them runs, and the next call has toolChoice none", async () => {
+    const reads = ["sample.1", "sample.2", "sample.3", "sample.4"].map((id) => ({ name: "read_sources", input: { ids: [id], topic: "the first thing" } }));
+    const { fake, requests } = recordingFake([{ toolCalls: reads }, { text: "Test Person planned it [sample.2]." }]);
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(fake, { telemetry });
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), deps));
+
+    expect(toolChoices(requests)).toEqual([undefined, "none"]);
+    const results = toolMessages(requests[1]);
+    expect(results).toHaveLength(4);
+    expect(results.filter((result) => result.includes(READ_LIMIT_ERROR))).toHaveLength(1);
+    expect(results.join("\n")).not.toContain("Text for Result.");
+    expect(streamedText(events)).toBe("Test Person planned it [sample.2].");
+    expect((await deps.log.list(1)).flatMap(({ read }) => read).sort()).toEqual(["sample.1", "sample.2", "sample.3"]);
+    expect(telemetry.events.map(({ reads }) => reads)).toEqual([3]);
+  });
+
+  test("a read whose input fails the schema does not count: three valid reads after it all run, and only the call after them has toolChoice none", async () => {
+    const { fake, requests } = recordingFake([
+      readCall({ ids: Array.from({ length: 21 }, (_, i) => `sample.${i + 1}`), topic: "the first thing" }),
+      readCall({ ids: ["sample.1"], topic: "the problem" }),
+      readCall({ ids: ["sample.2"], topic: "what was done" }),
+      readCall({ ids: ["sample.3"], topic: "how it worked" }),
+      { text: "Test Person planned it [sample.2] and built it [sample.3]." },
+    ]);
+    const deps = seamDeps(fake);
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), deps));
+
+    expect(toolChoices(requests)).toEqual([undefined, undefined, undefined, undefined, "none"]);
+    expect(toolMessages(requests[4]).join("\n")).not.toContain(READ_LIMIT_ERROR);
+    expect(streamedText(events)).toBe("Test Person planned it [sample.2] and built it [sample.3].");
+    expect((await deps.log.list(1)).map(({ read }) => read)).toEqual([["sample.1", "sample.2", "sample.3"]]);
+  });
+
+  test("another middleware's onBeforeToolCall that transforms the arguments of every read cannot skip the budget: the fourth read is still skipped", async () => {
+    const { fake, requests } = recordingFake([
+      readCall({ ids: ["sample.1"], topic: "the problem" }),
+      readCall({ ids: ["sample.2"], topic: "what was done" }),
+      readCall({ ids: ["sample.3"], topic: "how it worked" }),
+      readCall({ ids: ["sample.4"], topic: "the result" }),
+      { text: "Test Person measured the result [sample.5]." },
+    ]);
+    // Its decision comes first, and onBeforeToolCall is first-win: a budget in that hook would never run.
+    const transformsReads: ChatMiddleware = {
+      name: "transforms-reads",
+      onBeforeToolCall: (_ctx, call) => (call.toolName === "read_sources" ? { type: "transformArgs", args: { ids: ["sample.5"], topic: "the tools" } } : undefined),
+    };
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(fake, { telemetry, testMiddleware: [transformsReads] });
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), deps));
+
+    expect(toolChoices(requests)).toEqual([undefined, undefined, undefined, "none", "none"]);
+    expect(toolMessages(requests[4]).at(-1)).toContain(READ_LIMIT_ERROR);
+    expect(streamedText(events)).toBe("Test Person measured the result [sample.5].");
+    expect((await deps.log.list(1)).map(({ read }) => read)).toEqual([["sample.5"]]);
+    expect(telemetry.events.map(({ reads }) => reads)).toEqual([3]);
+  });
+
+  test("another middleware's skip ends its read before the guard: that call reads nothing and does not count, so three reads after it run", async () => {
+    const { fake, requests } = recordingFake([
+      readCall({ ids: ["sample.1"], topic: "the problem" }),
+      readCall({ ids: ["sample.2"], topic: "what was done" }),
+      readCall({ ids: ["sample.3"], topic: "how it worked" }),
+      readCall({ ids: ["sample.4"], topic: "the result" }),
+      { text: "Test Person measured the result [sample.4] but not the problem [sample.1]." },
+    ]);
+    let skipped = false;
+    const skipsFirstRead: ChatMiddleware = {
+      name: "skips-first-read",
+      onBeforeToolCall: (_ctx, call) => {
+        if (call.toolName !== "read_sources" || skipped) return undefined;
+        skipped = true;
+        return { type: "skip", result: { error: "Skipped by another middleware." } };
+      },
+    };
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(fake, { telemetry, testMiddleware: [skipsFirstRead] });
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), deps));
+
+    expect(toolChoices(requests)).toEqual([undefined, undefined, undefined, undefined, "none"]);
+    expect(toolMessages(requests[4]).join("\n")).not.toContain(READ_LIMIT_ERROR);
+    expect(streamedText(events)).toBe("Test Person measured the result [sample.4] but not the problem .");
+    expect((await deps.log.list(1)).map(({ read }) => read)).toEqual([["sample.2", "sample.3", "sample.4"]]);
+    expect(telemetry.events.map(({ reads }) => reads)).toEqual([3]);
+  });
+
+  test("on the real Anthropic adapter, the call after the third read sends tool_choice none with the same tools and the same cache marker, so the cached prompt holds", async () => {
+    const stub = stubAnthropic([
+      thinkingRead("The catalog names sample.", ["sample.1"]),
+      thinkingRead("The next passage says more.", ["sample.2"]),
+      thinkingRead("One more passage.", ["sample.3"]),
+      { thinking: "The passages answer it.", text: "Test Person planned it [sample.2] and built it [sample.3]." },
+    ]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), seamDeps(stub.adapter)));
+
+    expect(stub.requests.map((request) => request.tool_choice)).toEqual([undefined, undefined, undefined, { type: "none" }]);
+    expect(new Set(stub.requests.map((request) => JSON.stringify(request.tools))).size).toBe(1);
+    expect(stub.requests[3]?.tools?.map((tool) => tool.name)).toEqual(["read_sources"]);
+    expect(stub.requests[3]?.tools?.at(-1)?.cache_control).toEqual({ type: "ephemeral" });
+    expect(streamedText(events)).toBe("Test Person planned it [sample.2] and built it [sample.3].");
+  });
+});
+
+describe("the last call", () => {
+  /** A read call whose input fails the schema: a tool call that reads nothing and does not count as a read. */
+  const failsTheSchema = readCall({ ids: [], topic: "the first thing" });
+
+  test("five scripted model calls that each call a tool: the sixth has toolChoice none, and the turn ends with an answer", async () => {
+    const { fake, requests } = recordingFake([
+      readCall({ ids: ["sample.1"], topic: "the problem" }),
+      readCall({ ids: ["sample.2"], topic: "what was done" }),
+      failsTheSchema,
+      failsTheSchema,
+      failsTheSchema,
+      { text: "Test Person planned it [sample.2]." },
+    ]);
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(fake, { telemetry });
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), deps));
+
+    expect(toolChoices(requests)).toEqual([undefined, undefined, undefined, undefined, undefined, "none"]);
+    expect(new Set(toolLists(requests)).size).toBe(1);
+    expect(streamedText(events)).toBe("Test Person planned it [sample.2].");
+    expect(citationEvents(events)).toEqual([{ citations: ["sample.2"], removed: 0 }]);
+    expect(events.at(-1)?.type).toBe("RUN_FINISHED");
+    expect((await deps.log.list(1)).map(({ outcome }) => outcome)).toEqual(["answered"]);
+    expect(telemetry.events.map(({ reads, modelCalls }) => ({ reads, modelCalls }))).toEqual([{ reads: 2, modelCalls: 6 }]);
+  });
+
+  test("a model that calls a tool at the sixth call anyway gets no seventh call: maxIterations(6) bounds the loop", async () => {
+    const { fake } = recordingFake([...Array<FakeResponse>(6).fill(failsTheSchema), { text: "Test Person planned it." }]);
+    const telemetry = inMemoryTelemetry();
+
+    await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), seamDeps(fake, { telemetry })));
+
+    expect(fake.state.callCount).toBe(6);
+    expect(telemetry.events.map(({ modelCalls }) => modelCalls)).toEqual([6]);
   });
 });
 
