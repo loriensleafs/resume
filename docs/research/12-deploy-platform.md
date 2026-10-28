@@ -172,6 +172,28 @@ The third review found 39 issues (interview row 126). These are the facts behind
 - Bun loads `.env`, `.env.<NODE_ENV>` and `.env.local` into a run on its own (https://bun.com/docs/runtime/environment-variables). `bun audit --prod` leaves development packages out (https://bun.com/docs/pm/cli/audit).
 - Nitro's Bun runtime (installed `nitro` 3.0.260903-beta, `_presets.mjs` `resolveVercelRuntime` and its Vercel page): the value comes from `vercel.functions.runtime`; without it, Nitro writes `"bun1.x"` when `vercel.json` has `bunVersion` or the build runs in Bun. Nitro's docs show only `"bun1.x"`, so whether a function can name `"bun1.4.x"` is a spike check. It can: such a function runs Bun 1.4.1 (spike check 2, below).
 
+## Build settings in code (task D8, 2026-10-27)
+
+**Bun's automatic `.env` loading.** SPEC-deploy ("Secrets and settings") asked whether `bunfig.toml` can turn it off. It can, so `bunfig.toml` holds `env = false`.
+
+- Bun's docs: "You can also disable it in `bunfig.toml`: `env = false`", and "Files passed with `--env-file` still load even when default loading is disabled" (https://bun.com/docs/runtime/environment-variables#disabling-automatic-env-loading; the same on https://bun.com/docs/runtime/bunfig#env). When Bun runs as `node` (`bun --bun`), it loads no `.env` file on its own either.
+- A local check with Bun 1.4.4 in a fixture folder agrees. With no `bunfig.toml`, `bun <file>`, `bun run <script>` and `bun test` loaded `.env` (and `bun test` also `.env.test`). With `env = false`, none of them did, and `--env-file=.secrets/local.env` still loaded that file. `src/deploy/__tests__/config.test.ts` repeats this check with the repository's own `bunfig.toml`.
+- Scope: Bun reads `bunfig.toml` from the folder that a run starts in. A run that started in a subfolder loaded that subfolder's `.env`, and the root `bunfig.toml` did not stop it (local check). So the test that fails when any `.env*` file exists in the checkout stays the guard; `bunfig.toml` adds a second one for runs from the root.
+
+**The ignore step before `scripts/ignore-build.sh` exists.** `vercel.json` names `sh scripts/ignore-build.sh`, and task D30 writes the script.
+
+- Until then, `sh` cannot open the file and exits with a code other than 0: 127 in a local check on macOS.
+- Vercel's guide: "If the command returns "0", the build will be skipped. If, however, a code "1" or greater is returned, then a new deployment will be built" (https://vercel.com/kb/guide/how-do-i-use-the-ignored-build-step-field-on-vercel). The project settings page names only codes 1 and 0 (https://vercel.com/docs/project-configuration/project-settings#ignored-build-step).
+- So every push builds until D30, docs-only pushes too. That is the safe side of SPEC-deploy's rule: the ignore step builds on every error. No Vercel project builds `main` before setup step 4.
+- The setting also makes Vercel expose `VERCEL_GIT_PREVIOUS_SHA`, which is "only exposed when an Ignored Build Step is provided" (above), so D30's script can read it.
+
+**The lockfile: version 2 again, so no spike push** (the conductor's decision, 2026-10-27).
+
+- **Verdict.** `bun.lock` has `lockfileVersion: 2` again since task A10 (`977e07d`). A10 moved the design system packages to 0.3.3 and removed A9's scoped `zod` override from `package.json` (rows 158 and 172). Bun 1.4 writes version 3 only while such an override exists ("Facts the spike adds", below).
+- **Check 1 covers it.** Run 40567813019 had the settings of `vercel.json`: `bunVersion` `"1.4.x"`, a version-2 lockfile and the install command `bun ci`. Its build ran Bun 1.4.4, and `bun ci` passed. So the 1.4.2 installer is not needed.
+- **Scope.** That run installed the spike's own `package.json` and `bun.lock`, not `main`'s. Setup step 4's first build of the real project is the real check: its `bun ci` installs `main`'s files.
+- **History.** While the override made the lockfile version 3 (A9 to A10), no deployment had built from a version-3 lockfile. D8 first prepared one push of `main`'s version-3 files to `prototype/deploy-spike`. A local run with Bun 1.4.4 built the spike that way, which proved Bun 1.4.4 and not Vercel's build image. The push was never made: with version 2 back, its question was gone.
+
 ## Deploy spike verdicts (2026-10-27)
 
 SPEC-deploy's deploy spike ran on Peter's throwaway Vercel project `resume-deploy-spike` (Pro, Standard Protection, no domains, no Anthropic key). Its code is on the branch `prototype/deploy-spike`, tip `bc119a7`. That branch's `prototypes/deploy-spike/README.md` holds every run's verdict lines word for word, the controls and the scope of each verdict. Two throwaway branches hold the parts that only their runs used: `prototype/d3-preview` (check 11 on a preview) and `prototype/d5-waf` (check 8 on previews). No branch is merged.
@@ -200,7 +222,7 @@ The verdicts below are copied from that README. A run id is a GitHub Actions run
 - **Static files.** Vercel sends `content-disposition: inline; filename="<name>"` with each static file (`inline` alone for `/`), and its default `cache-control: public, max-age=0, must-revalidate` on a 308 (checks 4 and 5).
 - **The lockfile versions.** The spike README cites only Bun PR #31539, Bun issue #28792 and the `@vercel/build-utils` changelog; the D6 builder added Bun PR #38333 and the two third-party pull requests, and the D6 fix checked each one at its source on 2026-10-27.
   - Bun 1.4 writes a new `bun.lock` with `lockfileVersion: 2` (PR #31539, in the README). It keeps an existing version-1 lockfile at version 1.
-  - It writes `lockfileVersion: 3` only for nested or version-scoped overrides: "Rules persist inside the `overrides` section and the file is stamped `lockfileVersion: 3` **only when such rules exist**" (https://github.com/oven-sh/bun/pull/38333, merged 2026-08-14). This repository's override `"@acmelabs/design-system-mcp>zod"` is nested.
+  - It writes `lockfileVersion: 3` only for nested or version-scoped overrides: "Rules persist inside the `overrides` section and the file is stamped `lockfileVersion: 3` **only when such rules exist**" (https://github.com/oven-sh/bun/pull/38333, merged 2026-08-14). This repository's override `"@acmelabs/design-system-mcp>zod"` (task A9) was nested; task A10 removed it, and the lockfile went back to version 2.
   - Older Bun reads neither: "Older Bun versions cannot read v2 lockfiles" (issue #28792, in the README), and version-3 lockfiles are "unreadable by older Bun" (PR #38333). Dependabot's pull request says the same of Bun 1.3.14, which "reads only v1" (https://github.com/dependabot/dependabot-core/pull/16071, closed unmerged). Nx's merged pull request makes Nx's own lockfile parser accept versions 2 and 3 (https://github.com/nrwl/nx/pull/36666).
   - Vercel's `@vercel/build-utils` 14.10.1 "selects the Bun 1.4 binary whenever the lockfile requires it" (https://unpkg.com/@vercel/build-utils@14.12.0/CHANGELOG.md, quoted in the README).
 - **Vercel freezes a function between requests.** With no `waitUntil`, a write planned 2 s after the stream's end landed when the next request reached the function, 15 s later (check 7). Nitro's Vercel entry sets `req.waitUntil = context?.waitUntil` (`nitro/dist/presets/vercel/runtime/vercel.web.mjs`); that is Nitro's code, not a documented API.
@@ -225,7 +247,7 @@ Peter asked whether another host would deliver a visitor's Stop to the chat func
 
 ### Open points
 
-- **The version-3 lockfile.** `main`'s `bun.lock` has `lockfileVersion: 3` since the scoped `zod` override in `package.json` (task A9). No spike deployment built from a version-3 lockfile. With `bunVersion` `"1.4.x"` the build got Bun 1.4.4 also from a version-1 lockfile, and Bun 1.4 reads version 3. Unverified: whether Vercel's install step accepts version 3, and which of its two Bun 1.4 rules applies then. Open for D8.
+- **The version-3 lockfile: closed.** `main`'s `bun.lock` had `lockfileVersion: 3` from task A9's scoped `zod` override until task A10 removed it. It is version 2 again, which check 1 covers ("Build settings in code", above). Setup step 4's first build confirms it on the real project.
 - **`CRON_SECRET`.** Vercel documents that a cron call carries `Authorization: Bearer <CRON_SECRET>` once the project sets it (https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs). The spike project set none, so no run saw it. Setup step 13 proves it on the real project.
 - **The toolbar header.** No run proves that `x-vercel-skip-toolbar` keeps an enabled toolbar off. A second attempt would load a preview in Chrome with a user agent without `Headless`, make a plain request with and without the header, and print booleans about the changed bytes (whether they hold `vercel.live`).
 - **Not tested:** a chat turn of up to 120 s under the 150 s `maxDuration` (check 7); the "api rate limit" rule, which never fired (check 8); the host redirects of pkloss.dev, pwk.dev and www.peterkloss.dev, which had no domain on the project (check 5); one header name in two spellings (check 4); a pattern host in a redirect (check 6).

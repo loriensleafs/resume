@@ -1,0 +1,4 @@
+# Bun loads .env, .env.<NODE_ENV> and .env.local into a run on its own; this turns that off for every run that
+# starts in this folder, `bun test` included (SPEC-deploy, "Secrets and settings"). A file that --env-file names
+# still loads: `bun run questions` and `bun run evals` name .secrets/local.env. https://bun.com/docs/runtime/bunfig#env
+env = false

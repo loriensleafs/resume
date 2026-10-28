@@ -1,4 +1,5 @@
-// Seam 1 of SPEC-deploy at unit level: addPolicyTags() on a fixture static folder (tasks/modules/deploy.md, Notes).
+// Seam 1 of SPEC-deploy at unit level: addPolicyTags() on a fixture static folder (tasks/modules/deploy.md, Notes),
+// and the settings in code that Vercel and Bun read from the checkout: vercel.json, and no .env file (task D8).
 // The checks of the built output (each built page's own tag, no style attribute) live once, in the site's build test,
 // src/site/__tests__/build.test.ts.
 // Each expected hash is a literal from outside this code. 'sha256-B2yPHKaXnvFWtRChIbabYmUBFZdVfKKXHbWtWidDVF8=' is
@@ -8,8 +9,12 @@
 
 import { afterAll, describe, expect, test } from "bun:test";
 import { $ } from "bun";
+import { existsSync } from "node:fs";
+import { readdir } from "node:fs/promises";
+import { resolve } from "node:path";
 import { addPolicyTags } from "../policy";
 
+const REPO = resolve(import.meta.dir, "../../..");
 const tmp = `${Bun.env.TMPDIR ?? "/tmp"}/deploy-config-test-${crypto.randomUUID()}`;
 
 /** Writes the pages into a new static folder and returns its path. */
@@ -17,6 +22,25 @@ async function staticFolder(name: string, pages: Record<string, string>): Promis
   const dir = `${tmp}/${name}`;
   for (const [path, html] of Object.entries(pages)) await Bun.write(`${dir}/${path}`, html);
   return dir;
+}
+
+/**
+ * The paths, from root, of every entry under root whose name starts with ".env", ignored files included. It leaves out
+ * installed packages (node_modules), git's own folder and each nested checkout, a folder with its own .git, such as an
+ * agent's worktree under .claude/worktrees/. It follows no symbolic link.
+ */
+async function envFiles(root: string, dir = root): Promise<string[]> {
+  const found: string[] = [];
+  const entries = (await readdir(dir, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name));
+  for (const entry of entries) {
+    const path = `${dir}/${entry.name}`;
+    if (entry.name.startsWith(".env")) found.push(path.slice(root.length + 1));
+    if (!entry.isDirectory() || entry.name === "node_modules" || entry.name === ".git" || existsSync(`${path}/.git`)) {
+      continue;
+    }
+    found.push(...(await envFiles(root, path)));
+  }
+  return found;
 }
 
 afterAll(async () => {
@@ -189,5 +213,59 @@ describe("addPolicyTags()", () => {
     const dir = await staticFolder("no-pages", { "assets/app.js": "console.log(1);" });
 
     await expect(addPolicyTags(dir)).rejects.toThrow(`no HTML file under ${dir}`);
+  });
+});
+
+describe("vercel.json", () => {
+  // The expected object is SPEC-deploy's, "Configuration in code". Routes, headers and the cron live in the build's
+  // .vercel/output/config.json instead, so any other key here fails.
+  test("holds only the build settings: Bun 1.4, no framework, bun ci, build:site and the ignore step", async () => {
+    expect(await Bun.file(`${REPO}/vercel.json`).json()).toEqual({
+      $schema: "https://openapi.vercel.sh/vercel.json",
+      bunVersion: "1.4.x",
+      framework: null,
+      installCommand: "bun ci",
+      buildCommand: "bun run build:site",
+      ignoreCommand: "sh scripts/ignore-build.sh",
+    });
+  });
+});
+
+// Bun loads .env, .env.<NODE_ENV> and .env.local into a run on its own (SPEC-deploy, "Secrets and settings"), so Peter's
+// local keys live in .secrets/local.env, and no file named .env or .env.* is ever created.
+describe("no .env file", () => {
+  test("the checkout holds no .env file, ignored ones included", async () => {
+    expect(await envFiles(REPO)).toEqual([]);
+  });
+
+  // The control: a scan that found nothing would let the checkout's test pass with a .env file in place.
+  test("the scan finds each planted .env file, and leaves out installed packages and nested checkouts", async () => {
+    const root = `${tmp}/env-scan`;
+    for (const path of [".env", "src/.env.local", "node_modules/some-package/.env", "worktree/.env", "README.md"]) {
+      await Bun.write(`${root}/${path}`, "");
+    }
+    await Bun.write(`${root}/worktree/.git`, "gitdir: elsewhere\n");
+
+    expect(await envFiles(root)).toEqual([".env", "src/.env.local"]);
+  });
+});
+
+describe("bunfig.toml", () => {
+  // Bun reads bunfig.toml from the folder that a run starts in, so a fixture folder with a copy shows its effect.
+  // `bun run questions` and `bun run evals` name .secrets/local.env with --env-file (SPEC-deploy), so that must load.
+  test("turns Bun's automatic .env loading off, and a file that --env-file names still loads", async () => {
+    const dir = `${tmp}/bunfig`;
+    await Bun.write(`${dir}/.env`, "D8_MARKER=from-dotenv\n");
+    await Bun.write(`${dir}/.secrets/local.env`, "D8_MARKER=from-local-env\n");
+    const marker = "process.env.D8_MARKER ?? 'unset'";
+    // The control: without the repository's bunfig.toml, Bun loads the .env file.
+    expect((await $`${process.execPath} --print ${marker}`.cwd(dir).text()).trim()).toBe("from-dotenv");
+
+    await Bun.write(`${dir}/bunfig.toml`, Bun.file(`${REPO}/bunfig.toml`));
+
+    expect((await $`${process.execPath} --print ${marker}`.cwd(dir).text()).trim()).toBe("unset");
+    expect((await $`${process.execPath} --env-file=.secrets/local.env --print ${marker}`.cwd(dir).text()).trim()).toBe(
+      "from-local-env",
+    );
   });
 });
