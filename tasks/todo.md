@@ -83,7 +83,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [C5](modules/chat.md#c5-the-read-tool-passages-read-on-the-server-ids-only-on-the-wire) The read tool: passages read on the server, ids only on the wire — blocked by C3, K7, K8 (done 2026-10-27; ids only on the wire; bounds from `readLimits`)
 - [x] [C6](modules/chat.md#c6-the-read-budget-and-the-last-call) The read budget and the last call — blocked by C5 (done 2026-10-27; `readBudget(turn)` in `limits.ts`; `recordRead()` in `turn.ts`)
 - [x] [C7](modules/chat.md#c7-the-ask-about-this-read-and-request-line) The "Ask about this" read and request line — blocked by C6 (done 2026-10-27; `about-read.ts`; the About read counts toward the budget)
-- [ ] [C8](modules/chat.md#c8-markers-refusals-follow-up-questions-and-the-citation-forms) Markers: refusals, follow-up questions and the citation forms — blocked by C5
+- [x] [C8](modules/chat.md#c8-markers-refusals-follow-up-questions-and-the-citation-forms) Markers: refusals, follow-up questions and the citation forms — blocked by C5 (done 2026-10-27; `answerMarkers`; split markers covered at chunk sizes 1 to 9)
 - [ ] [C9](modules/chat.md#c9-the-open-tools-open_resume-and-open_source) The open tools: `open_resume` and `open_source` — blocked by C8
 - [ ] [C10](modules/chat.md#c10-the-conversation-sent-20-turns-40000-characters-earlier-reads-as-ids) The conversation sent: 20 turns, 40,000 characters, earlier reads as ids — blocked by C5
 - [x] [C11](modules/chat.md#c11-the-limit-stream-stream-errors-model-errors-and-stop) The limit stream, stream errors, model errors and Stop — blocked by C3 (done 2026-10-27; the response has its own controller; a Stop that reaches the handler logs `stopped`)
