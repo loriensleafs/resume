@@ -215,11 +215,11 @@ So the function bundle holds `Not public` text on purpose, and no file under `.v
 **`readPassages()` rules.**
 
 - Each id is a source id, which reads all its passages, or a passage id. Only approved sources count. Any other id goes to `unknown`, a draft's id and a resume entry id included.
-- It takes at most 20 ids, each at most 64 characters (`readLimits`). A longer list or a longer id is a programming error, and it throws. The chat's read tool checks its input against the same limits first, so the model gets a tool error instead ([SPEC-chat](SPEC-chat.md)).
+- It takes at most 20 ids, each at most 64 characters (`readLimits`). A longer list or a longer id is a programming error, and it throws. The chat's read tool checks its input against the same limits first, so the model gets a tool error instead ([SPEC-chat](SPEC-chat.md)). An id's characters are its Unicode code points, as zod's string `max()` counts them, so an id that the tool's schema lets through never throws. `readLimits.idCharacters` is the passage id cap and `readLimits.characters` the source cap, so each number is written once.
 - It takes the ids in the order given. The text groups the passages by source, in the order each source first appears. Within a source, passages keep file order.
-- Each source in the text has its header once and its `Not public` section once, at its end. This is also true when only one of its passages was asked for.
+- Each source in the text has its header once and its `Not public` section once, at its end. This is also true when only one of its passages was asked for. One blank line parts two sources.
 - An id whose passages are already in the text adds nothing. `read` lists each id whose text is in the result, once, in the order asked. A source id in `read` means that all its passages were read.
-- The 24,000 characters count all of `text`: headers, passages and `Not public` sections. When the next id would take `text` past the limit, `readPassages()` stops. That id, and every later id it knows and has not read, go to `skipped` in order.
+- The 24,000 characters count all of `text`, as the build counts a rendered source: headers, passages, `Not public` sections and the blank lines between sources. When the next id would take `text` past the limit, `readPassages()` stops. That id, and every later id it knows and has not read, go to `skipped`, each once, in order. A later id whose passages are already in the text goes to `read`, because its text is in the result.
 - `unknown` holds each unknown id once, in the order asked, also after the stop.
 - `text` stays on the server. Only `{ read, unknown, skipped }` reaches the browser ([SPEC-chat](SPEC-chat.md)).
 

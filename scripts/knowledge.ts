@@ -10,7 +10,7 @@
 // `bun run knowledge > core.txt` writes the core alone.
 
 import { buildKnowledge } from "../src/knowledge/build";
-import { readPassages } from "../src/knowledge/read";
+import { readLimits, readPassages } from "../src/knowledge/read";
 import { CORE_CHARACTERS, renderCore, renderSource, SOURCE_CHARACTERS } from "../src/knowledge/render";
 import type { Entry, Knowledge } from "../src/knowledge/types";
 
@@ -42,7 +42,9 @@ async function printRead(knowledge: Knowledge, ids: string[]): Promise<void> {
   const { text, unknown, skipped } = readPassages(knowledge, ids);
   await Bun.write(Bun.stdout, text);
   for (const id of unknown) console.error(`Unknown id ${JSON.stringify(id)}: no approved source or passage has it.`);
-  for (const id of skipped) console.error(`Skipped id ${JSON.stringify(id)}: the read reached its size limit before it.`);
+  for (const id of skipped) {
+    console.error(`Skipped id ${JSON.stringify(id)}: the read reached its limit of ${formatCount(readLimits.characters)} characters before it.`);
+  }
   if (unknown.length) console.error("`bun run knowledge` lists the approved sources.");
   if (unknown.length || skipped.length) process.exitCode = 1;
 }
