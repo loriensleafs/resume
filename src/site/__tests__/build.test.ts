@@ -1,6 +1,5 @@
-// Seam 1 of SPEC-site: buildSite() writes the real build output, and these tests read its files.
-// The fixture root holds the project's files: the repository's resume.yaml with a name, a lead and a headline of its
-// own, and a fake phone number in private.yaml.
+// Seam 1 of SPEC-site: the build script, `bun run build:site`, writes the real build output once, with every step that
+// Vercel's build runs, and these tests read its files. The fixture root (fixture-root.ts) holds the project's files.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { $, Glob } from "bun";
@@ -8,16 +7,9 @@ import { Face, Blob as HarfBuzzBlob } from "harfbuzzjs";
 import { formatRange, formatTitle, loadResume, type Resume } from "../../content";
 import { buildKnowledge } from "../../knowledge/build";
 import { holds } from "../../private-details";
-import { buildSite } from "../build";
+import { FAKE_PHONE, FIXTURE_HEADLINE, FIXTURE_LEAD, FIXTURE_NAME, writeFixtureRoot } from "./fixture-root";
 
 const REPO = `${import.meta.dir}/../../..`;
-const FAKE_PHONE = "(555) 555-0100";
-/** Only the fixture root's resume.yaml holds this name, so a page title that shows it read that resume.yaml. */
-const FIXTURE_NAME = "The Fixture Root’s Name";
-/** Only the fixture root's resume.yaml holds this lead, so a page that shows it read resume.yaml from that root. */
-const FIXTURE_LEAD = "The fixture root’s lead, which no other resume.yaml holds.";
-/** Only the fixture root's resume.yaml holds this headline, so an app bar that shows it read that resume.yaml. */
-const FIXTURE_HEADLINE = "The fixture root’s headline, which no other resume.yaml holds";
 const tmp = `${Bun.env.TMPDIR ?? "/tmp"}/site-test-${crypto.randomUUID()}`;
 const root = `${tmp}/root`;
 const outDir = `${tmp}/out`;
@@ -149,22 +141,15 @@ async function scriptsLoadedBy(page: string): Promise<string[]> {
 }
 
 beforeAll(async () => {
-  const source = Bun.YAML.parse(await Bun.file(`${REPO}/resume.yaml`).text()) as { basics: object };
-  const fixtureSource = {
-    ...source,
-    basics: { ...source.basics, name: FIXTURE_NAME, summary: FIXTURE_LEAD, label: FIXTURE_HEADLINE },
-  };
-  await Bun.write(`${root}/resume.yaml`, Bun.YAML.stringify(fixtureSource));
-  await Bun.write(`${root}/private.yaml`, `basics:\n  phone: ${FAKE_PHONE}\n`);
+  await writeFixtureRoot(root);
   resume = await loadResume("public", root);
-  // The build runs from another working folder, with a relative output folder, as a caller outside the
-  // repository would: neither may change where Vite finds the site or where the output goes.
-  const testsFolder = process.cwd();
-  process.chdir(tmp);
-  try {
-    await buildSite({ root, outDir: "out" });
-  } finally {
-    process.chdir(testsFolder);
+  // One build, with all its steps, in its own process (SPEC-deploy, "The build script"). `bun run` starts the script
+  // in the repository, so both folders are absolute. The script inherits `bun test`'s NODE_ENV, "test", and makes the
+  // production build all the same. One build per checkout runs at a time: Nitro keeps the last build's output folder
+  // at a fixed path (src/site/build.ts).
+  const build = await $`${process.execPath} run build:site --root ${root} --out ${outDir}`.cwd(REPO).quiet().nothrow();
+  if (build.exitCode !== 0) {
+    throw new Error(`bun run build:site failed with exit code ${build.exitCode}:\n${build.stderr}\n${build.stdout}`);
   }
 }, 120_000);
 
@@ -626,7 +611,79 @@ describe("private details", () => {
   });
 });
 
+/** The text of each inline script of a page (a script element with no src attribute), in page order, as written. */
+async function inlineScriptsOf(page: string): Promise<string[]> {
+  const scripts: string[] = [];
+  new HTMLRewriter()
+    .on("script:not([src])", {
+      element: () => void scripts.push(""),
+      // A script's text arrives in chunks after its start tag, so each chunk belongs to the last script.
+      text: (chunk) => void (scripts[scripts.length - 1] += chunk.text),
+    })
+    .transform(await Bun.file(`${staticDir}/${page}`).text());
+  return scripts;
+}
+
+/**
+ * The hash source that allows an inline script, as the browser computes it: SHA-256 over the script's text in UTF-8,
+ * in base64 (https://www.w3.org/TR/CSP3/#match-element-to-source-list). The browser hashes the text its parser read,
+ * in which CR LF and a lone CR are LF
+ * (https://html.spec.whatwg.org/multipage/parsing.html#preprocessing-the-input-stream).
+ */
+async function hashSourceOf(script: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(script.replace(/\r\n?/g, "\n")));
+  return `'sha256-${Buffer.from(digest).toString("base64")}'`;
+}
+
+/** A page's policy tags, by the http-equiv value that the browser matches without regard to case. */
+const POLICY_TAG = 'meta[http-equiv="Content-Security-Policy" i]';
+
+/** The content of a policy tag: SPEC-deploy's form, `default-src 'self'; script-src 'self'` and then the hashes. */
+const POLICY_TAG_CONTENT = /^default-src 'self'; script-src 'self'((?: 'sha256-[A-Za-z0-9+/]+={0,2}')*)$/;
+
+/** The hash sources that a page's first policy tag allows, sorted, or what keeps the tag from listing any. */
+async function hashesAllowedBy(page: string): Promise<string[] | string> {
+  const [content] = await attributeOn(page, POLICY_TAG, "content");
+  if (content === undefined) return "no policy tag";
+  const hashes = POLICY_TAG_CONTENT.exec(content ?? "")?.[1];
+  if (hashes === undefined) return `not SPEC-deploy's form: ${content}`;
+  return hashes.split(" ").filter(Boolean).sort();
+}
+
 describe("the Content Security Policy", () => {
+  // SPEC-deploy, Headers: a policy tag protects only what comes after it, and the browser enforces it only inside
+  // <head>. So each page's tag is the first element in its <head>, and it is the page's only one: the browser enforces
+  // every policy it finds, and a second tag without the page's hashes would block its scripts.
+  test("each HTML file, 404.html included, opens its <head> with its one policy tag", async () => {
+    const opening: Record<string, { first: string[]; policyTags: number }> = {};
+    const expected: typeof opening = {};
+    for (const page of await htmlFiles()) {
+      const tags = (await elementsOn(page, "*")).map((element) => element.tag);
+      const httpEquiv = (await attributeOn(page, "*", "http-equiv")).map((value) => value?.toLowerCase());
+      opening[page] = {
+        first: tags.slice(0, 3).map((tag, i) => (httpEquiv[i] ? `${tag} http-equiv=${httpEquiv[i]}` : tag)),
+        policyTags: (await attributeOn(page, POLICY_TAG, "content")).length,
+      };
+      expected[page] = { first: ["html", "head", "meta http-equiv=content-security-policy"], policyTags: 1 };
+    }
+    expect(opening).toEqual(expected);
+  });
+
+  // SPEC-site, Acceptance criteria and Testing 1: the tag lists exactly the hashes of the page's own inline scripts,
+  // each once. A missing hash blocks a script; an extra one allows a script the page does not hold. A page with no
+  // inline script, such as 404.html, gets `script-src 'self'` alone.
+  test("each policy tag allows by hash exactly its own page's inline scripts, each hash once", async () => {
+    const allowed: Record<string, string[] | string> = {};
+    const expected: Record<string, string[]> = {};
+    for (const page of await htmlFiles()) {
+      allowed[page] = await hashesAllowedBy(page);
+      expected[page] = [...new Set(await Promise.all((await inlineScriptsOf(page)).map(hashSourceOf)))].sort();
+    }
+    expect(allowed).toEqual(expected);
+    // The pages hold TanStack Start's inline scripts, so the check above compares real hashes.
+    expect(Object.values(expected).flat().length).toBeGreaterThan(0);
+  });
+
   // style-src 'self' blocks a style attribute, and no hash can allow one (SPEC-deploy, Headers).
   test("no page holds a style attribute", async () => {
     const styled: string[] = [];
