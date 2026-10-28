@@ -14,6 +14,13 @@ import { runErrorCode, type RunErrorCode } from "./wire";
 /** How the turn ended. */
 export type TurnEnding = { outcome: QuestionLogEntry["outcome"]; errorCode: RunErrorCode | null };
 
+/**
+ * How a turn that ended with an error event ended. Anthropic's spend limit during the run is `limit`,
+ * as a refusal by the budget is (Question log; SPEC-deploy, "How the limit state reaches the browser").
+ * Every other code is `error`.
+ */
+const errorEnding = (errorCode: RunErrorCode): TurnEnding => ({ outcome: errorCode === "SPEND_LIMIT" ? "limit" : "error", errorCode });
+
 /** What finishTurn() writes to: the question log, the telemetry and the clock of ChatDeps. */
 type FinishDeps = { log: QuestionLog; telemetry: Telemetry; now(): Date };
 
@@ -27,7 +34,7 @@ export function finishTurnHooks(deps: FinishDeps, turn: Turn): ChatMiddleware {
     onFinish: (ctx) => ctx.defer(finishTurn(deps, turn, { outcome: "answered", errorCode: null })),
     // A model error ends with the code the wire sent for it. A throw has none: it is SERVER_ERROR,
     // which the stream wrapper also sends.
-    onError: (ctx) => ctx.defer(finishTurn(deps, turn, { outcome: "error", errorCode: turn.errorCode ?? "SERVER_ERROR" })),
+    onError: (ctx) => ctx.defer(finishTurn(deps, turn, errorEnding(turn.errorCode ?? "SERVER_ERROR"))),
     // The visitor's Stop, where its abort reaches the handler (row 168).
     onAbort: (ctx) => ctx.defer(finishTurn(deps, turn, { outcome: "stopped", errorCode: null })),
   };
