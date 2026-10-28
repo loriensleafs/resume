@@ -163,7 +163,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [S30](modules/site.md#s30-the-speed-budget) The speed budget — blocked by S29
 - [ ] [Checkpoint site: phones, offline, install](modules/site.md#checkpoint-site-phones-offline-install) — after S23 to S30; Peter: review the preview at 390 × 844
 - [x] [D11](modules/deploy.md#d11-the-daily-cap-holds-under-parallel-requests) The daily cap holds under parallel requests — blocked by D10 (done 2026-10-27; one store transaction per reservation; https only; D12 and D15 close the interim gaps)
-- [ ] [D12](modules/deploy.md#d12-daily-totals-and-the-cost-estimate) Daily totals and the cost estimate — blocked by D11
+- [x] [D12](modules/deploy.md#d12-daily-totals-and-the-cost-estimate) Daily totals and the cost estimate — blocked by D11 (done 2026-10-27; a known cost settles the reservation; `daily-totals.ts`)
 - [ ] [D13](modules/deploy.md#d13-limit-alerts-for-the-months-spend-and-the-daily-cap) Limit alerts for the month's spend and the daily cap — blocked by D12; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [D14](modules/deploy.md#d14-the-monthly-limit-pauses-the-chat-and-one-probe-an-hour) The monthly limit pauses the chat, and one probe an hour — blocked by D13; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [D15](modules/deploy.md#d15-a-failing-or-slow-store-never-breaks-an-answer) A failing or slow store never breaks an answer — blocked by D13; Peter: its wording draft goes to his one review before D37 (row 153)
