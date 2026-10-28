@@ -90,7 +90,7 @@ export const turnLimits = {
 - **The last call.** After the third read returns, and at the sixth model call, `readBudget`'s `onConfig` gives the next call `toolChoice: "none"`. The tools stay in the request, so the cache holds, but the call can only answer. A turn therefore never ends on a tool call with no answer.
 - **Model calls.** `agentLoopStrategy: maxIterations(6)` bounds the loop as a whole.
 - **Thinking.** Sonnet 5.5 always thinks, and its thinking counts toward each call's `max_tokens`. `handleChat()` calls `chat()` with `reasoning: { level: "medium", summary: true }` and `modelOptions: { max_tokens: turnLimits.answerTokens }`. The Anthropic adapter sends this as adaptive thinking with `output_config.effort: "medium"` and `display: "summarized"` (Peter, row 156; what reaches the browser is in Thinking). The summarized display can delay the first answer text a little; the answer step that shows the thinking summary shows that wait. Billing is the same as with the thinking text omitted (Anthropic's thinking docs, [research 07](../docs/research/07-tanstack-ai-hosting-model.md)), so SPEC-deploy's reservation of $0.90 per turn still covers the worst turn under these limits.
-- **Deadline.** A timer on the run's `abortController` aborts it at 120 s. The handler then sends its own `RUN_ERROR` event with the code `DEADLINE` before the stream closes, because the browser takes a stream that closes with no error event as a finished answer. The log records `error`, not `stopped`. [SPEC-deploy](SPEC-deploy.md) sets the function's `maxDuration` to 150 s.
+- **Deadline.** A timer on the run's `abortController` aborts it 120 s after the run starts; a run that ends first stops the timer. The handler then sends its own `RUN_ERROR` event with the code `DEADLINE` before the stream closes, because the browser takes a stream that closes with no error event as a finished answer. The log records `error`, not `stopped`. [SPEC-deploy](SPEC-deploy.md) sets the function's `maxDuration` to 150 s.
 - **Conversation sent.** The server sends the model the last 20 turns, and at most 40,000 characters of them, oldest dropped first. Earlier reads reach the model as ids only, because a citation needs a read in the same turn ([decision 0016](../docs/decisions/0016-two-layer-knowledge.md)). The browser holds only those ids (see Tools). The browser's history builder makes the messages it sends from the saved rows' `UIMessage`s only: their text parts, and tool calls with id-only results. It never reads `answer.thinking` (see Saved conversation). The browser's connection applies the same window before it sends, so a long conversation never reaches the 256 KB cap.
 
 ## The request
@@ -148,7 +148,7 @@ All three tools run on the server; no tool writes anything. The two open tools r
 |---|---|---|---|
 | `read_sources` | `{ ids: string[]; topic: string }`, `topic` at most 60 characters | To the model: the `readPassages()` result, `{ text, read, unknown, skipped }`. To the browser: `{ read, unknown, skipped }` only | None. Reads approved sources only. Its call shows "Found 1 source about <topic>" and "Reading <title>" |
 | `open_resume` | `{}` | `{ opened: true }` | The browser calls `workspace.openResume()`. The answer shows the resume card |
-| `open_source` | `{ passageId: string }` | `{ opened: true }` or `{ error }` | Only for a passage of an approved source that the conversation cites (a kept marker in an earlier answer's text) or that this turn read. The browser calls `workspace.openCitation(id, n)` |
+| `open_source` | `{ passageId: string }` | `{ opened: true }` or `{ error }`. To the browser, the error is one fixed text (after C9's review) | Only for a passage of an approved source that the conversation cites (a kept marker in an earlier answer's text) or that this turn read. The browser calls `workspace.openCitation(id, n)` |
 
 The `read_sources` input schema checks SPEC-knowledge's `readLimits` before the tool calls `readPassages()`: at most 20 ids, each at most 64 characters. Too many ids or a too-long id is a tool error, not a throw out of the handler. An unknown or skipped id comes back named in the result, so the model can say what it could not read. A tool error is a result the model sees, not a failed run.
 
@@ -360,7 +360,7 @@ type SavedConversationState = {
 
 ## Question log
 
-One entry per turn that reached the model. One function, `finishTurn()` in `src/chat/server/finish-turn.ts`, writes the turn's entry and its `chat_turn` event (see Turn telemetry). The terminal middleware hook calls it with `ctx.defer()`, and the stream wrapper calls it after a throw (see The request, "A thrown run"). It keeps per-turn state, so each turn writes each record exactly once:
+One entry per turn that reached the model. One function, `finishTurn()` in `src/chat/server/finish-turn.ts`, writes the turn's entry and its `chat_turn` event (see Turn telemetry). `finishRejected()` writes the `chat_turn` event of a rejected request, which is not a turn, so it writes no question-log entry. The terminal middleware hook calls `finishTurn()` with `ctx.defer()`, the deadline middleware calls it with `ctx.defer()` when the deadline passes (see Limits, "Deadline"), and the stream wrapper calls it after a throw (see The request, "A thrown run"). It keeps per-turn state, so each turn writes each record exactly once, and the first call decides how the turn ended:
 
 ```ts
 export type QuestionLogEntry = {
@@ -491,20 +491,25 @@ bun run evals                      # the trick questions against the real model;
 ## Project Structure
 
 ```text
-src/chat/server/handle-chat.ts     handleChat(request, deps): the module's server entry point, the request checks in order,
-                                   and the stream wrapper that turns a throw into SERVER_ERROR
+src/chat/server/handle-chat.ts     handleChat(request, deps) and ChatDeps: the module's server entry point, which wires one turn
+src/chat/server/request-checks.ts  checkRequest(): the request checks in order, with an { ok } result; the ChatError shape, its
+                                   codes and chatError()
+src/chat/server/run.ts             the run's controller, which a Stop aborts, and the stream wrapper that ends the stream with
+                                   SERVER_ERROR after a throw and with DEADLINE after the deadline
 src/chat/server/about-read.ts      readAbout(): the About read of a passage or a source, its read_sources call and whole result
                                    for the model, and the middleware that sends the call and its id-only result first
 src/chat/server/props.ts           ChatProps and the messages schema
 src/chat/server/prompt.ts          the system prompt, with the core from SPEC-knowledge's renderCore(knowledge), and the scope, audience and about lines
 src/chat/server/tools.ts           read_sources (its input checks readLimits), open_resume, open_source
+src/chat/server/tool-names.ts      the three tool names, in a leaf module that imports nothing
 src/chat/server/limits.ts          turnLimits; the readBudget and deadline middleware
 src/chat/server/markers.ts         the marker middleware and the chat.citations event
 src/chat/server/wire.ts            the chunk middleware, a new instance per request: the event allowlist, read results as ids,
                                    RUN_ERROR events as wireError(code), and the thinking summary as chat.thinking events;
                                    the fixed messages per code and wireError()
 src/chat/server/finish-turn.ts     finishTurn(): writes the turn's question-log entry and its chat_turn event exactly once;
-                                   the terminal hook and the stream wrapper call it
+                                   the terminal hook, the deadline middleware and the stream wrapper call it; finishRejected():
+                                   the chat_turn event of a rejected request
 src/chat/server/question-log.ts    QuestionLog, QuestionLogEntry, Budget and Telemetry, and their in-memory versions
 src/chat/server/telemetry.ts       ChatTurnEvent, and the middleware that sums onUsage for finishTurn()
 src/chat/ui/                       ChatColumn, Messages, Question, QueuedQuestion, Answer, AnswerText, AnswerSteps,
@@ -514,8 +519,12 @@ src/chat/ui/answer-markdown.ts     the marker transform to #cite: link nodes, an
 src/chat/saved-conversation.ts     opens peterkloss-chat; the messages, queue and session collections; the pk-chat-send lock;
                                    the history builder, which gives useChat text parts and id-only tool results, never
                                    answer.thinking
-src/chat/device-index.ts           builds the device index from publicKnowledge(knowledge); matches at run time
+src/chat/device-index.ts           the browser's part: the device index's type, DEVICE_INDEX_FILE and loadDeviceIndex(), its
+                                   one fetch per page; matches at run time
+src/chat/device-index-build.ts     the build's part: buildDeviceIndex(), from publicKnowledge(knowledge), with the resume
+                                   entries' labels from the site's buildSiteData(root); only the Vite plugin imports it
 src/chat/vite-plugin.ts            the chat's Vite plugin: virtual:knowledge and device-index.json
+src/chat/virtual-knowledge.d.ts    the type of virtual:knowledge: the Knowledge type of buildKnowledge()
 src/site/routes/api.chat.ts        the server route (described below)
 evals/trick-questions.yaml         the eval cases
 scripts/evals.ts                   `bun run evals`
@@ -751,3 +760,7 @@ All rows are in the [decision record](../docs/design/interview-2026-10-26.md).
 - 2026-10-27, after C4's review: The request's step 4 also refuses a request whose newest message is not a user message with text (400 `INVALID_REQUEST`), and the Origin check runs before the body is read. Both are the conductor's decisions, for Peter's end review ([build decisions](../docs/design/build-decisions.md)).
 - 2026-10-27, task A10: the design system moved from 0.3.2 to 0.3.3 (row 172). Rendering answers names 0.3.3: `acme-markdown` has the same record at 0.3.3, and the parts in the chat's task conventions are the same.
 - 2026-10-27, after C12's review: the two spend-limit tests run the adapter's own SDK behind a stub `fetch` with Anthropic's documented bodies, and every other stubbed turn goes through `createAnthropicChatWithClient()`. The conductor's decision, for Peter's end review ([build decisions](../docs/design/build-decisions.md)).
+- 2026-10-27, after C16's review: Project Structure puts the device index's build code in `src/chat/device-index-build.ts`, apart from the browser's `device-index.ts`, and lists `src/chat/virtual-knowledge.d.ts`. The labels of the resume entries come from the site's `buildSiteData(root)` at build time. The conductor's decision, for Peter's end review ([build decisions](../docs/design/build-decisions.md)).
+- 2026-10-27, after C14's review: Question log names `finishRejected()`, which writes the `chat_turn` event of a rejected request and no question-log entry, because a rejected request is not a turn.
+- 2026-10-27, after C9's review: Project Structure lists `src/chat/server/tool-names.ts`, which C9 added. The browser gets one fixed `open_source` error text, whatever the error said (Tools). The fixed text is the conductor's decision, for Peter's end review.
+- 2026-10-27, task C13: Project Structure gains `request-checks.ts` and `run.ts`, which take the request checks and the stream wrapper out of `handle-chat.ts` (the carry-forward notes of C4 and C11). The Question log names the deadline middleware as a caller of `finishTurn()`, and Limits, "Deadline", says when the timer starts and stops. After C13's review, the `finish-turn.ts` line also names `finishRejected()`, and the `request-checks.ts` line says that `checkRequest()` gives an `{ ok }` result.

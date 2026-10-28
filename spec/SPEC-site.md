@@ -212,8 +212,11 @@ src/site/routes/             the route files: __root.tsx, index.tsx (workspace),
                              api.chat.ts (described in SPEC-chat); api.status.ts and api.cron.health.ts (described in SPEC-deploy)
 src/site/routeTree.gen.ts    the route tree, generated from src/site/routes/ by TanStack Router's plugin inside tanstackStart();
                              committed (TanStack Router's FAQ) and never edited by hand
-src/site/shell/              AppBar, CareerTimeline, DocumentPanel, ResumeView, SourceView, Sheet, InstallOffer, ThemeSwitch
+src/site/shell/              AppBar, CareerTimeline, DocumentPanel, ResumeView, SourceView, Sheet, InstallOffer, InstallAppButton,
+                             ThemeSwitch
 src/site/workspace.ts        the workspace contract the chat module reads
+src/site/install-offer.ts    the browser's saved install prompt, whether the site runs as the installed app, and the installed
+                             app's request for persistent storage; "Install app" and the install sheet read it
 src/site/saved-views.ts      the saved views in the IndexedDB database peterkloss-views
 src/site/head-script.ts      the inline head script: the theme and the first view's pre-paint flag
 src/site/suggested-questions.ts  the first view's suggested questions, overall and per role
@@ -223,9 +226,11 @@ src/site/site-data.ts        buildSiteData(): the pages' data, made at build tim
 src/site/data.ts             siteData(), the Vite plugin that makes modules from buildSiteData(): the pages' data, one
                              lazy JSON file per source, and the career timeline's stylesheet
 src/site/styles/             tokens import, fonts, layout
-src/site/build.ts            buildSite({ root, outDir }): the Vite build with prerendering, documents/ and 404.html
+src/site/build.ts            buildSite({ root, outDir }): the Vite build with prerendering, documents/, 404.html and the web
+                             manifest, manifest.webmanifest, from resume.yaml's name
 src/site/not-found.tsx       renderNotFoundPage(): the text of 404.html, a React tree with no script
-src/site/page-head.ts        SITE_ADDRESS and pageHead(): each page's title, description, canonical address and Open Graph tags
+src/site/page-head.ts        SITE_ADDRESS and pageHead(): each page's title, description, canonical address and Open Graph tags;
+                             SITE_LINKS, the web manifest and favicon links that every page holds
 src/site/service-worker.ts   writeServiceWorker(staticDir): Workbox generateSW over the static folder
 scripts/build-site.ts        `bun run build:site`: the build-time composition root (owned by SPEC-deploy)
 scripts/icons.ts             `bun run icons`: renders the icons with Chrome into public/icons/

@@ -52,3 +52,11 @@ export function recordRead(turn: Turn, result: Pick<ReadResult, "read">): void {
   turn.reads++;
   for (const id of result.read) if (!turn.readIds.includes(id)) turn.readIds.push(id);
 }
+
+/**
+ * Whether the turn has read the passage `id` of the source `source`: a read of the passage itself, or
+ * of its whole source, which reads every passage the source has. The citation check and open_source
+ * both ask it.
+ */
+export const hasRead = (turn: Pick<Turn, "readIds">, id: string, source: string): boolean =>
+  turn.readIds.includes(id) || turn.readIds.includes(source);

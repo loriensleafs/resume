@@ -13,11 +13,16 @@ import {
   FAKE_PHONE,
   FIXTURE_DEEP_DIVE,
   FIXTURE_DRAFT,
+  FIXTURE_DRAFT_LOGISTICS_ANSWER,
   FIXTURE_HEADLINE,
   FIXTURE_INTERVIEW,
+  FIXTURE_INTERVIEW_LINK,
   FIXTURE_LEAD,
+  FIXTURE_LINK,
+  FIXTURE_LOGISTICS_ANSWER,
   FIXTURE_NAME,
 } from "./fixture-root";
+import { iconSizes, pngSize } from "./image-sizes";
 
 const REPO = `${import.meta.dir}/../../..`;
 const { root, outDir, staticDir } = seam1;
@@ -346,6 +351,96 @@ describe("the static folder", () => {
   test("holds no text of the draft source: not its id, its title, its summary or its passage", async () => {
     for (const text of [FIXTURE_DRAFT, "draft source", "fixture draft"]) expect(await filesHolding(text)).toEqual([]);
   });
+
+  // The approved answer is the control: the device index holds it (C16).
+  test("holds the approved logistics answer and no draft one", async () => {
+    expect(await filesHolding(FIXTURE_LOGISTICS_ANSWER)).toEqual(["device-index.json"]);
+    expect(await filesHolding(FIXTURE_DRAFT_LOGISTICS_ANSWER)).toEqual([]);
+  });
+});
+
+/**
+ * device-index.json as a browser fetches it (SPEC-chat, "The build"): one row per resume entry, logistics answer and
+ * passage, by knowledge id, with the label and the text a browser shows, and the approved sources' links. The test
+ * states the file's shape itself, so it checks the file, not the chat module's type.
+ */
+type DeviceIndexFile = { entries: { id: string; label: string; text: string }[]; links: string[] };
+
+// SPEC-chat, The build, Citations card and Device matches: the chat's Vite plugin writes the device index into the
+// static folder during the site's Vite build, from publicKnowledge(knowledge) of the root that the build names.
+describe("the device index", () => {
+  const deviceIndex = async (): Promise<DeviceIndexFile> => Bun.file(`${staticDir}/device-index.json`).json();
+
+  // The fixture root's resume.yaml is the repository's, so its roles are FedNow and the others, with their x-short
+  // labels; its basics.name is the fixture's own, so the basics label shows that the plugin read the fixture root.
+  test('labels each resume entry once: "Resume: FedNow" for a role, "Resume: FedNow, highlight 2" for a highlight', async () => {
+    const { core } = await buildKnowledge({ root });
+    const resumeEntries = core.filter((entry) => entry.kind === "resume");
+    const { entries } = await deviceIndex();
+    const resumeRows = entries.filter((row) => resumeEntries.some((entry) => entry.id === row.id));
+    // Each resume entry once, in resume order, with the core's public text.
+    expect(resumeRows.map(({ id, text }) => ({ id, text }))).toEqual(resumeEntries.map(({ id, text }) => ({ id, text })));
+    const labelOf = new Map(resumeRows.map((row) => [row.id, row.label]));
+    expect(labelOf.get("role:fednow")).toBe("Resume: FedNow");
+    expect(labelOf.get("highlight:fednow.2")).toBe("Resume: FedNow, highlight 2");
+    expect(labelOf.get("role:sheridan")).toBe("Resume: Sheridan");
+    expect(labelOf.get("basics")).toBe(`Resume: ${FIXTURE_NAME}`);
+    expect(labelOf.get("skills:ai-platform")).toBe("Resume: Skills, AI platform");
+    expect(labelOf.get("education")).toBe("Resume: Education");
+  });
+
+  // SPEC-chat, Markers: a logistics citation reads "Logistics: work arrangement".
+  test('holds each approved logistics answer, labelled "Logistics: <topic>", with its text', async () => {
+    const { entries } = await deviceIndex();
+    expect(entries.filter((row) => row.id.startsWith("logistics:"))).toEqual([
+      { id: "logistics:work-arrangement", label: "Logistics: work arrangement", text: FIXTURE_LOGISTICS_ANSWER },
+    ]);
+  });
+
+  // SPEC-chat, Citations card: a passage's row reads "<source title>: <passage heading>".
+  test('holds each passage of each approved source, labelled "<source title>: <passage heading>", with its text', async () => {
+    const { sources } = publicKnowledge(await buildKnowledge({ root }));
+    const passages = sources.flatMap((source) => source.passages);
+    const { entries } = await deviceIndex();
+    const passageRows = entries.filter((row) => passages.some((passage) => passage.id === row.id));
+    expect(passageRows.map(({ id, text }) => ({ id, text }))).toEqual(passages.map(({ id, text }) => ({ id, text })));
+    expect(passageRows).toContainEqual({
+      id: `${FIXTURE_DEEP_DIVE}.2`,
+      label: "The fixture root’s deep dive: What Peter did",
+      text: "The fixture deep dive’s account of what Peter did.",
+    });
+    expect(passageRows).toContainEqual({
+      id: `${FIXTURE_INTERVIEW}.3`,
+      label: "The fixture root’s interview: How did you help with the fixture?",
+      text: "The fixture interview’s second answer.",
+    });
+  });
+
+  // SPEC-chat, Rendering answers: an answer may link to the exact https addresses in the approved sources' links. The
+  // draft's link names the draft, so the test of the draft's text shows that it is in no file.
+  test("holds the approved sources' links, each once, in source-id order", async () => {
+    expect((await deviceIndex()).links).toEqual([FIXTURE_LINK, FIXTURE_INTERVIEW_LINK]);
+  });
+
+  // SPEC-chat, The build: the browser fetches the device index on demand, so neither the file nor its loader is part of
+  // the JavaScript that / loads first (SPEC-site's 200 KB budget). No page uses it before task C36; this guards C36.
+  test("is not part of the JavaScript that / loads before any interaction", async () => {
+    const scripts = await Promise.all(
+      (await scriptsLoadedBy("index.html")).map((script) => Bun.file(`${staticDir}${script}`).text()),
+    );
+    expect(scripts.filter((script) => script.includes("device-index.json"))).toEqual([]);
+  });
+
+  // A whole source is never a citation (SPEC-chat, Markers), and a draft is not in the knowledge base.
+  test("holds the resume entries, then the logistics answers, then the passages, and nothing else", async () => {
+    const knowledge = publicKnowledge(await buildKnowledge({ root }));
+    const { entries } = await deviceIndex();
+    expect(entries.map((row) => row.id)).toEqual([
+      ...knowledge.core.filter((entry) => entry.kind === "resume").map((entry) => entry.id),
+      "logistics:work-arrangement",
+      ...knowledge.sources.flatMap((source) => source.passages.map((passage) => passage.id)),
+    ]);
+  });
 });
 
 // SPEC-site, Views: Resume view; Testing 1. Both pages show the whole resume, each entry with its knowledge id.
@@ -422,7 +517,8 @@ describe.each(["index.html", "resume/index.html"])("the app bar in %s", (page) =
   });
 
   // The page's route gives the end slot its content (the capability map's contract "the app bar's end slot"). Neither
-  // route gives it any yet; the workspace route puts New chat there on phones, which seam 2 checks.
+  // route gives it any yet; the workspace route puts New chat there on phones, which seam 2 checks. "Install app" shows
+  // there only after the browser offers the install, so no prerendered page holds it (seam 2 checks it too).
   test("holds no end-slot element while the page's route gives the slot no content", async () => {
     expect(await elementsOn(page, 'acme-app-bar [slot="end"]')).toEqual([]);
   });
@@ -989,46 +1085,6 @@ const ICONS: Record<string, number[]> = {
   "icon-maskable-512.png": [512],
 };
 
-/** The PNG signature, the first 8 bytes of every PNG file (https://www.w3.org/TR/png-3/#5PNG-file-signature). */
-const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-
-/**
- * The width and height of a PNG image, from its IHDR chunk, which comes first, right after the signature
- * (https://www.w3.org/TR/png-3/#11IHDR). It throws for any other file.
- */
-function pngSize(png: Uint8Array): { width: number; height: number } {
-  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
-  const isPng = PNG_SIGNATURE.every((byte, i) => png[i] === byte);
-  if (!isPng || new TextDecoder().decode(png.subarray(12, 16)) !== "IHDR") throw new Error("not a PNG file");
-  return { width: view.getUint32(16), height: view.getUint32(20) };
-}
-
-/**
- * The size of each square image in an icon file: a PNG file holds one; an ICO file holds the PNG images its directory
- * lists. An ICO file is a 6-byte header (0, type 1, the image count), then one 16-byte entry per image: its width and
- * height (0 means 256), its byte length and its offset
- * (https://learn.microsoft.com/en-us/previous-versions/ms997538(v=msdn.10); a PNG image inside an ICO file:
- * https://devblogs.microsoft.com/oldnewthing/20101022-00/?p=12473). It throws when an image is not square, or when an
- * entry's size is not its PNG's.
- */
-function iconSizes(file: Uint8Array): number[] {
-  const square = ({ width, height }: { width: number; height: number }) => {
-    if (width !== height) throw new Error(`an image is ${width} × ${height} px, not square`);
-    return width;
-  };
-  if (PNG_SIGNATURE.every((byte, i) => file[i] === byte)) return [square(pngSize(file))];
-  const view = new DataView(file.buffer, file.byteOffset, file.byteLength);
-  if (view.getUint16(0, true) !== 0 || view.getUint16(2, true) !== 1) throw new Error("neither a PNG nor an ICO file");
-  return Array.from({ length: view.getUint16(4, true) }, (_, i) => {
-    const entry = 6 + 16 * i;
-    const listed = square({ width: view.getUint8(entry) || 256, height: view.getUint8(entry + 1) || 256 });
-    const start = view.getUint32(entry + 12, true);
-    const size = square(pngSize(file.subarray(start, start + view.getUint32(entry + 8, true))));
-    if (size !== listed) throw new Error(`image ${i + 1} is listed at ${listed} px, but its PNG is ${size} px`);
-    return size;
-  });
-}
-
 // SPEC-site, Views: App icon, and Testing 1. Vercel's build has no Chrome, so the icon files are committed, as the
 // documents are, and the build copies them; it renders none.
 describe("the site's icons", () => {
@@ -1044,6 +1100,66 @@ describe("the site's icons", () => {
 
   test.each(Object.entries(ICONS))("icons/%s holds square images of %p px", async (file, sizes) => {
     expect(iconSizes(await Bun.file(`${staticDir}/icons/${file}`).bytes())).toEqual(sizes);
+  });
+});
+
+/** The web manifest's address on the site, as SPEC-deploy's cache table names it (Headers). */
+const WEB_MANIFEST = "/manifest.webmanifest";
+
+// SPEC-site, Acceptance criteria and Testing 1: the site installs as a standalone app, named after Peter, with the PK
+// icon, and its start address and scope are the site's root. buildSite() makes the web manifest from resume.yaml's
+// name, so the fixture root's name shows that the manifest read that file.
+describe("the web manifest", () => {
+  const webManifest = () => Bun.file(`${staticDir}${WEB_MANIFEST}`).json();
+
+  // The id is the start address, as a browser would derive it; written out, it keeps the installed app the same app
+  // if the start address ever changes (https://www.w3.org/TR/appmanifest/#id-member).
+  test("has the fixture root's name, id /, start_url /, scope / and display standalone", async () => {
+    const { id, name, start_url, scope, display } = await webManifest();
+    expect({ id, name, start_url, scope, display }).toEqual({
+      id: "/",
+      name: FIXTURE_NAME,
+      start_url: "/",
+      scope: "/",
+      display: "standalone",
+    });
+  });
+
+  test("lists PNG icons of 192 px, 512 px and a maskable 512 px", async () => {
+    const { icons } = await webManifest();
+    expect(icons.map(({ sizes, type, purpose }: Record<string, string>) => ({ sizes, type, purpose }))).toEqual([
+      { sizes: "192x192", type: "image/png", purpose: undefined },
+      { sizes: "512x512", type: "image/png", purpose: undefined },
+      { sizes: "512x512", type: "image/png", purpose: "maskable" },
+    ]);
+  });
+
+  // A browser reads each icon from its address, resolved against the manifest's own address.
+  test("each icon it lists is a committed file of public/icons/, at the size it gives", async () => {
+    const { icons } = await webManifest();
+    for (const { src, sizes } of icons as Record<string, string>[]) {
+      const { pathname } = new URL(src!, `https://peterkloss.dev${WEB_MANIFEST}`);
+      expect(pathname).toStartWith("/icons/");
+      const served = await Bun.file(`${staticDir}${pathname}`).bytes();
+      expect(Buffer.compare(served, await Bun.file(`${REPO}/public${pathname}`).bytes())).toBe(0);
+      const { width, height } = pngSize(served);
+      expect(`${width}x${height}`).toBe(sizes!);
+    }
+  });
+
+  // Every page links the manifest, so the browser can offer the install from any page, and the favicon, so a tab
+  // shows the PK icon. Without the link a browser asks for /favicon.ico, which is no file of the site.
+  test("every HTML file, 404.html included, links the web manifest and the favicon, once each", async () => {
+    const links: Record<string, { manifest: (string | null)[]; favicon: (string | null)[] }> = {};
+    const expected: typeof links = {};
+    for (const page of await htmlFiles()) {
+      links[page] = {
+        manifest: await attributeOn(page, 'link[rel="manifest"]', "href"),
+        favicon: await attributeOn(page, 'link[rel="icon"]', "href"),
+      };
+      expected[page] = { manifest: [WEB_MANIFEST], favicon: ["/icons/favicon.ico"] };
+    }
+    expect(links).toEqual(expected);
   });
 });
 

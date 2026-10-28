@@ -14,7 +14,7 @@ import { EventType, type ChatMiddleware, type ModelMessage, type StreamChunk } f
 import { readPassages } from "../../knowledge/read";
 import type { Knowledge, ReadResult, Source } from "../../knowledge/types";
 import { turnLimits } from "./limits";
-import { READ_SOURCES } from "./tools";
+import { READ_SOURCES } from "./tool-names";
 import { recordRead, type Turn } from "./turn";
 import type { ReadIds } from "./wire";
 

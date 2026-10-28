@@ -1,11 +1,12 @@
 // buildSite(): the site's production build (SPEC-site, Project Structure). It runs the Vite app build of
 // vite.config.ts, which prerenders the pages into Nitro's Vercel output under the folder the caller names, then writes
-// the not-found page, 404.html, beside them.
+// the not-found page, 404.html, and the web manifest beside them.
 import { join, resolve } from "node:path";
 import { Glob } from "bun";
 import { createBuilder } from "vite";
-import { loadResume } from "../content";
+import { loadResume, type Resume } from "../content";
 import { renderNotFoundPage } from "./not-found";
+import { WEB_MANIFEST_ADDRESS } from "./page-head";
 
 /** The site's Vite config. It sets Vite's root to its own folder, the repository, which holds src/site. */
 const VITE_CONFIG = join(import.meta.dir, "../../vite.config.ts");
@@ -41,19 +42,48 @@ export async function buildSite({ root, outDir }: BuildSiteOptions): Promise<voi
     nitro: { output: { dir: resolve(outDir, ".vercel/output") } },
   });
   await builder.buildApp();
-  await writeNotFoundPage(resolve(root), resolve(outDir, ".vercel/output/static"));
+  // The pages' own data: the same resume.yaml through the same public loader.
+  const { basics } = await loadResume("public", resolve(root));
+  const staticDir = resolve(outDir, ".vercel/output/static");
+  await writeNotFoundPage(basics, staticDir);
+  await Bun.write(join(staticDir, WEB_MANIFEST_ADDRESS), JSON.stringify(webManifest(basics), null, 2));
 }
 
 /**
  * Writes 404.html, the not-found page, into the static folder, outside the route tree. It takes the pages' own data and
- * stylesheets: the name and the headline from the same resume.yaml through the same public loader, and each
- * stylesheet that every prerendered page links.
+ * stylesheets: the name and the headline, and each stylesheet that every prerendered page links.
  */
-async function writeNotFoundPage(root: string, staticDir: string): Promise<void> {
-  const { basics } = await loadResume("public", root);
+async function writeNotFoundPage(basics: Resume["basics"], staticDir: string): Promise<void> {
   const stylesheets = await stylesheetsOfEveryPage(staticDir);
   const page = renderNotFoundPage({ basics: { name: basics.name, label: basics.label }, stylesheets });
   await Bun.write(join(staticDir, "404.html"), page);
+}
+
+/**
+ * The web manifest (https://www.w3.org/TR/appmanifest/), from which the browser installs the site as a standalone app
+ * named after Peter, with the PK icon (SPEC-site, Acceptance criteria; Views: Installed app and App icon). Its
+ * addresses resolve against the manifest's own, so the start address and the scope are https://peterkloss.dev/.
+ *
+ * - The id is the start address, as a browser would derive it. Written out, it keeps the installed app the same app if
+ *   the start address ever changes (https://www.w3.org/TR/appmanifest/#id-member).
+ * - The icons are the committed files that `bun run icons` renders into public/icons/, which Vite copies. An icon with
+ *   no purpose serves any use; the maskable one keeps its letters inside the safe zone.
+ * - No theme_color: the installed-app boards draw the title bar light in light mode and dark in dark mode, which one
+ *   manifest color cannot do. Without it the browser draws its own title bar, in the system's appearance.
+ */
+function webManifest(basics: Resume["basics"]) {
+  return {
+    id: "/",
+    name: basics.name,
+    start_url: "/",
+    scope: "/",
+    display: "standalone",
+    icons: [
+      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { src: "/icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+    ],
+  };
 }
 
 /**

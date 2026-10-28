@@ -6,6 +6,7 @@ import { questionLogContract } from "../../chat/server/__tests__/question-log-co
 import type { QuestionLogEntry } from "../../chat/server/question-log";
 import type { ChatTurnEvent } from "../../chat/server/telemetry";
 import { createOps } from "../ops";
+import { startFakeNtfy, type FakeNtfy } from "./fake-ntfy";
 import { startFakeUpstash, type FakeUpstash } from "./fake-upstash";
 
 /** 2026-10-27 at noon UTC, the day the specs write their examples for. */
@@ -661,5 +662,333 @@ describe("the telemetry and the daily totals, in production on the in-test Upsta
     });
     expect(yesterday).toMatchObject({ date: "2026-10-27", turns: { answered: 1 }, longestDurationMs: 30_000 });
     expect(upstash.get("qcost:2026-10-28")).toBeNull();
+  });
+});
+
+describe("the limit alerts, in production on the in-test Upstash and ntfy servers", () => {
+  // The function instances and the store share one clock, which a test can move on.
+  let clock: Date;
+  let upstash: FakeUpstash;
+  let ntfy: FakeNtfy;
+  let printed: string[];
+  beforeEach(() => {
+    clock = new Date("2026-10-27T12:00:00.000Z");
+    upstash = startFakeUpstash({ now: () => clock });
+    ntfy = startFakeNtfy();
+    printed = [];
+  });
+  afterEach(async () => {
+    await upstash.stop();
+    await ntfy.stop();
+  });
+
+  /** The secret topic on the in-test ntfy server. No test name holds it, as no log line may. */
+  const topic = "resume-alerts-in-test";
+
+  /** A new production function instance with the store and the alerts set, whose function log is `printed`. */
+  const functionInstance = () =>
+    createOps(
+      {
+        VERCEL_ENV: "production",
+        KV_REST_API_URL: upstash.url,
+        KV_REST_API_TOKEN: upstash.token,
+        NTFY_TOPIC_URL: `${ntfy.url}/${topic}`,
+      },
+      { now: () => clock, print: (line) => printed.push(line) },
+    );
+
+  /** Reserves a turn on the instance, as the handler does before its first model call. */
+  const reserveOn = async (ops: ReturnType<typeof createOps>) => {
+    const ticket = await ops.budget.reserve();
+    if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
+    return ticket.reservation;
+  };
+
+  /** A turn cut off by the deadline: its last model call did not finish, so it keeps its whole $0.90 reservation. */
+  const deadlineTurn: ChatTurnEvent = { ...answeredTurn, outcome: "error", errorCode: "DEADLINE" };
+
+  test("the month's estimate passing 75% of the $20 limit pushes one urgent spend75 with the spec's text; at exactly 75% it pushes none", async () => {
+    // $14.10 of October is settled already, in millionths of a dollar.
+    upstash.set("qcost:2026-10", "14100000");
+    const ops = functionInstance();
+
+    // The kept $0.90 makes $15.00: at 75% of $20, not past it.
+    await ops.telemetry.record(deadlineTurn, await reserveOn(ops));
+    expect(ntfy.pushes).toEqual([]);
+
+    // The worked example's $0.058001 makes $15.058001: past 75%.
+    await ops.telemetry.record(workedExampleTurn, await reserveOn(ops));
+    expect(ntfy.pushes).toEqual([
+      {
+        topic,
+        priority: 5,
+        title: "Chat at 75% of its $20 limit for October",
+        message: "Raise it in the Anthropic Console, then in src/ops/limits.ts.",
+        headers: expect.any(Object),
+      },
+    ]);
+  });
+
+  test("spend75 goes out once a month: no later turn that month pushes again, on any function instance, and its marker lasts until 00:00 UTC on the next month's first day", async () => {
+    upstash.set("qcost:2026-10", "15000000");
+    const first = functionInstance();
+    await first.telemetry.record(deadlineTurn, await reserveOn(first));
+    expect(ntfy.pushes).toHaveLength(1);
+
+    clock = new Date("2026-10-31T23:59:00.000Z");
+    for (const ops of [first, functionInstance(), functionInstance()]) await ops.telemetry.record(deadlineTurn, await reserveOn(ops));
+
+    expect(ntfy.pushes).toHaveLength(1);
+    expect(upstash.expiresAt("alert:spend75:2026-10")).toEqual(new Date("2026-11-01T00:00:00.000Z"));
+  });
+
+  test("the next month's estimate passing 75% pushes spend75 again, for that month", async () => {
+    upstash.set("qcost:2026-10", "15000000");
+    const ops = functionInstance();
+    await ops.telemetry.record(deadlineTurn, await reserveOn(ops));
+
+    clock = new Date("2026-11-20T09:00:00.000Z");
+    upstash.set("qcost:2026-11", "15000000");
+    await ops.telemetry.record(deadlineTurn, await reserveOn(ops));
+
+    expect(ntfy.pushes.map((push) => push.title)).toEqual([
+      "Chat at 75% of its $20 limit for October",
+      "Chat at 75% of its $20 limit for November",
+    ]);
+  });
+
+  test("17 DAILY_LIMIT refusals at once on 25 function instances push one urgent daycap, with the wording draft's text, and its marker lasts until 00:00 UTC", async () => {
+    const budgets = Array.from({ length: 25 }, () => functionInstance().budget);
+
+    const tickets = await Promise.all(budgets.map((budget) => budget.reserve()));
+
+    expect(tickets.filter((ticket) => !ticket.ok)).toHaveLength(17);
+    expect(ntfy.pushes).toEqual([
+      {
+        topic,
+        priority: 5,
+        title: "Chat paused at its $8 daily cap until 00:00 UTC",
+        message: "If bun run questions shows real spend, raise the cap in src/ops/limits.ts.",
+        headers: expect.any(Object),
+      },
+    ]);
+    expect(upstash.expiresAt("alert:daycap:2026-10-27")).toEqual(new Date("2026-10-28T00:00:00.000Z"));
+  });
+
+  test("after the daycap push, the instance that pushed and an instance that found the marker refuse later turns that day with no store call", async () => {
+    const pushed = functionInstance().budget;
+    for (let turn = 0; turn < 8; turn++) await pushed.reserve();
+    expect(await pushed.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
+    // A second instance's first refusal: its reservation, the take-back and a claim that finds the marker.
+    const found = functionInstance().budget;
+    expect(await found.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
+    const storeCalls = upstash.requests.length;
+
+    clock = new Date("2026-10-27T23:59:59.999Z");
+    for (const budget of [pushed, found, pushed, found]) expect(await budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
+
+    expect(upstash.requests).toHaveLength(storeCalls);
+    expect(ntfy.pushes).toHaveLength(1);
+  });
+
+  test("the next UTC day's first DAILY_LIMIT refusal pushes daycap again", async () => {
+    const budget = functionInstance().budget;
+    for (let turn = 0; turn < 9; turn++) await budget.reserve();
+
+    clock = new Date("2026-10-28T00:00:00.000Z");
+    for (let turn = 0; turn < 9; turn++) await budget.reserve();
+
+    expect(ntfy.pushes).toHaveLength(2);
+    expect(upstash.expiresAt("alert:daycap:2026-10-28")).toEqual(new Date("2026-10-29T00:00:00.000Z"));
+  });
+
+  type Instance = ReturnType<typeof createOps>;
+  /** Each kind: its marker's period at noon on 2026-10-27, the setup that brings it to its limit, and the event that raises it. */
+  const alertKinds: [kind: string, period: string, atTheLimit: (ops: Instance) => Promise<void>, event: (ops: Instance) => Promise<void>][] = [
+    [
+      "daycap",
+      "2026-10-27",
+      async (ops) => {
+        for (let turn = 0; turn < 8; turn++) await reserveOn(ops);
+      },
+      async (ops) => {
+        await ops.budget.reserve();
+      },
+    ],
+    [
+      "spend75",
+      "2026-10",
+      async () => upstash.set("qcost:2026-10", "15000000"),
+      async (ops) => ops.telemetry.record(deadlineTurn, await reserveOn(ops)),
+    ],
+  ];
+
+  test.each(alertKinds)(
+    "a %s push first claims its marker with SET NX and a 10-minute expiry, in one /multi-exec transaction",
+    async (kind, period, atTheLimit, event) => {
+      const ops = functionInstance();
+      await atTheLimit(ops);
+      const before = upstash.requests.length;
+
+      await event(ops);
+
+      const claims = upstash.requests.slice(before).filter((request) => request.body.includes('"SET"'));
+      expect(claims.map((request) => [request.path, JSON.parse(request.body)])).toEqual([
+        [
+          "/multi-exec",
+          [
+            ["SET", `alert:${kind}:${period}`, "2026-10-27T12:00:00.000Z", "NX", "EX", "600"],
+            ["PTTL", `alert:${kind}:${period}`],
+          ],
+        ],
+      ]);
+      expect(ntfy.pushes).toHaveLength(1);
+    },
+  );
+
+  test.each(alertKinds)(
+    "a %s push that ntfy refuses leaves its marker for 10 minutes and prints an ops_error line; the first event after them pushes again",
+    async (kind, period, atTheLimit, event) => {
+      const ops = functionInstance();
+      await atTheLimit(ops);
+      ntfy.refuseNext(1);
+
+      await event(ops);
+
+      expect(ntfy.refused()).toBe(1);
+      expect(ntfy.pushes).toEqual([]);
+      expect(upstash.expiresAt(`alert:${kind}:${period}`)).toEqual(new Date("2026-10-27T12:10:00.000Z"));
+      expect(printed.map((line) => JSON.parse(line) as unknown)).toContainEqual({ event: "ops_error", step: "alert_push", alert: kind, code: "HTTP_429" });
+
+      // While the marker lives, neither this instance nor another one pushes.
+      clock = new Date("2026-10-27T12:09:59.999Z");
+      await event(ops);
+      await event(functionInstance());
+      expect(ntfy.refused() + ntfy.pushes.length).toBe(1);
+
+      clock = new Date("2026-10-27T12:10:00.001Z");
+      await event(ops);
+      expect(ntfy.pushes).toHaveLength(1);
+      expect(upstash.expiresAt(`alert:${kind}:${period}`)).toEqual(new Date(kind === "daycap" ? "2026-10-28T00:00:00.000Z" : "2026-11-01T00:00:00.000Z"));
+    },
+  );
+
+  test(
+    "with the ntfy server holding its answers, reserve() at the daily cap and record() past 75% each return within about 3 s; each push counts as failed, and a later event pushes again",
+    async () => {
+      // October at exactly 75% of its limit, and the day 8 reservations in: one more $0.90 takes each past its limit.
+      upstash.set("qcost:2026-10", "15000000");
+      const ops = functionInstance();
+      const reservations: string[] = [];
+      for (let turn = 0; turn < 8; turn++) reservations.push(await reserveOn(ops));
+      ntfy.holdNext(2);
+      const timed = async (event: () => Promise<unknown>) => {
+        const started = performance.now();
+        await event();
+        return performance.now() - started;
+      };
+
+      // Both events run at once, so the test waits out one time limit, not two.
+      const durations = await Promise.all([
+        timed(async () => expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" })),
+        timed(() => ops.telemetry.record(deadlineTurn, reservations[0])),
+      ]);
+
+      // SPEC-deploy, "Store calls": each push, 3 s. Without the limit neither event returns, and the test times out.
+      expect(ntfy.held()).toBe(2);
+      for (const duration of durations) expect(duration).toBeLessThan(4_000);
+      // A push that timed out is a failed push: its marker expires in 10 minutes, and its line holds one word.
+      expect(upstash.expiresAt("alert:daycap:2026-10-27")).toEqual(new Date("2026-10-27T12:10:00.000Z"));
+      expect(upstash.expiresAt("alert:spend75:2026-10")).toEqual(new Date("2026-10-27T12:10:00.000Z"));
+      const opsErrors = printed.map((line) => JSON.parse(line) as Record<string, unknown>).filter((line) => line.event === "ops_error");
+      expect(opsErrors).toHaveLength(2);
+      expect(opsErrors).toContainEqual({ event: "ops_error", step: "alert_push", alert: "daycap", code: "TimeoutError" });
+      expect(opsErrors).toContainEqual({ event: "ops_error", step: "alert_push", alert: "spend75", code: "TimeoutError" });
+      expect(printed.join("\n")).not.toContain(topic);
+
+      clock = new Date("2026-10-27T12:10:00.001Z");
+      expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
+      await ops.telemetry.record(deadlineTurn, reservations[1]);
+      expect(ntfy.pushes.map((push) => push.title)).toEqual([
+        "Chat paused at its $8 daily cap until 00:00 UTC",
+        "Chat at 75% of its $20 limit for October",
+      ]);
+    },
+    15_000,
+  );
+
+  test("no push holds question text: not its title, its line or any header", async () => {
+    const question = "Our confidential Example Corp posting pays $250k; does Peter fit it?";
+    upstash.set("qcost:2026-10", "15000000");
+    const ops = functionInstance();
+
+    await ops.log.append({ ...answeredEntry, question });
+    for (let turn = 0; turn < 8; turn++) await ops.telemetry.record(deadlineTurn, await reserveOn(ops));
+    expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
+
+    // Both kinds went out, so the check below reads real pushes.
+    expect(ntfy.pushes.map((push) => push.title)).toEqual([
+      "Chat at 75% of its $20 limit for October",
+      "Chat paused at its $8 daily cap until 00:00 UTC",
+    ]);
+    for (const push of ntfy.pushes) {
+      expect(JSON.stringify(push)).not.toContain("Example Corp");
+      expect(JSON.stringify(push)).not.toContain("$250k");
+    }
+  });
+
+  test("in production with no NTFY_TOPIC_URL, the daily cap and the 75% mark push nothing, throw nothing and claim no marker", async () => {
+    upstash.set("qcost:2026-10", "15000000");
+    const ops = createOps(
+      { VERCEL_ENV: "production", KV_REST_API_URL: upstash.url, KV_REST_API_TOKEN: upstash.token },
+      { now: () => clock, print: (line) => printed.push(line) },
+    );
+
+    for (let turn = 0; turn < 8; turn++) await ops.telemetry.record(deadlineTurn, await reserveOn(ops));
+    expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
+
+    expect(ntfy.pushes).toEqual([]);
+    expect(upstash.requests.filter((request) => request.body.includes('"SET"'))).toEqual([]);
+  });
+
+  test("a topic address that is not https gets no request, so the topic never goes in clear text, and the ops_error line says NOT_HTTPS", async () => {
+    const reached: string[] = [];
+    // The store's calls go through; any other request is recorded and fails.
+    const storeOnlyFetch = ((input: string | URL | Request, init?: RequestInit) => {
+      if (String(input).startsWith(upstash.url)) return fetch(input, init);
+      reached.push(String(input));
+      return Promise.reject(new TypeError("no request may leave the test"));
+    }) as typeof fetch;
+    const ops = createOps(
+      {
+        VERCEL_ENV: "production",
+        KV_REST_API_URL: upstash.url,
+        KV_REST_API_TOKEN: upstash.token,
+        NTFY_TOPIC_URL: `http://ntfy.example/${topic}`,
+      },
+      { now: () => clock, print: (line) => printed.push(line), fetch: storeOnlyFetch },
+    );
+
+    for (let turn = 0; turn < 9; turn++) await ops.budget.reserve();
+
+    expect(reached).toEqual([]);
+    expect(upstash.requests.filter((request) => request.body.includes('"SET"'))).toEqual([]);
+    expect(printed.map((line) => JSON.parse(line) as unknown)).toEqual([
+      { event: "ops_error", step: "alert_push", alert: "daycap", code: "NOT_HTTPS" },
+    ]);
+  });
+
+  test("a push whose request throws prints an ops_error line with one word for the error, and never the topic or its address", async () => {
+    const ops = functionInstance();
+    for (let turn = 0; turn < 8; turn++) await reserveOn(ops);
+    // Nothing answers at the topic's address any more, so the real fetch throws.
+    await ntfy.stop();
+
+    expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
+
+    expect(printed).toHaveLength(1);
+    expect(JSON.parse(printed[0]!)).toEqual({ event: "ops_error", step: "alert_push", alert: "daycap", code: expect.stringMatching(/^[A-Za-z0-9_]{1,32}$/) });
+    expect(printed[0]).not.toContain(topic);
+    expect(printed[0]).not.toContain(new URL(ntfy.url).port);
   });
 });
