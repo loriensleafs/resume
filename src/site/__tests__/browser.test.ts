@@ -221,6 +221,138 @@ describe.each(["/", "/resume"])("the design-system parts on %s", (path) => {
   });
 });
 
+/** How long a check waits for the page to show a change, in ms: well inside bun test's 5-second limit for a test. */
+const CHANGE_WAIT = 2_000;
+
+/** What the install offer's stand-ins count in the page: the saved prompt's calls and the persistent-storage requests. */
+type InstallCounts = { installPromptCalls: number; persistCalls: number };
+
+/**
+ * Stands in for the browser's offer to install the site (SPEC-site, Views: Install offer). Chrome fires
+ * `beforeinstallprompt` only for a site that meets its install criteria, which a test cannot arrange, so the test
+ * dispatches an event of its own. Its prompt() counts its calls in `installPromptCalls`, and the browser answers
+ * "dismissed". The page then has two animation frames to show the change.
+ */
+async function offerInstall(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const counts = window as unknown as InstallCounts;
+    counts.installPromptCalls = 0;
+    const choice = { outcome: "dismissed", platform: "" };
+    const event = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+      prompt: async () => {
+        counts.installPromptCalls += 1;
+        return choice;
+      },
+      userChoice: Promise.resolve(choice),
+    });
+    window.dispatchEvent(event);
+    await new Promise((shown) => requestAnimationFrame(() => requestAnimationFrame(shown)));
+  });
+}
+
+/**
+ * An init script that counts the page's calls of navigator.storage.persist() in `persistCalls`. The stand-in answers
+ * true and asks the browser nothing.
+ */
+async function countPersistCalls(context: BrowserContext): Promise<void> {
+  await context.addInitScript(() => {
+    const counts = window as unknown as InstallCounts;
+    counts.persistCalls = 0;
+    // Each new page starts at about:blank, which is no secure context, so the browser gives it no StorageManager.
+    if (typeof StorageManager === "undefined") return;
+    StorageManager.prototype.persist = async () => {
+      counts.persistCalls += 1;
+      return true;
+    };
+  });
+}
+
+/**
+ * An init script that makes each page run as the installed app: `(display-mode: standalone)` matches, as in the app's
+ * own window. It answers that media query with "all", which matches every page, so the page still gets a real
+ * MediaQueryList, with its change events.
+ */
+async function runAsApp(context: BrowserContext): Promise<void> {
+  await context.addInitScript(() => {
+    const matchMedia = window.matchMedia.bind(window);
+    window.matchMedia = (query) => matchMedia(query.replace(/\(\s*display-mode\s*:\s*standalone\s*\)/g, "all"));
+  });
+}
+
+/** The "Install app" button, as the accessibility tree names it: the native button inside acme-button. */
+const installApp = (page: Page) => page.getByRole("button", { name: "Install app" });
+
+// SPEC-site, Views: App bar and Install offer. On wide screens, "Install app" (a secondary button with Chrome's install
+// icon) shows in the app bar's end slot only after the browser offers installation, and never while the site runs as
+// an app. Selecting it calls the browser's saved prompt. On phones, the install sheet offers the app instead (S36).
+describe('"Install app" in the app bar', () => {
+  test("shows on a wide screen after beforeinstallprompt, and selecting it calls the saved prompt once", async () => {
+    await inWindow(WIDE, async (browserWindow) => {
+      const { page } = await visit(browserWindow, "/");
+      expect(await installApp(page).count()).toBe(0);
+      await offerInstall(page);
+      await installApp(page).waitFor({ state: "visible", timeout: CHANGE_WAIT });
+      const shown = await page.evaluate(() => {
+        const button = document.querySelector('acme-app-bar [slot="end"] acme-button') as
+          | (HTMLElement & { variant: string })
+          | null;
+        return {
+          variant: button?.variant,
+          icon: button?.querySelector('[slot="start"]')?.localName,
+          label: button?.textContent?.trim(),
+          upgraded: button?.shadowRoot !== null && button?.matches(":defined"),
+        };
+      });
+      expect(shown).toEqual({
+        variant: "secondary",
+        icon: "acme-install-desktop-icon",
+        label: "Install app",
+        upgraded: true,
+      });
+      await installApp(page).click();
+      expect(await page.evaluate(() => (window as unknown as InstallCounts).installPromptCalls)).toBe(1);
+      // The browser's prompt serves one call per event, so the button goes once it has been used.
+      await installApp(page).waitFor({ state: "detached", timeout: CHANGE_WAIT });
+    });
+  });
+
+  // The offer is kept on a phone, and the width alone hides the button: at the wide size it shows.
+  test("shows nothing at 390 × 844 after beforeinstallprompt, and shows once the window is wide", async () => {
+    await inWindow(PHONE, async (browserWindow) => {
+      const { page } = await visit(browserWindow, "/");
+      await offerInstall(page);
+      expect(await installApp(page).isVisible()).toBe(false);
+      await page.setViewportSize(WIDE);
+      await installApp(page).waitFor({ state: "visible", timeout: CHANGE_WAIT });
+    });
+  });
+
+  test("shows nothing after beforeinstallprompt while the site runs as an app", async () => {
+    await inWindow(WIDE, async (browserWindow) => {
+      await runAsApp(browserWindow.context);
+      const { page } = await visit(browserWindow, "/");
+      await offerInstall(page);
+      expect(await installApp(page).count()).toBe(0);
+    });
+  });
+});
+
+// SPEC-site, Saved views: the site asks the browser for persistent storage when it runs as the installed app, so the
+// browser keeps the saved session. In a browser tab it asks nothing.
+describe("persistent storage", () => {
+  test.each([
+    ["running as an app, the site asks once", true, 1],
+    ["in a browser tab, the site does not ask", false, 0],
+  ])("%s", async (_name, asApp, calls) => {
+    await inWindow(WIDE, async (browserWindow) => {
+      await countPersistCalls(browserWindow.context);
+      if (asApp) await runAsApp(browserWindow.context);
+      const { page } = await visit(browserWindow, "/");
+      expect(await page.evaluate(() => (window as unknown as InstallCounts).persistCalls)).toBe(calls);
+    });
+  });
+});
+
 /** WCAG 2.2 at levels A and AA, as axe-core tags its rules. axe-core 4.14 has no rule for WCAG 2.2's new A criteria. */
 const WCAG_22_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
@@ -256,6 +388,15 @@ describe.each(["/", "/resume"])("accessibility of %s", (path) => {
   ])("axe-core reports no WCAG 2.2 AA violation at %s", async (_size, viewport) => {
     await inWindow(viewport, async (browserWindow) => {
       const { page } = await visit(browserWindow, path);
+      expect(await axeViolations(page)).toEqual([]);
+    });
+  });
+
+  test('axe-core reports no WCAG 2.2 AA violation at 1440 × 900 with "Install app" shown', async () => {
+    await inWindow(WIDE, async (browserWindow) => {
+      const { page } = await visit(browserWindow, path);
+      await offerInstall(page);
+      await installApp(page).waitFor({ state: "visible", timeout: CHANGE_WAIT });
       expect(await axeViolations(page)).toEqual([]);
     });
   });

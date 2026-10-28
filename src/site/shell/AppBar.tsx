@@ -3,6 +3,8 @@ import { AppBar as AcmeAppBar } from "@acmelabs/design-system-react/components/a
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import type { SiteResume } from "../data";
+import { useInstallOffer } from "../install-offer";
+import { InstallAppButton } from "./InstallAppButton";
 
 export type AppBarProps = {
   /** `name`, Peter's name, goes in the blue name box; `label`, the headline, follows it. */
@@ -15,10 +17,15 @@ export type AppBarProps = {
  * The app bar that every page opens with (SPEC-site, Views: App bar): the design system's acme-app-bar, as the
  * first-view board draws it. The name box, a link to the workspace, sits in the start slot. The headline is the main
  * header content, in the default slot, whose region the design system lets shrink, so a narrow screen cuts the
- * headline instead of widening the page. The end slot holds what the page's route gives it (the capability map's
- * contract "the app bar's end slot"), so each route decides the slot's content from its own state.
+ * headline instead of widening the page. The end slot holds "Install app" while the browser offers the install, then
+ * what the page's route gives it (the capability map's contract "the app bar's end slot"), so each route decides the
+ * slot's content from its own state.
  */
 export function AppBar({ basics, end }: AppBarProps) {
+  // "Install app" shows only while the browser offers the install and the site does not run as an app (Views: Install
+  // offer). The prerender knows neither, so no page holds the button before its scripts run.
+  const { runsAsApp, install } = useInstallOffer();
+  const installApp = install && !runsAsApp ? <InstallAppButton install={install} /> : null;
   // React renders nothing for null, undefined, true or false, so a route can pass `active && <NewChat />`. The end slot
   // then prints no element, as when the route passes no end.
   const hasEnd = end !== null && end !== undefined && typeof end !== "boolean";
@@ -30,8 +37,9 @@ export function AppBar({ basics, end }: AppBarProps) {
       </Link>{" "}
       {/* The space keeps the name and the headline apart in the light DOM, before the part upgrades. */}
       <span className="text-label-14 app-bar-headline">{basics.label}</span>
-      {hasEnd && (
+      {(installApp || hasEnd) && (
         <div slot="end" className="app-bar-end">
+          {installApp}
           {end}
         </div>
       )}

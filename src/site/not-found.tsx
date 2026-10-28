@@ -2,6 +2,7 @@
 // buildSite() renders it after the Vite build, outside the route tree: the root route's shell always renders
 // <Scripts />, and this page holds no script.
 import { renderToStaticMarkup } from "react-dom/server";
+import { SITE_LINKS } from "./page-head";
 import type { AppBarProps } from "./shell/AppBar";
 
 export type NotFoundPageProps = {
@@ -37,6 +38,10 @@ function NotFoundPage({ basics, stylesheets }: NotFoundPageProps) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Page not found</title>
+        {/* The web manifest and the favicon, as on every page (src/site/page-head.ts). */}
+        {SITE_LINKS.map(({ rel, href }) => (
+          <link key={rel} rel={rel} href={href} />
+        ))}
         {stylesheets.map((href) => (
           <link key={href} rel="stylesheet" href={href} />
         ))}
