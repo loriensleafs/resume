@@ -36,6 +36,12 @@ function withoutPageList(): Plugin {
   };
 }
 
+/**
+ * The prerender's page list (SPEC-site, Tech Stack): / and /resume here, and /sources/<id> for each approved source,
+ * which siteData() adds in a build, once it knows the root that buildSite() names. Both plugins get this one array.
+ */
+const pages = [{ path: "/" }, { path: "/resume" }];
+
 export default defineConfig({
   // Vite's root is this folder, wherever Vite starts (https://vite.dev/config/shared-options#root; the default is
   // the working folder). TanStack Start's prerender starts a Vite preview server with this file alone, so the root
@@ -44,14 +50,14 @@ export default defineConfig({
   root: import.meta.dirname,
   server: { port: 3000 },
   plugins: [
-    // The pages' data, made at build time from resume.yaml (src/site/data.ts). buildSite() sets `siteData.root`;
-    // `vite dev` reads this folder's resume.yaml.
-    siteData(),
+    // The pages' data, made at build time from resume.yaml and the approved sources (src/site/data.ts). buildSite()
+    // sets `siteData.root`; `vite dev` reads this folder's files.
+    siteData({ pages }),
     // Static prerendering (SPEC-site, Tech Stack), with the options of TanStack Start's guide:
     // https://tanstack.com/start/latest/docs/framework/react/guide/static-prerendering
     tanstackStart({
       srcDirectory: "src/site",
-      pages: [{ path: "/" }, { path: "/resume" }],
+      pages,
       prerender: {
         enabled: true,
         crawlLinks: true,
