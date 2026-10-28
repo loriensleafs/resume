@@ -71,6 +71,9 @@ exports[`buildKnowledge on the real files renders the core the chat sees (snapsh
 [fednow-standards-mentoring] FedNow front-end standards, the testing harness, and mentoring: deep-dive, roles fednow. How Peter wrote and introduced front-end standards that 5+ teams adopted, developed a testing harness, mentored 20+ developers one-on-one and ran weekly office hours open to every development team.
 [highspot-agent-workflow] The agent workflow system for Highspot's platform team: deep-dive, roles highspot. How Peter designed the team's agent workflow, wrote its agents and skills, built its tooling in TypeScript on Bun, and how the team used it to build a streaming Markdown component and a data table.
 [highspot-ai-standards] The AI development standards Peter introduced at Highspot: deep-dive, roles highspot. How Peter introduced many of the team's AI development standards: spec-driven development, shared skills and agents, agent context files, and rules that keep agents on Polar UI components.
+[highspot-data-table] The Polar UI data table, built on TanStack Table: deep-dive, roles highspot. How Peter wrote the 21 specs and 189 requirement documents for Polar UI's data table, designed its API and built it on TanStack Table, after an AG Grid Enterprise license was blocked.
+[highspot-mcp-server] The polar-ui MCP server, the design system's contract for AI coding agents: deep-dive, roles highspot. How Peter led the organization-wide effort on the polar-ui MCP server, designed and built it, and how it became a standard part of every Cursor and Claude Code setup for front-end work at Highspot.
+[highspot-streaming-markdown] The streaming Markdown component in the Polar UI design system: deep-dive, roles highspot. How Peter designed the API of Polar UI's streaming Markdown component, built its streaming renderer, and how it gave Highspot one consistent Markdown experience, streamed or not.
 "
 `;
 
@@ -106,5 +109,20 @@ exports[`buildKnowledge on the real files lists every approved source's passage 
   "[highspot-ai-standards.3] How it worked",
   "[highspot-ai-standards.4] Result",
   "[highspot-ai-standards.5] Tools",
+  "[highspot-data-table.1] Problem",
+  "[highspot-data-table.2] What Peter did",
+  "[highspot-data-table.3] How it worked",
+  "[highspot-data-table.4] Result",
+  "[highspot-data-table.5] Tools",
+  "[highspot-mcp-server.1] Problem",
+  "[highspot-mcp-server.2] What Peter did",
+  "[highspot-mcp-server.3] How it worked",
+  "[highspot-mcp-server.4] Result",
+  "[highspot-mcp-server.5] Tools",
+  "[highspot-streaming-markdown.1] Problem",
+  "[highspot-streaming-markdown.2] What Peter did",
+  "[highspot-streaming-markdown.3] How it worked",
+  "[highspot-streaming-markdown.4] Result",
+  "[highspot-streaming-markdown.5] Tools",
 ]
 `;

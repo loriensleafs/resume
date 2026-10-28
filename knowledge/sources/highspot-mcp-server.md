@@ -1,10 +1,14 @@
 ---
 id: highspot-mcp-server
 title: The polar-ui MCP server, the design system's contract for AI coding agents
-role: highspot
-highlights: [1]
+kind: deep-dive
+subject: project
+roles: [highspot]
+highlights: [highlight:highspot.1]
+summary: How Peter led the organization-wide effort on the polar-ui MCP server, designed and built it, and how it became a standard part of every Cursor and Claude Code setup for front-end work at Highspot.
+links: []
 status: approved
-approved: 2026-10-26
+approved: 2026-10-27
 source: Interview with Peter, 2026-10-26
 ---
 

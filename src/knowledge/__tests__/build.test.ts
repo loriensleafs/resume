@@ -700,7 +700,8 @@ describe("buildKnowledge on the real files", () => {
   });
 
   // Approved passages are append-only (SPEC-knowledge, Sources), so an approved passage id always
-  // names the same passage, also in a visitor's saved session. Empty until the first source is approved.
+  // names the same passage, also in a visitor's saved session. It holds one list per approved source, in
+  // source-id order; the nine deep dives were the first approved sources.
   test("lists every approved source's passage ids with their headings (snapshot, append-only: accept a diff only when it adds lines at the end of a source's list, or a new source's list)", async () => {
     const { sources } = await buildKnowledge({ root: REPO });
     expect(sources.flatMap((s) => s.passages.map((p) => `[${p.id}] ${p.heading}`))).toMatchSnapshot();
