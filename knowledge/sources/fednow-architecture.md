@@ -1,10 +1,14 @@
 ---
 id: fednow-architecture
 title: FedNow's front-end architecture and its migration
-role: fednow
-highlights: [1]
+kind: deep-dive
+subject: project
+roles: [fednow]
+highlights: [highlight:fednow.1]
+summary: How Peter led the design of FedNow's routing-based front-end architecture, with its shared packages, and how the whole application moved to it without delaying any features or the launch.
+links: []
 status: approved
-approved: 2026-10-26
+approved: 2026-10-27
 source: Interview with Peter, 2026-10-26
 ---
 

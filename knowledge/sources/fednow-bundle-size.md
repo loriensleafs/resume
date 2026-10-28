@@ -1,10 +1,14 @@
 ---
 id: fednow-bundle-size
 title: Cutting FedNow's initial bundle from over 15 MB to under 1 MB
-role: fednow
-highlights: [2]
+kind: deep-dive
+subject: project
+roles: [fednow]
+highlights: [highlight:fednow.2]
+summary: How Peter audited FedNow's application and led the work that cut its initial bundle from over 15 MB to under 1 MB through code splitting, a new build setup and tree-shakeable ES modules.
+links: []
 status: approved
-approved: 2026-10-26
+approved: 2026-10-27
 source: Interview with Peter, 2026-10-26
 ---
 
