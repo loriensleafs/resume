@@ -22,6 +22,7 @@ import {
   FIXTURE_LOGISTICS_ANSWER,
   FIXTURE_NAME,
 } from "./fixture-root";
+import { iconSizes, pngSize } from "./image-sizes";
 
 const REPO = `${import.meta.dir}/../../..`;
 const { root, outDir, staticDir } = seam1;
@@ -516,7 +517,8 @@ describe.each(["index.html", "resume/index.html"])("the app bar in %s", (page) =
   });
 
   // The page's route gives the end slot its content (the capability map's contract "the app bar's end slot"). Neither
-  // route gives it any yet; the workspace route puts New chat there on phones, which seam 2 checks.
+  // route gives it any yet; the workspace route puts New chat there on phones, which seam 2 checks. "Install app" shows
+  // there only after the browser offers the install, so no prerendered page holds it (seam 2 checks it too).
   test("holds no end-slot element while the page's route gives the slot no content", async () => {
     expect(await elementsOn(page, 'acme-app-bar [slot="end"]')).toEqual([]);
   });
@@ -944,46 +946,6 @@ const ICONS: Record<string, number[]> = {
   "icon-maskable-512.png": [512],
 };
 
-/** The PNG signature, the first 8 bytes of every PNG file (https://www.w3.org/TR/png-3/#5PNG-file-signature). */
-const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-
-/**
- * The width and height of a PNG image, from its IHDR chunk, which comes first, right after the signature
- * (https://www.w3.org/TR/png-3/#11IHDR). It throws for any other file.
- */
-function pngSize(png: Uint8Array): { width: number; height: number } {
-  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
-  const isPng = PNG_SIGNATURE.every((byte, i) => png[i] === byte);
-  if (!isPng || new TextDecoder().decode(png.subarray(12, 16)) !== "IHDR") throw new Error("not a PNG file");
-  return { width: view.getUint32(16), height: view.getUint32(20) };
-}
-
-/**
- * The size of each square image in an icon file: a PNG file holds one; an ICO file holds the PNG images its directory
- * lists. An ICO file is a 6-byte header (0, type 1, the image count), then one 16-byte entry per image: its width and
- * height (0 means 256), its byte length and its offset
- * (https://learn.microsoft.com/en-us/previous-versions/ms997538(v=msdn.10); a PNG image inside an ICO file:
- * https://devblogs.microsoft.com/oldnewthing/20101022-00/?p=12473). It throws when an image is not square, or when an
- * entry's size is not its PNG's.
- */
-function iconSizes(file: Uint8Array): number[] {
-  const square = ({ width, height }: { width: number; height: number }) => {
-    if (width !== height) throw new Error(`an image is ${width} × ${height} px, not square`);
-    return width;
-  };
-  if (PNG_SIGNATURE.every((byte, i) => file[i] === byte)) return [square(pngSize(file))];
-  const view = new DataView(file.buffer, file.byteOffset, file.byteLength);
-  if (view.getUint16(0, true) !== 0 || view.getUint16(2, true) !== 1) throw new Error("neither a PNG nor an ICO file");
-  return Array.from({ length: view.getUint16(4, true) }, (_, i) => {
-    const entry = 6 + 16 * i;
-    const listed = square({ width: view.getUint8(entry) || 256, height: view.getUint8(entry + 1) || 256 });
-    const start = view.getUint32(entry + 12, true);
-    const size = square(pngSize(file.subarray(start, start + view.getUint32(entry + 8, true))));
-    if (size !== listed) throw new Error(`image ${i + 1} is listed at ${listed} px, but its PNG is ${size} px`);
-    return size;
-  });
-}
-
 // SPEC-site, Views: App icon, and Testing 1. Vercel's build has no Chrome, so the icon files are committed, as the
 // documents are, and the build copies them; it renders none.
 describe("the site's icons", () => {
@@ -999,6 +961,66 @@ describe("the site's icons", () => {
 
   test.each(Object.entries(ICONS))("icons/%s holds square images of %p px", async (file, sizes) => {
     expect(iconSizes(await Bun.file(`${staticDir}/icons/${file}`).bytes())).toEqual(sizes);
+  });
+});
+
+/** The web manifest's address on the site, as SPEC-deploy's cache table names it (Headers). */
+const WEB_MANIFEST = "/manifest.webmanifest";
+
+// SPEC-site, Acceptance criteria and Testing 1: the site installs as a standalone app, named after Peter, with the PK
+// icon, and its start address and scope are the site's root. buildSite() makes the web manifest from resume.yaml's
+// name, so the fixture root's name shows that the manifest read that file.
+describe("the web manifest", () => {
+  const webManifest = () => Bun.file(`${staticDir}${WEB_MANIFEST}`).json();
+
+  // The id is the start address, as a browser would derive it; written out, it keeps the installed app the same app
+  // if the start address ever changes (https://www.w3.org/TR/appmanifest/#id-member).
+  test("has the fixture root's name, id /, start_url /, scope / and display standalone", async () => {
+    const { id, name, start_url, scope, display } = await webManifest();
+    expect({ id, name, start_url, scope, display }).toEqual({
+      id: "/",
+      name: FIXTURE_NAME,
+      start_url: "/",
+      scope: "/",
+      display: "standalone",
+    });
+  });
+
+  test("lists PNG icons of 192 px, 512 px and a maskable 512 px", async () => {
+    const { icons } = await webManifest();
+    expect(icons.map(({ sizes, type, purpose }: Record<string, string>) => ({ sizes, type, purpose }))).toEqual([
+      { sizes: "192x192", type: "image/png", purpose: undefined },
+      { sizes: "512x512", type: "image/png", purpose: undefined },
+      { sizes: "512x512", type: "image/png", purpose: "maskable" },
+    ]);
+  });
+
+  // A browser reads each icon from its address, resolved against the manifest's own address.
+  test("each icon it lists is a committed file of public/icons/, at the size it gives", async () => {
+    const { icons } = await webManifest();
+    for (const { src, sizes } of icons as Record<string, string>[]) {
+      const { pathname } = new URL(src!, `https://peterkloss.dev${WEB_MANIFEST}`);
+      expect(pathname).toStartWith("/icons/");
+      const served = await Bun.file(`${staticDir}${pathname}`).bytes();
+      expect(Buffer.compare(served, await Bun.file(`${REPO}/public${pathname}`).bytes())).toBe(0);
+      const { width, height } = pngSize(served);
+      expect(`${width}x${height}`).toBe(sizes!);
+    }
+  });
+
+  // Every page links the manifest, so the browser can offer the install from any page, and the favicon, so a tab
+  // shows the PK icon. Without the link a browser asks for /favicon.ico, which is no file of the site.
+  test("every HTML file, 404.html included, links the web manifest and the favicon, once each", async () => {
+    const links: Record<string, { manifest: (string | null)[]; favicon: (string | null)[] }> = {};
+    const expected: typeof links = {};
+    for (const page of await htmlFiles()) {
+      links[page] = {
+        manifest: await attributeOn(page, 'link[rel="manifest"]', "href"),
+        favicon: await attributeOn(page, 'link[rel="icon"]', "href"),
+      };
+      expected[page] = { manifest: [WEB_MANIFEST], favicon: ["/icons/favicon.ico"] };
+    }
+    expect(links).toEqual(expected);
   });
 });
 

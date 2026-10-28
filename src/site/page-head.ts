@@ -27,6 +27,22 @@ export type PageHeadOptions = {
  */
 const SHARE_IMAGE = { path: "/icons/icon-512.png", width: 512, height: 512 };
 
+/**
+ * The web manifest's address on the site, as SPEC-deploy's cache table names it (Headers). buildSite() writes the file
+ * there (src/site/build.ts).
+ */
+export const WEB_MANIFEST_ADDRESS = "/manifest.webmanifest";
+
+/**
+ * The links that every page's head holds, the not-found page's included. The web manifest lets the browser install the
+ * site from any page (SPEC-site, Acceptance criteria). The favicon is the one `bun run icons` renders into public/icons/
+ * (Views: App icon); without this link a browser asks for /favicon.ico, which is no file of the site.
+ */
+export const SITE_LINKS = [
+  { rel: "manifest", href: WEB_MANIFEST_ADDRESS },
+  { rel: "icon", href: "/icons/favicon.ico" },
+];
+
 /** One page's title, description, canonical address and Open Graph tags (https://ogp.me). */
 export function pageHead({ path, title, description }: PageHeadOptions) {
   const address = new URL(path, SITE_ADDRESS).href;
