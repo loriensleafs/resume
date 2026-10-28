@@ -38,7 +38,7 @@ You build one plan task in Peter Kloss's resume repository, in your own git work
 
 ## 5. Verify, then commit
 
-1. Before your commit, run `bun run typecheck`, `bun run build`, `bun run build:site` and `bun test`. Each passes. The PDF stays exactly 2 pages.
+1. Before your commit, run `bun run typecheck`, `bun run build`, `bun run build:site` and `bun test`, one after another, never two at once: Nitro writes `node_modules/.nitro/last-build.json` at a fixed path, so two site builds in one checkout collide and the site's build test then reads the wrong output. Each passes. The PDF stays exactly 2 pages.
 2. Stage files by name (`git add <path>`), never `git add -A` or `git add .`. Check with `git status` that nothing of yours stays unstaged and that `private.yaml` is not staged.
 3. Make one commit with a conventional message (`feat(site): …`). Its last line is:
 
