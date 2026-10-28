@@ -218,6 +218,13 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
     messages,
     // The handler's own tools only: the request's tools never reach chat() (The request).
     tools: chatTools(deps.knowledge, turn),
+    // Sonnet 5.5 always thinks (Limits, "Thinking"; row 156). The adapter sends adaptive thinking at effort
+    // medium with the summarized display, so the thinking summary streams; the wire sends it as chat.thinking.
+    reasoning: { level: "medium", summary: true },
+    // Anthropic's max_tokens for each model call, thinking included (row 131).
+    modelOptions: { max_tokens: turnLimits.answerTokens },
+    // The 5-minute prompt cache, keyed by the threadId. The handler sets it itself: no caller chooses it.
+    promptCache: "short",
     abortController: run,
     // The library's own log lines hold the error alone, as the chat's do.
     debug: libraryLogging,

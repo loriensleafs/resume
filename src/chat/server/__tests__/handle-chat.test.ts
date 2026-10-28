@@ -6,6 +6,8 @@
 import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { EventType, uiMessagesToWire, type ChatMiddleware, type StreamChunk, type TextOptions, type UIMessage } from "@tanstack/ai";
 import { fakeText, type FakeResponse } from "@tanstack/ai/testing";
+// The browser's client, through the framework package that re-exports @tanstack/ai-client (skill ai-core).
+import { ChatClient, fetchServerSentEvents } from "@tanstack/ai-react";
 import { buildKnowledge } from "../../../knowledge/build";
 import { renderCore } from "../../../knowledge/render";
 import { deepDiveFile, fixture, removeFixtures } from "../../../knowledge/__tests__/fixtures";
@@ -14,6 +16,7 @@ import { handleChat, type ChatDeps } from "../handle-chat";
 import { inMemoryBudget, inMemoryQuestionLog, inMemoryTelemetry, type Budget, type QuestionLog, type Telemetry } from "../question-log";
 import type { ChatTurnEvent } from "../telemetry";
 import { questionLogContract } from "./question-log-contract";
+import { anthropicAnswering, SIGNATURE, SPEND_LIMIT_ERRORS, stubAnthropic, type ApiError } from "./stub-anthropic";
 
 questionLogContract("in-memory", (now) => inMemoryQuestionLog(now));
 
@@ -350,6 +353,82 @@ describe("events on the wire", () => {
     expect(events.filter((e) => e.type === added.type && e.name === added.name)).toEqual([]);
     expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1].");
     expect(events.at(-1)?.type).toBe("RUN_FINISHED");
+  });
+
+  test("the allowlisted events of a turn on the real Anthropic adapter reach the wire with no rawEvent, metadata or usage from the model: no provider, model id, response id or token count", async () => {
+    const stub = stubAnthropic([
+      thinkingRead("The catalog names sample.", ["sample.2"]),
+      { thinking: "The passage answers it.", text: "Test Person planned the first thing [sample.2]." },
+    ]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), seamDeps(stub.adapter)));
+
+    const passed = ["RUN_STARTED", "RUN_FINISHED", "TEXT_MESSAGE_START", "TEXT_MESSAGE_CONTENT", "TEXT_MESSAGE_END", "TOOL_CALL_START", "TOOL_CALL_ARGS", "TOOL_CALL_END"];
+    expect(passed.filter((type) => !events.some((e) => e.type === type))).toEqual([]);
+    for (const event of events.filter((e) => passed.includes(e.type))) {
+      expect(event.rawEvent).toBeUndefined();
+      expect(event.usage).toBeUndefined();
+      // The engine's own metadata may remain: it carries the AG-UI fields TanStack AI keeps there.
+      expect(Object.keys((event.metadata as { tanstack?: object } | undefined)?.tanstack ?? {})).not.toContainAnyValues(["source", "model", "responseId"]);
+    }
+    const wire = JSON.stringify(events);
+    for (const detail of ["claude-sonnet-5-5", "anthropic-messages", '"provider"', "msg_stub_", '"usage"']) expect(wire).not.toContain(detail);
+    expect(streamedText(events)).toBe("Test Person planned the first thing [sample.2].");
+  });
+
+  test("each request's wire middleware knows only its own run's tool calls: a call id that an earlier request started as another tool does not let a later request's result pass whole", async () => {
+    const fake = fakeText();
+    fake.setResponses([{ text: "Test Person built the first thing [highlight:acme.1]." }, { text: "Test Person built the second thing [highlight:acme.2]." }]);
+    const callId = "call-shared-1";
+    // The first request starts the call as a tool whose result would pass whole; the second sends a result for that id.
+    const startsOtherTool = addingAfterText({ type: "TOOL_CALL_START", toolCallId: callId, toolCallName: "open_resume" });
+    const sendsResult = addingAfterText({ type: "TOOL_CALL_RESULT", messageId: "m-1", toolCallId: callId, role: "tool", content: "Internal code." });
+    const deps = seamDeps(fake);
+
+    await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), { ...deps, testMiddleware: [startsOtherTool] }));
+    const later = await readEvents(await handleChat(chatRequest([question("What else did Test Person build?")]), { ...deps, testMiddleware: [sendsResult] }));
+
+    expect(later.filter((e) => e.type === "TOOL_CALL_RESULT").map((e) => JSON.parse(String(e.content)))).toEqual([{ read: [], unknown: [], skipped: [] }]);
+    expect(JSON.stringify(later)).not.toContain("Internal code.");
+  });
+
+  test("the chat has no provider-run tool: every tool the model gets is the handler's own, with its input schema, so every tool result comes back as a TOOL_CALL_RESULT that the wire rewrites", async () => {
+    const stub = stubAnthropic([{ text: "Test Person built the first thing [highlight:acme.1]." }]);
+
+    await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), seamDeps(stub.adapter)));
+
+    // A provider-run tool, such as Anthropic's web search, has a versioned type and no input schema of
+    // ours, and its result arrives in the tool call's own events, past the id-only rewrite.
+    const tools = stub.requests[0]?.tools ?? [];
+    expect(tools.map((tool) => tool.name)).toEqual(["read_sources"]);
+    for (const tool of tools) {
+      expect(tool.input_schema).toBeDefined();
+      expect(tool.type === undefined || tool.type === "custom").toBe(true);
+    }
+  });
+
+  test.each<[string, Record<string, unknown>, string]>([
+    [
+      "a TOOL_CALL_END that carries a result, which the engine turns into a TOOL_CALL_RESULT after the middleware",
+      { type: "TOOL_CALL_END", toolCallId: "call-read-1", toolCallName: "read_sources", input: { ids: ["sample"], topic: "x" }, result: "Internal code." },
+      "Internal code.",
+    ],
+    [
+      "a TOOL_CALL_START whose metadata holds a thought signature, which the engine turns into a REASONING_ENCRYPTED_VALUE after the middleware",
+      { type: "TOOL_CALL_START", toolCallId: "call-open-1", toolCallName: "open_resume", parentMessageId: "m-1", metadata: { thoughtSignature: SIGNATURE } },
+      SIGNATURE,
+    ],
+  ])("%s: the wire sends the event with its named fields only, so the hidden text never reaches the browser", async (_name, added, hidden) => {
+    const fake = fakeText();
+    fake.setResponses([{ text: "Test Person built the first thing [highlight:acme.1]." }]);
+
+    const events = await readEvents(
+      await handleChat(chatRequest([question("What did Test Person build?")]), seamDeps(fake, { testMiddleware: [addingAfterText(added)] })),
+    );
+
+    expect(events.filter((e) => e.type === added.type)).toHaveLength(1);
+    expect(events.filter((e) => e.type === "TOOL_CALL_RESULT" || e.type.startsWith("REASONING_"))).toEqual([]);
+    expect(JSON.stringify(events)).not.toContain(hidden);
   });
 
   test("a CUSTOM event named chat.<name> that a test middleware adds passes, as the chat's own events do", async () => {
@@ -759,6 +838,61 @@ describe("limits", () => {
       expect(await deps.log.list(1)).toEqual([]);
     },
   );
+
+  test.each(Object.entries(SPEND_LIMIT_ERRORS))(
+    "Anthropic's %s, as the SDK's real error class, ends the 200 stream with RUN_ERROR SPEND_LIMIT and its fixed message only, and writes one limit entry",
+    async (_name, error) => {
+      const asked = "What did Test Person build?";
+      const telemetry = inMemoryTelemetry();
+      const deps = seamDeps(anthropicAnswering(error), { telemetry });
+
+      const response = await handleChat(chatRequest([question(asked)]), deps);
+      const events = await readEvents(response);
+
+      expect(response.status).toBe(200);
+      expect(events.filter((e) => e.type === "RUN_ERROR")).toEqual([
+        { type: "RUN_ERROR", code: "SPEND_LIMIT", message: "The chat has reached this month's limit.", timestamp: expect.any(Number) },
+      ]);
+      expect(events.at(-1)?.type).toBe("RUN_ERROR");
+      const wire = JSON.stringify(events);
+      for (const detail of ["You have reached", "invalid_request_error", "rate_limit_error", "enforced_spend_limit_reached", "req_stub"]) {
+        expect(wire).not.toContain(detail);
+      }
+      expect((await deps.log.list(1)).map(({ question, outcome }) => ({ question, outcome }))).toEqual([{ question: asked, outcome: "limit" }]);
+      expect(telemetry.events.map(({ outcome, errorCode }) => ({ outcome, errorCode }))).toEqual([{ outcome: "limit", errorCode: "SPEND_LIMIT" }]);
+    },
+  );
+
+  // The SDK error's message holds the whole body as text, so a check of the message text would pass each of these.
+  const notSpendLimits: [string, ApiError, string][] = [
+    [
+      "a 429 rate limit whose message names the spend cap's code, with no error_code in its body",
+      { status: 429, body: { type: "error", error: { type: "rate_limit_error", message: "Rate limited; not enforced_spend_limit_reached." } } },
+      "429",
+    ],
+    [
+      "a 529 overload whose message starts as a spend limit's does",
+      { status: 529, body: { type: "error", error: { type: "overloaded_error", message: "You have reached your specified workspace API usage limits." } } },
+      "529",
+    ],
+    [
+      "a 400 whose message holds a spend limit's words after its start",
+      {
+        status: 400,
+        body: { type: "error", error: { type: "invalid_request_error", message: "messages.1: You have reached your specified workspace API usage limits." } },
+      },
+      "400",
+    ],
+  ];
+
+  test.each(notSpendLimits)("%s is no spend limit: the stream ends with RUN_ERROR and the status as its code, and the entry is error", async (_name, error, code) => {
+    const deps = seamDeps(anthropicAnswering(error));
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), deps));
+
+    expect(events.filter((e) => e.type === "RUN_ERROR").map((e) => e.code)).toEqual([code]);
+    expect((await deps.log.list(1)).map(({ outcome }) => outcome)).toEqual(["error"]);
+  });
 });
 
 describe("stream errors", () => {
@@ -901,6 +1035,26 @@ describe("endings", () => {
     // One entry per turn that reached the model (Question log).
     expect(await deps.log.list(1)).toEqual([]);
   });
+
+  test("the stub's max_tokens stop ends the stream with RUN_ERROR MAX_TOKENS and its fixed message, with no RUN_FINISHED and no chat.citations after the partial text, and writes one error entry", async () => {
+    const stub = stubAnthropic([
+      { thinking: "The visitor asks what was built.", text: "Test Person built the first thing [highlight:acme.1] and then the", stopReason: "max_tokens" },
+    ]);
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(stub.adapter, { telemetry });
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), deps));
+
+    // The browser keeps no partial text after an error ending (How a turn ends): the stream ends on the
+    // error, and no citation of the cut text is reported.
+    expect(events.at(-1)).toEqual({ type: "RUN_ERROR", code: "MAX_TOKENS", message: "The answer didn't arrive.", timestamp: expect.any(Number) });
+    expect(events.filter((e) => e.type === "RUN_ERROR")).toHaveLength(1);
+    expect(events.filter((e) => e.type === "RUN_FINISHED" || (e.type === "CUSTOM" && e.name === "chat.citations"))).toEqual([]);
+    expect((await deps.log.list(1)).map(({ question, outcome }) => ({ question, outcome }))).toEqual([
+      { question: "What did Test Person build?", outcome: "error" },
+    ]);
+    expect(telemetry.events.map(({ outcome, errorCode }) => ({ outcome, errorCode }))).toEqual([{ outcome: "error", errorCode: "MAX_TOKENS" }]);
+  });
 });
 
 describe("a thrown run", () => {
@@ -994,6 +1148,162 @@ describe("a thrown run", () => {
       expect(line).not.toContain(asked);
     }
     expect((await deps.log.list(1)).map(({ question, outcome }) => ({ question, outcome }))).toEqual([{ question: asked, outcome: "error" }]);
+  });
+});
+
+/** The chat.thinking events of a response, in order. */
+const thinkingEvents = (events: WireEvent[]) => events.filter((e) => e.type === "CUSTOM" && e.name === "chat.thinking");
+
+/** The thinking summary as the browser receives it: every chat.thinking delta, joined. */
+const streamedThinking = (events: WireEvent[]) =>
+  thinkingEvents(events)
+    .map((e) => (e.value as { delta?: string }).delta ?? "")
+    .join("");
+
+/** A stub model call that reads through read_sources, after it thinks. */
+const thinkingRead = (thinking: string, ids: string[]) => ({ thinking, toolUse: { name: "read_sources", input: { ids, topic: "the first thing" } } });
+
+describe("thinking", () => {
+  test("the stub client sees adaptive thinking at effort medium with the summarized display, max_tokens 8,000 and the short prompt cache on every model call", async () => {
+    const stub = stubAnthropic([
+      thinkingRead("The catalog names sample.", ["sample.2"]),
+      { thinking: "The passage answers it.", text: "Test Person planned the first thing [sample.2]." },
+    ]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), seamDeps(stub.adapter)));
+
+    expect(streamedText(events)).toBe("Test Person planned the first thing [sample.2].");
+    expect(stub.requests).toHaveLength(2);
+    for (const request of stub.requests) {
+      expect(request.thinking).toEqual({ type: "adaptive", display: "summarized" });
+      expect(request.output_config).toEqual({ effort: "medium" });
+      expect(request.max_tokens).toBe(8_000);
+      // The short cache is the 5-minute one: an ephemeral marker with no 1-hour ttl.
+      expect(request.system?.at(-1)?.cache_control).toEqual({ type: "ephemeral" });
+      expect(request.tools?.at(-1)?.cache_control).toEqual({ type: "ephemeral" });
+      expect(JSON.stringify(request)).not.toContain('"ttl"');
+    }
+  });
+
+  test("no REASONING_* event reaches the wire and the signature appears nowhere in it: each thinking block arrives as chat.thinking events that carry only active or delta, and the turn's next model call still gets the signature", async () => {
+    const thinking = ["The catalog names sample, so the chat reads it.", "The passage answers the question."];
+    const stub = stubAnthropic([
+      thinkingRead(thinking[0]!, ["sample.2"]),
+      { thinking: thinking[1], text: "Test Person planned the first thing [sample.2]." },
+    ]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), seamDeps(stub.adapter)));
+
+    expect(events.filter((e) => e.type.startsWith("REASONING_"))).toEqual([]);
+    expect(JSON.stringify(events)).not.toContain(SIGNATURE);
+    const steps = thinkingEvents(events);
+    for (const event of steps) expect(Object.keys(event).sort()).toEqual(["name", "timestamp", "type", "value"]);
+    expect(steps.map((e) => e.value)).toEqual([
+      { active: true },
+      { delta: thinking[0] },
+      { active: false },
+      { active: true },
+      { delta: thinking[1] },
+      { active: false },
+    ]);
+    expect(streamedText(events)).toBe("Test Person planned the first thing [sample.2].");
+    // The server's own messages keep the signature, so the read loop inside the turn is unchanged (Thinking, rule 1).
+    expect(JSON.stringify(stub.requests[1]?.messages)).toContain(SIGNATURE);
+  });
+
+  test("an [id] or <<…>> in the thinking summary gives no kept citation, no refusal and no follow-up question, and 0 removed, and its delta text equals the input", async () => {
+    // A resume entry the check would keep, one it would remove, and the two marker forms of the answer text.
+    const thinking = "The visitor asks about [highlight:acme.1] and [highlight:highspot.1]. <<refusal: not-covered>> <<follow-up: x>>";
+    const stub = stubAnthropic([{ thinking, text: "Test Person built the first thing at Acme." }]);
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(stub.adapter, { telemetry });
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build at Acme?")]), deps));
+
+    expect(streamedThinking(events)).toBe(thinking);
+    expect(citationEvents(events)).toEqual([{ citations: [], removed: 0 }]);
+    expect(events.filter((e) => e.type === "CUSTOM" && e.name !== "chat.thinking" && e.name !== "chat.citations")).toEqual([]);
+    expect((await deps.log.list(1)).map(({ citations, removed, outcome }) => ({ citations, removed, outcome }))).toEqual([
+      { citations: [], removed: 0, outcome: "answered" },
+    ]);
+    expect(telemetry.events.map(({ citations, removed }) => ({ citations, removed }))).toEqual([{ citations: 0, removed: 0 }]);
+  });
+
+  /** A thinking summary of `length` characters: "Step 1. Step 2. …", cut to that length. */
+  const longThinking = (length: number) =>
+    Array.from({ length: Math.ceil(length / 8) }, (_, i) => `Step ${i + 1}. `)
+      .join("")
+      .slice(0, length);
+
+  test("a thinking summary of 25,000 characters reaches the wire as 20,000, ending with …, and the answer still arrives whole", async () => {
+    const thinking = longThinking(25_000);
+    const stub = stubAnthropic([{ thinking, text: "Test Person built the first thing [highlight:acme.1]." }]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), seamDeps(stub.adapter)));
+
+    const arrived = streamedThinking(events);
+    expect(arrived).toHaveLength(20_000);
+    expect(arrived).toBe(`${thinking.slice(0, 19_999)}…`);
+    expect(thinkingEvents(events).map((e) => e.value).filter((value) => !("delta" in (value as object)))).toEqual([{ active: true }, { active: false }]);
+    expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1].");
+  });
+
+  test("the wire output of a turn with thinking, run through the real @tanstack/ai-client stream processor, gives a next request that passes the request check and holds no thinking text", async () => {
+    const thinking = ["The catalog names sample, so the chat reads it.", "The passage answers the question.", "The visitor asks a follow-up."];
+    const stub = stubAnthropic([
+      thinkingRead(thinking[0]!, ["sample.2"]),
+      { thinking: thinking[1], text: "Test Person planned the first thing [sample.2]." },
+      { thinking: thinking[2], text: "Test Person built it at Acme [highlight:acme.1]." },
+    ]);
+    const deps = seamDeps(stub.adapter);
+    /** Each request the browser's client sends, and the status the handler answers it with. */
+    const sent: { body: string; status: number }[] = [];
+    const arrived: string[] = [];
+    /** The network, for the browser's client: each request goes to handleChat(). */
+    const toHandler = async (url: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(url, init);
+      const body = await request.clone().text();
+      const response = await handleChat(request, deps);
+      sent.push({ body, status: response.status });
+      return response;
+    };
+    const browser = new ChatClient({
+      threadId: THREAD_ID,
+      connection: fetchServerSentEvents(CHAT_URL, { fetchClient: Object.assign(toHandler, { preconnect: fetch.preconnect }) }),
+      onCustomEvent: (name, value) => {
+        if (name === "chat.thinking" && typeof value === "object" && value !== null && "delta" in value) arrived.push(String(value.delta));
+      },
+    });
+
+    await browser.sendMessage("How did Test Person build the first thing?");
+    await browser.sendMessage("Where did Test Person build it?");
+
+    // The next request passed the request check, so the second answer arrived.
+    expect(sent.map(({ status }) => status)).toEqual([200, 200]);
+    expect(browser.getMessages().at(-1)?.parts).toContainEqual(expect.objectContaining({ type: "text", content: "Test Person built it at Acme [highlight:acme.1]." }));
+    // The browser received the thinking summary of both answers, and it built no thinking part from it.
+    expect(arrived.join("")).toBe(thinking.join(""));
+    expect(browser.getMessages().flatMap((message) => message.parts.map((part) => part.type))).not.toContain("thinking");
+    const next = sent[1]?.body ?? "";
+    expect(JSON.parse(next).messages.map((message: { role: string }) => message.role)).not.toContain("reasoning");
+    for (const text of [...thinking, SIGNATURE]) expect(next).not.toContain(text);
+  });
+
+  test("the 20,000 characters count for the whole turn: the block that passes them ends with …, and a later block sends its active events with no text", async () => {
+    const blocks = [longThinking(15_000), longThinking(15_000), "The passages answer it."];
+    const stub = stubAnthropic([
+      thinkingRead(blocks[0]!, ["sample.2"]),
+      thinkingRead(blocks[1]!, ["sample.3"]),
+      { thinking: blocks[2], text: "Test Person planned it [sample.2] and tested it [sample.3]." },
+    ]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), seamDeps(stub.adapter)));
+
+    expect(streamedThinking(events)).toBe(`${blocks.join("").slice(0, 19_999)}…`);
+    // The third block: its start and its end, and no delta between them.
+    expect(thinkingEvents(events).slice(-2).map((e) => e.value)).toEqual([{ active: true }, { active: false }]);
+    expect(thinkingEvents(events).filter((e) => "active" in (e.value as object))).toHaveLength(6);
+    expect(streamedText(events)).toBe("Test Person planned it [sample.2] and tested it [sample.3].");
   });
 });
 
