@@ -19,6 +19,7 @@ import { ChatMessages, ChatProps } from "./props";
 import type { Budget, QuestionLog, Telemetry } from "./question-log";
 import { libraryLogging, logServerError } from "./server-log";
 import { turnUsage } from "./telemetry";
+import { chatTools } from "./tools";
 import { startTurn } from "./turn";
 import { wireError, wireEvents } from "./wire";
 
@@ -215,6 +216,8 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
     threadId,
     systemPrompts: [systemPrompt(deps.knowledge)],
     messages,
+    // The handler's own tools only: the request's tools never reach chat() (The request).
+    tools: chatTools(deps.knowledge, turn),
     abortController: run,
     // The library's own log lines hold the error alone, as the chat's do.
     debug: libraryLogging,
