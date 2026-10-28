@@ -81,7 +81,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [C3](modules/chat.md#c3-one-turn-through-handlechat-a-resume-citation-kept-and-one-log-entry) One turn through `handleChat()`: a resume citation kept and one log entry — blocked by A9, C1, C2, K3 (done 2026-10-27; `finishTurn()`, the `Turn` state, a pure marker scanner and one error-code guard came with it)
 - [x] [C4](modules/chat.md#c4-request-checks-with-the-chaterror-shape-and-turnlimits) Request checks with the `ChatError` shape and `turnLimits` — blocked by C3 (done 2026-10-27; a request needs a question with text; `CheckedRequest` carries only what `chat()` may use)
 - [x] [C5](modules/chat.md#c5-the-read-tool-passages-read-on-the-server-ids-only-on-the-wire) The read tool: passages read on the server, ids only on the wire — blocked by C3, K7, K8 (done 2026-10-27; ids only on the wire; bounds from `readLimits`)
-- [ ] [C6](modules/chat.md#c6-the-read-budget-and-the-last-call) The read budget and the last call — blocked by C5
+- [x] [C6](modules/chat.md#c6-the-read-budget-and-the-last-call) The read budget and the last call — blocked by C5 (done 2026-10-27; `readBudget(turn)` in `limits.ts`; `recordRead()` in `turn.ts`)
 - [ ] [C7](modules/chat.md#c7-the-ask-about-this-read-and-request-line) The "Ask about this" read and request line — blocked by C6
 - [ ] [C8](modules/chat.md#c8-markers-refusals-follow-up-questions-and-the-citation-forms) Markers: refusals, follow-up questions and the citation forms — blocked by C5
 - [ ] [C9](modules/chat.md#c9-the-open-tools-open_resume-and-open_source) The open tools: `open_resume` and `open_source` — blocked by C8
@@ -110,7 +110,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 
 - [x] [D8](modules/deploy.md#d8-build-settings-in-code-and-no-env-files) Build settings in code, and no `.env` files — blocked by D6 (done 2026-10-27; no spike push: `bun.lock` is version 2 again since A10)
 - [x] [D17](modules/deploy.md#d17-the-routes-redirects-clean-addresses-three-api-routes-and-the-not-found-page) The routes: redirects, clean addresses, three API routes and the not-found page — blocked by D16, D6 (done 2026-10-27; `findFunctionFolders()`; the named-folder check moves to D20)
-- [ ] [D18](modules/deploy.md#d18-security-and-cache-headers) Security and cache headers — blocked by D17
+- [x] [D18](modules/deploy.md#d18-security-and-cache-headers) Security and cache headers — blocked by D17 (done 2026-10-27; one policy header per path, the worker policy route last; a 404 under `/assets/` stays immutable as the spec writes it)
 - [x] [D10](modules/deploy.md#d10-the-question-log-in-upstash-deleted-by-the-store-after-90-days) The question log in Upstash, deleted by the store after 90 days — blocked by D9, D6 (done 2026-10-27; REST with `fetch`, one `/multi-exec` per write)
 - [ ] [S9](modules/site.md#s9-the-preview-and-the-real-browser-test) The preview and the real-browser test — blocked by S8, D17
 - [ ] [S10](modules/site.md#s10-the-career-timeline-band) The career timeline band — blocked by S9, T1
@@ -162,7 +162,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [S29](modules/site.md#s29-offline-after-one-visit-and-installable) Offline after one visit, and installable — blocked by S28, S21, S25
 - [ ] [S30](modules/site.md#s30-the-speed-budget) The speed budget — blocked by S29
 - [ ] [Checkpoint site: phones, offline, install](modules/site.md#checkpoint-site-phones-offline-install) — after S23 to S30; Peter: review the preview at 390 × 844
-- [ ] [D11](modules/deploy.md#d11-the-daily-cap-holds-under-parallel-requests) The daily cap holds under parallel requests — blocked by D10
+- [x] [D11](modules/deploy.md#d11-the-daily-cap-holds-under-parallel-requests) The daily cap holds under parallel requests — blocked by D10 (done 2026-10-27; one store transaction per reservation; https only; D12 and D15 close the interim gaps)
 - [ ] [D12](modules/deploy.md#d12-daily-totals-and-the-cost-estimate) Daily totals and the cost estimate — blocked by D11
 - [ ] [D13](modules/deploy.md#d13-limit-alerts-for-the-months-spend-and-the-daily-cap) Limit alerts for the month's spend and the daily cap — blocked by D12; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [D14](modules/deploy.md#d14-the-monthly-limit-pauses-the-chat-and-one-probe-an-hour) The monthly limit pauses the chat, and one probe an hour — blocked by D13; Peter: its wording draft goes to his one review before D37 (row 153)
