@@ -654,6 +654,48 @@ describe("endings", () => {
       },
     ]);
   });
+
+  test("a closed connection during the answer: the response's cancel aborts the model call, and the turn writes one stopped entry", async () => {
+    const fake = fakeText({ tokensPerSecond: 200 });
+    let modelCallSignal: AbortSignal | null | undefined;
+    fake.setResponses([
+      ({ request }) => {
+        modelCallSignal = request.request?.signal;
+        return { text: "Test Person built the first thing at Acme [highlight:acme.1], and later the second thing [highlight:acme.2]." };
+      },
+    ]);
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(fake, { telemetry });
+
+    const response = await handleChat(chatRequest([question("What did Test Person build?")]), deps);
+    // The browser's connection closes after the first text event; leaving the loop cancels the response.
+    for await (const bytes of response.body ?? []) if (new TextDecoder().decode(bytes).includes("TEXT_MESSAGE_CONTENT")) break;
+
+    expect(modelCallSignal?.aborted).toBe(true);
+    expect((await deps.log.list(1)).map(({ question, outcome }) => ({ question, outcome }))).toEqual([
+      { question: "What did Test Person build?", outcome: "stopped" },
+    ]);
+    expect(telemetry.events.map(({ outcome }) => outcome)).toEqual(["stopped"]);
+  });
+
+  test("a Stop before handleChat() runs: no throw and no model call, one stopped chat_turn event settles the reservation, and no log entry, as the turn never reached the model", async () => {
+    const fake = fakeText();
+    fake.setResponses([{ text: "Test Person built the first thing [highlight:acme.1]." }]);
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(fake, { telemetry });
+    const visitor = new AbortController();
+    visitor.abort();
+
+    const events = await readEvents(await handleChat(postChat(chatBody([question("What did Test Person build?")]), {}, CHAT_URL, visitor.signal), deps));
+
+    expect(fake.state.callCount).toBe(0);
+    expect(events.filter((e) => e.type === "RUN_ERROR" || e.type === "RUN_FINISHED" || e.type === "TEXT_MESSAGE_CONTENT")).toEqual([]);
+    expect(telemetry.events.map(({ outcome, modelCalls, errorCode }) => ({ outcome, modelCalls, errorCode }))).toEqual([
+      { outcome: "stopped", modelCalls: 0, errorCode: null },
+    ]);
+    // One entry per turn that reached the model (Question log).
+    expect(await deps.log.list(1)).toEqual([]);
+  });
 });
 
 describe("a thrown run", () => {
@@ -711,6 +753,43 @@ describe("a thrown run", () => {
       expect((await deps.log.list(1)).map(({ question, outcome }) => ({ question, outcome }))).toEqual([{ question: asked, outcome: "error" }]);
     },
   );
+
+  test("a RUN_ERROR whose code getter throws a marker: the wire middleware catches its own error, so the run does not throw, the stream ends with RUN_ERROR SERVER_ERROR and fixed text only, and the turn writes one error entry", async () => {
+    const asked = "What did Test Person build at Acme?";
+    const fake = fakeText();
+    fake.setResponses([{ error: `${MARKER}: the provider failed` }]);
+    // The model's RUN_ERROR, with a code that throws when the wire middleware reads it.
+    const unreadableCode: ChatMiddleware = {
+      name: "unreadable-code",
+      onChunk: (_ctx, chunk) => {
+        if (chunk.type !== EventType.RUN_ERROR) return undefined;
+        return Object.defineProperty({ ...chunk }, "code", {
+          get: () => {
+            throw new Error(`${MARKER}: ${asked}`);
+          },
+        });
+      },
+    };
+    const deps = seamDeps(fake, { testMiddleware: [unreadableCode] });
+    let events: WireEvent[] = [];
+
+    const lines = await serverLogLines(async () => {
+      events = await readEvents(await handleChat(chatRequest([question(asked)]), deps));
+    });
+
+    expect(events.filter((e) => e.type === "RUN_ERROR")).toEqual([
+      { type: "RUN_ERROR", code: "SERVER_ERROR", message: "The answer didn't arrive.", timestamp: expect.any(Number) },
+    ]);
+    expect(events.at(-1)?.type).toBe("RUN_ERROR");
+    expect(JSON.stringify(events)).not.toContain(MARKER);
+    expect(lines.some((line) => line.startsWith("chat wire:"))).toBe(true);
+    expect(lines.some((line) => line.includes("the run threw"))).toBe(false);
+    for (const line of lines) {
+      expect(line).not.toContain(MARKER);
+      expect(line).not.toContain(asked);
+    }
+    expect((await deps.log.list(1)).map(({ question, outcome }) => ({ question, outcome }))).toEqual([{ question: asked, outcome: "error" }]);
+  });
 });
 
 describe("turn telemetry", () => {

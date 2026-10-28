@@ -178,14 +178,15 @@ async function* serverErrorOnThrow(
 }
 
 /**
- * The run's controller, which the visitor's Stop aborts (How a turn ends): the request's abort reaches
- * the model call through chat(). On Vercel the request's signal never fires, and the turn logs its own
- * ending (row 168; SPEC-deploy, "A Stop on Vercel").
+ * The run's controller, which the visitor's Stop aborts (How a turn ends): the first of `signals` to
+ * abort reaches the model call through chat(). On Vercel the request's signal never fires (row 168),
+ * and SPEC-deploy owns that case ("A Stop on Vercel"); this code only reacts where the signal fires.
  */
-function stoppedBy(signal: AbortSignal): AbortController {
+function stoppedBy(...signals: AbortSignal[]): AbortController {
   const run = new AbortController();
-  if (signal.aborted) run.abort();
-  else signal.addEventListener("abort", () => run.abort(), { once: true });
+  const stop = AbortSignal.any(signals);
+  if (stop.aborted) run.abort();
+  else stop.addEventListener("abort", () => run.abort(), { once: true });
   return run;
 }
 
@@ -204,7 +205,11 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
     return toServerSentEventsResponse(only(wireError(reserved.errorCode)));
   }
 
-  const run = stoppedBy(request.signal);
+  // The response's own controller, which only the visitor's closed connection aborts. A Stop aborts the
+  // run but not the response, so the response reads the run to its end, and the run's terminal hook ends
+  // the turn, also after a Stop that came before the run started.
+  const delivery = new AbortController();
+  const run = stoppedBy(request.signal, delivery.signal);
   const stream = chat({
     adapter: deps.adapter,
     threadId,
@@ -224,6 +229,5 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
     ],
   });
   const endAsThrown = () => finishTurn(deps, turn, { outcome: "error", errorCode: "SERVER_ERROR" });
-  // The response's own cancel, when the visitor's connection closes, aborts the run too.
-  return toServerSentEventsResponse(serverErrorOnThrow(stream, run.signal, endAsThrown), { abortController: run });
+  return toServerSentEventsResponse(serverErrorOnThrow(stream, run.signal, endAsThrown), { abortController: delivery });
 }

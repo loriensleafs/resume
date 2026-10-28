@@ -6,7 +6,6 @@
 
 import { EventType, type ChatMiddleware, type RunErrorEvent, type StreamChunk } from "@tanstack/ai";
 import { logServerError } from "./server-log";
-import type { Turn } from "./turn";
 
 /**
  * The handler's own codes, each with its fixed message. The browser shows its own text for each code
@@ -20,8 +19,8 @@ const MESSAGES = {
   SERVER_ERROR: "The answer didn't arrive.",
 } as const;
 
-/** The fixed message of every model API code: the browser shows the same alert as for an error. */
-const MODEL_API_MESSAGE = "The answer didn't arrive.";
+/** The fixed message of every model API code: SERVER_ERROR's, as the browser shows the same alert as for an error. */
+const MODEL_API_MESSAGE = MESSAGES.SERVER_ERROR;
 
 export type HandlerErrorCode = keyof typeof MESSAGES;
 
@@ -68,7 +67,7 @@ function wireCodeOf(event: Extract<StreamChunk, { type: "RUN_ERROR" }>): RunErro
  * rawEvent, metadata, usage, nested error or other provider detail reaches the browser, and the turn
  * keeps the code it sent for finishTurn().
  */
-export function wireEvents(turn: Turn): ChatMiddleware {
+export function wireEvents(turn: { errorCode: RunErrorCode | null }): ChatMiddleware {
   function rewrite(chunk: StreamChunk): StreamChunk | undefined {
     if (chunk.type !== EventType.RUN_ERROR) return undefined;
     const code = wireCodeOf(chunk);
