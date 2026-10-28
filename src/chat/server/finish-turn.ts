@@ -2,7 +2,8 @@
 // question-log entry and its chat_turn event, from the turn's state. The terminal middleware hooks
 // below call it with ctx.defer(), so the run awaits the writes before the response ends, and the
 // stream wrapper in handle-chat.ts calls it after a throw. Each turn writes each record exactly once,
-// and a failed write never breaks the answer.
+// and a failed write never breaks the answer. finishRejected() writes the chat_turn event of a
+// request that the checks rejected, which never became a turn.
 
 import type { ChatMiddleware } from "@tanstack/ai";
 import { utcDay, type QuestionLog, type QuestionLogEntry, type Telemetry } from "./question-log";
@@ -87,6 +88,27 @@ export async function finishTurn(deps: FinishDeps, turn: Turn, ending: TurnEndin
     entry && attempt("question-log", () => deps.log.append(entry)),
     attempt("telemetry", () => deps.telemetry.record(event, turn.reservation)),
   ]);
+}
+
+/**
+ * The chat_turn event of a request that the checks rejected (The request; Turn telemetry). It has no
+ * question that passed the checks, so it never became a turn: it reserved, read, cited and called
+ * nothing, and writes no log entry. Its error code is null, because a rejection's ChatError code is
+ * none of the codes the event holds. Call it before the response, as every write finishes first.
+ */
+export async function finishRejected(deps: Pick<FinishDeps, "telemetry" | "now">, startedAt: Date): Promise<void> {
+  const event: ChatTurnEvent = {
+    event: "chat_turn",
+    outcome: "rejected",
+    reads: 0,
+    citations: 0,
+    removed: 0,
+    modelCalls: 0,
+    ...NO_TOKENS,
+    durationMs: deps.now().getTime() - startedAt.getTime(),
+    errorCode: null,
+  };
+  await attempt("telemetry", () => deps.telemetry.record(event));
 }
 
 /** Runs one write; a failure is logged on the server and never thrown, so it never breaks the answer. */
