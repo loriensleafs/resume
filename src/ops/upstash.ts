@@ -90,9 +90,12 @@ export async function claimAlertMarker(
   return { claimed: claim === "OK", heldForMs };
 }
 
-/** After a successful push, keeps the alert's marker until the end of its period, so no other push of its kind goes out in it. */
-export async function keepAlertMarker(store: UpstashStore, kind: string, period: string): Promise<void> {
-  await store.transaction([["EXPIREAT", alertMarkerKey(kind, period), String(alertPeriodEnd(period) / 1000)]]);
+/**
+ * After a successful push, keeps the alert's marker until `endsAt`, the end of its period in Unix
+ * milliseconds, so no other push of its kind goes out in it.
+ */
+export async function keepAlertMarker(store: UpstashStore, kind: string, period: string, endsAt: number): Promise<void> {
+  await store.transaction([["EXPIREAT", alertMarkerKey(kind, period), String(endsAt / 1000)]]);
 }
 
 /**
@@ -119,6 +122,17 @@ export function keptDays(now: () => Date, days: number): string[] {
  * settles on the day it reserved; the rest makes each reservation unique.
  */
 const reservationOn = (day: string) => `${day}/${crypto.randomUUID()}`;
+
+/**
+ * The reservation of a turn that reserve() allowed although the store failed (SPEC-deploy, "The store
+ * fails"). Its $0.90 never reached the day's cost, so the telemetry adds the turn's whole cost to the
+ * day, not the cost less the $0.90 (daily-totals.ts). A `<day>/<uuid>` reservation here would take
+ * $0.90 off the day that was never added, and the day's cost would come out low.
+ */
+export const uncountedReservationOn = (day: string) => `${day}/uncounted/${crypto.randomUUID()}`;
+
+/** Whether the day's cost counts the reservation's $0.90: false only for an uncounted reservation. */
+export const reservationCounted = (reservation: string) => !/^\d{4}-\d{2}-\d{2}\/uncounted\//.test(reservation);
 
 /** The UTC day a reservation names. A text that is not one of this budget's reservations throws. */
 export function reservationDay(reservation: string): string {
@@ -167,11 +181,14 @@ export function upstashQuestionLog(store: UpstashStore, now: () => Date): Questi
  * @param now says which UTC day is today.
  * @param onCapped gets the UTC day of each DAILY_LIMIT refusal, for the daycap alert (alerts.ts). It
  *   decides itself whether the refusal needs a store call.
+ * @param onTakeBackFailed gets the error of a take-back that failed, for its ops_error line and the
+ *   storefail alert (alerts.ts). The refusal stands.
  */
 export function upstashBudget(
   store: UpstashStore,
   now: () => Date,
   onCapped: (day: string) => Promise<void> = async () => {},
+  onTakeBackFailed: (step: "take_back", error: unknown) => Promise<void> = async () => {},
 ): Budget {
   /** The UTC day on which this function instance saw the cap, if any. */
   let cappedDay: string | undefined;
@@ -186,7 +203,7 @@ export function upstashBudget(
       if (total <= limits.dailyCap) return { ok: true, reservation: reservationOn(day) };
       // Set before the await: a turn that starts while takeBack() waits is refused with no store call.
       cappedDay = day;
-      await takeBack(store, day);
+      await takeBack(store, day, onTakeBackFailed);
       await onCapped(day);
       return { ok: false, errorCode: "DAILY_LIMIT" };
     },
@@ -196,13 +213,14 @@ export function upstashBudget(
 /**
  * Takes a refused turn's reservation back from the day's cost. The refusal stands when this fails:
  * the cap was passed, and the amount left counted errs toward pausing, as an unsettled reservation
- * does (SPEC-deploy, "The daily cap", step 4). D15 prints the failure as an ops_error line.
+ * does (SPEC-deploy, "The daily cap", step 4). The failure goes to `failed`, for its ops_error line.
  */
-async function takeBack(store: UpstashStore, day: string): Promise<void> {
+async function takeBack(store: UpstashStore, day: string, failed: (step: "take_back", error: unknown) => Promise<void>): Promise<void> {
   try {
     await addToDayCost(store, day, -limits.reservation);
-  } catch {
-    // Nothing more to do here until D15: a refusal never becomes an allowed turn.
+  } catch (error) {
+    // A refusal never becomes an allowed turn, so the failure is reported and nothing more.
+    await failed("take_back", error);
   }
 }
 

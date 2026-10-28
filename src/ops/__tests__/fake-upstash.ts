@@ -3,7 +3,8 @@
 // codes (https://upstash.com/docs/redis/features/restapi, read 2026-10-27). It keeps each key's expiry
 // on the clock it is given, as Redis does: a key is gone once that clock passes its expiry, and an
 // expiry already past deletes the key at once. It records every request, so a test can check what
-// reached the store, or that nothing did.
+// reached the store, or that nothing did. A test can make it fail every request, as an outage does,
+// or hold requests with no answer, as a hung store does, and then make it answer again.
 
 export type UpstashRequest = {
   method: string;
@@ -25,6 +26,17 @@ export type FakeUpstash = {
   set(key: string, value: string): void;
   /** The string at a key, as GET gives it; null for a missing key. */
   get(key: string): string | null;
+  /** From now on, answers every request with `status`, 500 by default, and runs no command, as an outage does. */
+  failEvery(status?: number): void;
+  /**
+   * From now on, holds each request whose body `matches`, every request by default, with no answer,
+   * as a hung store does, until the server stops. A held request runs no command.
+   */
+  holdEvery(matches?: (body: string) => boolean): void;
+  /** How many requests the server holds. */
+  held(): number;
+  /** From now on, answers and runs commands again, as a working store does. Held requests stay held. */
+  recover(): void;
   stop(): Promise<void>;
 };
 
@@ -66,6 +78,12 @@ export function startFakeUpstash({ now = () => new Date() }: { now?: () => Date 
   const token = "test";
   const requests: UpstashRequest[] = [];
   const keys = new Map<string, Entry>();
+  /** The status of an outage, while the server fails every request. */
+  let failingWith: number | undefined;
+  /** Which requests the server holds, while it holds any. */
+  let holding: ((body: string) => boolean) | undefined;
+  /** The answers of the held requests, which stop() gives at last, so no handler is left waiting. */
+  const heldAnswers: (() => void)[] = [];
 
   /** The key's entry, or undefined once the store's clock has passed its expiry (Redis: now > when). */
   const live = (key: string): Entry | undefined => {
@@ -223,6 +241,11 @@ export function startFakeUpstash({ now = () => new Date() }: { now?: () => Date 
       const body = await request.text();
       requests.push({ method: request.method, path, authorization, body });
 
+      if (holding?.(body)) {
+        await new Promise<void>((answer) => heldAnswers.push(answer));
+        return Response.json({ error: "held until the server stopped" }, { status: 503 });
+      }
+      if (failingWith !== undefined) return Response.json({ error: "ERR the store is down" }, { status: failingWith });
       if (authorization !== `Bearer ${token}`) return Response.json({ error: "Unauthorized" }, { status: 401 });
       if (request.method !== "POST" || (path !== "/multi-exec" && path !== "/pipeline")) {
         return Response.json({ error: "ERR unknown command" }, { status: 400 });
@@ -271,7 +294,21 @@ export function startFakeUpstash({ now = () => new Date() }: { now?: () => Date 
       if (value !== undefined && value.type !== "string") throw new Error(`The key ${key} holds a ${value.type}, not a string.`);
       return value?.value ?? null;
     },
-    stop: () => server.stop(true),
+    failEvery(status = 500) {
+      failingWith = status;
+    },
+    holdEvery(matches = () => true) {
+      holding = matches;
+    },
+    held: () => heldAnswers.length,
+    recover() {
+      failingWith = undefined;
+      holding = undefined;
+    },
+    stop() {
+      for (const answer of heldAnswers) answer();
+      return server.stop(true);
+    },
   };
 }
 

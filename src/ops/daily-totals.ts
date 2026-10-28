@@ -16,6 +16,7 @@ import {
   keptDays,
   monthCostKey,
   monthKeysExpireAt,
+  reservationCounted,
   reservationDay,
 } from "./upstash";
 import { UpstashError, type Command, type UpstashStore } from "./upstash-rest";
@@ -74,8 +75,10 @@ export function upstashTelemetry(
       const stats = dayStatsKey(day);
       const longest = dayLongestKey(day);
       const month = monthCostKey(day);
-      // The settlement replaces the reservation on the day it counts on with the turn's cost.
-      const settlement = cost - limits.reservation;
+      // The settlement replaces the reservation on the day it counts on with the turn's cost. An
+      // uncounted reservation, which reserve() gave while the store failed, never reached the day's
+      // cost, so the turn's whole cost is added instead (upstash.ts).
+      const settlement = reservationCounted(reservation) ? cost - limits.reservation : cost;
       const commands: Command[] = [
         ...statsIncrements(event, tokens).map(([field, amount]): Command => ["HINCRBY", stats, field, String(amount)]),
         ["EXPIREAT", stats, expiresAt],

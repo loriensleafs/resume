@@ -109,7 +109,10 @@ describe("createOps() in production", () => {
 
     await expect(ops.log.append(answeredEntry)).resolves.toBeUndefined();
     await expect(ops.telemetry.record(answeredTurn, ticket.reservation)).resolves.toBeUndefined();
-    expect(printed.map((line) => JSON.parse(line) as unknown)).toEqual([answeredTurn]);
+    expect(printed.map((line) => JSON.parse(line) as unknown)).toEqual([
+      { event: "ops_error", step: "config", code: "missing_config", missing: ["KV_REST_API_URL", "KV_REST_API_TOKEN", "NTFY_TOPIC_URL"] },
+      answeredTurn,
+    ]);
   });
 });
 
@@ -132,8 +135,10 @@ describe("createOps() in production, on the in-test Upstash server", () => {
 
 describe("createOps() with the store and alert variables set", () => {
   let upstash: FakeUpstash;
+  let printed: string[];
   beforeEach(() => {
     upstash = startFakeUpstash({ now: noon });
+    printed = [];
   });
   afterEach(async () => {
     await upstash.stop();
@@ -147,8 +152,12 @@ describe("createOps() with the store and alert variables set", () => {
     ANTHROPIC_API_KEY: "test",
   });
 
-  /** A production function instance on the in-test store, at noon on 2026-10-27. */
-  const productionOps = () => createOps({ VERCEL_ENV: "production", ...storeAndAlerts() }, { now: noon });
+  /** A production function instance on the in-test store, at noon on 2026-10-27, whose function log is `printed`. */
+  const productionOps = () =>
+    createOps({ VERCEL_ENV: "production", ...storeAndAlerts() }, { now: noon, print: (line) => printed.push(line) });
+
+  /** The lines in the function log, as JSON. */
+  const printedLines = () => printed.map((line) => JSON.parse(line) as unknown);
 
   test("an entry that one function instance appends comes back from another instance's list(1)", async () => {
     await productionOps().log.append(answeredEntry);
@@ -203,26 +212,25 @@ describe("createOps() with the store and alert variables set", () => {
     expect(reads.map((request) => [request.path, (JSON.parse(request.body) as unknown[]).length])).toEqual([["/pipeline", 90]]);
   });
 
-  test("with a wrong token, append() rejects with the store's 401, and the error holds no question text or token", async () => {
+  test("with a wrong token, append() resolves and prints an ops_error line with the store's 401, and no line holds question text or the token", async () => {
     const ops = createOps(
       { VERCEL_ENV: "production", KV_REST_API_URL: upstash.url, KV_REST_API_TOKEN: "not-the-token" },
-      { now: noon },
+      { now: noon, print: (line) => printed.push(line) },
     );
 
-    const error = await ops.log.append(answeredEntry).then(
-      () => undefined,
-      (refusal: unknown) => refusal,
-    );
+    await expect(ops.log.append(answeredEntry)).resolves.toBeUndefined();
 
-    expect(error).toMatchObject({ name: "UpstashError", code: "HTTP_401" });
-    expect((error as Error).message).not.toContain(answeredEntry.question);
-    expect((error as Error).message).not.toContain("not-the-token");
+    expect(printedLines()).toContainEqual({ event: "ops_error", step: "append", code: "HTTP_401" });
+    expect(printed.join("\n")).not.toContain(answeredEntry.question);
+    expect(printed.join("\n")).not.toContain("not-the-token");
   });
 
-  test("append() rejects when a command in its transaction fails, although the store answers 200", async () => {
+  test("append() resolves and prints an ops_error line when a command in its transaction fails, although the store answers 200", async () => {
     upstash.set("qlog:2026-10-27", "a string where the day's list belongs");
 
-    await expect(productionOps().log.append(answeredEntry)).rejects.toMatchObject({ name: "UpstashError", code: "WRONGTYPE" });
+    await expect(productionOps().log.append(answeredEntry)).resolves.toBeUndefined();
+
+    expect(printedLines()).toContainEqual({ event: "ops_error", step: "append", code: "WRONGTYPE" });
   });
 
   test("list() rejects when the store cannot read a day", async () => {
@@ -232,10 +240,11 @@ describe("createOps() with the store and alert variables set", () => {
   });
 
   test.each(["27 October 2026", "2026-02-30", "2026-10-27T12:00:00.000Z", ""])(
-    "an entry dated %p is refused and writes nothing, so no key lives without its expiry",
+    "an entry dated %p is refused with an ops_error line and writes nothing, so no key lives without its expiry",
     async (date) => {
-      await expect(productionOps().log.append({ ...answeredEntry, date })).rejects.toThrow("not a UTC day");
+      await expect(productionOps().log.append({ ...answeredEntry, date })).resolves.toBeUndefined();
 
+      expect(printedLines()).toEqual([{ event: "ops_error", step: "append", code: "RangeError" }]);
       expect(upstash.requests).toEqual([]);
     },
   );
@@ -258,7 +267,7 @@ describe("createOps() with the store and alert variables set", () => {
   // The in-test server's address is http on 127.0.0.1, which every other test here uses: a loopback
   // request never leaves the machine, so the rule lets it through.
   test.each(["http://store.example", "ws://store.example", "store.example"])(
-    "a store address %p that is not https gets no request, so the token never goes in clear text",
+    "a store address %p that is not https gets no request, so the token never goes in clear text, and append() prints NOT_HTTPS",
     async (url) => {
       const reached: string[] = [];
       // A store that answers every command, so only the address rule can stop the call.
@@ -268,10 +277,12 @@ describe("createOps() with the store and alert variables set", () => {
       }) as unknown as typeof fetch;
       const ops = createOps(
         { VERCEL_ENV: "production", KV_REST_API_URL: url, KV_REST_API_TOKEN: upstash.token },
-        { now: noon, fetch: answeringFetch },
+        { now: noon, fetch: answeringFetch, print: (line) => printed.push(line) },
       );
 
-      await expect(ops.log.append(answeredEntry)).rejects.toMatchObject({ name: "UpstashError", code: "NOT_HTTPS" });
+      await expect(ops.log.append(answeredEntry)).resolves.toBeUndefined();
+      expect(printedLines()).toContainEqual({ event: "ops_error", step: "append", code: "NOT_HTTPS" });
+      // A read for Peter is not part of an answer, so it still rejects.
       await expect(ops.log.list(1)).rejects.toMatchObject({ name: "UpstashError", code: "NOT_HTTPS" });
       expect(reached).toEqual([]);
     },
@@ -287,6 +298,26 @@ describe("createOps() with the store and alert variables set", () => {
 
       expect(await ops.log.list(1)).toEqual([answeredEntry]);
       expect(upstash.requests).toEqual([]);
+    },
+  );
+
+  test.each(["KV_REST_API_URL", "KV_REST_API_TOKEN", "NTFY_TOPIC_URL"] as const)(
+    "in production with %s missing, every turn prints an ops_error line with missing_config that names it, and the turn still goes through",
+    async (missing) => {
+      const env = { VERCEL_ENV: "production", ...storeAndAlerts(), [missing]: undefined };
+      const ops = createOps(env, { now: noon, print: (line) => printed.push(line) });
+
+      for (let turn = 0; turn < 2; turn++) {
+        const ticket = await ops.budget.reserve();
+        if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
+        await ops.telemetry.record(answeredTurn, ticket.reservation);
+        await ops.log.append(answeredEntry);
+      }
+
+      expect(printedLines().filter((line) => (line as { event: string }).event === "ops_error")).toEqual([
+        { event: "ops_error", step: "config", code: "missing_config", missing: [missing] },
+        { event: "ops_error", step: "config", code: "missing_config", missing: [missing] },
+      ]);
     },
   );
 
@@ -398,21 +429,23 @@ describe("the daily cap, in production on the in-test Upstash server", () => {
     expect(upstash.get("qcost:2026-10-28")).toBe("900000");
   });
 
-  test("a refusal stands when the store fails to take its $0.90 back, and the $0.90 stays counted", async () => {
+  test("a refusal stands when the store fails to take its $0.90 back, the $0.90 stays counted, and the take-back prints its ops_error line", async () => {
     // Other function instances have reserved 8 turns today.
     upstash.set("qcost:2026-10-27", "7200000");
     let storeCalls = 0;
     // The store takes the reservation, then answers 500 to the take-back.
     const failingAfterFirstCall = ((input: string | URL | Request, init?: RequestInit) =>
       ++storeCalls === 1 ? fetch(input, init) : Promise.resolve(Response.json({ error: "ERR" }, { status: 500 }))) as typeof fetch;
+    const printed: string[] = [];
     const ops = createOps(
       { VERCEL_ENV: "production", KV_REST_API_URL: upstash.url, KV_REST_API_TOKEN: upstash.token },
-      { now: () => clock, fetch: failingAfterFirstCall },
+      { now: () => clock, fetch: failingAfterFirstCall, print: (line) => printed.push(line) },
     );
 
     expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
     // An amount left counted errs toward pausing, as an unsettled reservation does.
     expect(upstash.get("qcost:2026-10-27")).toBe("8100000");
+    expect(printed.map((line) => JSON.parse(line) as unknown)).toContainEqual({ event: "ops_error", step: "take_back", code: "HTTP_500" });
   });
 });
 
@@ -452,8 +485,10 @@ describe("the telemetry and the daily totals, in production on the in-test Upsta
 
     await ops.telemetry.record(withThreadId, reservation);
 
-    expect(printed.map((line) => JSON.parse(line) as unknown)).toEqual([answeredTurn]);
-    expect(printed[0]).not.toContain("thread-of-one-visitor");
+    // These instances have no NTFY_TOPIC_URL, so the log also holds the turn's missing_config line.
+    const lines = printed.map((line) => JSON.parse(line) as { event: string });
+    expect(lines.filter((line) => line.event === "chat_turn")).toEqual([answeredTurn]);
+    expect(printed.join("\n")).not.toContain("thread-of-one-visitor");
     expect(upstash.requests.map((request) => request.body).join("\n")).not.toContain("thread-of-one-visitor");
   });
 
@@ -991,4 +1026,232 @@ describe("the limit alerts, in production on the in-test Upstash and ntfy server
     expect(printed[0]).not.toContain(topic);
     expect(printed[0]).not.toContain(new URL(ntfy.url).port);
   });
+});
+
+describe("store failures, in production on the in-test Upstash and ntfy servers", () => {
+  // The function instances and the store share one clock, which a test can move on.
+  let clock: Date;
+  let upstash: FakeUpstash;
+  let ntfy: FakeNtfy;
+  let printed: string[];
+  beforeEach(() => {
+    clock = new Date("2026-10-27T12:00:00.000Z");
+    upstash = startFakeUpstash({ now: () => clock });
+    ntfy = startFakeNtfy();
+    printed = [];
+  });
+  afterEach(async () => {
+    await upstash.stop();
+    await ntfy.stop();
+  });
+
+  /** The secret topic on the in-test ntfy server. No test name holds it, as no log line may. */
+  const topic = "resume-alerts-in-test";
+
+  /** A new production function instance with the store and the alerts set, whose function log is `printed`. */
+  const functionInstance = () =>
+    createOps(
+      {
+        VERCEL_ENV: "production",
+        KV_REST_API_URL: upstash.url,
+        KV_REST_API_TOKEN: upstash.token,
+        NTFY_TOPIC_URL: `${ntfy.url}/${topic}`,
+      },
+      { now: () => clock, print: (line) => printed.push(line) },
+    );
+
+  /** The ops_error lines in the function log, in the order printed. */
+  const opsErrors = () => printed.map((line) => JSON.parse(line) as Record<string, unknown>).filter((line) => line.event === "ops_error");
+
+  test("with the Upstash server returning 500, reserve() allows the turn, record() and append() resolve, and each prints an ops_error line with the store's 500", async () => {
+    upstash.failEvery(500);
+    const ops = functionInstance();
+
+    const ticket = await ops.budget.reserve();
+    if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
+    await expect(ops.telemetry.record(answeredTurn, ticket.reservation)).resolves.toBeUndefined();
+    await expect(ops.log.append(answeredEntry)).resolves.toBeUndefined();
+
+    expect(opsErrors()).toEqual([
+      { event: "ops_error", step: "reserve", code: "HTTP_500" },
+      { event: "ops_error", step: "record", code: "HTTP_500" },
+      { event: "ops_error", step: "append", code: "HTTP_500" },
+    ]);
+  });
+
+  test("with the Upstash server returning 500, the instance pushes one urgent storefail that day, with the wording draft's text, however many of its store calls fail", async () => {
+    upstash.failEvery(500);
+    const ops = functionInstance();
+
+    for (let turn = 0; turn < 3; turn++) {
+      const ticket = await ops.budget.reserve();
+      if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
+      await ops.telemetry.record(answeredTurn, ticket.reservation);
+      await ops.log.append(answeredEntry);
+    }
+    clock = new Date("2026-10-27T23:59:59.999Z");
+    await ops.budget.reserve();
+
+    expect(ntfy.pushes).toEqual([
+      {
+        topic,
+        priority: 5,
+        title: "Chat store failed: answers go on without the $8 daily cap",
+        message: "Check the Upstash console for an outage or a spent budget.",
+        headers: expect.any(Object),
+      },
+    ]);
+  });
+
+  test("a storefail marker lives only on its function instance, never in the failing store: another instance pushes its own, and the next UTC day pushes again", async () => {
+    upstash.failEvery(500);
+    const first = functionInstance();
+    const second = functionInstance();
+
+    await first.budget.reserve();
+    await second.budget.reserve();
+    expect(ntfy.pushes).toHaveLength(2);
+
+    clock = new Date("2026-10-28T00:00:00.000Z");
+    await first.budget.reserve();
+
+    expect(ntfy.pushes).toHaveLength(3);
+    expect(upstash.requests.filter((request) => request.body.includes('"SET"'))).toEqual([]);
+  });
+
+  test("a storefail push that ntfy refuses prints an ops_error line, and the first store failure 10 minutes later pushes again", async () => {
+    upstash.failEvery(500);
+    ntfy.refuseNext(1);
+    const ops = functionInstance();
+
+    await ops.budget.reserve();
+    expect(ntfy.refused()).toBe(1);
+    expect(opsErrors()).toContainEqual({ event: "ops_error", step: "alert_push", alert: "storefail", code: "HTTP_429" });
+
+    clock = new Date("2026-10-27T12:09:59.999Z");
+    await ops.budget.reserve();
+    expect(ntfy.refused() + ntfy.pushes.length).toBe(1);
+
+    clock = new Date("2026-10-27T12:10:00.001Z");
+    await ops.budget.reserve();
+    expect(ntfy.pushes).toHaveLength(1);
+  });
+
+  // Counted by hand: the worked example's cost is 58,001 millionths of a dollar (see the telemetry's
+  // tests), and a turn cut off by the deadline keeps its whole $0.90, 900,000.
+  test.each([
+    ["a turn whose model calls all finished", workedExampleTurn, "58001"],
+    ["a DEADLINE turn", { ...answeredTurn, outcome: "error", errorCode: "DEADLINE" } satisfies ChatTurnEvent, "900000"],
+  ] as const)(
+    "%s that reserve() allowed while the store failed adds its whole cost to its day and its month once the store answers again",
+    async (_label, turn, cost) => {
+      upstash.failEvery(500);
+      const ops = functionInstance();
+      const ticket = await ops.budget.reserve();
+      if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
+
+      upstash.recover();
+      await ops.telemetry.record(turn, ticket.reservation);
+
+      // The $0.90 never reached the day's cost, so record() takes none of it back: the day gets the
+      // whole cost, never the cost less $0.90.
+      expect(upstash.get("qcost:2026-10-27")).toBe(cost);
+      expect(upstash.get("qcost:2026-10")).toBe(cost);
+    },
+  );
+
+  /** How long an event takes, in milliseconds. */
+  const timed = async (event: () => Promise<unknown>) => {
+    const started = performance.now();
+    await event();
+    return performance.now() - started;
+  };
+
+  test(
+    "with the Upstash server holding every response, reserve() allows the turn within about 1 s, and record() and append() resolve within about 2 s",
+    async () => {
+      upstash.holdEvery();
+      const ops = functionInstance();
+
+      let reservation = "";
+      const reserving = await timed(async () => {
+        const ticket = await ops.budget.reserve();
+        if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
+        reservation = ticket.reservation;
+      });
+      // Both run at once, as the handler runs them after the last chunk, so the test waits out one limit, not two.
+      const [recording, appending] = await Promise.all([
+        timed(() => ops.telemetry.record(answeredTurn, reservation)),
+        timed(() => ops.log.append(answeredEntry)),
+      ]);
+
+      // SPEC-deploy, "Store calls": reserve() 1 s, each other store call 2 s. Without the limits nothing returns, and the test times out.
+      expect(upstash.held()).toBe(3);
+      expect(reserving).toBeLessThan(1_500);
+      expect(recording).toBeLessThan(2_500);
+      expect(appending).toBeLessThan(2_500);
+      // record() and append() time out together, so their lines can come in either order.
+      expect(opsErrors()).toHaveLength(3);
+      for (const step of ["reserve", "record", "append"]) expect(opsErrors()).toContainEqual({ event: "ops_error", step, code: "TIMEOUT" });
+      expect(ntfy.pushes.map((push) => push.title)).toEqual(["Chat store failed: answers go on without the $8 daily cap"]);
+    },
+    10_000,
+  );
+
+  test(
+    "with the Upstash server returning 500 and the ntfy server holding its answers, reserve() still allows the turn within about 3 s: the storefail push stops after 3 s and counts as failed",
+    async () => {
+      upstash.failEvery(500);
+      ntfy.holdNext(1);
+      const ops = functionInstance();
+
+      const reserving = await timed(async () => expect(await ops.budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) }));
+
+      // SPEC-deploy, "Store calls": each push, 3 s.
+      expect(ntfy.held()).toBe(1);
+      expect(reserving).toBeLessThan(4_000);
+      expect(opsErrors()).toEqual([
+        { event: "ops_error", step: "reserve", code: "HTTP_500" },
+        { event: "ops_error", step: "alert_push", alert: "storefail", code: "TimeoutError" },
+      ]);
+      expect(printed.join("\n")).not.toContain(topic);
+    },
+    10_000,
+  );
+
+  test("with no store at the store's address, reserve() allows the turn, and its ops_error line says NETWORK and holds neither the address nor the token", async () => {
+    // A server that has stopped: nothing answers at its address, so the request itself fails.
+    const gone = startFakeUpstash();
+    const address = gone.url;
+    await gone.stop();
+    const ops = createOps(
+      { VERCEL_ENV: "production", KV_REST_API_URL: address, KV_REST_API_TOKEN: "token-in-test", NTFY_TOPIC_URL: `${ntfy.url}/${topic}` },
+      { now: () => clock, print: (line) => printed.push(line) },
+    );
+
+    expect(await ops.budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) });
+
+    expect(opsErrors()).toEqual([{ event: "ops_error", step: "reserve", code: "NETWORK" }]);
+    expect(printed.join("\n")).not.toContain(new URL(address).port);
+    expect(printed.join("\n")).not.toContain("token-in-test");
+    expect(ntfy.pushes).toHaveLength(1);
+  });
+
+  test(
+    "a daycap claim that the store holds stops after 2 s: reserve() at the daily cap still refuses within about 2 s, prints the claim's ops_error line and pushes storefail",
+    async () => {
+      const ops = functionInstance();
+      for (let turn = 0; turn < 8; turn++) await ops.budget.reserve();
+      // The ninth reservation and its take-back go through; the claim of the daycap marker gets no answer.
+      upstash.holdEvery((body) => body.includes('"SET"'));
+
+      const refusing = await timed(async () => expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" }));
+
+      expect(upstash.held()).toBe(1);
+      expect(refusing).toBeLessThan(2_500);
+      expect(opsErrors()).toEqual([{ event: "ops_error", step: "alert_claim", alert: "daycap", code: "TIMEOUT" }]);
+      expect(ntfy.pushes.map((push) => push.title)).toEqual(["Chat store failed: answers go on without the $8 daily cap"]);
+    },
+    10_000,
+  );
 });
