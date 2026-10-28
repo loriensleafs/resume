@@ -4,7 +4,7 @@
 //   the function, so the function reads no source file at run time. It holds each source's Not public text, which the
 //   model gets on the server only, so the plugin refuses to give it to the browser's build.
 // - device-index.json, the device index, goes into the static folder during the same Vite build. It comes from
-//   publicKnowledge(knowledge), so it holds no Not public text (device-index.ts).
+//   publicKnowledge(knowledge), so it holds no Not public text (device-index-build.ts).
 // Both read the project's files under the root that buildSite() names: the site's build data reads the same root
 // (src/site/data.ts), so the seam-1 build reads its fixture root here too.
 // Vite's convention for a module made at build time: https://vite.dev/guide/api-plugin#importing-a-virtual-file
@@ -13,7 +13,8 @@ import { dirname, join, resolve } from "node:path";
 import type { Plugin } from "vite";
 import { buildKnowledge, publicKnowledge, SOURCES } from "../knowledge/build";
 import { buildSiteData } from "../site/data";
-import { buildDeviceIndex, DEVICE_INDEX_FILE, type DeviceIndex } from "./device-index";
+import { DEVICE_INDEX_FILE, type DeviceIndex } from "./device-index";
+import { buildDeviceIndex } from "./device-index-build";
 
 const KNOWLEDGE_ID = "virtual:knowledge";
 /** The resolved id: the "\0" prefix tells other plugins that no file holds the module. */
@@ -21,6 +22,7 @@ const RESOLVED_KNOWLEDGE_ID = `\0${KNOWLEDGE_ID}`;
 
 /** The device index of the project's files under `root`. */
 async function deviceIndexOf(root: string): Promise<DeviceIndex> {
+  // Each step (here, buildSiteData(), `load`) reads the files again, to get them as they are now; it takes milliseconds.
   const [knowledge, { data }] = await Promise.all([buildKnowledge({ root }), buildSiteData(root)]);
   return buildDeviceIndex(publicKnowledge(knowledge), data.resume);
 }
