@@ -494,6 +494,8 @@ bun run evals                      # the trick questions against the real model;
 src/chat/server/handle-chat.ts     handleChat(request, deps) and ChatDeps: the module's server entry point, which wires one turn
 src/chat/server/request-checks.ts  checkRequest(): the request checks in order, with an { ok } result; the ChatError shape, its
                                    codes and chatError()
+src/chat/server/origins.ts         chatOrigins(env): the allowed Origin values from VERCEL_ENV and VERCEL_URL, which the route
+                                   passes as ChatDeps.origins
 src/chat/server/run.ts             the run's controller, which a Stop aborts, and the stream wrapper that ends the stream with
                                    SERVER_ERROR after a throw and with DEADLINE after the deadline
 src/chat/server/about-read.ts      readAbout(): the About read of a passage or a source, its read_sources call and whole result
@@ -542,6 +544,7 @@ src/site/__tests__/browser.test.ts  seam 2, extended with the chat
 - `adapter`: `anthropicText("claude-sonnet-5-5")` when `VERCEL_ENV` is `production`; otherwise `fakeText()` with the fixtures, whatever variables are set.
 - `knowledge`: `virtual:knowledge`.
 - `log`, `budget` and `telemetry`: from SPEC-deploy's `createOps(process.env)`, which gives its in-memory parts outside production. The in-memory budget refuses every turn with `DAILY_LIMIT` when the preview starts with `PREVIEW_LIMIT=day`, and with `SPEND_LIMIT` with `PREVIEW_LIMIT=month`.
+- `origins`: `chatOrigins(process.env)`, the values that The request, "Origin", names.
 - `now`: the real clock.
 
 SPEC-deploy sets the function's `maxDuration` to 150 s and its region.
@@ -768,3 +771,4 @@ All rows are in the [decision record](../docs/design/interview-2026-10-26.md).
 - 2026-10-27, task C13: Project Structure gains `request-checks.ts` and `run.ts`, which take the request checks and the stream wrapper out of `handle-chat.ts` (the carry-forward notes of C4 and C11). The Question log names the deadline middleware as a caller of `finishTurn()`, and Limits, "Deadline", says when the timer starts and stops. After C13's review, the `finish-turn.ts` line also names `finishRejected()`, and the `request-checks.ts` line says that `checkRequest()` gives an `{ ok }` result.
 - 2026-10-27, task C10: Project Structure gains `conversation-sent.ts`. Limits, "Conversation sent", says how a turn's characters count and that `conversationSent()` rebuilds each earlier message from the fields the model needs. The Tools row of `open_source` reads the conversation sent, not the whole request. The rebuild's details and the `open_source` reading are C10's decisions, for Peter's end review.
 - 2026-10-27, after D14: Peter's row 184. Turn telemetry and user story 52 say that a `SPEND_LIMIT` turn settles with the cost of its finished model calls, $0 when none finished, as [SPEC-deploy](SPEC-deploy.md)'s "Which usage a turn settles with" now says.
+- 2026-10-27, after C17's review: Project Structure lists `src/chat/server/origins.ts`, and The route file names `origins`: `chatOrigins(process.env)`. Seam 1 checks its three cases through `handleChat()`. The conductor's decision, for Peter's end review.

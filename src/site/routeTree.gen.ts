@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ResumeRouteImport } from './routes/resume'
+import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as SourcesIdRouteImport } from './routes/sources.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const ResumeRoute = ResumeRouteImport.update({
   path: '/resume',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SourcesIdRoute = SourcesIdRouteImport.update({
   id: '/sources/$id',
   path: '/sources/$id',
@@ -32,30 +38,34 @@ const SourcesIdRoute = SourcesIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/resume': typeof ResumeRoute
+  '/api/chat': typeof ApiChatRoute
   '/sources/$id': typeof SourcesIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/resume': typeof ResumeRoute
+  '/api/chat': typeof ApiChatRoute
   '/sources/$id': typeof SourcesIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/resume': typeof ResumeRoute
+  '/api/chat': typeof ApiChatRoute
   '/sources/$id': typeof SourcesIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/resume' | '/sources/$id'
+  fullPaths: '/' | '/resume' | '/api/chat' | '/sources/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/resume' | '/sources/$id'
-  id: '__root__' | '/' | '/resume' | '/sources/$id'
+  to: '/' | '/resume' | '/api/chat' | '/sources/$id'
+  id: '__root__' | '/' | '/resume' | '/api/chat' | '/sources/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ResumeRoute: typeof ResumeRoute
+  ApiChatRoute: typeof ApiChatRoute
   SourcesIdRoute: typeof SourcesIdRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResumeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sources/$id': {
       id: '/sources/$id'
       path: '/sources/$id'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ResumeRoute: ResumeRoute,
+  ApiChatRoute: ApiChatRoute,
   SourcesIdRoute: SourcesIdRoute,
 }
 export const routeTree = rootRouteImport

@@ -22,7 +22,7 @@ import { upstashStore } from "./upstash-rest";
 
 export type { DailyTotals } from "./daily-totals";
 
-/** What createOps() reads from the environment. `process.env` fits it as it is. */
+/** What createOps() reads from the environment. `process.env` fits it as it is (see the declaration below). */
 export type OpsEnv = {
   VERCEL_ENV?: string; // the store and alerts are used only in "production"
   KV_REST_API_URL?: string; // set by the Upstash integration, Production only
@@ -32,6 +32,14 @@ export type OpsEnv = {
   PREVIEW_LIMIT?: string; // "day" or "month", outside production only: the budget refuses every turn with
                           // DAILY_LIMIT or SPEND_LIMIT, so a preview can show the "limit reached" state
 };
+
+// process.env's type declares these variables, as Bun's docs say to type them ("Environment variables", TypeScript).
+// Without it, TypeScript refuses `createOps(process.env)`: process.env's type declares only NODE_ENV and TZ, and a type
+// of optional fields only must share one of them (the weak-type check, TS2559). With it, OpsEnv needs no index
+// signature, so a misspelled key in a `createOps({...})` call fails the type check.
+declare module "bun" {
+  interface Env extends OpsEnv {}
+}
 
 /** The parts the chat's route file passes to handleChat() as ChatDeps, and the daily totals. */
 export type Ops = {

@@ -13,8 +13,10 @@ import { renderCore } from "../../../knowledge/render";
 import { deepDiveFile, fixture, removeFixtures } from "../../../knowledge/__tests__/fixtures";
 import type { Knowledge } from "../../../knowledge/types";
 import { handleChat, type ChatDeps } from "../handle-chat";
+import { chatOrigins } from "../origins";
 import { inMemoryBudget, inMemoryQuestionLog, inMemoryTelemetry, type Budget, type QuestionLog, type Telemetry } from "../question-log";
 import type { ChatTurnEvent } from "../telemetry";
+import { PREVIEW_ANSWER, SCRIPTED_TURNS, scriptedModel } from "./fixtures";
 import { questionLogContract } from "./question-log-contract";
 import { anthropicAnswering, SIGNATURE, SPEND_LIMIT_ERRORS, stubAnthropic, type ApiError } from "./stub-anthropic";
 
@@ -224,6 +226,64 @@ describe("citations", () => {
 
     expect(streamedText(events)).toBe("Test Person works at Acme [role:acme] and led its migration.");
     expect(citationEvents(events)).toEqual([{ citations: ["role:acme"], removed: 1 }]);
+  });
+});
+
+// The preview's fake model (SPEC-chat, Tech Stack; Project Structure, "The route file"): outside production the route
+// answers with the scripted turns of fixtures.ts, picked by the question text, from the knowledge of the build. So these
+// tests ask them with the repository's own knowledge: a read or a citation of an id that knowledge/sources/ or the core
+// does not have fails here, before `bun run dev` or a preview shows it as removed (C9's review).
+describe("the scripted turns", () => {
+  const REPOSITORY = `${import.meta.dir}/../../../..`;
+  let repository: Knowledge;
+
+  beforeAll(async () => {
+    repository = await buildKnowledge({ root: REPOSITORY });
+  });
+
+  const askScripted = async (messages: UIMessage[]) =>
+    readEvents(await handleChat(chatRequest(messages), seamDeps(scriptedModel(), { knowledge: repository })));
+
+  test.each(SCRIPTED_TURNS.map((turn) => [turn.question]))(
+    "%p reads only ids the repository has, and keeps every citation it makes",
+    async (asked) => {
+      const deps = seamDeps(scriptedModel(), { knowledge: repository });
+
+      const events = await readEvents(await handleChat(chatRequest([question(asked)]), deps));
+
+      const reads = readResults(events).map((e) => JSON.parse(String(e.content)) as { unknown: string[]; skipped: string[] });
+      expect(reads.map(({ unknown, skipped }) => ({ unknown, skipped }))).toEqual(reads.map(() => ({ unknown: [], skipped: [] })));
+      const [citations] = citationEvents(events) as [{ citations: string[]; removed: number }];
+      expect(citations.citations.length).toBeGreaterThan(0);
+      expect(citations.removed).toBe(0);
+      expect((await deps.log.list(1)).map(({ outcome }) => outcome)).toEqual(["answered"]);
+    },
+  );
+
+  test("the turn of the newest question answers, also after an earlier turn whose answer is in the request", async () => {
+    const events = await askScripted([
+      question("How did FedNow's bundle get under 1 MB?"),
+      answer("Peter did the initial audit of the application [fednow-bundle-size.2]."),
+      question("Is Peter open to remote work?"),
+    ]);
+
+    expect(citationEvents(events)).toEqual([{ citations: ["logistics:work-arrangement"], removed: 0 }]);
+  });
+
+  test("a question that differs from a scripted one only in letter case and spaces gets that turn", async () => {
+    const events = await askScripted([question("  IS PETER open to\n  remote work?  ")]);
+
+    expect(citationEvents(events)).toEqual([{ citations: ["logistics:work-arrangement"], removed: 0 }]);
+  });
+
+  test("a question that no scripted turn has gets the preview's own answer, with two scripted questions as its follow-up questions", async () => {
+    const events = await askScripted([question("What is Peter's favorite color?")]);
+
+    expect(streamedText(events)).toBe(PREVIEW_ANSWER);
+    expect(chatEvents(events, "chat.follow-ups")).toEqual([
+      { followUps: ["How did FedNow's bundle get under 1 MB?", "Is Peter open to remote work?"] },
+    ]);
+    expect(citationEvents(events)).toEqual([{ citations: [], removed: 0 }]);
   });
 });
 
@@ -2194,6 +2254,45 @@ describe("request checks", () => {
     );
 
     expect(statuses).toEqual([200, 200, 403]);
+  });
+
+  /** The deployment's own host, as VERCEL_URL gives it: with no scheme. */
+  const DEPLOYMENT_HOST = "resume-abc123.vercel.app";
+  /** The chat's address on that deployment. */
+  const DEPLOYMENT_CHAT = `https://${DEPLOYMENT_HOST}/api/chat`;
+
+  /** The status of each request, each one handled with the given origins. */
+  const statusesWith = (origins: string[], requests: Request[]) =>
+    Promise.all(requests.map(async (request) => (await handleChat(request, { ...checkSeam().deps, origins })).status));
+
+  test("the route's origins in production with VERCEL_URL: https://peterkloss.dev and https://<VERCEL_URL> pass, and https://example.com gets 403 FORBIDDEN_ORIGIN", async () => {
+    const origins = chatOrigins({ VERCEL_ENV: "production", VERCEL_URL: DEPLOYMENT_HOST });
+    const seam = checkSeam();
+
+    const statuses = await statusesWith(origins, [askFrom("https://peterkloss.dev", DEPLOYMENT_CHAT), askFrom(`https://${DEPLOYMENT_HOST}`, DEPLOYMENT_CHAT)]);
+    const response = await handleChat(askFrom("https://example.com", DEPLOYMENT_CHAT), { ...seam.deps, origins });
+
+    expect(statuses).toEqual([200, 200]);
+    expect(await rejection(response)).toEqual(chatError(403, "FORBIDDEN_ORIGIN"));
+  });
+
+  test("the route's origins in production with no VERCEL_URL: only https://peterkloss.dev passes, and the request's own origin gets 403", async () => {
+    const origins = chatOrigins({ VERCEL_ENV: "production" });
+
+    const statuses = await statusesWith(origins, [askFrom("https://peterkloss.dev", DEPLOYMENT_CHAT), askFrom(`https://${DEPLOYMENT_HOST}`, DEPLOYMENT_CHAT)]);
+
+    expect(statuses).toEqual([200, 403]);
+  });
+
+  test.each([
+    ["a preview", { VERCEL_ENV: "preview", VERCEL_URL: DEPLOYMENT_HOST }, `https://${DEPLOYMENT_HOST}`],
+    ["`bun run dev`, with no VERCEL_ENV", {}, "http://localhost:3000"],
+  ])("the route's origins outside production, on %s, are none: the request's own origin passes, and https://peterkloss.dev gets 403", async (_name, env, ownOrigin) => {
+    const origins = chatOrigins(env);
+
+    const statuses = await statusesWith(origins, [askFrom(ownOrigin, `${ownOrigin}/api/chat`), askFrom("https://peterkloss.dev", `${ownOrigin}/api/chat`)]);
+
+    expect(statuses).toEqual([200, 403]);
   });
 
   test("a request from another site's page is rejected before its body is read: a body over 256 KB still gets 403", async () => {

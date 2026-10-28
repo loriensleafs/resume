@@ -5,6 +5,7 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { Glob } from "bun";
 import { Face, Blob as HarfBuzzBlob } from "harfbuzzjs";
+import { PREVIEW_ANSWER } from "../../chat/server/__tests__/fixtures";
 import { formatRange, formatTitle, loadResume, type Resume } from "../../content";
 import { buildKnowledge, publicKnowledge } from "../../knowledge/build";
 import { holds } from "../../private-details";
@@ -361,6 +362,43 @@ describe("the static folder", () => {
   test("holds the approved logistics answer and no draft one", async () => {
     expect(await filesHolding(FIXTURE_LOGISTICS_ANSWER)).toEqual(["device-index.json"]);
     expect(await filesHolding(FIXTURE_DRAFT_LOGISTICS_ANSWER)).toEqual([]);
+  });
+});
+
+// SPEC-chat, "The build" and "The route file": the chat's server route gets the knowledge base from virtual:knowledge at
+// build time, each source's Not public text included, because the model reads it on the server. Outside production it
+// answers with the scripted turns, which the preview's fake model bundles with the function (SPEC-deploy). The route
+// has a server part only, so the browser's build never loads it; the static folder's tests above and the last test here
+// check that neither text reaches a file a browser loads.
+describe("the chat's function", () => {
+  const outputDir = `${outDir}/.vercel/output`;
+
+  /**
+   * Each file under the output's `folder` whose text holds `text`, by its path there. The scan follows links, because
+   * Nitro can write a function folder as a link to `__server.func` (src/deploy/routes.ts).
+   */
+  async function filesHolding(folder: "functions" | "static", text: string): Promise<string[]> {
+    const holding: string[] = [];
+    for await (const path of new Glob("**/*").scan({ cwd: `${outputDir}/${folder}`, dot: true, followSymlinks: true })) {
+      if ((await Bun.file(`${outputDir}/${folder}/${path}`).text()).includes(text)) holding.push(path);
+    }
+    return holding;
+  }
+
+  test("holds each approved source's Not public text, from virtual:knowledge", async () => {
+    const { sources } = await buildKnowledge({ root });
+    expect(sources).toHaveLength(2);
+    for (const source of sources) expect(await filesHolding("functions", source.notPublic)).not.toEqual([]);
+  });
+
+  // The function has the knowledge base from the build, so no file of it names the sources folder (C16's review).
+  test("names no path of the knowledge's sources folder, so it reads no source file at run time", async () => {
+    expect(await filesHolding("functions", "knowledge/sources")).toEqual([]);
+  });
+
+  test("holds the scripted turns of the preview's fake model, which no static file holds", async () => {
+    expect(await filesHolding("functions", PREVIEW_ANSWER)).not.toEqual([]);
+    expect(await filesHolding("static", PREVIEW_ANSWER)).toEqual([]);
   });
 });
 
