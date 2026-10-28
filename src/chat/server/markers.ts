@@ -11,7 +11,8 @@ import { EventType, type ChatMiddleware, type StreamChunk } from "@tanstack/ai";
 import { parseId } from "../../knowledge/ids";
 import type { Knowledge } from "../../knowledge/types";
 import { turnLimits } from "./limits";
-import { markerScanner, type MarkerScanner, type RefusalKind, type Scan, type Verdict } from "./marker-scanner";
+import { markerScanner, type MarkerScanner, type Scan, type Verdict } from "./marker-scanner";
+import type { RefusalKind } from "./question-log";
 import { logServerError } from "./server-log";
 import type { Turn } from "./turn";
 
@@ -31,7 +32,7 @@ const chatEvent = (name: string, value: Citations | Refusal | FollowUps): Stream
 });
 
 /** A follow-up question passes the check with some text and at most turnLimits.followUpCharacters characters (Markers). */
-const isFollowUp = (question: string) => question !== "" && question.length <= turnLimits.followUpCharacters;
+const passesFollowUpCheck = (question: string) => question !== "" && question.length <= turnLimits.followUpCharacters;
 
 type CitableIds = {
   /** Resume entries and logistics answers: they are in the core, so an answer cites them with no read. */
@@ -59,7 +60,7 @@ function citableIds(knowledge: Knowledge): CitableIds {
 }
 
 /** The marker middleware for one turn. It keeps one marker scanner per text message, which holds that message's undecided text. */
-export function citationMarkers(knowledge: Knowledge, turn: Turn): ChatMiddleware {
+export function answerMarkers(knowledge: Knowledge, turn: Turn): ChatMiddleware {
   const { citable, catalog, passages } = citableIds(knowledge);
   const scanners = new Map<string, MarkerScanner>();
   /** The turn's follow-up questions that passed the check. */
@@ -99,7 +100,7 @@ export function citationMarkers(knowledge: Knowledge, turn: Turn): ChatMiddlewar
           break;
         case "follow-up":
           // A follow-up question past the first two, or too long, is dropped; it is no citation, so it is not counted.
-          if (followUps.length < turnLimits.followUps && isFollowUp(marker.question)) followUps.push(marker.question);
+          if (followUps.length < turnLimits.followUps && passesFollowUpCheck(marker.question)) followUps.push(marker.question);
           break;
         case "unknown":
           turn.removed++;

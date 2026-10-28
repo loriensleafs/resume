@@ -15,7 +15,7 @@ import type { Knowledge } from "../../knowledge/types";
 import { readAbout } from "./about-read";
 import { finishTurn, finishTurnHooks } from "./finish-turn";
 import { readBudget, turnLimits } from "./limits";
-import { citationMarkers } from "./markers";
+import { answerMarkers } from "./markers";
 import { systemPrompts } from "./prompt";
 import { ChatMessages, ChatProps } from "./props";
 import type { Budget, QuestionLog, Telemetry } from "./question-log";
@@ -242,7 +242,7 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
     // (One turn, step 9).
     middleware: [
       about.middleware,
-      citationMarkers(deps.knowledge, turn),
+      answerMarkers(deps.knowledge, turn),
       turnUsage(turn),
       ...(deps.testMiddleware ?? []),
       wireEvents(turn),

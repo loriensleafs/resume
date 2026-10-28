@@ -1095,6 +1095,8 @@ describe("markers: refusals and follow-up questions", () => {
 
     const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build at Acme?")]), seamDeps(fake)));
 
+    // A removed marker takes the spaces and tabs before it, never a line break. SPEC-chat's Markers
+    // section names no rule for the line breaks around a removed marker, so these three stay.
     expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1].\n\n\n");
     for (const event of events.filter((e) => e.type === "TEXT_MESSAGE_CONTENT")) {
       expect(String(event.delta)).not.toContain("follow-up");
@@ -1102,6 +1104,67 @@ describe("markers: refusals and follow-up questions", () => {
     }
     expect(chatEvents(events, "chat.follow-ups")).toEqual([{ followUps: [longest] }]);
     expect(citationEvents(events)).toEqual([{ citations: ["highlight:acme.1"], removed: 0 }]);
+  });
+});
+
+/**
+ * `fake`, with the text of each text message streamed in TEXT_MESSAGE_CONTENT events of `size`
+ * characters, not fakeText()'s 4: the fake's own text events of a message are joined, then split again.
+ */
+function inTextEventsOf(size: number, fake: ReturnType<typeof fakeText>): ReturnType<typeof fakeText> {
+  const chatStream = fake.chatStream.bind(fake);
+  fake.chatStream = async function* (options) {
+    let text = "";
+    for await (const chunk of chatStream(options)) {
+      if (chunk.type === EventType.TEXT_MESSAGE_CONTENT) {
+        text += chunk.delta;
+        continue;
+      }
+      if (chunk.type === EventType.TEXT_MESSAGE_END) {
+        for (let at = 0; at < text.length; at += size) {
+          yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: chunk.messageId, delta: text.slice(at, at + size), timestamp: Date.now() };
+        }
+        text = "";
+      }
+      yield chunk;
+    }
+  };
+  return fake;
+}
+
+describe("markers: split over text events", () => {
+  test("one answer with a kept and a removed citation, a refusal and a follow-up question gives the same visitor text and the same markers in text events of 1 to 9 characters", async () => {
+    const text =
+      "Test Person built the first thing [highlight:acme.1] and tested it [role:nobody]. Test Person's salary is outside what this chat answers. " +
+      "<<refusal: out-of-scope>> <<follow-up: What else did Test Person build at Acme?>>";
+    const sizes = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    const results = [];
+
+    for (const size of sizes) {
+      const fake = fakeText();
+      fake.setResponses([{ text }]);
+      const deps = seamDeps(inTextEventsOf(size, fake));
+      const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build at Acme?")]), deps));
+      results.push({
+        size,
+        text: streamedText(events),
+        citations: citationEvents(events),
+        refusal: chatEvents(events, "chat.refusal"),
+        followUps: chatEvents(events, "chat.follow-ups"),
+        outcome: (await deps.log.list(1)).map(({ outcome }) => outcome),
+      });
+    }
+
+    expect(results).toEqual(
+      sizes.map((size) => ({
+        size,
+        text: "Test Person built the first thing [highlight:acme.1] and tested it. Test Person's salary is outside what this chat answers.",
+        citations: [{ citations: ["highlight:acme.1"], removed: 1 }],
+        refusal: [{ refusal: "out-of-scope" }],
+        followUps: [{ followUps: ["What else did Test Person build at Acme?"] }],
+        outcome: ["refusal:out-of-scope"],
+      })),
+    );
   });
 });
 

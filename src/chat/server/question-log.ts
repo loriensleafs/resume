@@ -5,6 +5,9 @@
 
 import type { ChatTurnEvent } from "./telemetry";
 
+/** The two kinds of refusal (SPEC-chat, Answers the chat gives, "Refusals"): a refusal marker names one, and the log's outcome holds it. */
+export type RefusalKind = "out-of-scope" | "not-covered";
+
 export type QuestionLogEntry = {
   id: string;           // random, not the threadId
   date: string;         // the UTC day only, "2026-10-27"
@@ -12,7 +15,7 @@ export type QuestionLogEntry = {
   read: string[];       // source and passage ids read this turn
   citations: string[];  // kept citations
   removed: number;      // markers the check removed
-  outcome: "answered" | "refusal:out-of-scope" | "refusal:not-covered" | "stopped" | "error" | "limit";
+  outcome: "answered" | `refusal:${RefusalKind}` | "stopped" | "error" | "limit";
 };
 
 export type QuestionLog = {

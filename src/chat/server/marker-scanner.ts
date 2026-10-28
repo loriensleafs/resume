@@ -12,6 +12,8 @@
 // marker after it would take. At the message's end every held text is decided. The marker middleware
 // (markers.ts) keeps one scanner per text message and records the markers in the turn.
 
+import type { RefusalKind } from "./question-log";
+
 /** Text from "[" is held at most this many characters, "[" included (Markers, "Holding"). */
 const HOLD_CHARACTERS = 120;
 /** Every id form is written with these characters only (SPEC-knowledge, Ids). */
@@ -30,9 +32,9 @@ const FENCE_LENGTH = 3;
 /** The check's verdict on a bracketed id: a citation kept or removed, or no citation, which passes as text. */
 export type Verdict = "kept" | "removed" | "not-a-citation";
 
-/** The two kinds of refusal (Answers the chat gives, "Refusals"). */
-const REFUSAL_KINDS = ["out-of-scope", "not-covered"] as const;
-export type RefusalKind = (typeof REFUSAL_KINDS)[number];
+/** The kinds a refusal marker can name: one key for each RefusalKind, so the typecheck finds a kind missing here. */
+const REFUSAL_KINDS: Record<RefusalKind, true> = { "out-of-scope": true, "not-covered": true };
+const isRefusalKind = (kind: string): kind is RefusalKind => Object.hasOwn(REFUSAL_KINDS, kind);
 
 /**
  * A marker the scanner found. A citation carries the check's verdict. A <<…>> is a refusal of one of the
@@ -65,8 +67,8 @@ const FOLLOW_UP = /^follow-up:([\s\S]*)$/;
 /** The marker that the text between "<<" and ">>" names. */
 function markerIn(inside: string): Marker {
   const text = inside.trim();
-  const refusal = REFUSAL_KINDS.find((kind) => kind === REFUSAL.exec(text)?.[1]);
-  if (refusal !== undefined) return { kind: "refusal", refusal };
+  const refusal = REFUSAL.exec(text)?.[1];
+  if (refusal !== undefined && isRefusalKind(refusal)) return { kind: "refusal", refusal };
   const followUp = FOLLOW_UP.exec(text);
   if (followUp !== null) return { kind: "follow-up", question: followUp[1]!.trim() };
   return { kind: "unknown" };
@@ -195,27 +197,27 @@ export function markerScanner(verdictOf: (id: string) => Verdict): MarkerScanner
    */
   function code(input: string, at: number, final: boolean): number | null {
     const mark = input[at]!;
-    const run = runLength(input, at);
-    if (at + run === input.length && !final) return null;
-    if (lineStart && run >= FENCE_LENGTH) {
-      const end = lineEnd(input, at + run);
+    const length = runLength(input, at);
+    if (at + length === input.length && !final) return null;
+    if (lineStart && length >= FENCE_LENGTH) {
+      const end = lineEnd(input, at + length);
       if (mark === "`" && end === input.length && !final) return null;
-      if (mark === "~" || !input.slice(at + run, end).includes("`")) {
+      if (mark === "~" || !input.slice(at + length, end).includes("`")) {
         pass(input.slice(at, end));
-        context = { in: "fenced code", mark, length: run };
+        context = { in: "fenced code", mark, length };
         return end - at;
       }
     }
     if (mark === "`") {
-      const end = codeSpanEnd(input, at, run, final);
+      const end = codeSpanEnd(input, at, length, final);
       if (end === "not yet") return null;
       if (end !== "never") {
         pass(input.slice(at, end));
         return end - at;
       }
     }
-    pass(input.slice(at, at + run));
-    return run;
+    pass(input.slice(at, at + length));
+    return length;
   }
 
   /** Decides the text from `at` in text: returns how many characters it decided, or null when it must wait. */
