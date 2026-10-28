@@ -1,4 +1,4 @@
-// `bun run scripts/site-fonts.ts [path/to/GoogleSansFlex-VF.ttf]`: cuts the site's font into public/fonts/
+// `bun run scripts/site-fonts.ts [path/to/GoogleSansFlex-VF-5.000.ttf]`: cuts the site's font into public/fonts/
 // (SPEC-site, Tech Stack: Google Sans Flex served from the site itself, a Latin subset of the variable font).
 //
 // The cut is one WOFF file. It keeps the weight axis from 400 to 700 and pins every other axis at its default. That is
@@ -13,21 +13,22 @@
 // docs/design/wording-drafts/S7.md, compares it with WOFF2.
 //
 // Usage:
-//   bun run scripts/site-fonts.ts                   downloads the variable font to GoogleSansFlex-VF.ttf if missing
+//   bun run scripts/site-fonts.ts                   downloads the variable font to GoogleSansFlex-VF-5.000.ttf if missing
 //   bun run scripts/site-fonts.ts <variable font>   cuts that file; it must be the version below
 
 const REPO = `${import.meta.dir}/..`;
 
 /**
  * The variable font: Google Sans Flex 5.000 in google/fonts at a fixed commit, with its SHA-256. The script cuts only
- * this file, so a new cut reproduces the committed one. `bun run fonts` downloads the same file name from google/fonts'
- * main branch, where version 5.000 landed on 2026-10-09.
+ * this file, so a new cut reproduces the committed one. `bun run fonts` downloads the same font from google/fonts'
+ * main branch, where version 5.000 landed on 2026-10-09, and keeps it as GoogleSansFlex-VF.ttf.
  */
 const SOURCE = {
   url: "https://raw.githubusercontent.com/google/fonts/bd8f81ddb5c74d5c8897b36ad88b440266245103/ofl/googlesansflex/GoogleSansFlex%5BROND%2Copsz%2Cslnt%2Cwdth%2Cwght%5D.ttf",
   sha256: "a9ac770798857d5e8ac593ced42b22e40a7c08cec98319f92b0eccc2783a77ba",
-  // In the repository's root, where git ignores it, and where `bun run fonts` keeps its copy.
-  path: "GoogleSansFlex-VF.ttf",
+  // In the repository's root, where git ignores it. The name carries the version, so this pinned copy and the
+  // unpinned copy of `bun run fonts` never share a file, and neither script cuts the other's download.
+  path: "GoogleSansFlex-VF-5.000.ttf",
 };
 
 /**
