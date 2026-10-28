@@ -1,10 +1,14 @@
 ---
 id: highspot-ai-standards
 title: The AI development standards Peter introduced at Highspot
-role: highspot
-highlights: [2]
+kind: deep-dive
+subject: project
+roles: [highspot]
+highlights: [highlight:highspot.2]
+summary: "How Peter introduced many of the team's AI development standards: spec-driven development, shared skills and agents, agent context files, and rules that keep agents on Polar UI components."
+links: []
 status: approved
-approved: 2026-10-26
+approved: 2026-10-27
 source: Interview with Peter, 2026-10-26
 ---
 
