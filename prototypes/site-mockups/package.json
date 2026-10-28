@@ -3,7 +3,7 @@
   "private": true,
   "description": "Render tools for the site mockups: the design system's browser build for the boards, and Playwright for export.ts",
   "devDependencies": {
-    "@acmelabs/design-system-browser": "0.3.2",
+    "@acmelabs/design-system-browser": "0.3.3",
     "playwright": "1.63.0"
   }
 }

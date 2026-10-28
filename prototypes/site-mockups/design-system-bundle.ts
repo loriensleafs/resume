@@ -1,4 +1,4 @@
-// One-file bundle of the design system parts the site mockups use (design system 0.3.2).
+// One-file bundle of the design system parts the site mockups use, at the version that package.json pins.
 import tokens from "./node_modules/@acmelabs/design-system-browser/styles/tokens.css" with { type: "text" };
 if (!document.querySelector("style[data-acme-tokens]")) { const s = document.createElement("style"); s.dataset.acmeTokens = ""; s.textContent = tokens; document.head.prepend(s); }
 import "./node_modules/@acmelabs/design-system-browser/dist/define/app-bar.js";

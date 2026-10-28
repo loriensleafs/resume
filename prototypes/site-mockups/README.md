@@ -10,9 +10,11 @@ This branch keeps the sources of the site mockups. It is a prototype record, not
 | `boards/canvas.json` | The canvas index: pages, board positions, titles and notes |
 | `design-system-bundle.ts` | The entry for the one-file design-system bundle the boards load as `acme/design-system.js` |
 | `export.ts` | Renders the "Merged, light and dark" boards to PNG without the canvas |
-| `package.json`, `bun.lock` | The render tools at exact versions: the design system's browser build 0.3.2 and Playwright 1.63.0 |
+| `package.json`, `bun.lock` | The render tools at exact versions: the design system's browser build and Playwright 1.63.0. The browser build's entry in `package.json` is the one place the boards' design-system version is written |
 
 The canvas has three pages. "Merged, light and dark" is the approved design. "First mockups" and "Concepts" are the earlier explorations it came from.
+
+On 2026-10-27 the boards moved to the design system 0.3.3 (decision record row 172 on `main`). The bundle built at 0.3.3 is byte-identical to the bundle built at 0.3.2, so the canvas stays at version 46: it already holds the same bundle. A new render of all 30 boards matches the approved images, so the images on `main` stay.
 
 ## Limits
 

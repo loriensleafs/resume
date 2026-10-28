@@ -5,13 +5,13 @@
     "": {
       "name": "site-mockups",
       "devDependencies": {
-        "@acmelabs/design-system-browser": "0.3.2",
+        "@acmelabs/design-system-browser": "0.3.3",
         "playwright": "1.63.0",
       },
     },
   },
   "packages": {
-    "@acmelabs/design-system-browser": ["@acmelabs/design-system-browser@0.3.2", "", {}, "sha512-ccJrHqkH//gIfDlKkwaX1hxJ+2HMAANOZfa+t30+3wUlFh6ci8IwA5PRNHghB56TZTl08xHzghG+xhiyp1nnlA=="],
+    "@acmelabs/design-system-browser": ["@acmelabs/design-system-browser@0.3.3", "", {}, "sha512-35MmR7vPdI9sl2r25wFEwxTbNhZ+T9qzOpKCF49gUs2TJpOJxt6qv15MlBFEuT3Ngms6IUdO6VhP2R70s5ZJXQ=="],
 
     "playwright": ["playwright@1.63.0", "", { "dependencies": { "playwright-core": "1.63.0" }, "bin": { "playwright": "cli.js" } }, "sha512-+7ziBLidS4NaNCdt57SUDT+wYmmd5fmiQejUic/kb+YsYSCPyOOE9sebzMjNmQrsnNpDJqd4WHvV/8lfKfUDUg=="],
 
