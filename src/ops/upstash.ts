@@ -1,16 +1,10 @@
-// The store calls (SPEC-deploy, "Store calls"; decision 0022): Upstash's REST API through `fetch`
-// with `Authorization: Bearer`, and no package. Each write runs its commands as one transaction
-// through `/multi-exec`. Each read runs through `/pipeline`, which the read-only token may also use;
-// Upstash refuses `/multi-exec` to that token, even for reads (spike check 9, row 167). This file also
-// holds the key layout and the expiry rules.
+// The store's key layout and expiry rules (SPEC-deploy, the key table; decision 0022), and the parts
+// of the ops module that live in the store: the question log and the budget. The calls themselves go
+// through upstash-rest.ts.
 
-import { utcDay, type QuestionLog, type QuestionLogEntry } from "../chat/server/question-log";
-
-/** The store: its REST address and token, and the fetch that reaches it. */
-export type UpstashStore = { url: string; token: string; fetch: typeof fetch };
-
-/** One Redis command, its name first. */
-type Command = [string, ...string[]];
+import { utcDay, type Budget, type QuestionLog, type QuestionLogEntry } from "../chat/server/question-log";
+import * as limits from "./limits";
+import { UpstashError, type Command, type UpstashStore } from "./upstash-rest";
 
 const DAY_MS = 86_400_000;
 
@@ -20,6 +14,9 @@ const RETENTION_DAYS = 90;
 /** The key of a day's question-log list. */
 const questionLogKey = (day: string) => `qlog:${day}`;
 
+/** The key of a day's cost with its open reservations, in millionths of a dollar. */
+const dayCostKey = (day: string) => `qcost:${day}`;
+
 /**
  * When a day's keys expire, in Unix seconds for `EXPIREAT`: 00:00 UTC on the 90th day after the day.
  * A text that is not a UTC day such as "2026-10-27" has no expiry, so it throws before any write.
@@ -28,7 +25,7 @@ function dayKeysExpireAt(day: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
   const start = match ? Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : NaN;
   // "2026-02-30" matches, but it is not a day: Date.UTC() moves it to 2026-03-02.
-  if (Number.isNaN(start) || utcDay(start) !== day) throw new RangeError("The entry's date is not a UTC day.");
+  if (Number.isNaN(start) || utcDay(start) !== day) throw new RangeError("The date is not a UTC day.");
   return String((start + RETENTION_DAYS * DAY_MS) / 1000);
 }
 
@@ -43,7 +40,7 @@ export function upstashQuestionLog(store: UpstashStore, now: () => Date): Questi
       const key = questionLogKey(entry.date);
       const expiresAt = dayKeysExpireAt(entry.date);
       // One transaction, so the list never exists without its expiry.
-      await transaction(store, [
+      await store.transaction([
         ["RPUSH", key, JSON.stringify(entryFields(entry))],
         ["EXPIREAT", key, expiresAt],
       ]);
@@ -55,10 +52,7 @@ export function upstashQuestionLog(store: UpstashStore, now: () => Date): Questi
       const keys: string[] = [];
       for (let back = 0; back < kept; back++) keys.push(questionLogKey(utcDay(today - back * DAY_MS)));
       if (keys.length === 0) return [];
-      const lists = await pipeline(
-        store,
-        keys.map((key): Command => ["LRANGE", key, "0", "-1"]),
-      );
+      const lists = await store.pipeline(keys.map((key): Command => ["LRANGE", key, "0", "-1"]));
       // A day's list holds its entries in the order appended; the spec fixes no order within a day,
       // and this log, like the in-memory one, puts the later entry first.
       return lists.flatMap((list) => (list as string[]).map((json) => JSON.parse(json) as QuestionLogEntry).reverse());
@@ -67,64 +61,71 @@ export function upstashQuestionLog(store: UpstashStore, now: () => Date): Questi
 }
 
 /**
+ * The budget in the store: the daily cap (SPEC-deploy, "The daily cap").
+ *
+ * - `reserve()` adds the reservation to the day's cost, `qcost:<day>`, in one transaction. The store
+ *   adds atomically, so parallel calls, on one function instance or on many, never pass the cap together.
+ * - When the new total passes the cap, it takes the reservation back and refuses with DAILY_LIMIT. This
+ *   budget then remembers the capped day and refuses later turns that day with no store call.
+ * - A reservation that is never settled stays counted for the day, which errs toward pausing.
+ *
+ * @param now says which UTC day is today.
+ */
+export function upstashBudget(store: UpstashStore, now: () => Date): Budget {
+  /** The UTC day on which this function instance saw the cap, if any. */
+  let cappedDay: string | undefined;
+  return {
+    async reserve() {
+      const day = utcDay(now().getTime());
+      if (day === cappedDay) return { ok: false, errorCode: "DAILY_LIMIT" };
+      const total = await addToDayCost(store, day, limits.reservation);
+      if (total <= limits.dailyCap) return { ok: true, reservation: reservationOn(day) };
+      cappedDay = day;
+      await takeBack(store, day);
+      return { ok: false, errorCode: "DAILY_LIMIT" };
+    },
+  };
+}
+
+/**
+ * Takes a refused turn's reservation back from the day's cost. The refusal stands when this fails:
+ * the cap was passed, and the amount left counted errs toward pausing, as an unsettled reservation
+ * does (SPEC-deploy, "The daily cap", step 4). D15 prints the failure as an ops_error line.
+ */
+async function takeBack(store: UpstashStore, day: string): Promise<void> {
+  try {
+    await addToDayCost(store, day, -limits.reservation);
+  } catch {
+    // Nothing more to do here until D15: a refusal never becomes an allowed turn.
+  }
+}
+
+/**
+ * Adds `amount`, in millionths of a dollar, to the day's cost in one transaction that also gives the
+ * key its expiry, so the key never exists without it. Gives the new total.
+ */
+async function addToDayCost(store: UpstashStore, day: string, amount: number): Promise<number> {
+  const key = dayCostKey(day);
+  const [total] = await store.transaction([
+    ["INCRBY", key, String(amount)],
+    ["EXPIREAT", key, dayKeysExpireAt(day)],
+  ]);
+  if (typeof total !== "number" || !Number.isSafeInteger(total)) {
+    throw new UpstashError("Upstash /multi-exec: INCRBY did not answer a whole number", "BAD_REPLY");
+  }
+  return total;
+}
+
+/**
+ * A new reservation. It names the UTC day its cost counts on, so a turn that ends after 00:00 UTC
+ * settles on the day it reserved; the rest makes each reservation unique.
+ */
+const reservationOn = (day: string) => `${day}/${crypto.randomUUID()}`;
+
+/**
  * The entry's seven fields and nothing else. An object with more fields, such as a threadId, still
  * fits the type at run time, and the log keeps no field that SPEC-chat leaves out (decision 0020).
  */
 function entryFields({ id, date, question, read, citations, removed, outcome }: QuestionLogEntry): QuestionLogEntry {
   return { id, date, question, read, citations, removed, outcome };
-}
-
-/** Runs the commands as one transaction. */
-const transaction = (store: UpstashStore, commands: Command[]) => call(store, "/multi-exec", commands);
-
-/** Runs the commands in order in one request, not atomically: for reads. */
-const pipeline = (store: UpstashStore, commands: Command[]) => call(store, "/pipeline", commands);
-
-/**
- * A store call the store refused, or a command in it that failed. Its `code` is one short word, the
- * HTTP status or Redis's error word, so a log line can name the failure without any text. Its message
- * holds the endpoint, the command's name and the code only: the store's own error text can repeat a
- * command's values (Redis's "unknown command" error quotes its first arguments).
- */
-export class UpstashError extends Error {
-  override readonly name = "UpstashError";
-  constructor(
-    message: string,
-    readonly code: string,
-  ) {
-    super(message);
-  }
-}
-
-/**
- * Sends the commands to one endpoint and gives each command's result, in order. It throws an
- * UpstashError when the store refuses the call, and when any command fails: in a transaction the
- * other commands still run and the store answers 200, so each reply is read.
- */
-async function call(store: UpstashStore, endpoint: "/multi-exec" | "/pipeline", commands: Command[]): Promise<unknown[]> {
-  const response = await store.fetch(`${store.url.replace(/\/+$/, "")}${endpoint}`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${store.token}`, "content-type": "application/json" },
-    body: JSON.stringify(commands),
-  });
-  const replies: unknown = await response.json().catch(() => undefined);
-  if (!response.ok) {
-    const code = `HTTP_${response.status}`;
-    throw new UpstashError(`Upstash ${endpoint} answered ${code}`, code);
-  }
-  if (!Array.isArray(replies) || replies.length !== commands.length) {
-    throw new UpstashError(`Upstash ${endpoint} did not answer each command`, "BAD_REPLY");
-  }
-  return replies.map((reply: unknown, index) => {
-    if (typeof reply === "object" && reply !== null && "result" in reply) return reply.result;
-    const code = errorWord(reply);
-    throw new UpstashError(`Upstash ${endpoint}: ${commands[index]![0]} failed with ${code}`, code);
-  });
-}
-
-/** Redis's error word from a reply `{ "error": "WRONGTYPE Operation against …" }`, or BAD_REPLY. */
-function errorWord(reply: unknown): string {
-  const error = typeof reply === "object" && reply !== null && "error" in reply ? reply.error : undefined;
-  if (typeof error !== "string") return "BAD_REPLY";
-  return /^[A-Z]+\b/.exec(error)?.[0] ?? "ERR";
 }

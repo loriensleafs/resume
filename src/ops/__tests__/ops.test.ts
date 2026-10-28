@@ -235,6 +235,28 @@ describe("createOps() with the store and alert variables set", () => {
     expect(reached).toEqual(["/multi-exec", "/pipeline"]);
   });
 
+  // The in-test server's address is http on 127.0.0.1, which every other test here uses: a loopback
+  // request never leaves the machine, so the rule lets it through.
+  test.each(["http://store.example", "ws://store.example", "store.example"])(
+    "a store address %p that is not https gets no request, so the token never goes in clear text",
+    async (url) => {
+      const reached: string[] = [];
+      // A store that answers every command, so only the address rule can stop the call.
+      const answeringFetch = (async (input: string | URL | Request) => {
+        reached.push(String(input));
+        return Response.json([{ result: 1 }, { result: 1 }]);
+      }) as unknown as typeof fetch;
+      const ops = createOps(
+        { VERCEL_ENV: "production", KV_REST_API_URL: url, KV_REST_API_TOKEN: upstash.token },
+        { now: noon, fetch: answeringFetch },
+      );
+
+      await expect(ops.log.append(answeredEntry)).rejects.toMatchObject({ name: "UpstashError", code: "NOT_HTTPS" });
+      await expect(ops.log.list(1)).rejects.toMatchObject({ name: "UpstashError", code: "NOT_HTTPS" });
+      expect(reached).toEqual([]);
+    },
+  );
+
   test.each(["KV_REST_API_URL", "KV_REST_API_TOKEN"] as const)(
     "in production with %s missing, the log still keeps entries and calls no server",
     async (missing) => {
@@ -248,12 +270,11 @@ describe("createOps() with the store and alert variables set", () => {
     },
   );
 
-  test.each(["day", "month", "daily"])("in production, PREVIEW_LIMIT=%s is ignored: the budget allows the turn", async (previewLimit) => {
-    // The budget calls no server yet: production keeps its in-memory interim budget (ops.ts) until
-    // D11. The variables are here so that this test runs on the store-backed path once D11 builds it.
+  test.each(["day", "month", "daily"])("in production, PREVIEW_LIMIT=%s is ignored: the store's budget allows the turn", async (previewLimit) => {
     const ops = createOps({ VERCEL_ENV: "production", PREVIEW_LIMIT: previewLimit, ...storeAndAlerts() }, { now: noon });
 
     expect(await ops.budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) });
+    expect(upstash.requests.map((request) => request.path)).toEqual(["/multi-exec"]);
   });
 
   test.each(["preview", "development", undefined])("with VERCEL_ENV %p, a whole turn calls no server", async (vercelEnv) => {
@@ -266,5 +287,109 @@ describe("createOps() with the store and alert variables set", () => {
     await ops.log.list(7);
 
     expect(upstash.requests).toEqual([]);
+  });
+});
+
+describe("the daily cap, in production on the in-test Upstash server", () => {
+  // The function instances and the store share one clock, which a test can move to the next day.
+  let clock: Date;
+  let upstash: FakeUpstash;
+  beforeEach(() => {
+    clock = new Date("2026-10-27T12:00:00.000Z");
+    upstash = startFakeUpstash({ now: () => clock });
+  });
+  afterEach(async () => {
+    await upstash.stop();
+  });
+
+  /** A new production function instance on the in-test store. */
+  const functionInstance = () =>
+    createOps(
+      { VERCEL_ENV: "production", KV_REST_API_URL: upstash.url, KV_REST_API_TOKEN: upstash.token },
+      { now: () => clock },
+    );
+
+  test.each([
+    ["one function instance", 1],
+    ["25 function instances", 25],
+  ])("25 parallel reserve() calls on an empty day, on %s: 8 succeed and 17 refuse with DAILY_LIMIT", async (_label, instances) => {
+    const budgets = Array.from({ length: instances }, () => functionInstance().budget);
+
+    const tickets = await Promise.all(Array.from({ length: 25 }, (_unused, call) => budgets[call % instances]!.reserve()));
+
+    // 8 × $0.90 = $7.20; a ninth would make $8.10, which passes the $8 cap.
+    expect(tickets.filter((ticket) => ticket.ok)).toHaveLength(8);
+    expect(tickets.filter((ticket) => !ticket.ok)).toEqual(
+      Array.from({ length: 17 }, () => ({ ok: false, errorCode: "DAILY_LIMIT" })),
+    );
+  });
+
+  test("the 17 refusals take their $0.90 back: the day's cost in the store is $7.20", async () => {
+    const budget = functionInstance().budget;
+
+    await Promise.all(Array.from({ length: 25 }, () => budget.reserve()));
+
+    // In millionths of a dollar: 8 × 900,000.
+    expect(upstash.get("qcost:2026-10-27")).toBe("7200000");
+  });
+
+  test("each write of the daily cap is one /multi-exec transaction, and qcost:<day> expires at 00:00 UTC on the 90th day after its day", async () => {
+    const budget = functionInstance().budget;
+
+    // 8 reservations, then a refusal and its take-back: 10 writes.
+    for (let turn = 0; turn < 9; turn++) await budget.reserve();
+
+    expect(upstash.requests.map((request) => request.path)).toEqual(Array.from({ length: 10 }, () => "/multi-exec"));
+    for (const request of upstash.requests) {
+      const commands = JSON.parse(request.body) as string[][];
+      expect(commands.map(([name, key]) => [name, key])).toEqual([
+        ["INCRBY", "qcost:2026-10-27"],
+        ["EXPIREAT", "qcost:2026-10-27"],
+      ]);
+    }
+    // Counted by hand: 4 days to the end of October, 30 in November, 31 in December, 25 in January.
+    expect(upstash.expiresAt("qcost:2026-10-27")).toEqual(new Date("2027-01-25T00:00:00.000Z"));
+  });
+
+  test("after the first refusal, the same function instance refuses later turns that day with no store call", async () => {
+    const budget = functionInstance().budget;
+    for (let turn = 0; turn < 8; turn++) await budget.reserve();
+    expect(await budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
+    const storeCallsAtFirstRefusal = upstash.requests.length;
+
+    clock = new Date("2026-10-27T23:59:59.999Z");
+
+    expect(await budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
+    expect(await budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
+    expect(upstash.requests).toHaveLength(storeCallsAtFirstRefusal);
+  });
+
+  test("the next UTC day allows turns again, on that day's own cost", async () => {
+    const budget = functionInstance().budget;
+    for (let turn = 0; turn < 8; turn++) await budget.reserve();
+    expect(await budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
+
+    clock = new Date("2026-10-28T00:00:00.000Z");
+
+    expect(await budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) });
+    // $0.90 is 900,000 millionths of a dollar.
+    expect(upstash.get("qcost:2026-10-28")).toBe("900000");
+  });
+
+  test("a refusal stands when the store fails to take its $0.90 back, and the $0.90 stays counted", async () => {
+    // Other function instances have reserved 8 turns today.
+    upstash.set("qcost:2026-10-27", "7200000");
+    let storeCalls = 0;
+    // The store takes the reservation, then answers 500 to the take-back.
+    const failingAfterFirstCall = ((input: string | URL | Request, init?: RequestInit) =>
+      ++storeCalls === 1 ? fetch(input, init) : Promise.resolve(Response.json({ error: "ERR" }, { status: 500 }))) as typeof fetch;
+    const ops = createOps(
+      { VERCEL_ENV: "production", KV_REST_API_URL: upstash.url, KV_REST_API_TOKEN: upstash.token },
+      { now: () => clock, fetch: failingAfterFirstCall },
+    );
+
+    expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
+    // An amount left counted errs toward pausing, as an unsettled reservation does.
+    expect(upstash.get("qcost:2026-10-27")).toBe("8100000");
   });
 });
