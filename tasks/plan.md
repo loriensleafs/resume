@@ -72,7 +72,7 @@ Each item names the task it blocks; todo.md shows them as "Peter:".
 6. Each spec change the spike's verdicts need: D6.
 7. Deleting the throwaway project and its Upstash database: D32.
 8. Done 2026-10-27: now a wording draft in the [index](../docs/design/wording-drafts.md), for item 28 (row 153).
-9. The nine summaries, three per move, with the moved files: K11, K12 and K13, and through them C17. The run stops for these (row 152).
+9. Done 2026-10-27 (rows 181 to 183): the nine summaries, three per move, with the moved files: K11, K12 and K13, and through them C17. The run stops for these (row 152).
 10. The interviews, and the kind line for interview sources before the first interview source is approved: task 13. The run stops for these (row 152).
 11. A SPEC-chat amendment, only if a TanStack AI name differs: C1.
 12. Done 2026-10-27: now a wording draft in the [index](../docs/design/wording-drafts.md), for item 28 (row 153).
