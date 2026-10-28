@@ -13,9 +13,13 @@ import {
   FAKE_PHONE,
   FIXTURE_DEEP_DIVE,
   FIXTURE_DRAFT,
+  FIXTURE_DRAFT_LOGISTICS_ANSWER,
   FIXTURE_HEADLINE,
   FIXTURE_INTERVIEW,
+  FIXTURE_INTERVIEW_LINK,
   FIXTURE_LEAD,
+  FIXTURE_LINK,
+  FIXTURE_LOGISTICS_ANSWER,
   FIXTURE_NAME,
 } from "./fixture-root";
 
@@ -345,6 +349,96 @@ describe("the static folder", () => {
 
   test("holds no text of the draft source: not its id, its title, its summary or its passage", async () => {
     for (const text of [FIXTURE_DRAFT, "draft source", "fixture draft"]) expect(await filesHolding(text)).toEqual([]);
+  });
+
+  // The approved answer is the control: the device index holds it (C16).
+  test("holds the approved logistics answer and no draft one", async () => {
+    expect(await filesHolding(FIXTURE_LOGISTICS_ANSWER)).toEqual(["device-index.json"]);
+    expect(await filesHolding(FIXTURE_DRAFT_LOGISTICS_ANSWER)).toEqual([]);
+  });
+});
+
+/**
+ * device-index.json as a browser fetches it (SPEC-chat, "The build"): one row per resume entry, logistics answer and
+ * passage, by knowledge id, with the label and the text a browser shows, and the approved sources' links. The test
+ * states the file's shape itself, so it checks the file, not the chat module's type.
+ */
+type DeviceIndexFile = { entries: { id: string; label: string; text: string }[]; links: string[] };
+
+// SPEC-chat, The build, Citations card and Device matches: the chat's Vite plugin writes the device index into the
+// static folder during the site's Vite build, from publicKnowledge(knowledge) of the root that the build names.
+describe("the device index", () => {
+  const deviceIndex = async (): Promise<DeviceIndexFile> => Bun.file(`${staticDir}/device-index.json`).json();
+
+  // The fixture root's resume.yaml is the repository's, so its roles are FedNow and the others, with their x-short
+  // labels; its basics.name is the fixture's own, so the basics label shows that the plugin read the fixture root.
+  test('labels each resume entry once: "Resume: FedNow" for a role, "Resume: FedNow, highlight 2" for a highlight', async () => {
+    const { core } = await buildKnowledge({ root });
+    const resumeEntries = core.filter((entry) => entry.kind === "resume");
+    const { entries } = await deviceIndex();
+    const resumeRows = entries.filter((row) => resumeEntries.some((entry) => entry.id === row.id));
+    // Each resume entry once, in resume order, with the core's public text.
+    expect(resumeRows.map(({ id, text }) => ({ id, text }))).toEqual(resumeEntries.map(({ id, text }) => ({ id, text })));
+    const labelOf = new Map(resumeRows.map((row) => [row.id, row.label]));
+    expect(labelOf.get("role:fednow")).toBe("Resume: FedNow");
+    expect(labelOf.get("highlight:fednow.2")).toBe("Resume: FedNow, highlight 2");
+    expect(labelOf.get("role:sheridan")).toBe("Resume: Sheridan");
+    expect(labelOf.get("basics")).toBe(`Resume: ${FIXTURE_NAME}`);
+    expect(labelOf.get("skills:ai-platform")).toBe("Resume: Skills, AI platform");
+    expect(labelOf.get("education")).toBe("Resume: Education");
+  });
+
+  // SPEC-chat, Markers: a logistics citation reads "Logistics: work arrangement".
+  test('holds each approved logistics answer, labelled "Logistics: <topic>", with its text', async () => {
+    const { entries } = await deviceIndex();
+    expect(entries.filter((row) => row.id.startsWith("logistics:"))).toEqual([
+      { id: "logistics:work-arrangement", label: "Logistics: work arrangement", text: FIXTURE_LOGISTICS_ANSWER },
+    ]);
+  });
+
+  // SPEC-chat, Citations card: a passage's row reads "<source title>: <passage heading>".
+  test('holds each passage of each approved source, labelled "<source title>: <passage heading>", with its text', async () => {
+    const { sources } = publicKnowledge(await buildKnowledge({ root }));
+    const passages = sources.flatMap((source) => source.passages);
+    const { entries } = await deviceIndex();
+    const passageRows = entries.filter((row) => passages.some((passage) => passage.id === row.id));
+    expect(passageRows.map(({ id, text }) => ({ id, text }))).toEqual(passages.map(({ id, text }) => ({ id, text })));
+    expect(passageRows).toContainEqual({
+      id: `${FIXTURE_DEEP_DIVE}.2`,
+      label: "The fixture root’s deep dive: What Peter did",
+      text: "The fixture deep dive’s account of what Peter did.",
+    });
+    expect(passageRows).toContainEqual({
+      id: `${FIXTURE_INTERVIEW}.3`,
+      label: "The fixture root’s interview: How did you help with the fixture?",
+      text: "The fixture interview’s second answer.",
+    });
+  });
+
+  // SPEC-chat, Rendering answers: an answer may link to the exact https addresses in the approved sources' links. The
+  // draft's link names the draft, so the test of the draft's text shows that it is in no file.
+  test("holds the approved sources' links, each once, in source-id order", async () => {
+    expect((await deviceIndex()).links).toEqual([FIXTURE_LINK, FIXTURE_INTERVIEW_LINK]);
+  });
+
+  // SPEC-chat, The build: the browser fetches the device index on demand, so neither the file nor its loader is part of
+  // the JavaScript that / loads first (SPEC-site's 200 KB budget). No page uses it before task C36; this guards C36.
+  test("is not part of the JavaScript that / loads before any interaction", async () => {
+    const scripts = await Promise.all(
+      (await scriptsLoadedBy("index.html")).map((script) => Bun.file(`${staticDir}${script}`).text()),
+    );
+    expect(scripts.filter((script) => script.includes("device-index.json"))).toEqual([]);
+  });
+
+  // A whole source is never a citation (SPEC-chat, Markers), and a draft is not in the knowledge base.
+  test("holds the resume entries, then the logistics answers, then the passages, and nothing else", async () => {
+    const knowledge = publicKnowledge(await buildKnowledge({ root }));
+    const { entries } = await deviceIndex();
+    expect(entries.map((row) => row.id)).toEqual([
+      ...knowledge.core.filter((entry) => entry.kind === "resume").map((entry) => entry.id),
+      "logistics:work-arrangement",
+      ...knowledge.sources.flatMap((source) => source.passages.map((passage) => passage.id)),
+    ]);
   });
 });
 
