@@ -8,7 +8,7 @@ import { z } from "zod";
 import { readLimits, readPassages } from "../../knowledge/read";
 import type { Knowledge } from "../../knowledge/types";
 import { turnLimits } from "./limits";
-import type { Turn } from "./turn";
+import { recordRead, type Turn } from "./turn";
 
 /** The read tool's name, which the wire middleware also reads. */
 export const READ_SOURCES = "read_sources";
@@ -39,16 +39,12 @@ const readSources = toolDefinition({
   inputSchema: ReadInput,
 });
 
-/**
- * The tools of one turn. A read records what it read in the turn: the turn's reads, and the ids in
- * `read` for the question log and the citation check.
- */
+/** The tools of one turn. A read records what it read in the turn (recordRead()). */
 export function chatTools(knowledge: Knowledge, turn: Turn) {
   return [
     readSources.server(({ ids }) => {
       const result = readPassages(knowledge, ids);
-      turn.reads++;
-      for (const id of result.read) if (!turn.readIds.includes(id)) turn.readIds.push(id);
+      recordRead(turn, result);
       return result;
     }),
   ];
