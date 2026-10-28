@@ -13,6 +13,7 @@ import { renderCore } from "../../../knowledge/render";
 import { deepDiveFile, fixture, removeFixtures } from "../../../knowledge/__tests__/fixtures";
 import type { Knowledge } from "../../../knowledge/types";
 import { handleChat, type ChatDeps } from "../handle-chat";
+import { chatOrigins } from "../origins";
 import { inMemoryBudget, inMemoryQuestionLog, inMemoryTelemetry, type Budget, type QuestionLog, type Telemetry } from "../question-log";
 import type { ChatTurnEvent } from "../telemetry";
 import { PREVIEW_ANSWER, SCRIPTED_TURNS, scriptedModel } from "./fixtures";
@@ -2031,6 +2032,45 @@ describe("request checks", () => {
     );
 
     expect(statuses).toEqual([200, 200, 403]);
+  });
+
+  /** The deployment's own host, as VERCEL_URL gives it: with no scheme. */
+  const DEPLOYMENT_HOST = "resume-abc123.vercel.app";
+  /** The chat's address on that deployment. */
+  const DEPLOYMENT_CHAT = `https://${DEPLOYMENT_HOST}/api/chat`;
+
+  /** The status of each request, each one handled with the given origins. */
+  const statusesWith = (origins: string[], requests: Request[]) =>
+    Promise.all(requests.map(async (request) => (await handleChat(request, { ...checkSeam().deps, origins })).status));
+
+  test("the route's origins in production with VERCEL_URL: https://peterkloss.dev and https://<VERCEL_URL> pass, and https://example.com gets 403 FORBIDDEN_ORIGIN", async () => {
+    const origins = chatOrigins({ VERCEL_ENV: "production", VERCEL_URL: DEPLOYMENT_HOST });
+    const seam = checkSeam();
+
+    const statuses = await statusesWith(origins, [askFrom("https://peterkloss.dev", DEPLOYMENT_CHAT), askFrom(`https://${DEPLOYMENT_HOST}`, DEPLOYMENT_CHAT)]);
+    const response = await handleChat(askFrom("https://example.com", DEPLOYMENT_CHAT), { ...seam.deps, origins });
+
+    expect(statuses).toEqual([200, 200]);
+    expect(await rejection(response)).toEqual(chatError(403, "FORBIDDEN_ORIGIN"));
+  });
+
+  test("the route's origins in production with no VERCEL_URL: only https://peterkloss.dev passes, and the request's own origin gets 403", async () => {
+    const origins = chatOrigins({ VERCEL_ENV: "production" });
+
+    const statuses = await statusesWith(origins, [askFrom("https://peterkloss.dev", DEPLOYMENT_CHAT), askFrom(`https://${DEPLOYMENT_HOST}`, DEPLOYMENT_CHAT)]);
+
+    expect(statuses).toEqual([200, 403]);
+  });
+
+  test.each([
+    ["a preview", { VERCEL_ENV: "preview", VERCEL_URL: DEPLOYMENT_HOST }, `https://${DEPLOYMENT_HOST}`],
+    ["`bun run dev`, with no VERCEL_ENV", {}, "http://localhost:3000"],
+  ])("the route's origins outside production, on %s, are none: the request's own origin passes, and https://peterkloss.dev gets 403", async (_name, env, ownOrigin) => {
+    const origins = chatOrigins(env);
+
+    const statuses = await statusesWith(origins, [askFrom(ownOrigin, `${ownOrigin}/api/chat`), askFrom("https://peterkloss.dev", `${ownOrigin}/api/chat`)]);
+
+    expect(statuses).toEqual([200, 403]);
   });
 
   test("a request from another site's page is rejected before its body is read: a body over 256 KB still gets 403", async () => {

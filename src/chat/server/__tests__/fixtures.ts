@@ -45,8 +45,7 @@ export const PREVIEW_ANSWER =
   "This is the preview's scripted model, and it answers only its scripted questions. Try one of these.";
 
 /** The preview's own turn: its answer, with the first two scripted questions as its follow-up questions. */
-const PREVIEW_TURN: ScriptedTurn = {
-  question: "",
+const PREVIEW_TURN: Pick<ScriptedTurn, "responses"> = {
   responses: [
     {
       text: [PREVIEW_ANSWER, ...SCRIPTED_TURNS.slice(0, 2).map((turn) => `<<follow-up: ${turn.question}>>`)].join(" "),
@@ -64,7 +63,7 @@ if (TURNS_BY_QUESTION.size !== SCRIPTED_TURNS.length) {
 }
 
 /** The scripted turn of a question; the preview's own turn when no scripted turn has the question. */
-export function scriptedTurnFor(question: string): ScriptedTurn {
+export function scriptedTurnFor(question: string): Pick<ScriptedTurn, "responses"> {
   return TURNS_BY_QUESTION.get(comparable(question)) ?? PREVIEW_TURN;
 }
 

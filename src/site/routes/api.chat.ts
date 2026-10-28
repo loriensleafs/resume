@@ -12,8 +12,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import knowledge from "virtual:knowledge";
 import { scriptedModel } from "../../chat/server/__tests__/fixtures";
 import { handleChat, type ChatDeps } from "../../chat/server/handle-chat";
+import { chatOrigins } from "../../chat/server/origins";
 import { createOps } from "../../ops/ops";
-import { SITE_ADDRESS } from "../page-head";
 
 /** VERCEL_ENV alone picks the model; no other variable switches it (SPEC-deploy, "Changes to other specs", item 11). */
 const production = process.env.VERCEL_ENV === "production";
@@ -25,14 +25,8 @@ const production = process.env.VERCEL_ENV === "production";
  */
 const ops = createOps(process.env);
 
-/**
- * The Origin values the chat accepts (SPEC-chat, The request, "Origin"). In production: the site's address and the
- * deployment's own, so the list is never empty there. An empty list means the request's own origin, which a proxy that
- * rewrites the scheme or the host can change (C4's review), so only previews and `bun run dev` use it.
- */
-const origins = production
-  ? [SITE_ADDRESS, ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : [])]
-  : [];
+/** The Origin values the chat accepts (SPEC-chat, The request, "Origin"); chatOrigins() says which. */
+const origins = chatOrigins(process.env);
 
 /**
  * Sonnet 5.5, the production model (decision 0013), new for each request: anthropicText() throws when no key is set, as
