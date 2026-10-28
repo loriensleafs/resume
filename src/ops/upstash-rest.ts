@@ -74,6 +74,7 @@ function safeBase(url: string): string | undefined {
  * trustworthy. The in-test server is one; a local Upstash REST proxy would be another.
  */
 function isLoopback(hostname: string): boolean {
+  // The pattern matches 127.999.1.1 too, but new URL() refuses such a host first, so it never gets here.
   return /^127(\.\d{1,3}){3}$/.test(hostname) || hostname === "[::1]" || hostname === "localhost";
 }
 
@@ -87,6 +88,8 @@ async function call(store: UpstashSettings, endpoint: Endpoint, commands: Comman
     method: "POST",
     headers: { authorization: `Bearer ${store.token}`, "content-type": "application/json" },
     body: JSON.stringify(commands),
+    // The store never redirects, and a redirect must never carry the token to another address.
+    redirect: "error",
   });
   const replies: unknown = await response.json().catch(() => undefined);
   if (!response.ok) {

@@ -80,6 +80,7 @@ export function upstashBudget(store: UpstashStore, now: () => Date): Budget {
       if (day === cappedDay) return { ok: false, errorCode: "DAILY_LIMIT" };
       const total = await addToDayCost(store, day, limits.reservation);
       if (total <= limits.dailyCap) return { ok: true, reservation: reservationOn(day) };
+      // Set before the await: a turn that starts while takeBack() waits is refused with no store call.
       cappedDay = day;
       await takeBack(store, day);
       return { ok: false, errorCode: "DAILY_LIMIT" };
