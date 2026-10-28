@@ -1,7 +1,8 @@
 // The fixture root of seam 1 (SPEC-site, Testing 1): a folder that holds the project's files, as the build script's
 // --root reads them. Its resume.yaml is the repository's, with a name, a lead and a headline of its own, so a page that
 // shows them read this root. Its private.yaml holds a fake phone number, so a file that holds it leaks a private
-// detail. A task whose build step reads another project file adds that file here.
+// detail. Its knowledge/sources/ holds two approved sources and a draft, each with Not public text (S16). A task whose
+// build step reads another project file adds that file here.
 
 const REPO = `${import.meta.dir}/../../..`;
 
@@ -14,7 +15,110 @@ export const FIXTURE_LEAD = "The fixture root’s lead, which no other resume.ya
 /** Only the fixture root's resume.yaml holds this headline, so an app bar that shows it read that resume.yaml. */
 export const FIXTURE_HEADLINE = "The fixture root’s headline, which no other resume.yaml holds";
 
-/** Writes the fixture root into the folder `root`: its resume.yaml and its private.yaml. */
+/**
+ * The fixture root's approved deep dive. Its role and its five passages give SPEC-site's example of a kind line: "Deep
+ * dive, written from Peter's answers and approved by him. FedNow, 2021 – 2024. 5 passages."
+ */
+export const FIXTURE_DEEP_DIVE = "fixture-deep-dive";
+/** The fixture root's approved interview, about two roles, with an answer in two paragraphs. */
+export const FIXTURE_INTERVIEW = "fixture-interview";
+/** The fixture root's draft source: no page, no file and no text of it may reach the output. */
+export const FIXTURE_DRAFT = "fixture-draft";
+
+/** The knowledge/sources/ files of the fixture root, by file name. Each text is the fixture's own, in plain prose. */
+const SOURCES: Record<string, string> = {
+  [`${FIXTURE_DEEP_DIVE}.md`]: `---
+id: ${FIXTURE_DEEP_DIVE}
+title: The fixture root’s deep dive
+kind: deep-dive
+subject: project
+roles: [fednow]
+highlights: [highlight:fednow.1]
+summary: The fixture deep dive’s summary, which its page gives as its description.
+links: []
+status: approved
+approved: 2026-10-27
+source: Interview with Peter, 2026-10-27
+---
+
+## Problem
+
+The fixture deep dive’s problem, in its own words.
+
+## What Peter did
+
+The fixture deep dive’s account of what Peter did.
+
+## How it worked
+
+The fixture deep dive’s account of how it worked.
+
+## Result
+
+The fixture deep dive’s result.
+
+## Tools
+
+The fixture deep dive’s tools.
+
+## Not public
+
+The fixture deep dive’s Not public kinds of material, which no static file holds.
+`,
+  [`${FIXTURE_INTERVIEW}.md`]: `---
+id: ${FIXTURE_INTERVIEW}
+title: The fixture root’s interview
+kind: interview
+subject: career
+roles: [highspot, fednow]
+summary: The fixture interview’s summary, which its page gives as its description.
+links: []
+status: approved
+approved: 2026-10-27
+source: Interview with Peter, 2026-10-27
+---
+
+## Why the fixture question?
+
+The fixture interview’s first answer, in its first paragraph.
+
+The fixture interview’s first answer, in its second paragraph.
+
+## Why the fixture question? (continued)
+
+The fixture interview’s first answer, continued.
+
+## How did you help with the fixture?
+
+The fixture interview’s second answer.
+
+## Not public
+
+The fixture interview’s Not public kinds of material, which no static file holds.
+`,
+  [`${FIXTURE_DRAFT}.md`]: `---
+id: ${FIXTURE_DRAFT}
+title: The fixture root’s draft source
+kind: interview
+subject: story
+roles: [fednow]
+summary: The fixture draft’s summary, which no output holds.
+links: []
+status: draft
+source: Interview with Peter, 2026-10-27
+---
+
+## What did the fixture draft ask?
+
+The fixture draft’s answer, which no output holds.
+
+## Not public
+
+The fixture draft’s Not public kinds of material.
+`,
+};
+
+/** Writes the fixture root into the folder `root`: its resume.yaml, its private.yaml and its knowledge sources. */
 export async function writeFixtureRoot(root: string): Promise<void> {
   const source = Bun.YAML.parse(await Bun.file(`${REPO}/resume.yaml`).text()) as { basics: object };
   const fixtureSource = {
@@ -23,4 +127,5 @@ export async function writeFixtureRoot(root: string): Promise<void> {
   };
   await Bun.write(`${root}/resume.yaml`, Bun.YAML.stringify(fixtureSource));
   await Bun.write(`${root}/private.yaml`, `basics:\n  phone: ${FAKE_PHONE}\n`);
+  for (const [name, text] of Object.entries(SOURCES)) await Bun.write(`${root}/knowledge/sources/${name}`, text);
 }

@@ -24,18 +24,19 @@ export const seam1 = {
   staticDir: `${folder}/out/.vercel/output/static`,
 } as const;
 
-let built: Promise<void> | undefined;
+let built: Promise<string> | undefined;
 
 /**
  * Builds the seam-1 folder, with every step that Vercel's build runs (SPEC-deploy, "The build script"). The first call
- * of a test run builds; every later call gets the same build, or the same failure.
+ * of a test run builds; every later call gets the same build, or the same failure. It resolves to what the build script
+ * wrote to standard output, TanStack Start's prerender log among it.
  */
-export function buildOutput(): Promise<void> {
+export function buildOutput(): Promise<string> {
   built ??= build();
   return built;
 }
 
-async function build(): Promise<void> {
+async function build(): Promise<string> {
   await $`rm -rf ${folder}`.quiet();
   await writeFixtureRoot(seam1.root);
   // `bun run` starts the script in the repository, so both folders are absolute. The script inherits `bun test`'s
@@ -47,4 +48,5 @@ async function build(): Promise<void> {
   if (result.exitCode !== 0) {
     throw new Error(`bun run build:site failed with exit code ${result.exitCode}:\n${result.stderr}\n${result.stdout}`);
   }
+  return result.stdout.toString();
 }
