@@ -265,8 +265,9 @@ describe.each([
     expect(await attributeOn(page, 'link[rel="canonical"]', "href")).toEqual([address]);
   });
 
-  // The Open Graph protocol (https://ogp.me): what a share preview shows, each tag once.
-  test("has a share preview's Open Graph tags: type, canonical address, title, description", async () => {
+  // The Open Graph protocol (https://ogp.me): what a share preview shows, each tag once. The image is the 512 px app
+  // icon, with its width and height (Peter, decision record row 173).
+  test("has a share preview's Open Graph tags: type, canonical address, title, description, image", async () => {
     const tags: Record<string, (string | null)[]> = {};
     new HTMLRewriter()
       .on('meta[property^="og:"]', {
@@ -281,7 +282,25 @@ describe.each([
       "og:url": [address],
       "og:title": [title],
       "og:description": [FIXTURE_LEAD],
+      "og:image": ["https://peterkloss.dev/icons/icon-512.png"],
+      "og:image:width": ["512"],
+      "og:image:height": ["512"],
     });
+  });
+});
+
+// Decision record row 173: the share preview of / and /resume shows the approved 512 px app icon. A preview reads the
+// image from its address on the site, so the file must be in the static folder at the width and height the tags give.
+describe.each(["index.html", "resume/index.html"])("the share image of %s", (page) => {
+  test("is a committed icon in the static folder, at the width and height its tags give", async () => {
+    const [image] = await attributeOn(page, 'meta[property="og:image"]', "content");
+    const [width] = await attributeOn(page, 'meta[property="og:image:width"]', "content");
+    const [height] = await attributeOn(page, 'meta[property="og:image:height"]', "content");
+    const { origin, pathname } = new URL(image ?? "", "https://invalid.invalid");
+    expect(origin).toBe("https://peterkloss.dev");
+    const served = await Bun.file(`${staticDir}${pathname}`).bytes();
+    expect(Buffer.compare(served, await Bun.file(`${REPO}/public${pathname}`).bytes())).toBe(0);
+    expect(pngSize(served)).toEqual({ width: Number(width), height: Number(height) });
   });
 });
 
@@ -621,6 +640,76 @@ describe("the site's fonts", () => {
   });
 });
 
+/**
+ * The site's icons, as `bun run icons` renders them into public/icons/ (SPEC-site, Views: App icon), each file with the
+ * size of each square image it holds: the rounded square at 192 and 512 px, the maskable version at 512 px, and the
+ * favicon with the app-icon board's three small sizes.
+ */
+const ICONS: Record<string, number[]> = {
+  "favicon.ico": [16, 32, 48],
+  "icon-192.png": [192],
+  "icon-512.png": [512],
+  "icon-maskable-512.png": [512],
+};
+
+/** The PNG signature, the first 8 bytes of every PNG file (https://www.w3.org/TR/png-3/#5PNG-file-signature). */
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+/**
+ * The width and height of a PNG image, from its IHDR chunk, which comes first, right after the signature
+ * (https://www.w3.org/TR/png-3/#11IHDR). It throws for any other file.
+ */
+function pngSize(png: Uint8Array): { width: number; height: number } {
+  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  const isPng = PNG_SIGNATURE.every((byte, i) => png[i] === byte);
+  if (!isPng || new TextDecoder().decode(png.subarray(12, 16)) !== "IHDR") throw new Error("not a PNG file");
+  return { width: view.getUint32(16), height: view.getUint32(20) };
+}
+
+/**
+ * The size of each square image in an icon file: a PNG file holds one; an ICO file holds the PNG images its directory
+ * lists. An ICO file is a 6-byte header (0, type 1, the image count), then one 16-byte entry per image: its width and
+ * height (0 means 256), its byte length and its offset
+ * (https://learn.microsoft.com/en-us/previous-versions/ms997538(v=msdn.10); a PNG image inside an ICO file:
+ * https://devblogs.microsoft.com/oldnewthing/20101022-00/?p=12473). It throws when an image is not square, or when an
+ * entry's size is not its PNG's.
+ */
+function iconSizes(file: Uint8Array): number[] {
+  const square = ({ width, height }: { width: number; height: number }) => {
+    if (width !== height) throw new Error(`an image is ${width} × ${height} px, not square`);
+    return width;
+  };
+  if (PNG_SIGNATURE.every((byte, i) => file[i] === byte)) return [square(pngSize(file))];
+  const view = new DataView(file.buffer, file.byteOffset, file.byteLength);
+  if (view.getUint16(0, true) !== 0 || view.getUint16(2, true) !== 1) throw new Error("neither a PNG nor an ICO file");
+  return Array.from({ length: view.getUint16(4, true) }, (_, i) => {
+    const entry = 6 + 16 * i;
+    const listed = square({ width: view.getUint8(entry) || 256, height: view.getUint8(entry + 1) || 256 });
+    const start = view.getUint32(entry + 12, true);
+    const size = square(pngSize(file.subarray(start, start + view.getUint32(entry + 8, true))));
+    if (size !== listed) throw new Error(`image ${i + 1} is listed at ${listed} px, but its PNG is ${size} px`);
+    return size;
+  });
+}
+
+// SPEC-site, Views: App icon, and Testing 1. Vercel's build has no Chrome, so the icon files are committed, as the
+// documents are, and the build copies them; it renders none.
+describe("the site's icons", () => {
+  test("the static folder holds each committed file of public/icons/, byte for byte", async () => {
+    const committed = (await Array.fromAsync(new Glob("*").scan({ cwd: `${REPO}/public/icons` }))).sort();
+    expect(committed).toEqual(Object.keys(ICONS));
+    for (const file of committed) {
+      const copy = Bun.file(`${staticDir}/icons/${file}`);
+      expect(await copy.exists()).toBe(true);
+      expect(Buffer.compare(await copy.bytes(), await Bun.file(`${REPO}/public/icons/${file}`).bytes())).toBe(0);
+    }
+  });
+
+  test.each(Object.entries(ICONS))("icons/%s holds square images of %p px", async (file, sizes) => {
+    expect(iconSizes(await Bun.file(`${staticDir}/icons/${file}`).bytes())).toEqual(sizes);
+  });
+});
+
 describe("the sitemap", () => {
   // A crawled /?source= or /?role= link would otherwise be listed here (SPEC-site, Tech Stack).
   test("lists / and /resume on peterkloss.dev, and no address with a query", async () => {
@@ -645,12 +734,23 @@ describe("the sitemap", () => {
   });
 });
 
+/**
+ * A file's content as the private-detail scan reads it, by the rule of the push guard
+ * (.agents/skills/release/scripts/private-detail-check.ts): a NUL byte in the first 8,000 bytes makes a file binary
+ * (Git's own rule), and each byte of a binary file is one character, so the ASCII text inside it, such as a PNG's text
+ * chunk, stays readable. Read as UTF-8, a binary file's stray bytes would become U+FFFD, which holds() takes as a
+ * separator between two digits. Any other file is UTF-8 text.
+ */
+function scannedText(bytes: Uint8Array): string {
+  return bytes.subarray(0, 8000).includes(0) ? Buffer.from(bytes).toString("latin1") : new TextDecoder().decode(bytes);
+}
+
 describe("private details", () => {
   // holds() also finds the number in any other format (src/private-details.ts). The failure names files only.
   test("no file under the output holds the fixture root's phone number", async () => {
     const leaks: string[] = [];
     for await (const path of new Glob("**/*").scan({ cwd: outDir, dot: true })) {
-      if (holds(await Bun.file(`${outDir}/${path}`).text(), FAKE_PHONE)) leaks.push(path);
+      if (holds(scannedText(await Bun.file(`${outDir}/${path}`).bytes()), FAKE_PHONE)) leaks.push(path);
     }
     expect(leaks).toEqual([]);
   });
