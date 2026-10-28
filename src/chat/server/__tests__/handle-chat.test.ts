@@ -4,7 +4,7 @@
 // the telemetry events.
 
 import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
-import { uiMessagesToWire, type TextOptions, type UIMessage } from "@tanstack/ai";
+import { EventType, uiMessagesToWire, type ChatMiddleware, type TextOptions, type UIMessage } from "@tanstack/ai";
 import { fakeText } from "@tanstack/ai/testing";
 import { buildKnowledge } from "../../../knowledge/build";
 import { renderCore } from "../../../knowledge/render";
@@ -60,12 +60,16 @@ function chatBody(messages: UIMessage[], forwardedProps: Record<string, unknown>
   };
 }
 
-/** A POST to the chat with the given body: a string or a stream is sent as it is, any other value as its JSON. */
-function postChat(body: unknown, headers: Record<string, string> = {}, url = CHAT_URL): Request {
+/**
+ * A POST to the chat with the given body: a string or a stream is sent as it is, any other value as its
+ * JSON. `signal` is the request's abort signal, which fires when the visitor selects Stop.
+ */
+function postChat(body: unknown, headers: Record<string, string> = {}, url = CHAT_URL, signal?: AbortSignal): Request {
   return new Request(url, {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
     body: typeof body === "string" || body instanceof ReadableStream ? body : JSON.stringify(body),
+    ...(signal ? { signal } : {}),
   });
 }
 
@@ -97,6 +101,30 @@ async function readEvents(response: Response): Promise<WireEvent[]> {
     .split("\n\n")
     .filter((block) => block.startsWith("data: "))
     .map((block) => JSON.parse(block.slice("data: ".length)) as WireEvent);
+}
+
+/**
+ * Every server-sent event of a response, read as they arrive. At the first event that `stopAt` matches,
+ * the visitor selects Stop: `stop` runs, and the read goes on until the response ends.
+ */
+async function readEventsAndStop(response: Response, stopAt: (event: WireEvent) => boolean, stop: () => void): Promise<WireEvent[]> {
+  const events: WireEvent[] = [];
+  const decoder = new TextDecoder();
+  let pending = "";
+  let stopped = false;
+  for await (const bytes of response.body ?? []) {
+    const blocks = (pending + decoder.decode(bytes, { stream: true })).split("\n\n");
+    pending = blocks.pop() ?? "";
+    for (const block of blocks.filter((b) => b.startsWith("data: "))) {
+      const event = JSON.parse(block.slice("data: ".length)) as WireEvent;
+      events.push(event);
+      if (!stopped && stopAt(event)) {
+        stopped = true;
+        stop();
+      }
+    }
+  }
+  return events;
 }
 
 /** The answer text as the browser receives it: every TEXT_MESSAGE_CONTENT delta, joined. */
@@ -506,9 +534,12 @@ describe("request checks", () => {
 });
 
 describe("limits", () => {
-  test.each(["DAILY_LIMIT", "SPEND_LIMIT"] as const)(
-    "a budget that refuses with %s gives a 200 stream with one RUN_ERROR event with that code, no model call and no log entry",
-    async (code) => {
+  test.each([
+    ["DAILY_LIMIT", "The chat has reached today's limit."],
+    ["SPEND_LIMIT", "The chat has reached this month's limit."],
+  ] as const)(
+    "a budget that refuses with %s gives a 200 stream with one RUN_ERROR event, its code and its fixed message only, no model call and no log entry",
+    async (code, message) => {
       const fake = fakeText();
       fake.setResponses([{ text: "Test Person built the first thing [highlight:acme.1]." }]);
       const deps = seamDeps(fake, { budget: inMemoryBudget(code) });
@@ -518,9 +549,166 @@ describe("limits", () => {
 
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toBe("text/event-stream");
-      expect(events).toEqual([{ type: "RUN_ERROR", code, message: expect.any(String), timestamp: expect.any(Number) }]);
+      expect(events).toEqual([{ type: "RUN_ERROR", code, message, timestamp: expect.any(Number) }]);
       expect(fake.state.callCount).toBe(0);
       expect(await deps.log.list(1)).toEqual([]);
+    },
+  );
+});
+
+describe("stream errors", () => {
+  /** The provider's own text, error body and request id: none of them reaches the wire. */
+  const PROVIDER_MESSAGE = "Overloaded: claude-sonnet-5-5 could not answer request req_011CUfake";
+  const PROVIDER_BODY = { type: "error", error: { type: "overloaded_error", message: PROVIDER_MESSAGE } };
+
+  /**
+   * The fake model, whose call fails with a RUN_ERROR that carries `code` and the details the Anthropic
+   * adapter puts on one (@tanstack/ai-anthropic, src/adapters/text.ts, the catch of
+   * processAnthropicStream): the provider's message, its error body as rawEvent, usage, metadata, the
+   * error type, the request id, the retry delay and the nested error.
+   */
+  function failingModel(code: string | undefined) {
+    const fake = fakeText();
+    fake.setResponses([{ error: PROVIDER_MESSAGE }]);
+    const chatStream = fake.chatStream.bind(fake);
+    fake.chatStream = async function* (options) {
+      for await (const chunk of chatStream(options)) {
+        yield chunk.type !== EventType.RUN_ERROR
+          ? chunk
+          : {
+              ...chunk,
+              ...(code === undefined ? {} : { code }),
+              rawEvent: PROVIDER_BODY,
+              usage: { promptTokens: 1_200, completionTokens: 30, totalTokens: 1_230 },
+              metadata: { tanstack: { source: { provider: "anthropic", api: "messages", model: "claude-sonnet-5-5" } }, provider: PROVIDER_BODY },
+              errorType: "overloaded_error",
+              requestId: "req_011CUfake",
+              retryAfterMs: 30_000,
+              error: { message: PROVIDER_MESSAGE, ...(code === undefined ? {} : { code }) },
+            };
+      }
+    };
+    return fake;
+  }
+
+  test.each([
+    ["no code", undefined, "SERVER_ERROR"],
+    ["the HTTP status 529", "529", "529"],
+    ["the code context_overflow", "context_overflow", "context_overflow"],
+    ["the adapter's code max_tokens", "max_tokens", "MAX_TOKENS"],
+    ["a code that is text", "overloaded: try again later", "SERVER_ERROR"],
+  ])(
+    "a model error with %s ends the stream with one RUN_ERROR that holds only its code and the fixed message, and writes one error entry",
+    async (_name, code, wireCode) => {
+      const deps = seamDeps(failingModel(code));
+
+      const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), deps));
+
+      expect(events.filter((e) => e.type === "RUN_ERROR")).toEqual([
+        { type: "RUN_ERROR", code: wireCode, message: "The answer didn't arrive.", timestamp: expect.any(Number) },
+      ]);
+      expect(events.at(-1)?.type).toBe("RUN_ERROR");
+      const wire = JSON.stringify(events);
+      for (const detail of [PROVIDER_MESSAGE, "overloaded_error", "req_011CUfake", "30000", "1230"]) expect(wire).not.toContain(detail);
+      expect((await deps.log.list(1)).map(({ question, outcome }) => ({ question, outcome }))).toEqual([
+        { question: "What did Test Person build?", outcome: "error" },
+      ]);
+    },
+  );
+});
+
+describe("endings", () => {
+  test("a Stop during the answer: the request's abort reaches the model call, what arrived ends with no error event, and the turn writes one stopped entry", async () => {
+    // 200 tokens of 4 characters a second: the answer streams over about half a second, so the Stop
+    // after its first text event comes well before its end.
+    const fake = fakeText({ tokensPerSecond: 200 });
+    const text = "Test Person built the first thing at Acme [highlight:acme.1], and later the second thing [highlight:acme.2].";
+    let modelCallSignal: AbortSignal | null | undefined;
+    fake.setResponses([
+      ({ request }) => {
+        modelCallSignal = request.request?.signal;
+        return { text };
+      },
+    ]);
+    const deps = seamDeps(fake);
+    const visitor = new AbortController();
+
+    const response = await handleChat(postChat(chatBody([question("What did Test Person build?")]), {}, CHAT_URL, visitor.signal), deps);
+    const events = await readEventsAndStop(response, (e) => e.type === "TEXT_MESSAGE_CONTENT", () => visitor.abort());
+
+    expect(modelCallSignal?.aborted).toBe(true);
+    const arrived = streamedText(events);
+    expect(arrived).not.toBe("");
+    expect(text.startsWith(arrived)).toBe(true);
+    expect(arrived.length).toBeLessThan(text.length);
+    expect(events.filter((e) => e.type === "RUN_ERROR" || e.type === "RUN_FINISHED")).toEqual([]);
+    expect(await deps.log.list(1)).toEqual([
+      {
+        id: expect.any(String),
+        date: "2026-10-27",
+        question: "What did Test Person build?",
+        read: [],
+        citations: [],
+        removed: 0,
+        outcome: "stopped",
+      },
+    ]);
+  });
+});
+
+describe("a thrown run", () => {
+  /** A text that the test can find anywhere: on the wire, or in a server log line. */
+  const MARKER = "marker-5f3a9c";
+
+  /** Every line the server logs while `run` runs, at every console level, objects included. */
+  async function serverLogLines(run: () => Promise<void>): Promise<string[]> {
+    const lines: string[] = [];
+    const spies = (["error", "warn", "log", "info", "debug", "dir"] as const).map((level) =>
+      spyOn(console, level).mockImplementation((...args: unknown[]) => {
+        lines.push(args.map((arg) => (typeof arg === "string" ? arg : Bun.inspect(arg))).join(" "));
+      }),
+    );
+    try {
+      await run();
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
+    return lines;
+  }
+
+  test.each([
+    ["an Error", (text: string): unknown => new Error(text)],
+    ["a bare string", (text: string): unknown => text],
+  ])(
+    "a middleware that throws %s with a marker: the marker never reaches the wire, the stream ends with RUN_ERROR SERVER_ERROR, each server log line holds the error alone, and the turn writes one error entry",
+    async (_name, thrown) => {
+      const asked = "What did Test Person build at Acme?";
+      const fake = fakeText();
+      fake.setResponses([{ text: "Test Person built the first thing [highlight:acme.1]." }]);
+      // Its error repeats the marker and the question, as careless code can.
+      const throwing: ChatMiddleware = {
+        name: "throws",
+        onChunk: (_ctx, chunk) => {
+          if (chunk.type === EventType.TEXT_MESSAGE_CONTENT) throw thrown(`${MARKER}: ${asked}`);
+        },
+      };
+      const deps = seamDeps(fake, { testMiddleware: [throwing] });
+      let events: WireEvent[] = [];
+
+      const lines = await serverLogLines(async () => {
+        events = await readEvents(await handleChat(chatRequest([question(asked)]), deps));
+      });
+
+      expect(events.at(-1)).toEqual({ type: "RUN_ERROR", code: "SERVER_ERROR", message: "The answer didn't arrive.", timestamp: expect.any(Number) });
+      expect(events.filter((e) => e.type === "RUN_ERROR")).toHaveLength(1);
+      expect(JSON.stringify(events)).not.toContain(MARKER);
+      expect(lines.some((line) => line.includes("SERVER_ERROR"))).toBe(true);
+      for (const line of lines) {
+        expect(line).not.toContain(MARKER);
+        expect(line).not.toContain(asked);
+        expect(line).not.toContain(THREAD_ID);
+      }
+      expect((await deps.log.list(1)).map(({ question, outcome }) => ({ question, outcome }))).toEqual([{ question: asked, outcome: "error" }]);
     },
   );
 });

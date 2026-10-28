@@ -7,18 +7,20 @@ import {
   chatParamsFromRequestBody,
   toServerSentEventsResponse,
   type AnyTextAdapter,
+  type ChatMiddleware,
   type StreamChunk,
 } from "@tanstack/ai";
 import type { Knowledge } from "../../knowledge/types";
-import { finishTurn } from "./finish-turn";
+import { finishTurn, finishTurnHooks } from "./finish-turn";
 import { turnLimits } from "./limits";
 import { citationMarkers } from "./markers";
 import { systemPrompt } from "./prompt";
 import { ChatMessages, ChatProps } from "./props";
 import type { Budget, QuestionLog, Telemetry } from "./question-log";
+import { libraryLogging, logServerError } from "./server-log";
 import { turnUsage } from "./telemetry";
 import { startTurn } from "./turn";
-import { wireError } from "./wire";
+import { wireError, wireEvents } from "./wire";
 
 export type ChatDeps = {
   adapter: AnyTextAdapter; // anthropicText("claude-sonnet-5-5"), createAnthropicChat() in the evals, or fakeText()
@@ -29,6 +31,13 @@ export type ChatDeps = {
   origins: string[]; // the allowed Origin values; the route computes them from VERCEL_ENV and VERCEL_URL;
   // empty means the request's own origin (outside production, tests, evals)
   now(): Date;
+  /**
+   * Tests only: middleware that runs after the marker and usage middleware and before the wire
+   * middleware, so a seam-1 test can throw inside the run or add an event the wire must handle
+   * (SPEC-chat, Testing Strategy, "Stream errors" and "Events on the wire"). The route, the evals and
+   * the preview never set it.
+   */
+  testMiddleware?: ChatMiddleware[];
 };
 
 /** A stream of one event, for an answer the model does not give. */
@@ -146,6 +155,40 @@ async function checkRequest(request: Request, origins: readonly string[]): Promi
   return { threadId: params.threadId, messages: params.messages, question, props: props.data };
 }
 
+/**
+ * The stream wrapper (The request, "A thrown run"). A throw out of the chat() stream never passes the
+ * chunk middleware, and toServerSentEventsResponse() would send the error's own message. So a throw
+ * becomes wireError("SERVER_ERROR"), the real error is logged on the server only, and `endTurn` ends the
+ * turn as error, which does nothing when the terminal hook already did. An abort is not a throw of
+ * this kind: the abort decides how the turn ends, and the stream closes with no error event.
+ */
+async function* serverErrorOnThrow(
+  stream: AsyncIterable<StreamChunk>,
+  run: AbortSignal,
+  endTurn: () => Promise<void>,
+): AsyncGenerator<StreamChunk> {
+  try {
+    yield* stream;
+  } catch (error) {
+    if (run.aborted) return;
+    logServerError("chat: the run threw, and the turn ends with SERVER_ERROR", error);
+    await endTurn();
+    yield wireError("SERVER_ERROR");
+  }
+}
+
+/**
+ * The run's controller, which the visitor's Stop aborts (How a turn ends): the request's abort reaches
+ * the model call through chat(). On Vercel the request's signal never fires, and the turn logs its own
+ * ending (row 168; SPEC-deploy, "A Stop on Vercel").
+ */
+function stoppedBy(signal: AbortSignal): AbortController {
+  const run = new AbortController();
+  if (signal.aborted) run.abort();
+  else signal.addEventListener("abort", () => run.abort(), { once: true });
+  return run;
+}
+
 export async function handleChat(request: Request, deps: ChatDeps): Promise<Response> {
   const startedAt = deps.now();
   const checked = await checkRequest(request, deps.origins);
@@ -161,20 +204,26 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
     return toServerSentEventsResponse(only(wireError(reserved.errorCode)));
   }
 
+  const run = stoppedBy(request.signal);
   const stream = chat({
     adapter: deps.adapter,
     threadId,
     systemPrompts: [systemPrompt(deps.knowledge)],
     messages,
+    abortController: run,
+    // The library's own log lines hold the error alone, as the chat's do.
+    debug: libraryLogging,
+    // The wire middleware sees every event the others leave. The terminal hooks come last: the run
+    // awaits their deferred writes before the stream ends (One turn, step 9).
     middleware: [
       citationMarkers(deps.knowledge, turn),
       turnUsage(turn),
-      {
-        name: "finish-turn",
-        // The terminal hook: the run awaits the deferred writes before the stream ends (One turn, step 9).
-        onFinish: (ctx) => ctx.defer(finishTurn(deps, turn, { outcome: "answered", errorCode: null })),
-      },
+      ...(deps.testMiddleware ?? []),
+      wireEvents(turn),
+      finishTurnHooks(deps, turn),
     ],
   });
-  return toServerSentEventsResponse(stream);
+  const endAsThrown = () => finishTurn(deps, turn, { outcome: "error", errorCode: "SERVER_ERROR" });
+  // The response's own cancel, when the visitor's connection closes, aborts the run too.
+  return toServerSentEventsResponse(serverErrorOnThrow(stream, run.signal, endAsThrown), { abortController: run });
 }
