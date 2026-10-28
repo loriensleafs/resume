@@ -17,7 +17,7 @@ import {
   type Telemetry,
 } from "../chat/server/question-log";
 import type { ChatTurnEvent } from "../chat/server/telemetry";
-import { limitAlerts, type LimitAlerts, type StoreStep } from "./alerts";
+import { limitAlerts, opsError, type LimitAlerts, type StoreStep } from "./alerts";
 import { upstashTelemetry, upstashTotals, type DailyTotals } from "./daily-totals";
 import { uncountedReservationOn, upstashBudget, upstashQuestionLog } from "./upstash";
 import { upstashStore } from "./upstash-rest";
@@ -106,7 +106,7 @@ export function createOps(
     telemetry: printedTelemetry(print, upstashTelemetry(store, now, alerts)),
     totals: upstashTotals(store, now),
   };
-  return reportingMissing(answersGoOn(parts, now, alerts.storeFailed), missing, print);
+  return reportingMissing(answersGoOn(parts, now, alerts), missing, print);
 }
 
 /**
@@ -122,7 +122,7 @@ const MONITORING_VARIABLES = ["KV_REST_API_URL", "KV_REST_API_TOKEN", "NTFY_TOPI
  */
 function reportingMissing(ops: Ops, missing: readonly string[], print: (line: string) => void): Ops {
   if (missing.length === 0) return ops;
-  const line = JSON.stringify({ event: "ops_error", step: "config", code: "missing_config", missing });
+  const line = opsError({ step: "config", code: "missing_config", missing });
   return {
     ...ops,
     budget: {
@@ -137,30 +137,43 @@ function reportingMissing(ops: Ops, missing: readonly string[], print: (line: st
 /**
  * The store's log, budget and telemetry, each with a fallback for every failure (SPEC-deploy, "The
  * store fails"): `reserve()` allows the turn, and `append()` and `record()` resolve. So a store error
- * never breaks an answer, and the chat module needs no catch of its own. Each failure goes to
- * `failed`, which prints its ops_error line.
+ * never breaks an answer, and the chat module needs no catch of its own.
  *
  * `reserve()` allows the turn because Anthropic's monthly limit is still the hard cap, and refusing
  * every visitor during a store outage is worse. Its reservation is an uncounted one (upstash.ts), so
  * the turn's cost reaches the day in full once the store answers again.
+ *
+ * Each step returns at its own time limit, and the storefail push that a failure starts goes on beside
+ * the turn (SPEC-deploy, "Store calls"). `record()` and `append()` are the end-of-turn writes, which
+ * the response waits for, so each also waits for any storefail push, within the push's own 3 s. The
+ * push then runs while the answer streams and ends before the response ends (row 168).
  */
-function answersGoOn(ops: Ops, now: () => Date, failed: LimitAlerts["storeFailed"]): Ops {
-  const orElse = async <T>(step: StoreStep, call: () => Promise<T>, fallback: () => T): Promise<T> => {
+function answersGoOn(ops: Ops, now: () => Date, alerts: Pick<LimitAlerts, "storeFailed" | "pushesEnded">): Ops {
+  /**
+   * Runs one store step. When it fails, the step reports the failure, its ops_error line and the
+   * storefail push, which starts here and is not waited for, and gives the fallback.
+   */
+  const reportingFailure = async <T>(step: StoreStep, call: () => Promise<T>, fallback: () => T): Promise<T> => {
     try {
       return await call();
     } catch (error) {
-      await failed(step, error);
+      alerts.storeFailed(step, error);
       return fallback();
     }
   };
+  /** Runs one end-of-turn write as reportingFailure() does, then waits for any storefail push. */
+  const endOfTurn = async (step: "record" | "append", write: () => Promise<void>): Promise<void> => {
+    await reportingFailure(step, write, () => undefined);
+    await alerts.pushesEnded();
+  };
   return {
     ...ops,
-    log: { ...ops.log, append: (entry) => orElse("append", () => ops.log.append(entry), () => undefined) },
+    log: { ...ops.log, append: (entry) => endOfTurn("append", () => ops.log.append(entry)) },
     budget: {
       reserve: () =>
-        orElse("reserve", () => ops.budget.reserve(), () => ({ ok: true, reservation: uncountedReservationOn(utcDay(now().getTime())) })),
+        reportingFailure("reserve", () => ops.budget.reserve(), () => ({ ok: true, reservation: uncountedReservationOn(utcDay(now().getTime())) })),
     },
-    telemetry: { record: (event, reservation) => orElse("record", () => ops.telemetry.record(event, reservation), () => undefined) },
+    telemetry: { record: (event, reservation) => endOfTurn("record", () => ops.telemetry.record(event, reservation)) },
   };
 }
 

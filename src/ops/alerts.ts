@@ -1,9 +1,10 @@
 // The limit alerts (SPEC-deploy, "Limit alerts"; decision record rows 115 and 121): urgent ntfy pushes
 // to Peter's phone, each a title and one line that names the next step. This file holds the alert
 // rules, their texts and the push; the markers' keys and expiry rules are in upstash.ts. The kinds
-// here are spend75, daycap, spendlimit and storefail. This file also prints the ops_error line of each
-// failed store step, because a failed store call raises storefail. The storefail marker cannot live in
-// a failing store, so it lives on the function instance only.
+// here are spend75, daycap, spendlimit and storefail. This file also builds every ops_error line, and
+// prints the line of each failed store step, because a failed store call raises storefail. The
+// storefail marker cannot live in a failing store, so it lives on the function instance only. The
+// storefail push goes on beside the turn, and the turn's end-of-turn writes wait for it (ops.ts).
 //
 // An alert holds no visitor text: its words come only from its kind, its period and limits.ts.
 
@@ -23,11 +24,15 @@ export type AlertKind = "spend75" | "daycap" | "spendlimit" | "storefail";
 type Alert = { kind: AlertKind; period: string; endsAt: number; title: string; message: string };
 
 /**
- * The steps of a turn that call the store: the budget's reservation and its take-back of a refused
- * turn's $0.90, the telemetry's record and the question log's append. Each is a word in the step's
- * ops_error line.
+ * The steps that call the store, each a word in its ops_error line: a turn's reservation, its
+ * take-back of a refused turn's $0.90 and its claim of the hour's probe of the monthly limit, its
+ * record and its append, and an alert's claim of its marker and the keep of the marker after a
+ * successful push.
  */
-export type StoreStep = "reserve" | "take_back" | "record" | "append";
+export type StoreStep = "reserve" | "take_back" | "probe_claim" | "record" | "append" | "alert_claim" | "alert_keep";
+
+/** The steps whose failure prints an ops_error line: a store step, an alert's push, and the check of the production variables. */
+export type OpsErrorStep = StoreStep | "alert_push" | "config";
 
 /** The events that can raise a limit alert. Each resolves, also when the push or the store fails. */
 export type LimitAlerts = {
@@ -39,11 +44,18 @@ export type LimitAlerts = {
   spendLimited(day: string): Promise<void>;
   /**
    * After `step` failed (SPEC-deploy, "The store fails"): prints the step's ops_error line, with one
-   * word for the error and nothing else. When a store call failed, it also pushes storefail, at most
-   * once a UTC day from this function instance. Another failure, such as an entry whose date is not a
-   * UTC day, is no store failure, so it pushes nothing.
+   * word for the error and nothing else. When a store call failed, it also starts the storefail push,
+   * at most once a UTC day from this function instance, and does not wait for it: pushesEnded() does.
+   * Another failure, such as an entry whose date is not a UTC day, is no store failure, so it pushes
+   * nothing.
    */
-  storeFailed(step: StoreStep, error: unknown): Promise<void>;
+  storeFailed(step: StoreStep, error: unknown): void;
+  /**
+   * Resolves once each storefail push that has started has ended, within the push's own 3 s
+   * (SPEC-deploy, "Store calls"). The end-of-turn writes wait for it, because Vercel freezes the
+   * function after the response, and a push left running then is lost (row 168).
+   */
+  pushesEnded(): Promise<void>;
 };
 
 /** What the alerts need from the function instance. */
@@ -83,9 +95,12 @@ export function limitAlerts(settings: AlertSettings): LimitAlerts {
     async spendLimited(day) {
       await send?.claimed(spendlimit(day));
     },
-    async storeFailed(step, error) {
+    storeFailed(step, error) {
       settings.print(opsError({ step, code: errorWord(error) }));
-      await send?.storeFailed(error);
+      send?.storeFailed(error);
+    },
+    pushesEnded: async () => {
+      await send?.pushesEnded();
     },
   };
 }
@@ -137,13 +152,15 @@ const storefail = (day: string): Alert => ({
  * The pushes of one function instance (SPEC-deploy, "Limit alerts"). A failed step prints an
  * ops_error line and never throws, so an alert never breaks an answer.
  *
- * - `claimed` sends spend75, daycap and spendlimit at most once in their period, across all function instances:
- *   it first claims the alert's marker in the store for 10 minutes, then pushes. After a successful
- *   push the marker lasts to the end of the period. After a failed push it expires in 10 minutes, and
- *   a later event claims it and pushes again.
- * - `storeFailed` sends storefail after a failed store call, at most once a UTC day from this
+ * - `claimed` sends spend75, daycap and spendlimit at most once in their period, across all function
+ *   instances: it first claims the alert's marker in the store for 10 minutes, then pushes. After a
+ *   successful push the marker lasts to the end of the period. After a failed push it expires in 10
+ *   minutes, and a later event claims it and pushes again.
+ * - `storeFailed` starts storefail after a failed store call, at most once a UTC day from this
  *   instance. Its marker cannot live in the store that failed, so it lives here only, with the same
- *   rules: 10 minutes after a failed push, the end of the day after a successful one.
+ *   rules: 10 minutes after a failed push or one that passed its 3 s, the end of the day after a
+ *   successful one. The push goes on beside the step that failed, which returns at its own time
+ *   limit; `pushesEnded` waits for it.
  *
  * The instance remembers until when each marker is known to live, and asks the store again only after
  * that. So an instance at the daily cap still refuses turns with no store call (SPEC-deploy, "The
@@ -189,21 +206,39 @@ function sender(topicUrl: string, { store, fetch, now, print }: AlertSettings) {
     return true;
   };
 
-  /** Pushes storefail after a failed store call. Any other error is no store failure, so it pushes nothing. */
-  const storeFailed = async (error: unknown) => {
+  /** The storefail pushes that have started and not yet ended. */
+  const pending = new Set<Promise<void>>();
+
+  /**
+   * Starts storefail after a failed store call, and gives no promise to wait for: the push stays in
+   * `pending` until it ends. Any other error is no store failure, so it pushes nothing.
+   */
+  const storeFailed = (error: unknown): void => {
     if (!(error instanceof UpstashError)) return;
     const alert = storefail(utcDay(now().getTime()));
     const started = start(alert);
-    if (started !== undefined) await deliver(started.topic, alert);
+    if (started === undefined) return;
+    // deliver() never throws; the catch keeps any slip from reaching the writes that wait for it.
+    const delivery: Promise<void> = deliver(started.topic, alert)
+      .catch(() => false)
+      .then(() => {
+        pending.delete(delivery);
+      });
+    pending.add(delivery);
   };
 
-  /** Runs one store step of an alert; a failure prints its ops_error line, raises storefail and gives undefined. */
-  const storeStep = async <T>(step: string, alert: Alert, call: () => Promise<T>): Promise<T | undefined> => {
+  /** Waits for each storefail push that has started, each within its own 3 s (PUSH_LIMIT_MS). */
+  const pushesEnded = async () => {
+    await Promise.all(pending);
+  };
+
+  /** Runs one store step of an alert; a failure prints its ops_error line, starts storefail and gives undefined. */
+  const storeStep = async <T>(step: StoreStep, alert: Alert, call: () => Promise<T>): Promise<T | undefined> => {
     try {
       return await call();
     } catch (error) {
       print(opsError({ step, alert: alert.kind, code: errorWord(error) }));
-      await storeFailed(error);
+      storeFailed(error);
       return undefined;
     }
   };
@@ -222,13 +257,14 @@ function sender(topicUrl: string, { store, fetch, now, print }: AlertSettings) {
     await storeStep("alert_keep", alert, () => keepAlertMarker(store, alert.kind, alert.period, alert.endsAt));
   };
 
-  return { claimed, storeFailed };
+  return { claimed, storeFailed, pushesEnded };
 }
 
 /**
  * How long a push may take, in milliseconds (SPEC-deploy, "Store calls": each push, 3 s). The daycap
- * push runs inside reserve(), the spend75 push inside record(), and the storefail push inside the step
- * whose store call failed, so a hung ntfy server holds a visitor's answer no longer than this.
+ * push runs inside reserve() and the spend75 push inside record(). The storefail push runs beside the
+ * turn, from the step whose store call failed, and the end-of-turn writes wait for it (ops.ts). So a
+ * hung ntfy server holds a visitor's answer no longer than this.
  */
 const PUSH_LIMIT_MS = 3_000;
 
@@ -257,10 +293,12 @@ async function push(topicUrl: string, fetchFn: typeof fetch, alert: Alert): Prom
 }
 
 /**
- * The ops_error line of a failed step: the step, the alert's kind for an alert's step, and one short
- * word for the failure, and nothing else.
+ * The ops_error line of a failed step, the one builder of every such line: the step, the alert's kind
+ * for an alert's step, one short word for the failure, and for missing_config the names of the missing
+ * variables, never their values. Nothing else.
  */
-const opsError = (fields: { step: string; alert?: AlertKind; code: string }) => JSON.stringify({ event: "ops_error", ...fields });
+export const opsError = (fields: { step: OpsErrorStep; alert?: AlertKind; code: string; missing?: readonly string[] }) =>
+  JSON.stringify({ event: "ops_error", ...fields });
 
 /** A word that cannot carry text: a code or a name. */
 const WORD = /^[A-Za-z0-9_]{1,32}$/;

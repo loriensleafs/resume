@@ -1066,6 +1066,31 @@ describe("store failures, in production on the in-test Upstash and ntfy servers"
   /** The ops_error lines in the function log, in the order printed. */
   const opsErrors = () => printed.map((line) => JSON.parse(line) as Record<string, unknown>).filter((line) => line.event === "ops_error");
 
+  /**
+   * One allowed turn as the handler runs it: reserve() before the first model call, and record() at
+   * the turn's end, which the response waits for, so any storefail push has ended when this resolves.
+   */
+  const turnOn = async (ops: ReturnType<typeof createOps>) => {
+    const ticket = await ops.budget.reserve();
+    if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
+    await ops.telemetry.record(answeredTurn, ticket.reservation);
+  };
+
+  /** The chat_turn event of a turn refused at the daily cap: it called no model, so it has no reservation and no tokens. */
+  const cappedTurn: ChatTurnEvent = {
+    ...answeredTurn,
+    outcome: "limit",
+    reads: 0,
+    citations: 0,
+    modelCalls: 0,
+    inputTokens: null,
+    cachedInputTokens: null,
+    cacheWriteTokens: null,
+    cacheWrite1hTokens: null,
+    outputTokens: null,
+    errorCode: "DAILY_LIMIT",
+  };
+
   test("with the Upstash server returning 500, reserve() allows the turn, record() and append() resolve, and each prints an ops_error line with the store's 500", async () => {
     upstash.failEvery(500);
     const ops = functionInstance();
@@ -1111,12 +1136,12 @@ describe("store failures, in production on the in-test Upstash and ntfy servers"
     const first = functionInstance();
     const second = functionInstance();
 
-    await first.budget.reserve();
-    await second.budget.reserve();
+    await turnOn(first);
+    await turnOn(second);
     expect(ntfy.pushes).toHaveLength(2);
 
     clock = new Date("2026-10-28T00:00:00.000Z");
-    await first.budget.reserve();
+    await turnOn(first);
 
     expect(ntfy.pushes).toHaveLength(3);
     expect(upstash.requests.filter((request) => request.body.includes('"SET"'))).toEqual([]);
@@ -1127,16 +1152,16 @@ describe("store failures, in production on the in-test Upstash and ntfy servers"
     ntfy.refuseNext(1);
     const ops = functionInstance();
 
-    await ops.budget.reserve();
+    await turnOn(ops);
     expect(ntfy.refused()).toBe(1);
     expect(opsErrors()).toContainEqual({ event: "ops_error", step: "alert_push", alert: "storefail", code: "HTTP_429" });
 
     clock = new Date("2026-10-27T12:09:59.999Z");
-    await ops.budget.reserve();
+    await turnOn(ops);
     expect(ntfy.refused() + ntfy.pushes.length).toBe(1);
 
     clock = new Date("2026-10-27T12:10:00.001Z");
-    await ops.budget.reserve();
+    await turnOn(ops);
     expect(ntfy.pushes).toHaveLength(1);
   });
 
@@ -1202,22 +1227,133 @@ describe("store failures, in production on the in-test Upstash and ntfy servers"
   );
 
   test(
-    "with the Upstash server returning 500 and the ntfy server holding its answers, reserve() still allows the turn within about 3 s: the storefail push stops after 3 s and counts as failed",
+    "with the Upstash and ntfy servers both holding every response, reserve() allows the turn within about 1 s, and record() returns after the storefail push stops, within its own 2 s plus what is left of the push's 3 s",
     async () => {
-      upstash.failEvery(500);
+      upstash.holdEvery();
       ntfy.holdNext(1);
       const ops = functionInstance();
 
-      const reserving = await timed(async () => expect(await ops.budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) }));
+      let reservation = "";
+      const reserving = await timed(async () => {
+        const ticket = await ops.budget.reserve();
+        if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
+        reservation = ticket.reservation;
+      });
+      let linesWhenRecorded: Record<string, unknown>[] = [];
+      let heldWhenRecorded = 0;
+      const recording = await timed(async () => {
+        await ops.telemetry.record(answeredTurn, reservation);
+        linesWhenRecorded = opsErrors();
+        heldWhenRecorded = ntfy.held();
+      });
 
-      // SPEC-deploy, "Store calls": each push, 3 s.
-      expect(ntfy.held()).toBe(1);
-      expect(reserving).toBeLessThan(4_000);
-      expect(opsErrors()).toEqual([
-        { event: "ops_error", step: "reserve", code: "HTTP_500" },
+      // SPEC-deploy, "Store calls": reserve() 1 s. The storefail push that its failure starts goes on beside the turn.
+      expect(reserving).toBeLessThan(1_500);
+      // record()'s own 2 s run while the push's 3 s go on, so it returns about 1 s after its own limit,
+      // when the push stops; never later than 2 s + 3 s.
+      expect(recording).toBeLessThan(3_500);
+      // The push reached the ntfy server and stopped before record() resolved, so it ends before the response.
+      expect(heldWhenRecorded).toBe(1);
+      expect(linesWhenRecorded).toEqual([
+        { event: "ops_error", step: "reserve", code: "TIMEOUT" },
+        { event: "ops_error", step: "record", code: "TIMEOUT" },
         { event: "ops_error", step: "alert_push", alert: "storefail", code: "TimeoutError" },
       ]);
       expect(printed.join("\n")).not.toContain(topic);
+    },
+    10_000,
+  );
+
+  test(
+    "with the store failing record() and append() and the ntfy server holding its answer, both return when the storefail push stops after 3 s; the push counts as failed, and a store failure 10 minutes later pushes again",
+    async () => {
+      const ops = functionInstance();
+      const ticket = await ops.budget.reserve();
+      if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
+      upstash.failEvery(500);
+      ntfy.holdNext(1);
+
+      // Both run at once, as the handler runs them after the last chunk. Each reads the log when it resolves.
+      const linesWhenDone: Record<string, unknown>[][] = [];
+      const durations = await Promise.all([
+        timed(async () => {
+          await ops.telemetry.record(answeredTurn, ticket.reservation);
+          linesWhenDone.push(opsErrors());
+        }),
+        timed(async () => {
+          await ops.log.append(answeredEntry);
+          linesWhenDone.push(opsErrors());
+        }),
+      ]);
+
+      // The store answers 500 at once, so each waits out the push's 3 s, never 2 s + 3 s.
+      for (const duration of durations) expect(duration).toBeLessThan(3_500);
+      for (const lines of linesWhenDone) {
+        expect(lines).toContainEqual({ event: "ops_error", step: "alert_push", alert: "storefail", code: "TimeoutError" });
+      }
+      expect(opsErrors()).toHaveLength(3);
+
+      clock = new Date("2026-10-27T12:10:00.001Z");
+      await ops.log.append(answeredEntry);
+      expect(ntfy.pushes.map((push) => push.title)).toEqual(["Chat store failed: answers go on without the $8 daily cap"]);
+    },
+    10_000,
+  );
+
+  test(
+    "a take-back that the store holds starts the storefail push and does not wait for it: reserve() refuses at the cap within about 1 s, and the refused turn's record() returns after the push stops",
+    async () => {
+      // Other instances reserved 8 turns today and already pushed daycap, so only storefail goes out.
+      upstash.set("qcost:2026-10-27", "7200000");
+      upstash.set("alert:daycap:2026-10-27", "2026-10-27T11:00:00.000Z");
+      upstash.holdEvery((body) => body.includes('"-900000"'));
+      ntfy.holdNext(1);
+      const ops = functionInstance();
+
+      const refusing = await timed(async () => expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" }));
+      let linesWhenRecorded: Record<string, unknown>[] = [];
+      // The handler ends a refused turn with record() before it sends the limit stream.
+      const recording = await timed(async () => {
+        await ops.telemetry.record(cappedTurn);
+        linesWhenRecorded = opsErrors();
+      });
+
+      // SPEC-deploy, "Store calls": reserve() 1 s, also for the take-back.
+      expect(refusing).toBeLessThan(1_500);
+      expect(recording).toBeLessThan(3_500);
+      expect(linesWhenRecorded).toEqual([
+        { event: "ops_error", step: "take_back", code: "TIMEOUT" },
+        { event: "ops_error", step: "alert_push", alert: "storefail", code: "TimeoutError" },
+      ]);
+    },
+    10_000,
+  );
+
+  test(
+    "a probe claim that the store holds is a store failure: reserve() allows the turn as a plain one within about 1 s, its $0.90 stays reserved until record() settles it, and one ops_error line names the claim",
+    async () => {
+      // A turn met Anthropic's limit 2 hours ago, so this turn tries to claim the hour's probe.
+      upstash.set("limit:spend", "2026-10-27T10:00:00.000Z");
+      upstash.holdEvery((body) => body.includes("limit:probe:"));
+      const ops = functionInstance();
+
+      let reservation = "";
+      const reserving = await timed(async () => {
+        const ticket = await ops.budget.reserve();
+        if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
+        reservation = ticket.reservation;
+      });
+      // $0.90 is 900,000 millionths of a dollar.
+      expect(upstash.get("qcost:2026-10-27")).toBe("900000");
+      await ops.telemetry.record(workedExampleTurn, reservation);
+
+      expect(reserving).toBeLessThan(1_500);
+      // Counted by hand: the worked example's cost, 58,001, replaces the $0.90, so the day holds it once.
+      expect(upstash.get("qcost:2026-10-27")).toBe("58001");
+      expect(opsErrors()).toEqual([{ event: "ops_error", step: "probe_claim", code: "TIMEOUT" }]);
+      expect(ntfy.pushes.map((push) => push.title)).toEqual(["Chat store failed: answers go on without the $8 daily cap"]);
+      // A plain turn says nothing about the limit now; only the hour's probe clears the marker.
+      expect(upstash.get("limit:spend")).toBe("2026-10-27T10:00:00.000Z");
     },
     10_000,
   );
@@ -1232,9 +1368,15 @@ describe("store failures, in production on the in-test Upstash and ntfy servers"
       { now: () => clock, print: (line) => printed.push(line) },
     );
 
-    expect(await ops.budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) });
+    const ticket = await ops.budget.reserve();
+    expect(ticket).toEqual({ ok: true, reservation: expect.any(String) });
+    // The turn ends as the handler ends it, so its record() waits for the storefail push.
+    await ops.telemetry.record(answeredTurn, ticket.ok ? ticket.reservation : undefined);
 
-    expect(opsErrors()).toEqual([{ event: "ops_error", step: "reserve", code: "NETWORK" }]);
+    expect(opsErrors()).toEqual([
+      { event: "ops_error", step: "reserve", code: "NETWORK" },
+      { event: "ops_error", step: "record", code: "NETWORK" },
+    ]);
     expect(printed.join("\n")).not.toContain(new URL(address).port);
     expect(printed.join("\n")).not.toContain("token-in-test");
     expect(ntfy.pushes).toHaveLength(1);
@@ -1249,6 +1391,8 @@ describe("store failures, in production on the in-test Upstash and ntfy servers"
       upstash.holdEvery((body) => body.includes('"SET"'));
 
       const refusing = await timed(async () => expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" }));
+      // The handler ends the refused turn with record(), which waits for the storefail push.
+      await ops.telemetry.record(cappedTurn);
 
       expect(upstash.held()).toBe(1);
       expect(refusing).toBeLessThan(2_500);

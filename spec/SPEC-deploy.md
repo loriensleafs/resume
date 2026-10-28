@@ -12,6 +12,8 @@ Amended on 2026-10-27 after task A10 (rows 158 and 172): `bun.lock` is version 2
 
 Amended on 2026-10-27 after task D14 and its review: a `SPEND_LIMIT` turn settles with the cost of its finished model calls, $0 when none finished, so failed probes never fill the day's cap (Peter, row 184; "Which usage a turn settles with"). The probe deletes the marker only when one of its model calls finished (The monthly limit), the conductor's decision for Peter's end review.
 
+Amended on 2026-10-27 after task D15's review: "Store calls" and "The store fails" say where the `storefail` push waits. It runs beside the turn, and `record()` and `append()` wait for it before the response ends. A failed probe claim lets the turn go on as a plain turn ("The store fails"). Both are the conductor's decisions, for Peter's end review ([build decisions](../docs/design/build-decisions.md)).
+
 ## Objective
 
 Put the site and the chat on the internet at `https://peterkloss.dev`, and keep them safe, cheap and observable without Peter watching them. The site serves recruiters, hiring managers and engineers during Peter's job search, when traffic is higher than usual (row 114), so a quiet failure or a spent limit must reach Peter at once.
@@ -413,13 +415,15 @@ export function createOpsReader(env: { KV_REST_API_URL: string; KV_REST_API_READ
 - Every write finishes before the response ends (Peter, row 168). Vercel freezes a function between requests, so a write after the response's end lands only when the next request reaches that instance (spike check 7).
 - `/api/chat` does not set `supportsCancellation` (Peter, row 168). With it, Vercel ends the function when the visitor stops, and the writes after the last chunk are lost; on the Bun runtime the function still does not learn of the Stop (spike check 7).
 - Each store call has a time limit of 2 s, and `reserve()` 1 s; each push, 3 s. A slow service never holds a visitor's answer longer than that.
+- A failed store call starts the `storefail` push and does not wait for it: `reserve()` returns at its 1 s limit, `record()` and `append()` at their 2 s. The push runs beside the turn, while the answer streams. `record()` and `append()`, which the response waits for, also wait for any `storefail` push, within its 3 s, so the push ends before the response ends. A refused turn's `record()` comes before its limit stream, so that stream also waits for the push.
 - Turns that never reach the model write nothing to the store: a rejected request, and a refusal at the cap or the monthly limit. They print their `chat_turn` line only. So a flood of bad requests cannot spend the store's budget.
 
 **The store fails.** A store error never breaks an answer.
 
 - `reserve()` then allows the turn: Anthropic's $20 is still the hard cap, and refusing every visitor during a store outage is worse.
 - `record()` and `append()` resolve, and an `ops_error` line is printed.
-- A `storefail` push goes out. Its marker cannot live in a failing store, so each function instance pushes at most once a day.
+- A `storefail` push goes out, beside the turn ("Store calls"). Its marker cannot live in a failing store, so each function instance pushes at most once a day. A push that fails or passes its 3 s leaves the instance free to push again 10 minutes later.
+- A probe claim that fails lets the turn go on as a plain turn, not the probe. Its $0.90 is already on the day, so `record()` settles it with the turn's cost. Only the probe clears `limit:spend`.
 
 **A setting is missing in production.** A missing store or ntfy variable keeps answers working, prints `ops_error` with `missing_config` on every turn, and shows as `false` in `/api/status`, so the health checks fail. The setup list puts the API key in last, after the store and the rate limits, so the chat never runs in production without its guards.
 
