@@ -4,8 +4,8 @@
 // the telemetry events.
 
 import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
-import { EventType, uiMessagesToWire, type ChatMiddleware, type TextOptions, type UIMessage } from "@tanstack/ai";
-import { fakeText } from "@tanstack/ai/testing";
+import { EventType, uiMessagesToWire, type ChatMiddleware, type StreamChunk, type TextOptions, type UIMessage } from "@tanstack/ai";
+import { fakeText, type FakeResponse } from "@tanstack/ai/testing";
 import { buildKnowledge } from "../../../knowledge/build";
 import { renderCore } from "../../../knowledge/render";
 import { deepDiveFile, fixture, removeFixtures } from "../../../knowledge/__tests__/fixtures";
@@ -137,7 +137,55 @@ const streamedText = (events: WireEvent[]) =>
 /** The values of the chat.citations events. */
 const citationEvents = (events: WireEvent[]) => events.filter((e) => e.type === "CUSTOM" && e.name === "chat.citations").map((e) => e.value);
 
+/** A model call that reads through read_sources with this input, as the model sends it. */
+const readCall = (input: unknown): FakeResponse => ({ toolCalls: [{ name: "read_sources", input }] });
+
+/**
+ * The fixture deep dive `sample` (knowledge/__tests__/fixtures.ts): its five passages, sample.1 to
+ * sample.5, each hold "Text for <heading>.", and its Not public section holds "Internal code.".
+ */
+const SAMPLE_TEXT = [
+  "Text for Problem.",
+  "Text for What Peter did.",
+  "Text for How it worked.",
+  "Text for Result.",
+  "Text for Tools.",
+  "Internal code.",
+];
+
 describe("citations", () => {
+  test("a read then an answer keeps a citation to a read passage and removes one to an unread passage, and chat.citations reports 1 removed", async () => {
+    const fake = fakeText();
+    fake.setResponses([
+      readCall({ ids: ["sample.2"], topic: "the first thing" }),
+      { text: "Test Person planned the first thing [sample.2] and tested it [sample.3]." },
+    ]);
+    const telemetry = inMemoryTelemetry();
+    const deps = seamDeps(fake, { telemetry });
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), deps));
+
+    expect(streamedText(events)).toBe("Test Person planned the first thing [sample.2] and tested it .");
+    expect(citationEvents(events)).toEqual([{ citations: ["sample.2"], removed: 1 }]);
+    expect((await deps.log.list(1)).map(({ read, citations, removed }) => ({ read, citations, removed }))).toEqual([
+      { read: ["sample.2"], citations: ["sample.2"], removed: 1 },
+    ]);
+    expect(telemetry.events.map(({ reads }) => reads)).toEqual([1]);
+  });
+
+  test("a read of a whole source makes each of its passages citable, and a passage the source does not have stays removed", async () => {
+    const fake = fakeText();
+    fake.setResponses([
+      readCall({ ids: ["sample"], topic: "the first thing" }),
+      { text: "Test Person found the problem [sample.1] and measured the result [sample.4] in step nine [sample.9]." },
+    ]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), seamDeps(fake)));
+
+    expect(streamedText(events)).toBe("Test Person found the problem [sample.1] and measured the result [sample.4] in step nine .");
+    expect(citationEvents(events)).toEqual([{ citations: ["sample.1", "sample.4"], removed: 1 }]);
+  });
+
   test("an answer with no read keeps a resume citation in the streamed text, and chat.citations lists it with 0 removed", async () => {
     const fake = fakeText();
     const text = "Test Person built the first thing at Acme [highlight:acme.1].";
@@ -157,6 +205,163 @@ describe("citations", () => {
 
     expect(streamedText(events)).toBe("Test Person works at Acme [role:acme] and led its migration .");
     expect(citationEvents(events)).toEqual([{ citations: ["role:acme"], removed: 1 }]);
+  });
+});
+
+/** The TOOL_CALL_RESULT events of the read_sources calls on the wire. */
+function readResults(events: WireEvent[]): WireEvent[] {
+  const reads = new Set(events.filter((e) => e.type === "TOOL_CALL_START" && e.toolCallName === "read_sources").map((e) => e.toolCallId));
+  return events.filter((e) => e.type === "TOOL_CALL_RESULT" && reads.has(e.toolCallId));
+}
+
+/** The text of the model request's tool messages: what the model reads of each tool result. */
+const toolMessages = (request: TextOptions | undefined) =>
+  (request?.messages ?? []).filter((message) => message.role === "tool").map((message) => JSON.stringify(message.content));
+
+describe("read results on the wire", () => {
+  test("no streamed event holds passage text or Not public text, each read_sources result holds { read, unknown, skipped } only, and the model's next call still gets the full read text", async () => {
+    const fake = fakeText();
+    const requests: TextOptions[] = [];
+    fake.setResponses([
+      readCall({ ids: ["sample", "nothing.1"], topic: "the first thing" }),
+      ({ request }) => {
+        requests.push(request);
+        return { text: "Test Person said what was done [sample.2]." };
+      },
+    ]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), seamDeps(fake)));
+
+    const wire = JSON.stringify(events);
+    for (const text of [...SAMPLE_TEXT, "Deep dive: written from Peter's answers"]) expect(wire).not.toContain(text);
+    const results = readResults(events);
+    expect(results).toHaveLength(1);
+    expect(results.map((e) => JSON.parse(String(e.content)))).toEqual([{ read: ["sample"], unknown: ["nothing.1"], skipped: [] }]);
+    expect(streamedText(events)).toBe("Test Person said what was done [sample.2].");
+    const [readText] = toolMessages(requests[0]);
+    for (const text of SAMPLE_TEXT) expect(readText).toContain(text);
+  });
+});
+
+describe("read limits", () => {
+  /** `count` passage ids of the fixture source, sample.1 onward; the ones past sample.5 are unknown. */
+  const passageIds = (count: number) => Array.from({ length: count }, (_, i) => `sample.${i + 1}`);
+
+  test.each([
+    ["21 ids", { ids: passageIds(21), topic: "the first thing" }],
+    ["an id of 65 characters", { ids: ["a".repeat(65)], topic: "the first thing" }],
+    ["no ids", { ids: [], topic: "the first thing" }],
+    ["a topic of 61 characters", { ids: ["sample.2"], topic: "t".repeat(61) }],
+    ["an empty topic", { ids: ["sample.2"], topic: "" }],
+  ])(
+    "a read_sources call with %s gets a tool error from the input schema, reads nothing, and the run goes on to the answer",
+    async (_name, input) => {
+      const fake = fakeText();
+      const requests: TextOptions[] = [];
+      fake.setResponses([
+        readCall(input),
+        ({ request }) => {
+          requests.push(request);
+          return { text: "Test Person built the first thing [highlight:acme.1]." };
+        },
+      ]);
+      const telemetry = inMemoryTelemetry();
+      const deps = seamDeps(fake, { telemetry });
+
+      const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), deps));
+
+      // The model reads the schema's error, not readPassages()'s, which throws past the same limits.
+      const [toolError] = toolMessages(requests[0]);
+      expect(toolError).toContain("Input validation failed for tool read_sources");
+      expect(toolError).not.toContain("readPassages()");
+      expect(readResults(events).map((e) => JSON.parse(String(e.content)))).toEqual([{ read: [], unknown: [], skipped: [] }]);
+      expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1].");
+      expect(events.filter((e) => e.type === "RUN_ERROR")).toEqual([]);
+      expect(telemetry.events.map(({ outcome, reads }) => ({ outcome, reads }))).toEqual([{ outcome: "answered", reads: 0 }]);
+    },
+  );
+
+  test.each([
+    ["20 ids", passageIds(20), "the first thing"],
+    ["an id of 64 characters", ["a".repeat(64)], "the first thing"],
+    ["a topic of 60 characters", ["sample.2"], "t".repeat(60)],
+  ])("a read_sources call with %s passes the input schema and is read", async (_name, ids, topic) => {
+    const fake = fakeText();
+    fake.setResponses([readCall({ ids, topic }), { text: "Test Person built the first thing [highlight:acme.1]." }]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), seamDeps(fake)));
+
+    const [result] = readResults(events).map((e) => JSON.parse(String(e.content)));
+    expect([...result.read, ...result.unknown]).toEqual(ids);
+  });
+});
+
+describe("events on the wire", () => {
+  /** The 11 event types the browser needs (SPEC-chat, The request, "Events on the wire"; research 07, finding 9). */
+  const ALLOWED = [
+    "RUN_STARTED",
+    "RUN_FINISHED",
+    "RUN_ERROR",
+    "TEXT_MESSAGE_START",
+    "TEXT_MESSAGE_CONTENT",
+    "TEXT_MESSAGE_END",
+    "TOOL_CALL_START",
+    "TOOL_CALL_ARGS",
+    "TOOL_CALL_END",
+    "TOOL_CALL_RESULT",
+    "CUSTOM",
+  ];
+
+  test("a turn that thinks, reads and answers puts only allowlisted event types on the wire, and only the chat's own CUSTOM events", async () => {
+    const fake = fakeText();
+    fake.setResponses([
+      { ...readCall({ ids: ["sample.2"], topic: "the first thing" }), thinking: "The catalog names sample." },
+      { thinking: "The passage answers it.", text: "Test Person planned the first thing [sample.2]." },
+    ]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), seamDeps(fake)));
+
+    expect(streamedText(events)).toBe("Test Person planned the first thing [sample.2].");
+    expect([...new Set(events.map((e) => e.type))].filter((type) => !ALLOWED.includes(type))).toEqual([]);
+    expect(events.filter((e) => e.type === "CUSTOM" && !String(e.name).startsWith("chat."))).toEqual([]);
+  });
+
+  /** A test middleware that adds `added` after the answer's TEXT_MESSAGE_END, before the wire middleware sees it. */
+  const addingAfterText = (added: Record<string, unknown>): ChatMiddleware => ({
+    name: "adds-an-event",
+    onChunk: (_ctx, chunk) =>
+      chunk.type === EventType.TEXT_MESSAGE_END ? [chunk, { timestamp: Date.now(), ...added } as unknown as StreamChunk] : undefined,
+  });
+
+  test.each<[string, Record<string, unknown>]>([
+    ["an event type TanStack AI does not have", { type: "FUTURE_EVENT", note: "added by a later version" }],
+    ["a STEP_STARTED event", { type: "STEP_STARTED", stepName: "plan" }],
+    ["a REASONING_MESSAGE_CONTENT event", { type: "REASONING_MESSAGE_CONTENT", messageId: "thinking-1", delta: "The visitor asks about Acme." }],
+    ["a MESSAGES_SNAPSHOT that holds read text", { type: "MESSAGES_SNAPSHOT", messages: [{ id: "m-1", role: "tool", toolCallId: "call-1", content: "Internal code." }] }],
+    ["an engine CUSTOM event", { type: "CUSTOM", name: "structured-output.complete", value: { object: {}, raw: "{}" } }],
+  ])("%s that a test middleware adds before the wire middleware is dropped, and the answer still arrives", async (_name, added) => {
+    const fake = fakeText();
+    fake.setResponses([{ text: "Test Person built the first thing [highlight:acme.1]." }]);
+
+    const events = await readEvents(
+      await handleChat(chatRequest([question("What did Test Person build?")]), seamDeps(fake, { testMiddleware: [addingAfterText(added)] })),
+    );
+
+    expect(events.filter((e) => e.type === added.type && e.name === added.name)).toEqual([]);
+    expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1].");
+    expect(events.at(-1)?.type).toBe("RUN_FINISHED");
+  });
+
+  test("a CUSTOM event named chat.<name> that a test middleware adds passes, as the chat's own events do", async () => {
+    const fake = fakeText();
+    fake.setResponses([{ text: "Test Person built the first thing [highlight:acme.1]." }]);
+    const added = { type: "CUSTOM", name: "chat.example", value: { note: "the chat's own" } };
+
+    const events = await readEvents(
+      await handleChat(chatRequest([question("What did Test Person build?")]), seamDeps(fake, { testMiddleware: [addingAfterText(added)] })),
+    );
+
+    expect(events.filter((e) => e.type === "CUSTOM" && e.name === "chat.example").map((e) => e.value)).toEqual([{ note: "the chat's own" }]);
   });
 });
 

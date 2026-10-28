@@ -1,7 +1,8 @@
 // The marker middleware (SPEC-chat, Markers): it checks each [id] citation in the answer text as the
 // text streams, through the scanner in marker-scanner.ts, and writes the kept citations and the count
-// removed into the turn. It ends the run with a chat.citations event. It checks text events only, so
-// the thinking summary never passes it.
+// removed into the turn. A passage counts once the turn's read tool has read it (tools.ts writes the
+// turn's reads). It ends the run with a chat.citations event. It checks text events only, so the
+// thinking summary never passes it.
 
 import { EventType, type ChatMiddleware, type StreamChunk } from "@tanstack/ai";
 import { parseId } from "../../knowledge/ids";
@@ -18,6 +19,8 @@ type CitableIds = {
   citable: ReadonlySet<string>;
   /** The sources in the catalog: a source or passage form names one of these, or it is no citation. */
   catalog: ReadonlySet<string>;
+  /** Every passage of the approved sources: a passage is citable once the turn has read it. */
+  passages: ReadonlySet<string>;
 };
 
 /** Built once for each Knowledge value, not once per request. */
@@ -29,6 +32,7 @@ function citableIds(knowledge: Knowledge): CitableIds {
     ids = {
       citable: new Set(knowledge.core.filter((entry) => entry.kind !== "catalog").map((entry) => entry.id)),
       catalog: new Set(knowledge.sources.map((source) => source.id)),
+      passages: new Set(knowledge.sources.flatMap((source) => source.passages.map((passage) => passage.id))),
     };
     citableIdsOf.set(knowledge, ids);
   }
@@ -37,14 +41,26 @@ function citableIds(knowledge: Knowledge): CitableIds {
 
 /** The marker middleware for one turn. It keeps the text held from an open "[" per text message. */
 export function citationMarkers(knowledge: Knowledge, turn: Turn): ChatMiddleware {
-  const { citable, catalog } = citableIds(knowledge);
+  const { citable, catalog, passages } = citableIds(knowledge);
   const held = new Map<string, string>();
 
-  /** A bracketed text is a citation only in an id form, and a source or passage form only for a source in the catalog. */
+  /**
+   * Whether the turn has read this passage: its id, or its whole source, is in the turn's reads. A
+   * whole-source read reads every passage the source has, and no other.
+   */
+  const readThisTurn = (id: string, source: string) =>
+    passages.has(id) && (turn.readIds.includes(id) || turn.readIds.includes(source));
+
+  /**
+   * A bracketed text is a citation only in an id form, and a source or passage form only for a source
+   * in the catalog. It is kept for a resume entry or a logistics answer, or for a passage the turn has
+   * read; a whole-source citation is always removed, because a citation names a passage.
+   */
   function verdictOf(id: string): Verdict {
     const form = parseId(id);
     if (!form) return "not-a-citation";
     if ((form.form === "source" || form.form === "passage") && !catalog.has(form.source)) return "not-a-citation";
+    if (form.form === "passage") return readThisTurn(id, form.source) ? "kept" : "removed";
     return citable.has(id) ? "kept" : "removed";
   }
 

@@ -1,11 +1,20 @@
-// What reaches the browser (SPEC-chat, The request, "Stream errors"): one table of fixed messages, one
-// per code, and wireError(code), which builds every RUN_ERROR event the handler sends. The event holds
-// its code and fixed message only. The wire middleware, a new instance per request, replaces every
-// RUN_ERROR of the run with wireError(code). C5 adds its event allowlist and the read results as ids,
-// and C12 the thinking summary as chat.thinking events.
+// What reaches the browser (SPEC-chat, The request, "Events on the wire" and "Stream errors"; Read
+// results on the wire): one table of fixed messages, one per code, and wireError(code), which builds
+// every RUN_ERROR event the handler sends. The event holds its code and fixed message only. The wire
+// middleware, a new instance per request, sends each read result as its ids only and replaces every
+// RUN_ERROR of the run with wireError(code). C12 adds the thinking summary as chat.thinking events.
 
-import { EventType, type ChatMiddleware, type RunErrorEvent, type StreamChunk } from "@tanstack/ai";
+import {
+  EventType,
+  type ChatMiddleware,
+  type RunErrorEvent,
+  type StreamChunk,
+  type ToolCallResultEvent,
+} from "@tanstack/ai";
+import { z } from "zod";
+import type { ReadResult } from "../../knowledge/types";
 import { logServerError } from "./server-log";
+import { READ_SOURCES } from "./tools";
 
 /**
  * The handler's own codes, each with its fixed message. The browser shows its own text for each code
@@ -63,16 +72,101 @@ function wireCodeOf(event: Extract<StreamChunk, { type: "RUN_ERROR" }>): RunErro
 }
 
 /**
- * The wire middleware for one turn. Every RUN_ERROR of the run leaves as wireError(code), so no
- * rawEvent, metadata, usage, nested error or other provider detail reaches the browser, and the turn
- * keeps the code it sent for finishTurn().
+ * The event types the browser needs (The request, "Events on the wire"): the 11 that research 07,
+ * finding 9, checked against the installed source. The wire drops every other type, so an event type
+ * that a later version of TanStack AI adds never reaches the browser: every REASONING_* event, every
+ * snapshot, every *_CHUNK form and every STEP_* event among them.
+ */
+const WIRE_TYPES: ReadonlySet<string> = new Set<StreamChunk["type"]>([
+  EventType.RUN_STARTED,
+  EventType.RUN_FINISHED,
+  EventType.RUN_ERROR,
+  EventType.TEXT_MESSAGE_START,
+  EventType.TEXT_MESSAGE_CONTENT,
+  EventType.TEXT_MESSAGE_END,
+  EventType.TOOL_CALL_START,
+  EventType.TOOL_CALL_ARGS,
+  EventType.TOOL_CALL_END,
+  EventType.TOOL_CALL_RESULT,
+  EventType.CUSTOM,
+]);
+
+/**
+ * The chat's own CUSTOM events are each named `chat.<name>`: chat.citations, chat.thinking and the
+ * marker middleware's refusal and follow-up events. Every other name, the engine's own among them
+ * (structured-output.*, sandbox.file*, ui-resource), is dropped.
+ */
+const CHAT_EVENT_PREFIX = "chat.";
+
+/** Whether an event may reach the browser: its type is on the allowlist, and a CUSTOM event is the chat's own. */
+const onTheWire = (chunk: StreamChunk) =>
+  WIRE_TYPES.has(chunk.type) && (chunk.type !== EventType.CUSTOM || chunk.name.startsWith(CHAT_EVENT_PREFIX));
+
+/** What the browser gets of a read: its ids, never its text (Read results on the wire). */
+export type ReadIds = Omit<ReadResult, "text">;
+
+/** A list of ids, or none when the value is not a list of strings. */
+const Ids = z.array(z.string()).catch([]);
+/** The three lists of ids, and no other field: an object schema drops every key it does not name, `text` among them. */
+const ReadIds = z.object({ read: Ids, unknown: Ids, skipped: Ids }).catch({ read: [], unknown: [], skipped: [] });
+
+/** The ids of a read result's content. A content that is no read result, such as a tool error, has none. */
+function readIdsOf(content: ToolCallResultEvent["content"]): ReadIds {
+  let result: unknown;
+  try {
+    result = typeof content === "string" ? JSON.parse(content) : undefined;
+  } catch {
+    result = undefined;
+  }
+  return ReadIds.parse(result);
+}
+
+/**
+ * A new TOOL_CALL_RESULT event for a read, from its named fields only: the content is the read's ids,
+ * and a tool error keeps its state, so the browser knows the read failed. The server's own tool
+ * message keeps the whole result for the model: the engine stores it before the event reaches onChunk.
+ */
+function idsOnly(event: ToolCallResultEvent): ToolCallResultEvent {
+  const failed = event.metadata?.tanstack?.state === "output-error";
+  return {
+    type: EventType.TOOL_CALL_RESULT,
+    timestamp: event.timestamp ?? Date.now(),
+    messageId: event.messageId,
+    toolCallId: event.toolCallId,
+    role: "tool",
+    content: JSON.stringify(readIdsOf(event.content) satisfies ReadIds),
+    ...(failed ? { metadata: { tanstack: { state: "output-error" } } } : {}),
+  };
+}
+
+/**
+ * The wire middleware for one turn. Only the allowlisted events pass. Each read_sources result
+ * leaves as its ids only, so no read text and no Not public section reaches the browser. Every
+ * RUN_ERROR of the run leaves as wireError(code), so no rawEvent, metadata, usage, nested error or
+ * other provider detail reaches the browser, and the turn keeps the code it sent for finishTurn().
  */
 export function wireEvents(turn: { errorCode: RunErrorCode | null }): ChatMiddleware {
-  function rewrite(chunk: StreamChunk): StreamChunk | undefined {
-    if (chunk.type !== EventType.RUN_ERROR) return undefined;
-    const code = wireCodeOf(chunk);
-    turn.errorCode = code;
-    return wireError(code);
+  /** The tool of each call this run started, by the call's id. */
+  const toolOf = new Map<string, string>();
+
+  function rewrite(chunk: StreamChunk): StreamChunk | null | undefined {
+    if (!onTheWire(chunk)) return null;
+    switch (chunk.type) {
+      case EventType.TOOL_CALL_START:
+        toolOf.set(chunk.toolCallId, chunk.toolCallName);
+        return undefined;
+      case EventType.TOOL_CALL_RESULT: {
+        // A result of a call this run did not start is taken as a read, so a read never passes whole.
+        const tool = toolOf.get(chunk.toolCallId);
+        return tool === undefined || tool === READ_SOURCES ? idsOnly(chunk) : undefined;
+      }
+      case EventType.RUN_ERROR: {
+        const code = wireCodeOf(chunk);
+        turn.errorCode = code;
+        return wireError(code);
+      }
+    }
+    return undefined;
   }
 
   return {
