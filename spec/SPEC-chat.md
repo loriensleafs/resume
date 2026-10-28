@@ -491,8 +491,10 @@ bun run evals                      # the trick questions against the real model;
 ## Project Structure
 
 ```text
-src/chat/server/handle-chat.ts     handleChat(request, deps): the module's server entry point, the request checks in order, the About read,
+src/chat/server/handle-chat.ts     handleChat(request, deps): the module's server entry point, the request checks in order,
                                    and the stream wrapper that turns a throw into SERVER_ERROR
+src/chat/server/about-read.ts      readAbout(): the About read of a passage or a source, its read_sources call and whole result
+                                   for the model, and the middleware that sends the call and its id-only result first
 src/chat/server/props.ts           ChatProps and the messages schema
 src/chat/server/prompt.ts          the system prompt, with the core from SPEC-knowledge's renderCore(knowledge), and the scope, audience and about lines
 src/chat/server/tools.ts           read_sources (its input checks readLimits), open_resume, open_source

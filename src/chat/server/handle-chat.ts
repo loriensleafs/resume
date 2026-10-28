@@ -12,10 +12,11 @@ import {
   type StreamChunk,
 } from "@tanstack/ai";
 import type { Knowledge } from "../../knowledge/types";
+import { readAbout } from "./about-read";
 import { finishTurn, finishTurnHooks } from "./finish-turn";
 import { readBudget, turnLimits } from "./limits";
 import { citationMarkers } from "./markers";
-import { systemPrompt } from "./prompt";
+import { systemPrompts } from "./prompt";
 import { ChatMessages, ChatProps } from "./props";
 import type { Budget, QuestionLog, Telemetry } from "./question-log";
 import { libraryLogging, logServerError } from "./server-log";
@@ -196,7 +197,7 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
   const startedAt = deps.now();
   const checked = await checkRequest(request, deps.origins);
   if (typeof checked === "string") return chatError(checked);
-  const { threadId, messages, question } = checked;
+  const { threadId, messages, question, props } = checked;
 
   // At the day's cap or the month's limit, the answer is the limit stream, and the model is not called.
   // The browser reads no body of a response that is not 200, so the refusal is a 200 stream (The request, "Limits").
@@ -207,6 +208,9 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
     return toServerSentEventsResponse(only(wireError(reserved.errorCode)));
   }
 
+  // "Ask about this" on a passage or a source: read 1, before readBudget(turn) copies the turn's reads.
+  const about = readAbout(deps.knowledge, turn, props.about);
+
   // The response's own controller, which only the visitor's closed connection aborts. A Stop aborts the
   // run but not the response, so the response reads the run to its end, and the run's terminal hook ends
   // the turn, also after a Stop that came before the run started.
@@ -215,8 +219,8 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
   const stream = chat({
     adapter: deps.adapter,
     threadId,
-    systemPrompts: [systemPrompt(deps.knowledge)],
-    messages,
+    systemPrompts: systemPrompts(deps.knowledge, props),
+    messages: [...messages, ...about.messages],
     // The handler's own tools only: the request's tools never reach chat() (The request).
     tools: chatTools(deps.knowledge, turn),
     // At most six model calls; readBudget() makes the sixth answer (Limits, "Model calls").
@@ -231,11 +235,13 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
     abortController: run,
     // The library's own log lines hold the error alone, as the chat's do.
     debug: libraryLogging,
-    // The wire middleware sees every event the others leave. The read budget's guard runs last of
-    // the guards, so it counts only reads that run, and its onConfig last, so no other middleware
-    // gives the last call its tools back. The terminal hooks come last: the run awaits their
-    // deferred writes before the stream ends (One turn, step 9).
+    // The About read's events go first, so every other middleware sees them. The wire middleware sees
+    // every event the others leave. The read budget's guard runs last of the guards, so it counts only
+    // reads that run, and its onConfig last, so no other middleware gives the last call its tools
+    // back. The terminal hooks come last: the run awaits their deferred writes before the stream ends
+    // (One turn, step 9).
     middleware: [
+      about.middleware,
       citationMarkers(deps.knowledge, turn),
       turnUsage(turn),
       ...(deps.testMiddleware ?? []),
