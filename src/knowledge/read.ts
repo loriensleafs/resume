@@ -25,14 +25,17 @@ export const readLimits = {
  * Throws on a call past `readLimits.ids` or `readLimits.idCharacters`. An id's characters are its
  * code points, as zod's string max() counts them, so an id the read tool's schema lets through never
  * throws here: 64 emoji are a string of length 128. Code points are never more than the length, so
- * only an id over the limit in length is counted.
+ * only an id over the limit in length is counted, and only to one past the limit: a long id costs
+ * no more than 65 steps, and its error says "65 or more".
  */
 function checkLimits(ids: string[]): void {
   if (ids.length > readLimits.ids) throw new RangeError(`readPassages() takes at most ${readLimits.ids} ids; it got ${ids.length}`);
   for (const [i, id] of ids.entries()) {
-    const characters = id.length > readLimits.idCharacters ? [...id].length : id.length;
+    if (id.length <= readLimits.idCharacters) continue;
+    let characters = 0;
+    for (const _ of id) if (++characters > readLimits.idCharacters) break;
     if (characters > readLimits.idCharacters) {
-      throw new RangeError(`readPassages() takes ids of at most ${readLimits.idCharacters} characters; the id at position ${i + 1} has ${characters}`);
+      throw new RangeError(`readPassages() takes ids of at most ${readLimits.idCharacters} characters; the id at position ${i + 1} has ${characters} or more`);
     }
   }
 }
@@ -95,6 +98,7 @@ export function readPassages(knowledge: Knowledge, ids: string[]): ReadResult {
     const before = inText.get(found.source);
     const after = new Set([...(before ?? []), ...found.passageIds]);
     // Its source is in the text with all the passages it names: it adds nothing, also after the stop.
+    // `after` holds every passage id in `before`, so the same size means the id adds no passage.
     if (before?.size === after.size) {
       read.add(id);
       continue;

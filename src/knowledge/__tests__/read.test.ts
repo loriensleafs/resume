@@ -210,6 +210,12 @@ describe("readLimits on the ids of one read", () => {
     expect(readPassages(knowledge, ["😀".repeat(64)]).unknown).toEqual(["😀".repeat(64)]);
     expect(() => readPassages(knowledge, ["😀".repeat(65)])).toThrow("the id at position 1 has 65");
   });
+
+  test("counts an id's characters only to one past the limit: an id of 1,000 has 65 or more", () => {
+    expect(() => readPassages(knowledge, ["a".repeat(1_000)])).toThrow(
+      "readPassages() takes ids of at most 64 characters; the id at position 1 has 65 or more",
+    );
+  });
 });
 
 /** An approved interview whose answers hold `answers` characters each, under "Question <n>?". */
