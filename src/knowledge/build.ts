@@ -221,8 +221,8 @@ export async function buildKnowledge(options: { root?: string } = {}): Promise<K
 /**
  * The knowledge base as a browser may hold it: the core, and each approved source without its Not
  * public text (SPEC-knowledge, "Who gets which shape"). The type alone does not keep that text out:
- * a Source is also an `Omit<Source, "notPublic">`. So each source is built anew from the fields a
- * browser may see. The callback's return type makes the type check reject any other field, and a
+ * a Source can be assigned to `Omit<Source, "notPublic">`, so a plain cast would leave the Not public
+ * text in place. So each source is built anew from the fields a browser may see. The callback's return type makes the type check reject any other field, and a
  * field added to Source stops the type check here until someone decides whether a browser may see it.
  */
 export function publicKnowledge(knowledge: Knowledge): PublicKnowledge {
