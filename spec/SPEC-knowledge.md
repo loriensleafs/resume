@@ -49,7 +49,7 @@ A citation is a passage id, a resume entry id or a logistics answer id. Resume e
 
 ## Sources
 
-One Markdown file per source in `knowledge/sources/<id>.md`. The nine deep dives move there from `knowledge/deep-dives/`. The move changes approved files, so it follows the edit rule below.
+One Markdown file per source in `knowledge/sources/<id>.md`. The nine deep dives moved there from `knowledge/deep-dives/` in K11 to K13 (rows 181 to 183), and that folder no longer exists. The move changes approved files, so it follows the edit rule below.
 
 ```markdown
 ---

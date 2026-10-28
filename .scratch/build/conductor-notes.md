@@ -147,3 +147,7 @@ Notes the reviews of finished tasks left for tasks not yet built. Each builder b
 - **C13 (from C6):** `readBudget`'s `onConfig` must run after any middleware that changes `toolChoice` or the tools; array position is the only guard. Put the deadline middleware before `readBudget`.
 - **C26 (from C6):** a read skipped by the budget reaches the wire as `{ read: [], unknown: [], skipped: [] }`, so the answer steps cannot tell it from an empty read; name the skip in the wire result.
 - **Glossary gaps (C6):** "model call", "read budget" and "last call".
+- **S31 (from S9):** `scripts/preview-site.ts` and `findFunctionFolders()` in `src/deploy/routes.ts` define a function folder by two rules (`.vc-config.json` required or not); export one scan. Move the preview's routing (`compileRoutes`, `runPhase`, `serve`) into a module such as `previewApp(outputDir)` with no top-level side effects, so the route headers, the host redirect, the `+` to `%20` query rewrite and `has` get direct tests; the smoke check (seam 3) depends on them too. A function path answers 501 until S31.
+- **C17 (from S9):** the browser test listens for policy violations on `document` only; if the chat adds a worker, listen there too.
+- **Every builder (from S9):** the site build test and the browser test share one build folder with a fixed name per checkout, so two test runs at once in one checkout delete each other's folder (500 pages, ENOENT on `404.html`). Run them one at a time.
+- **Glossary gaps (S9):** "preview" (the `bun run preview` server) has no entry.
