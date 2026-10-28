@@ -1,19 +1,18 @@
 // Seam 1 of SPEC-site: the build script, `bun run build:site`, writes the real build output once, with every step that
 // Vercel's build runs, and these tests read its files. The fixture root (fixture-root.ts) holds the project's files.
+// Seam 2 (browser.test.ts) serves the same build output (build-output.ts).
 
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { $, Glob } from "bun";
+import { beforeAll, describe, expect, test } from "bun:test";
+import { Glob } from "bun";
 import { Face, Blob as HarfBuzzBlob } from "harfbuzzjs";
 import { formatRange, formatTitle, loadResume, type Resume } from "../../content";
 import { buildKnowledge } from "../../knowledge/build";
 import { holds } from "../../private-details";
-import { FAKE_PHONE, FIXTURE_HEADLINE, FIXTURE_LEAD, FIXTURE_NAME, writeFixtureRoot } from "./fixture-root";
+import { buildOutput, seam1 } from "./build-output";
+import { FAKE_PHONE, FIXTURE_HEADLINE, FIXTURE_LEAD, FIXTURE_NAME } from "./fixture-root";
 
 const REPO = `${import.meta.dir}/../../..`;
-const tmp = `${Bun.env.TMPDIR ?? "/tmp"}/site-test-${crypto.randomUUID()}`;
-const root = `${tmp}/root`;
-const outDir = `${tmp}/out`;
-const staticDir = `${outDir}/.vercel/output/static`;
+const { root, outDir, staticDir } = seam1;
 
 /** The fixture root's resume, as the content module's loader reads it: what the pages must show. */
 let resume: Resume;
@@ -141,21 +140,10 @@ async function scriptsLoadedBy(page: string): Promise<string[]> {
 }
 
 beforeAll(async () => {
-  await writeFixtureRoot(root);
+  // One build per test run, with all its steps, in its own process (SPEC-deploy, "The build script").
+  await buildOutput();
   resume = await loadResume("public", root);
-  // One build, with all its steps, in its own process (SPEC-deploy, "The build script"). `bun run` starts the script
-  // in the repository, so both folders are absolute. The script inherits `bun test`'s NODE_ENV, "test", and makes the
-  // production build all the same. One build per checkout runs at a time: Nitro keeps the last build's output folder
-  // at a fixed path (src/site/build.ts).
-  const build = await $`${process.execPath} run build:site --root ${root} --out ${outDir}`.cwd(REPO).quiet().nothrow();
-  if (build.exitCode !== 0) {
-    throw new Error(`bun run build:site failed with exit code ${build.exitCode}:\n${build.stderr}\n${build.stdout}`);
-  }
 }, 120_000);
-
-afterAll(async () => {
-  await $`rm -rf ${tmp}`.quiet().nothrow();
-});
 
 describe("the HTML files", () => {
   // The not-found page is not a prerendered page: buildSite() writes it outside the route tree (SPEC-site, Project
