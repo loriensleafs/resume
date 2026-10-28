@@ -209,6 +209,12 @@ describe.each(["index.html", "resume/index.html"])("the app bar in %s", (page) =
     expect(nameBox).toBeGreaterThanOrEqual(0);
     expect(texts.indexOf(FIXTURE_HEADLINE)).toBeGreaterThan(nameBox);
   });
+
+  // The page's route gives the end slot its content (the capability map's contract "the app bar's end slot"). Neither
+  // route gives it any yet; the workspace route puts New chat there on phones, which seam 2 checks.
+  test("holds no end-slot element while the page's route gives the slot no content", async () => {
+    expect(await elementsOn(page, 'acme-app-bar [slot="end"]')).toEqual([]);
+  });
 });
 
 // The page's one h1 names what the page is about. On /resume that is Peter, as the documents open with his name; the

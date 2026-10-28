@@ -14,7 +14,7 @@ function ResumePage() {
   const resume = Route.useLoaderData();
   return (
     <>
-      <AppBar name={resume.basics.name} headline={resume.basics.label} />
+      <AppBar basics={resume.basics} />
       <main>
         {/* The page's heading is Peter's name, as the documents open with it. The app bar already shows the name, and
             no board draws this page, so the heading is for screen readers and search engines only. */}

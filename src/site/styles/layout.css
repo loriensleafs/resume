@@ -1,7 +1,9 @@
 /* The site's own rules, on the design system's tokens (SPEC-site, Code Style: layout uses the tokens and parts). */
 
 /* The app bar's name box, as the first-view board draws it. The design system has no part for a name box, so the link
-   itself is the box. The board's own sizes: no token holds a 28 px box, a 15 px label or an 8 px corner. */
+   itself is the box. The board's own sizes: no token holds a 28 px box, a 15 px label or an 8 px corner.
+   The board's colors stay by Peter's choice (decision record row 171): white on --ds-blue-700 is 4.44:1 in Chrome,
+   below AA's 4.5:1 for this text. It is the site's one known contrast exception (SPEC-site, Testing 2). */
 .app-bar-name {
   display: inline-flex;
   align-items: center;

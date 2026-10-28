@@ -14,7 +14,7 @@ function Workspace() {
   const resume = Route.useLoaderData();
   return (
     <>
-      <AppBar name={resume.basics.name} headline={resume.basics.label} />
+      <AppBar basics={resume.basics} />
       <main>
         <ResumeView resume={resume} />
       </main>
