@@ -8,6 +8,8 @@ Amended on 2026-10-27 for Peter's standing approval (decision record row 151): w
 
 Amended on 2026-10-27 with the deploy spike's verdicts (task D6; [research 12](../docs/research/12-deploy-platform.md#deploy-spike-verdicts-2026-10-27)), approved by Peter in decision record rows 167 to 170: the ten routine corrections (row 167), a Stop on Vercel (row 168), no persistent WAF block (row 169), and one plain request without the toolbar header (row 170).
 
+Amended on 2026-10-27 after task A10 (rows 158 and 172): `bun.lock` is version 2 again, so task D8 needs no spike push (Configuration in code; Open Questions). Task D8 also found that `bunfig.toml` turns Bun's automatic `.env` loading off (Secrets and settings).
+
 ## Objective
 
 Put the site and the chat on the internet at `https://peterkloss.dev`, and keep them safe, cheap and observable without Peter watching them. The site serves recruiters, hiring managers and engineers during Peter's job search, when traffic is higher than usual (row 114), so a quiet failure or a spent limit must reach Peter at once.
@@ -197,8 +199,8 @@ nitro({
 - Nitro's `/__server` function stays only as the destination of `/api/status` and `/api/cron/health`. No route sends a page or `/_serverFn/` to it, and step 3 answers its own path with the not-found page.
 - The routes also hold the cron: `crons: [{ path: "/api/cron/health", schedule: "17 15 * * *" }]`.
 - The chat's maximum duration is 150 s (row 132): above SPEC-chat's 120 s turn deadline (`deadlineMs: 120_000`), below Vercel's 300 s default, so a stuck function stops early.
-- Every tool in the build runs under Bun 1.4 (`bun --bun` for a tool with a Node shebang). Spike check 1: Vercel builds with Bun 1.4.4 when `bunVersion` is `"1.4.x"` or when `bun.lock` has `lockfileVersion: 2`, and with Bun 1.3.14 when neither holds. This setup has `bunVersion` `"1.4.x"`, so the install command installs no Bun of its own.
-- `bun.lock` has `lockfileVersion: 3` since the scoped `zod` override in `package.json`. No deployment has built from a version-3 lockfile yet, so task D8 checks it before the first release. If a build runs another Bun, the install command installs 1.4.2 with Bun's official installer, and the build command calls it by its absolute path, `$HOME/.bun/bin/bun`.
+- Every tool in the build runs under Bun 1.4 (`bun --bun` for a tool with a Node shebang). Spike check 1: Vercel builds with Bun 1.4.4 when `bunVersion` is `"1.4.x"` or when `bun.lock` has `lockfileVersion: 2`, and with Bun 1.3.14 when neither holds. This setup has both, `bunVersion` `"1.4.x"` and a version-2 `bun.lock`, so the install command installs no Bun of its own.
+- `bun.lock` has `lockfileVersion: 2` again since task A10 removed the scoped `zod` override from `package.json` (rows 158 and 172); the override had made it version 3. Spike check 1 built this setup with `bun ci`, so task D8 needs no spike push, and setup step 4's first build confirms it on the real project. If a build runs another Bun, the install command installs 1.4.2 with Bun's official installer, and the build command calls it by its absolute path, `$HOME/.bun/bin/bun`.
 - Pages get their data at build time, not from a server function at request time. A local check showed why: during client-side navigation, a route's loader runs in the browser and calls its server function as `GET /_serverFn/<id>`. With no server, that request gets a 404 and the page comes up empty, online and offline. This is an amendment to SPEC-site (below).
 
 ## Headers
@@ -546,7 +548,7 @@ There is no `private.yaml` in CI, so only public documents are built, and the pr
 | `KV_REST_API_URL`, `KV_REST_API_READ_ONLY_TOKEN`, `ANTHROPIC_API_KEY` (evals) | Peter's untracked `.secrets/local.env` | The Upstash console; the `resume-evals` key |
 
 - Bun loads `.env`, `.env.local` and `.env.<NODE_ENV>` (`.env.test` under `bun test`) into a run on its own. So the local file is `.secrets/local.env`, which Bun loads only when told: `bun run questions` and `bun run evals` pass `--env-file=.secrets/local.env`, and nothing else does.
-- No file named `.env` or `.env.*` is ever created. `.gitignore` gains `.secrets/`, `.env*` and `.vercel/`. A test fails when any `.env*` file exists in the checkout. The plan checks whether `bunfig.toml` can also turn the automatic loading off.
+- No file named `.env` or `.env.*` is ever created. `.gitignore` gains `.secrets/`, `.env*` and `.vercel/`. A test fails when any `.env*` file exists in the checkout. `bunfig.toml` also turns the automatic loading off with `env = false`, and a file that `--env-file` names still loads (task D8, [research 12](../docs/research/12-deploy-platform.md#build-settings-in-code-task-d8-2026-10-27)). It acts only on a run that starts in the repo root, so the test stays the guard.
 - GitHub holds no store token.
 - Agents never read, print or store a value from this table.
 
@@ -685,6 +687,7 @@ bun test                                 # every test
 
 ```text
 vercel.json                        bunVersion, install, build and ignore commands
+bunfig.toml                        env = false: Bun loads no .env file on its own
 documents/                         Peter-Kloss-Resume.pdf, .docx, .txt and inputs.sha256: the committed public documents (SPEC-content's)
 scripts/docs-only.txt              the paths that never change the live site
 scripts/site-changed.sh            exit 1 when a site file differs between two commits
@@ -914,6 +917,6 @@ The real platform is checked by the deploy spike, by the release check, by the t
 
 ## Open Questions
 
-- Whether Vercel builds a version-3 `bun.lock` with Bun 1.4 (Configuration in code). Task D8 checks it before the first release.
+- None. The version-3 `bun.lock` question closed when task A10 made the lockfile version 2 again, which spike check 1 covers (Configuration in code). Setup step 4's first build confirms it on the real project.
 
 The deploy spike answered checks 1 to 11 (research 12); check 12 runs at setup step 10. The "limit reached" texts, the 429 text and the not-found page's text are approved (row 138).

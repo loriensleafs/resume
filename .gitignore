@@ -6,6 +6,10 @@ dist/
 .tanstack/
 # Private details (phone number). Never commit this file.
 private.yaml
+# Peter's local keys (SPEC-deploy, "Secrets and settings"). Bun loads them only when a command names the file.
+.secrets/
+# Bun loads every .env file into a run on its own, so none is ever created; a test fails when one exists.
+.env*
 # Downloaded by `bun run fonts`.
 GoogleSansFlex-VF.ttf
 .DS_Store

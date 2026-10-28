@@ -113,8 +113,8 @@ Acceptance:
 - `vercel.json` holds only the build settings: `bunVersion` `1.4.x`, `framework: null`, `installCommand` `bun ci` (or the 1.4.2 installer if check 1 failed), `buildCommand` `bun run build:site`, `ignoreCommand` `sh scripts/ignore-build.sh`.
 - `.gitignore` gains `.secrets/`, `.env*` and `.vercel/`; a test fails when any `.env*` file exists in the checkout.
 - Research 12 records whether `bunfig.toml` can turn Bun's automatic `.env` loading off ("Secrets and settings"); if it can, `bunfig.toml` does.
-- Vercel builds from `main`'s version-3 `bun.lock` with Bun 1.4, and its `bun ci` passes (SPEC-deploy, Open Questions; research 12, Open points). Research 12 records the verdict. If the build runs another Bun, the install command takes SPEC-deploy's fallback installer.
-Verify: `bun test src/deploy/__tests__/config.test.ts`; `bun test`; one push of `main`'s `package.json` and `bun.lock` to `prototype/deploy-spike`, whose check 1 line names the build's Bun (while Peter keeps the spike project; otherwise the first build of setup step 4)
+- Research 12 records the lockfile verdict, and no spike push is needed: A10 (`977e07d`) made `bun.lock` version 2 again, and D1's check 1 built that setup (`bunVersion` `"1.4.x"`, a version-2 lockfile, `bun ci`) with Bun 1.4.4 (the conductor's decision, 2026-10-27).
+Verify: `bun test src/deploy/__tests__/config.test.ts`; `bun test`. The spike push is not needed, because D1's check 1 already covers a version-2 lockfile and setup step 4's first build checks `main`'s own files.
 Files: `vercel.json`, `.gitignore`, `bunfig.toml` (only if supported), `src/deploy/__tests__/config.test.ts`, `docs/research/12-deploy-platform.md`
 Size: S
 Needs Peter: no
