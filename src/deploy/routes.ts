@@ -3,6 +3,7 @@
 // at request time, with no policy tag. So this step replaces Nitro's routes with the spec's list and keeps Nitro's
 // other fields. The route forms are the ones the deploy spike ran on Vercel (research 12, "Deploy spike verdicts"), and the
 // fields follow Vercel's Build Output API: https://vercel.com/docs/build-output-api/configuration
+import type { Stats } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { Glob } from "bun";
@@ -61,24 +62,40 @@ function hostRedirect(host: string, src: string): Route {
 /** A literal path inside a route's `src`, which is a regular expression (PCRE). */
 const literal = (path: string) => path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** What a symbolic link points to. A link to a missing path stops the build and names the link. */
+async function linkTarget(link: string): Promise<Stats> {
+  try {
+    return await stat(link);
+  } catch (e) {
+    if ((e as { code?: string }).code !== "ENOENT") throw e;
+    throw new Error(`writeVercelConfig: ${link} is a symbolic link to a missing path`, { cause: e });
+  }
+}
+
 /**
  * The URL path of each function folder in the output, sorted: `functions/api/chat.func` is `/api/chat`. Vercel serves
- * a function folder at that path (https://vercel.com/docs/build-output-api/primitives#functions). The scan follows
- * symbolic links, because Nitro can write a per-route folder as a link to `__server.func` (its observability routes,
- * from compatibility date 2025-07-15; nitro 3.0.260903-beta, dist/_presets.mjs). It stops at each `.func` folder: what
- * is inside belongs to that function.
+ * a function folder at that path (https://vercel.com/docs/build-output-api/primitives#functions). Only a folder whose
+ * name ends in `.func` is one; a plain file with such a name is not. The scan follows symbolic links, because Nitro can
+ * write a per-route folder as a link to `__server.func` (its observability routes, from compatibility date 2025-07-15;
+ * nitro 3.0.260903-beta, dist/_presets.mjs). It stops at each `.func` folder: what is inside belongs to that function.
  */
 async function findFunctionFolders(outputDir: string): Promise<string[]> {
   const folders: string[] = [];
   async function scan(dir: string, path: string): Promise<void> {
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       const entryPath = join(dir, entry.name);
+      // A link counts as what it points to, so a linked folder is a folder like any other.
+      const isFolder = entry.isSymbolicLink() ? (await linkTarget(entryPath)).isDirectory() : entry.isDirectory();
+      if (!isFolder) continue;
       if (entry.name.endsWith(".func")) folders.push(`${path}/${entry.name.slice(0, -".func".length)}`);
-      // stat() follows a link, so a linked folder is scanned like any other.
-      else if ((await stat(entryPath)).isDirectory()) await scan(entryPath, `${path}/${entry.name}`);
+      else await scan(entryPath, `${path}/${entry.name}`);
     }
   }
-  await scan(join(outputDir, "functions"), "");
+  const functionsDir = join(outputDir, "functions");
+  if (!(await stat(functionsDir).catch(() => undefined))?.isDirectory()) {
+    throw new Error(`writeVercelConfig: no functions folder in ${outputDir}, so no Vercel output`);
+  }
+  await scan(functionsDir, "");
   return folders.sort();
 }
 

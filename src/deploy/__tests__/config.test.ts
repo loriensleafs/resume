@@ -343,6 +343,21 @@ describe("writeVercelConfig()", () => {
     ]);
   });
 
+  // Vercel runs a folder named *.func (https://vercel.com/docs/build-output-api/primitives#functions), so a plain file
+  // with that name is no function and needs no route.
+  test("does not count a plain file named *.func as a function folder", async () => {
+    const output = await nitroOutput("plain-func-file");
+    await Bun.write(`${output}/functions/notes.func`, "not a function");
+
+    await writeVercelConfig(output);
+
+    const routes = await routesOf(output);
+    const beforeFilesystem = routes.slice(0, routes.findIndex((route) => route.handle === "filesystem"));
+    expect(beforeFilesystem.filter((route) => route.dest !== undefined)).toEqual([
+      { src: "^/__server(?:/.*)?$", dest: "/404.html", status: 404 },
+    ]);
+  });
+
   // Nitro writes an override with a contentType for a prerendered file whose type its name does not give
   // (getPrerenderOverrides, nitro 3.0.260903-beta); "feed" stands for one.
   test("gives each prerendered page an override for its clean address, beside Nitro's own overrides", async () => {
@@ -407,6 +422,23 @@ describe("writeVercelConfig()", () => {
     await Bun.write(`${dir}/static/index.html`, "<!-- index.html -->");
 
     await expect(writeVercelConfig(dir)).rejects.toThrow(`no config.json in ${dir}`);
+  });
+
+  // Nitro always writes __server.func, so an output with no functions folder is not Nitro's whole Vercel output.
+  test("refuses an output with no functions folder, and names the folder", async () => {
+    const output = await nitroOutput("no-functions", { functions: [] });
+
+    await expect(writeVercelConfig(output)).rejects.toThrow(`no functions folder in ${output}`);
+  });
+
+  // Nitro's per-route folder is a link to __server.func, so a renamed __server.func leaves the link pointing at
+  // nothing. The build stops there, and does not count the link as a function folder.
+  test("refuses a symbolic link to a missing path in the functions folder, and names the link", async () => {
+    const output = await nitroOutput("dangling-link", { functions: [], links: ["sources/[id]"] });
+
+    await expect(writeVercelConfig(output)).rejects.toThrow(
+      `${resolve(output, "functions/sources/[id].func")} is a symbolic link to a missing path`,
+    );
   });
 });
 

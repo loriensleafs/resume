@@ -50,5 +50,5 @@ console.log(`Policy tags: ${pages.join(", ")}`);
 // 5. Deploy: the routes replace Nitro's own, so only the three API paths run as functions; the redirects, the clean
 //    addresses, the not-found page and the cron.
 const unnamedFolders = await writeVercelConfig(outputDir);
-console.log(`Routes: written; function folders sent to 404.html: ${unnamedFolders.join(", ")}`);
+console.log(`Routes: written; function folders sent to 404.html: ${unnamedFolders.join(", ") || "none"}`);
 console.log(`Built ${outputDir}`);
