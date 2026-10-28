@@ -71,7 +71,9 @@ export const startInstallOffer = createIsomorphicFn().client(() => {
     update({
       install: () => {
         update({ install: null }); // the event's one prompt is used
-        return event.prompt();
+        // The browser rejects the call when it cannot show the dialog. The site shows nothing for that either way, so
+        // the rejection ends here, and no caller leaves it unhandled.
+        return event.prompt().catch(() => undefined);
       },
     });
   });

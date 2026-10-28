@@ -1,10 +1,27 @@
 // The design system's wrapper is named AppBar too; this file's component is the site's app bar around it.
 import { AppBar as AcmeAppBar } from "@acmelabs/design-system-react/components/app-bar";
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { type ReactNode, useSyncExternalStore } from "react";
 import type { SiteResume } from "../data";
 import { useInstallOffer } from "../install-offer";
 import { InstallAppButton } from "./InstallAppButton";
+
+/** SPEC-site's wide layout, from 1024 px, as layout.css writes it. */
+const WIDE_SCREEN = "(width >= 1024px)";
+
+/** The wide-screen query, made at the first use in the browser. */
+let wideScreen: MediaQueryList | undefined;
+const wideScreenQuery = () => (wideScreen ??= window.matchMedia(WIDE_SCREEN));
+
+function followWideScreen(change: () => void): () => void {
+  wideScreenQuery().addEventListener("change", change);
+  return () => wideScreenQuery().removeEventListener("change", change);
+}
+
+/** True on a wide screen. The prerender knows no width, so it and the first render in the browser get false. */
+function useWideScreen(): boolean {
+  return useSyncExternalStore(followWideScreen, () => wideScreenQuery().matches, () => false);
+}
 
 export type AppBarProps = {
   /** `name`, Peter's name, goes in the blue name box; `label`, the headline, follows it. */
@@ -23,9 +40,13 @@ export type AppBarProps = {
  */
 export function AppBar({ basics, end }: AppBarProps) {
   // "Install app" shows only while the browser offers the install and the site does not run as an app (Views: Install
-  // offer). The prerender knows neither, so no page holds the button before its scripts run.
+  // offer), and on wide screens only: on phones the install sheet offers the app. The prerender knows none of it, so no
+  // page holds the button before its scripts run. Below 1024 px the button is left out, not hidden: an end slot with
+  // nothing visible in it still takes the bar's gap from the headline, and the design system has no rule that shows a
+  // part on wide screens only (its docs server, 0.3.3).
   const { runsAsApp, install } = useInstallOffer();
-  const installApp = install && !runsAsApp ? <InstallAppButton install={install} /> : null;
+  const wide = useWideScreen();
+  const installApp = install && !runsAsApp && wide ? <InstallAppButton install={install} /> : null;
   // React renders nothing for null, undefined, true or false, so a route can pass `active && <NewChat />`. The end slot
   // then prints no element, as when the route passes no end.
   const hasEnd = end !== null && end !== undefined && typeof end !== "boolean";

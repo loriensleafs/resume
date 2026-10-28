@@ -64,11 +64,12 @@ beforeAll(async () => {
   browser = await chromium.launch(chrome());
 }, 120_000);
 
+// On a busy machine, closing Chrome and stopping the preview can take longer than Bun's 5-second limit for a hook.
 afterAll(async () => {
   await browser?.close();
   preview?.kill();
   await preview?.exited;
-});
+}, 30_000);
 
 /** The two screen sizes of SPEC-site's browser checks. */
 const WIDE = { width: 1440, height: 900 };
@@ -231,23 +232,71 @@ type InstallCounts = { installPromptCalls: number; persistCalls: number };
  * Stands in for the browser's offer to install the site (SPEC-site, Views: Install offer). Chrome fires
  * `beforeinstallprompt` only for a site that meets its install criteria, which a test cannot arrange, so the test
  * dispatches an event of its own. Its prompt() counts its calls in `installPromptCalls`, and the browser answers
- * "dismissed". The page then has two animation frames to show the change.
+ * "dismissed". With `promptRejects`, prompt() rejects instead, as the browser's does when it cannot show the dialog. The
+ * page then has two animation frames to show the change.
  */
-async function offerInstall(page: Page): Promise<void> {
-  await page.evaluate(async () => {
+async function offerInstall(page: Page, { promptRejects = false } = {}): Promise<void> {
+  await page.evaluate(async (rejects) => {
     const counts = window as unknown as InstallCounts;
     counts.installPromptCalls = 0;
     const choice = { outcome: "dismissed", platform: "" };
     const event = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
       prompt: async () => {
         counts.installPromptCalls += 1;
+        if (rejects) throw new DOMException("The browser shows no install dialog.", "NotAllowedError");
         return choice;
       },
       userChoice: Promise.resolve(choice),
     });
     window.dispatchEvent(event);
     await new Promise((shown) => requestAnimationFrame(() => requestAnimationFrame(shown)));
+  }, promptRejects);
+}
+
+/** A layout-shift entry (https://w3c.github.io/layout-instability/#sec-layout-shift). TypeScript's DOM library lacks it. */
+type LayoutShiftEntry = PerformanceEntry & { value: number; hadRecentInput: boolean };
+
+/** What the layout-shift count keeps in the page: the shift counted so far, and the observer that counts it. */
+type LayoutShiftCount = { layoutShift: number; layoutShiftObserver: PerformanceObserver };
+
+/**
+ * An init script that adds up each page's layout shift from its start: the value of every shift, apart from a shift
+ * right after the visitor's input, which layout shift does not score (https://web.dev/articles/cls). The sum of every
+ * shift is never less than the score, which takes the largest window of shifts.
+ */
+async function countLayoutShift(context: BrowserContext): Promise<void> {
+  await context.addInitScript(() => {
+    const counts = window as unknown as LayoutShiftCount;
+    counts.layoutShift = 0;
+    counts.layoutShiftObserver = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries() as LayoutShiftEntry[]) {
+        if (!entry.hadRecentInput) counts.layoutShift += entry.value;
+      }
+    });
+    counts.layoutShiftObserver.observe({ type: "layout-shift", buffered: true });
   });
+}
+
+/**
+ * The page's layout shift so far, two animation frames from now: what the observer counted, and the shifts still
+ * waiting for its callback.
+ */
+async function layoutShift(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    await new Promise((painted) => requestAnimationFrame(() => requestAnimationFrame(painted)));
+    const counts = window as unknown as LayoutShiftCount;
+    for (const entry of counts.layoutShiftObserver.takeRecords() as LayoutShiftEntry[]) {
+      if (!entry.hadRecentInput) counts.layoutShift += entry.value;
+    }
+    return counts.layoutShift;
+  });
+}
+
+/** The box of the app bar's main region, the design system's part "content", which holds the headline. */
+async function appBarContentBox(page: Page) {
+  return page.evaluate(() =>
+    document.querySelector("acme-app-bar")?.shadowRoot?.querySelector('[part="content"]')?.getBoundingClientRect().toJSON(),
+  );
 }
 
 /**
@@ -269,14 +318,16 @@ async function countPersistCalls(context: BrowserContext): Promise<void> {
 
 /**
  * An init script that makes each page run as the installed app: `(display-mode: standalone)` matches, as in the app's
- * own window. It answers that media query with "all", which matches every page, so the page still gets a real
- * MediaQueryList, with its change events.
+ * own window. It answers that media query with `standIn`, by default "all", which matches every page, so the page still
+ * gets a real MediaQueryList, with its change events. A stand-in such as `(prefers-color-scheme: dark)` lets the test
+ * move the page into the app's window later, with page.emulateMedia(). Chrome's protocol cannot do it: its
+ * Emulation.setEmulatedMedia accepted the feature display-mode and changed nothing (seen with Chrome on 2026-10-27).
  */
-async function runAsApp(context: BrowserContext): Promise<void> {
-  await context.addInitScript(() => {
+async function runAsApp(context: BrowserContext, standIn = "all"): Promise<void> {
+  await context.addInitScript((replacement) => {
     const matchMedia = window.matchMedia.bind(window);
-    window.matchMedia = (query) => matchMedia(query.replace(/\(\s*display-mode\s*:\s*standalone\s*\)/g, "all"));
-  });
+    window.matchMedia = (query) => matchMedia(query.replace(/\(\s*display-mode\s*:\s*standalone\s*\)/g, replacement));
+  }, standIn);
 }
 
 /** The "Install app" button, as the accessibility tree names it: the native button inside acme-button. */
@@ -316,6 +367,53 @@ describe('"Install app" in the app bar', () => {
     });
   });
 
+  // SPEC-site, Testing 2: Speed: layout shift stays under 0.1. The button comes after the page's scripts run, so it
+  // must not move what the visitor already sees.
+  test("keeps the page's layout shift under 0.1 when it shows at 1440 × 900", async () => {
+    await inWindow(WIDE, async (browserWindow) => {
+      await countLayoutShift(browserWindow.context);
+      const { page } = await visit(browserWindow, "/");
+      await offerInstall(page);
+      await installApp(page).waitFor({ state: "visible", timeout: CHANGE_WAIT });
+      expect(await layoutShift(page)).toBeLessThan(0.1);
+    });
+  });
+
+  // The browser's prompt() rejects when it cannot show the dialog. The site shows nothing for that, and no unhandled
+  // rejection reaches the page. The browser fires unhandledrejection in a task after the rejection.
+  test("leaves no unhandled rejection when the browser rejects the prompt", async () => {
+    await inWindow(WIDE, async (browserWindow) => {
+      const { page } = await visit(browserWindow, "/");
+      await offerInstall(page, { promptRejects: true });
+      await installApp(page).waitFor({ state: "visible", timeout: CHANGE_WAIT });
+      await page.evaluate(() => {
+        const counts = window as unknown as { unhandledRejections: number };
+        counts.unhandledRejections = 0;
+        window.addEventListener("unhandledrejection", () => (counts.unhandledRejections += 1));
+      });
+      await installApp(page).click();
+      await installApp(page).waitFor({ state: "detached", timeout: CHANGE_WAIT });
+      const result = await page.evaluate(async () => {
+        for (let task = 0; task < 3; task++) await new Promise((next) => setTimeout(next));
+        const counts = window as unknown as InstallCounts & { unhandledRejections: number };
+        return { promptCalls: counts.installPromptCalls, unhandledRejections: counts.unhandledRejections };
+      });
+      expect(result).toEqual({ promptCalls: 1, unhandledRejections: 0 });
+    });
+  });
+
+  // On a phone the button is not shown, so the offer leaves the app bar as it was: the end slot adds no empty region,
+  // which would take the bar's gap from the headline.
+  test("leaves the app bar as it was at 390 × 844 after beforeinstallprompt", async () => {
+    await inWindow(PHONE, async (browserWindow) => {
+      const { page } = await visit(browserWindow, "/");
+      const before = await appBarContentBox(page);
+      expect(before?.width).toBeGreaterThan(0);
+      await offerInstall(page);
+      expect(await appBarContentBox(page)).toEqual(before);
+    });
+  });
+
   // The offer is kept on a phone, and the width alone hides the button: at the wide size it shows.
   test("shows nothing at 390 × 844 after beforeinstallprompt, and shows once the window is wide", async () => {
     await inWindow(PHONE, async (browserWindow) => {
@@ -349,6 +447,23 @@ describe("persistent storage", () => {
       if (asApp) await runAsApp(browserWindow.context);
       const { page } = await visit(browserWindow, "/");
       expect(await page.evaluate(() => (window as unknown as InstallCounts).persistCalls)).toBe(calls);
+    });
+  });
+
+  // Chrome can move an open tab into the app's own window when the site is installed (src/site/install-offer.ts). The
+  // stand-in query `(prefers-color-scheme: dark)` starts false in the test's light window, and emulateMedia flips it.
+  test('a tab that moves into the app\'s window hides "Install app" and asks once', async () => {
+    await inWindow(WIDE, async (browserWindow) => {
+      await countPersistCalls(browserWindow.context);
+      await runAsApp(browserWindow.context, "(prefers-color-scheme: dark)");
+      const { page } = await visit(browserWindow, "/");
+      await offerInstall(page);
+      await installApp(page).waitFor({ state: "visible", timeout: CHANGE_WAIT });
+      const persistCalls = () => page.evaluate(() => (window as unknown as InstallCounts).persistCalls);
+      expect(await persistCalls()).toBe(0);
+      await page.emulateMedia({ colorScheme: "dark" });
+      await installApp(page).waitFor({ state: "detached", timeout: CHANGE_WAIT });
+      expect(await persistCalls()).toBe(1);
     });
   });
 });
