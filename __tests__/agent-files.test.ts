@@ -197,6 +197,36 @@ describe("the repo skills", () => {
   });
 });
 
+// The update-mockups skill reaches the canvas only by its address, with the two actions that Peter's hook lets
+// through for it, `read` and `publish` (decision record rows 175 and 178; task A12).
+const MOCKUPS_SKILL = ".agents/skills/update-mockups/SKILL.md";
+// A claude.ai artifact address, in either of its two forms.
+const ARTIFACT_ADDRESS = /claude\.ai\/(?:code\/)?artifact\/[\w-]+/g;
+// The sentences of one Markdown line: each ends at a full stop before a space.
+const sentencesOf = (line: string) => line.split(/(?<=\.)\s+/);
+// A sentence that reads a canvas file: the `read` action with the Artifact tool's `path` or `paths`.
+const readsCanvasFile = (sentence: string) => sentence.includes("`read`") && /`paths?`/.test(sentence);
+const LIST_RULE = "the skill names the list action only to forbid it";
+const READ_RULE = "a read of a canvas file names its project/ path";
+
+describe("the update-mockups skill", () => {
+  test("it names the canvas address once, and no other artifact", () => {
+    expect(TEXT_FILES.get(MOCKUPS_SKILL)!.match(ARTIFACT_ADDRESS)?.length).toBe(1);
+  });
+
+  test("it names the list action only to forbid it", async () => {
+    const asksForList = (line: string) => sentencesOf(line).some((s) => s.includes("`list`") && !/\bnever\b|\bblock/i.test(s));
+    expect(await findings([MOCKUPS_SKILL], LIST_RULE, (text) => linesWhere(text, asksForList))).toEqual([]);
+  });
+
+  test("it reads each canvas file by its project/ path", async () => {
+    const readLines = linesWhere(TEXT_FILES.get(MOCKUPS_SKILL)!, (line) => sentencesOf(line).some(readsCanvasFile));
+    expect(readLines).not.toEqual([]); // control: the skill reads canvas files
+    const missesProjectPath = (line: string) => sentencesOf(line).some((s) => readsCanvasFile(s) && !s.includes("`project/"));
+    expect(await findings([MOCKUPS_SKILL], READ_RULE, (text) => linesWhere(text, missesProjectPath))).toEqual([]);
+  });
+});
+
 // SPEC-agents, Settings: every agent's project settings start the docs server with this one command.
 const DOCS_SERVER = "acme-design-system";
 const DOCS_SERVER_COMMAND = { command: "bun", args: ["run", "--silent", "design-system-mcp"] };
