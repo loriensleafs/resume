@@ -270,6 +270,13 @@ async function toWoff(sfnt: Uint8Array<ArrayBuffer>): Promise<Uint8Array> {
 
 const sha256Of = (bytes: Uint8Array) => new Bun.CryptoHasher("sha256").update(bytes).digest("hex");
 
+/** The bytes of the file at the path when its SHA-256 is the one of the font's variable font, or else undefined. */
+async function verify(font: Font, path: string): Promise<Uint8Array | undefined> {
+  // A new BunFile: one made before a download reads the file as empty after it (Bun 1.4.4, seen 2026-10-27).
+  const bytes = await Bun.file(path).bytes();
+  return sha256Of(bytes) === font.source.sha256 ? bytes : undefined;
+}
+
 /**
  * Each font's variable font: a file given on the command line, which its SHA-256 matches to the font, or else the
  * repository's copy at the font's path, downloaded when it is missing and checked by SHA-256.
@@ -278,14 +285,13 @@ async function readSources(given: string[]): Promise<Map<Font, Uint8Array>> {
   const sources = new Map<Font, Uint8Array>();
   for (const path of given) {
     if (!(await Bun.file(path).exists())) throw new Error(`site-fonts: no file at ${path}`);
-    const bytes = await Bun.file(path).bytes();
-    const sha256 = sha256Of(bytes);
-    const font = FONTS.find(({ source }) => source.sha256 === sha256);
-    if (!font) {
+    const matches = await Promise.all(FONTS.map(async (font) => ({ font, bytes: await verify(font, path) })));
+    const match = matches.find(({ bytes }) => bytes);
+    if (!match?.bytes) {
       const expected = FONTS.map(({ source }) => `${source.path} (${source.url})`).join(", ");
       throw new Error(`site-fonts: ${path} is none of the variable fonts this script cuts: ${expected}`);
     }
-    sources.set(font, bytes);
+    sources.set(match.font, match.bytes);
   }
   for (const font of FONTS) {
     if (sources.has(font)) continue;
@@ -298,10 +304,9 @@ async function readSources(given: string[]): Promise<Map<Font, Uint8Array>> {
       }
       await Bun.write(path, response);
     }
-    // A new BunFile: one made before the download reads the file as empty after it (Bun 1.4.4, seen 2026-10-27).
-    const bytes = await Bun.file(path).bytes();
-    const sha256 = sha256Of(bytes);
-    if (sha256 !== font.source.sha256) {
+    const bytes = await verify(font, path);
+    if (!bytes) {
+      const sha256 = sha256Of(await Bun.file(path).bytes());
       throw new Error(
         `site-fonts: ${path} is not the ${font.family} variable font this script cuts (its SHA-256 is ${sha256}). ` +
           `Delete it so that the script downloads ${font.source.url}, or pass that file.`,
@@ -314,8 +319,8 @@ async function readSources(given: string[]): Promise<Map<Font, Uint8Array>> {
 
 const sources = await readSources(Bun.argv.slice(2));
 const hb = await loadHarfBuzz();
-for (const font of FONTS) {
-  const sfnt = cutLatin(hb, font, sources.get(font)!);
+for (const [font, source] of sources) {
+  const sfnt = cutLatin(hb, font, source);
   const woff = await toWoff(sfnt);
   await Bun.write(`${REPO}/${font.output}`, woff);
   console.log(`${font.output}: ${woff.byteLength} bytes (${sfnt.byteLength} bytes as TrueType)`);

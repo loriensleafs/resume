@@ -7,7 +7,7 @@
      synthesize bold.
    - font-display swap is the design system's own: its Typeface page loads both families with display=swap. Text shows
      at once in the fallback font, then in this one.
-   - No preload link, as the design system's own load has none. On a phone profile (slow 4G, 4x CPU, three cold
+   - Flex: no preload link, as the design system's own load has none. On a phone profile (slow 4G, 4x CPU, three cold
      loads of / and /resume, 2026-10-27), a preload of the Flex file shared the link with the stylesheet that blocks
      the first paint: the first and the largest paint came about 190 ms later (870 ms against 680 ms), for about
      430 ms less in the fallback font. Layout shift was 0 either way. A browser fetches the Code file only for a page
