@@ -39,6 +39,23 @@ const answeredTurn: ChatTurnEvent = {
   errorCode: null,
 };
 
+/** A turn whose model calls all finished, with every kind of token, for the worked example of the cost estimate. */
+const workedExampleTurn: ChatTurnEvent = {
+  event: "chat_turn",
+  outcome: "answered",
+  reads: 2,
+  citations: 3,
+  removed: 0,
+  modelCalls: 3,
+  inputTokens: 3_000,
+  cachedInputTokens: 40_005,
+  cacheWriteTokens: 12_000,
+  cacheWrite1hTokens: 2_000,
+  outputTokens: 1_500,
+  durationMs: 21_000,
+  errorCode: null,
+};
+
 questionLogContract("createOps() outside production", (now) => createOps({ VERCEL_ENV: "preview" }, { now }).log);
 
 describe("createOps() outside production", () => {
@@ -82,14 +99,16 @@ describe("createOps() outside production", () => {
 });
 
 describe("createOps() in production", () => {
-  test("with no store or alert variables, a whole turn still works", async () => {
-    const ops = createOps({ VERCEL_ENV: "production" }, { now: noon });
+  test("with no store or alert variables, a whole turn still works, and its chat_turn line is printed", async () => {
+    const printed: string[] = [];
+    const ops = createOps({ VERCEL_ENV: "production" }, { now: noon, print: (line) => printed.push(line) });
 
     const ticket = await ops.budget.reserve();
     if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
 
     await expect(ops.log.append(answeredEntry)).resolves.toBeUndefined();
     await expect(ops.telemetry.record(answeredTurn, ticket.reservation)).resolves.toBeUndefined();
+    expect(printed.map((line) => JSON.parse(line) as unknown)).toEqual([answeredTurn]);
   });
 });
 
@@ -285,6 +304,8 @@ describe("createOps() with the store and alert variables set", () => {
     await ops.log.append(answeredEntry);
     await ops.telemetry.record(answeredTurn, ticket.reservation);
     await ops.log.list(7);
+    // Only the store keeps daily totals.
+    expect(await ops.totals(7)).toEqual([]);
 
     expect(upstash.requests).toEqual([]);
   });
@@ -391,5 +412,254 @@ describe("the daily cap, in production on the in-test Upstash server", () => {
     expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "DAILY_LIMIT" });
     // An amount left counted errs toward pausing, as an unsettled reservation does.
     expect(upstash.get("qcost:2026-10-27")).toBe("8100000");
+  });
+});
+
+describe("the telemetry and the daily totals, in production on the in-test Upstash server", () => {
+  // The function instances and the store share one clock, which a test can move to another day.
+  let clock: Date;
+  let upstash: FakeUpstash;
+  let printed: string[];
+  beforeEach(() => {
+    clock = new Date("2026-10-27T12:00:00.000Z");
+    upstash = startFakeUpstash({ now: () => clock });
+    printed = [];
+  });
+  afterEach(async () => {
+    await upstash.stop();
+  });
+
+  /** A new production function instance on the in-test store, whose function log is `printed`. */
+  const functionInstance = () =>
+    createOps(
+      { VERCEL_ENV: "production", KV_REST_API_URL: upstash.url, KV_REST_API_TOKEN: upstash.token },
+      { now: () => clock, print: (line) => printed.push(line) },
+    );
+
+  /** Reserves a turn on the instance, as the handler does before its first model call. */
+  const reserveOn = async (ops: ReturnType<typeof createOps>) => {
+    const ticket = await ops.budget.reserve();
+    if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
+    return ticket.reservation;
+  };
+
+  test("record() prints the chat_turn line, with the event's fields only: a threadId passed with it reaches neither the line nor the store", async () => {
+    const ops = functionInstance();
+    const reservation = await reserveOn(ops);
+    // The type keeps a threadId out, but an object with more fields still fits it at run time.
+    const withThreadId: ChatTurnEvent = Object.assign({ threadId: "thread-of-one-visitor" }, answeredTurn);
+
+    await ops.telemetry.record(withThreadId, reservation);
+
+    expect(printed.map((line) => JSON.parse(line) as unknown)).toEqual([answeredTurn]);
+    expect(printed[0]).not.toContain("thread-of-one-visitor");
+    expect(upstash.requests.map((request) => request.body).join("\n")).not.toContain("thread-of-one-visitor");
+  });
+
+  test("record() adds each turn to the day's totals: totals(1) shows the outcome counts, the five token counts and the longest duration", async () => {
+    const ops = functionInstance();
+    // A shorter turn after a longer one: the longest duration stays the longer one's.
+    const notCoveredTurn: ChatTurnEvent = {
+      event: "chat_turn",
+      outcome: "refusal:not-covered",
+      reads: 0,
+      citations: 0,
+      removed: 1,
+      modelCalls: 1,
+      inputTokens: 40,
+      cachedInputTokens: 9_000,
+      cacheWriteTokens: 500,
+      cacheWrite1hTokens: 200,
+      outputTokens: 120,
+      durationMs: 3_100,
+      errorCode: null,
+    };
+
+    await ops.telemetry.record(answeredTurn, await reserveOn(ops));
+    await ops.telemetry.record(notCoveredTurn, await reserveOn(ops));
+
+    expect(await ops.totals(1)).toEqual([
+      {
+        date: "2026-10-27",
+        turns: { answered: 1, "refusal:out-of-scope": 0, "refusal:not-covered": 1, stopped: 0, error: 0, limit: 0 },
+        modelCalls: 3,
+        reads: 1,
+        citations: 1,
+        removed: 1,
+        inputTokens: 1_240,
+        cachedInputTokens: 18_000,
+        cacheWriteTokens: 800,
+        cacheWrite1hTokens: 200,
+        outputTokens: 570,
+        errors: {},
+        durationMs: 11_500,
+        longestDurationMs: 8_400,
+      },
+    ]);
+  });
+
+  test("a turn with known token counts, 1-hour writes among them, settles with the worked example's cost, on its day and in its month", async () => {
+    const ops = functionInstance();
+
+    await ops.telemetry.record(workedExampleTurn, await reserveOn(ops));
+
+    // The worked example, counted by hand at the prices per million tokens:
+    //   uncached input   3,000 × $2.00 =  6,000    millionths of a dollar
+    //   cache reads     40,005 × $0.10 =  4,000.5
+    //   5-minute writes 10,000 × $2.50 = 25,000    (12,000 writes, less the 2,000 1-hour ones)
+    //   1-hour writes    2,000 × $4.00 =  8,000
+    //   output           1,500 × $10   = 15,000
+    // The sum, 58,000.5, rounds up to 58,001, so the estimate is never low. The $0.90 reservation
+    // (900,000) is replaced with it.
+    expect(upstash.get("qcost:2026-10-27")).toBe("58001");
+    expect(upstash.get("qcost:2026-10")).toBe("58001");
+  });
+
+  test("settling a smaller real cost frees room for another turn", async () => {
+    const ops = functionInstance();
+    const reservations = [];
+    for (let turn = 0; turn < 8; turn++) reservations.push(await reserveOn(ops));
+
+    // 8 × $0.90 = $7.20 reserved. Without the settlement, a ninth reservation would make $8.10 and be refused.
+    await ops.telemetry.record(workedExampleTurn, reservations[0]);
+
+    expect(await ops.budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) });
+    // $7.20 − $0.90 + $0.058001 + $0.90, in millionths of a dollar.
+    expect(upstash.get("qcost:2026-10-27")).toBe("7258001");
+  });
+
+  test("a turn with null token counts keeps its whole reservation, and adds no tokens to the totals", async () => {
+    const ops = functionInstance();
+    const noCallFinished: ChatTurnEvent = {
+      ...answeredTurn,
+      outcome: "error",
+      modelCalls: 1,
+      inputTokens: null,
+      cachedInputTokens: null,
+      cacheWriteTokens: null,
+      cacheWrite1hTokens: null,
+      outputTokens: null,
+      errorCode: "529",
+    };
+
+    await ops.telemetry.record(noCallFinished, await reserveOn(ops));
+
+    // $0.90 is 900,000 millionths of a dollar: it stays on the day and is the month's cost of the turn.
+    expect(upstash.get("qcost:2026-10-27")).toBe("900000");
+    expect(upstash.get("qcost:2026-10")).toBe("900000");
+    const [today] = await ops.totals(1);
+    expect(today).toMatchObject({ inputTokens: 0, cachedInputTokens: 0, cacheWriteTokens: 0, cacheWrite1hTokens: 0, outputTokens: 0 });
+    expect(today).toMatchObject({ turns: { error: 1 }, errors: { "529": 1 } });
+  });
+
+  test.each([
+    ["a stopped turn", { outcome: "stopped", errorCode: null }],
+    ["a DEADLINE turn", { outcome: "error", errorCode: "DEADLINE" }],
+  ] as const)(
+    "%s, whose first model call finished and whose second did not, keeps its whole reservation, and the totals show the first call's tokens only",
+    async (_label, ending) => {
+      const ops = functionInstance();
+      // The usage middleware summed the first call only: the second reported none.
+      const firstCallOnly: ChatTurnEvent = {
+        ...answeredTurn,
+        ...ending,
+        modelCalls: 2,
+        inputTokens: 1_100,
+        cachedInputTokens: 0,
+        cacheWriteTokens: 9_200,
+        cacheWrite1hTokens: 0,
+        outputTokens: 310,
+      };
+
+      await ops.telemetry.record(firstCallOnly, await reserveOn(ops));
+
+      expect(upstash.get("qcost:2026-10-27")).toBe("900000");
+      expect(upstash.get("qcost:2026-10")).toBe("900000");
+      expect((await ops.totals(1))[0]).toMatchObject({
+        turns: { [ending.outcome]: 1 },
+        errors: ending.errorCode ? { [ending.errorCode]: 1 } : {},
+        modelCalls: 2,
+        inputTokens: 1_100,
+        cachedInputTokens: 0,
+        cacheWriteTokens: 9_200,
+        cacheWrite1hTokens: 0,
+        outputTokens: 310,
+      });
+    },
+  );
+
+  test("a rejected turn and a limit refusal write nothing to the store, and print their chat_turn lines", async () => {
+    const ops = functionInstance();
+    const noModelCall = { ...answeredTurn, reads: 0, citations: 0, modelCalls: 0, durationMs: 4 };
+    const noTokens = { inputTokens: null, cachedInputTokens: null, cacheWriteTokens: null, cacheWrite1hTokens: null, outputTokens: null };
+    const rejected: ChatTurnEvent = { ...noModelCall, ...noTokens, outcome: "rejected", errorCode: null };
+    const refusedAtTheCap: ChatTurnEvent = { ...noModelCall, ...noTokens, outcome: "limit", errorCode: "DAILY_LIMIT" };
+
+    // Neither holds a reservation: a rejected request never reserves, and a refused one got none.
+    await ops.telemetry.record(rejected);
+    await ops.telemetry.record(refusedAtTheCap, undefined);
+
+    expect(upstash.requests).toEqual([]);
+    expect(printed.map((line) => JSON.parse(line) as unknown)).toEqual([rejected, refusedAtTheCap]);
+  });
+
+  test("each record() is one /multi-exec transaction that gives every key it writes its expiry", async () => {
+    const ops = functionInstance();
+    const reservation = await reserveOn(ops);
+    const reserveRequests = upstash.requests.length;
+
+    await ops.telemetry.record(workedExampleTurn, reservation);
+
+    const records = upstash.requests.slice(reserveRequests);
+    expect(records.map((request) => request.path)).toEqual(["/multi-exec"]);
+    const commands = JSON.parse(records[0]!.body) as string[][];
+    const written = new Set(commands.filter(([name]) => name !== "EXPIREAT").map(([, key]) => key));
+    const expiring = new Set(commands.filter(([name]) => name === "EXPIREAT").map(([, key]) => key));
+    expect(written).toEqual(new Set(["qstats:2026-10-27", "qslow:2026-10-27", "qcost:2026-10-27", "qcost:2026-10"]));
+    expect(expiring).toEqual(written);
+  });
+
+  // Each expiry is counted by hand. A day's keys: 00:00 UTC on the 90th day after the day. The month's:
+  // 90 days after the month ends, at 00:00 UTC on the next month's first day.
+  test.each([
+    ["2026-10-27", "2027-01-25T00:00:00.000Z", "2026-10", "2027-01-30T00:00:00.000Z"],
+    ["2026-12-31", "2027-03-31T00:00:00.000Z", "2026-12", "2027-04-01T00:00:00.000Z"],
+  ])("a turn on %s: its day's totals expire at %s, and qcost:%s at %s", async (day, dayExpiry, month, monthExpiry) => {
+    clock = new Date(`${day}T12:00:00.000Z`);
+    const ops = functionInstance();
+
+    await ops.telemetry.record(workedExampleTurn, await reserveOn(ops));
+
+    for (const key of [`qstats:${day}`, `qslow:${day}`, `qcost:${day}`]) expect(upstash.expiresAt(key)).toEqual(new Date(dayExpiry));
+    expect(upstash.expiresAt(`qcost:${month}`)).toEqual(new Date(monthExpiry));
+  });
+
+  test("a turn that ends after 00:00 UTC counts on the day it reserved, and totals(2) gives today first, a day with no turn in zeros", async () => {
+    clock = new Date("2026-10-27T23:59:50.000Z");
+    const ops = functionInstance();
+    const reservation = await reserveOn(ops);
+
+    clock = new Date("2026-10-28T00:00:20.000Z");
+    await ops.telemetry.record({ ...answeredTurn, durationMs: 30_000 }, reservation);
+
+    const [today, yesterday] = await ops.totals(2);
+    expect(today).toEqual({
+      date: "2026-10-28",
+      turns: { answered: 0, "refusal:out-of-scope": 0, "refusal:not-covered": 0, stopped: 0, error: 0, limit: 0 },
+      modelCalls: 0,
+      reads: 0,
+      citations: 0,
+      removed: 0,
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      cacheWriteTokens: 0,
+      cacheWrite1hTokens: 0,
+      outputTokens: 0,
+      errors: {},
+      durationMs: 0,
+      longestDurationMs: 0,
+    });
+    expect(yesterday).toMatchObject({ date: "2026-10-27", turns: { answered: 1 }, longestDurationMs: 30_000 });
+    expect(upstash.get("qcost:2026-10-28")).toBeNull();
   });
 });

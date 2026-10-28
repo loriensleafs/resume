@@ -1,6 +1,6 @@
 // The store's key layout and expiry rules (SPEC-deploy, the key table; decision 0022), and the parts
-// of the ops module that live in the store: the question log and the budget. The calls themselves go
-// through upstash-rest.ts.
+// of the ops module that live in the store: the question log and the budget. The daily totals, which
+// use the same keys, are in daily-totals.ts. The calls themselves go through upstash-rest.ts.
 
 import { utcDay, type Budget, type QuestionLog, type QuestionLogEntry } from "../chat/server/question-log";
 import * as limits from "./limits";
@@ -15,18 +15,60 @@ const RETENTION_DAYS = 90;
 const questionLogKey = (day: string) => `qlog:${day}`;
 
 /** The key of a day's cost with its open reservations, in millionths of a dollar. */
-const dayCostKey = (day: string) => `qcost:${day}`;
+export const dayCostKey = (day: string) => `qcost:${day}`;
+
+/** The key of the settled cost of the month of `day`, in millionths of a dollar: `qcost:<YYYY-MM>`. */
+export const monthCostKey = (day: string) => `qcost:${day.slice(0, 7)}`;
+
+/** The key of a day's totals: a hash of counts (`qstats`). */
+export const dayStatsKey = (day: string) => `qstats:${day}`;
+
+/** The key of a day's longest duration: a sorted set whose one member is LONGEST (`qslow`). */
+export const dayLongestKey = (day: string) => `qslow:${day}`;
+export const LONGEST = "longest";
 
 /**
  * When a day's keys expire, in Unix seconds for `EXPIREAT`: 00:00 UTC on the 90th day after the day.
  * A text that is not a UTC day such as "2026-10-27" has no expiry, so it throws before any write.
  */
-function dayKeysExpireAt(day: string): string {
+export function dayKeysExpireAt(day: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
   const start = match ? Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : NaN;
   // "2026-02-30" matches, but it is not a day: Date.UTC() moves it to 2026-03-02.
   if (Number.isNaN(start) || utcDay(start) !== day) throw new RangeError("The date is not a UTC day.");
   return String((start + RETENTION_DAYS * DAY_MS) / 1000);
+}
+
+/**
+ * When the keys of the month of `day`, a UTC day, expire, in Unix seconds for `EXPIREAT`: 90 days
+ * after the month ends, at 00:00 UTC on the first day of the next month.
+ */
+export function monthKeysExpireAt(day: string): string {
+  // Date.UTC() counts months from 0, so the month's own number, from 1, gives the next month.
+  const end = Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)), 1);
+  return String((end + RETENTION_DAYS * DAY_MS) / 1000);
+}
+
+/**
+ * The last `days` UTC days, today included, newest first. The store keeps no day older than the
+ * retention, so a read of one would only cost a command.
+ */
+export function keptDays(now: () => Date, days: number): string[] {
+  const today = now().getTime();
+  return Array.from({ length: Math.max(0, Math.min(days, RETENTION_DAYS)) }, (_unused, back) => utcDay(today - back * DAY_MS));
+}
+
+/**
+ * A new reservation. It names the UTC day its cost counts on, so a turn that ends after 00:00 UTC
+ * settles on the day it reserved; the rest makes each reservation unique.
+ */
+const reservationOn = (day: string) => `${day}/${crypto.randomUUID()}`;
+
+/** The UTC day a reservation names. A text that is not one of this budget's reservations throws. */
+export function reservationDay(reservation: string): string {
+  const day = /^(\d{4}-\d{2}-\d{2})\//.exec(reservation)?.[1];
+  if (day === undefined) throw new RangeError("The reservation is not one that this store's budget gave.");
+  return day;
 }
 
 /**
@@ -46,11 +88,7 @@ export function upstashQuestionLog(store: UpstashStore, now: () => Date): Questi
       ]);
     },
     async list(days) {
-      const today = now().getTime();
-      // The store keeps no day older than the retention, so reading one would only cost a command.
-      const kept = Math.min(days, RETENTION_DAYS);
-      const keys: string[] = [];
-      for (let back = 0; back < kept; back++) keys.push(questionLogKey(utcDay(today - back * DAY_MS)));
+      const keys = keptDays(now, days).map(questionLogKey);
       if (keys.length === 0) return [];
       const lists = await store.pipeline(keys.map((key): Command => ["LRANGE", key, "0", "-1"]));
       // A day's list holds its entries in the order appended; the spec fixes no order within a day,
@@ -67,7 +105,8 @@ export function upstashQuestionLog(store: UpstashStore, now: () => Date): Questi
  *   adds atomically, so parallel calls, on one function instance or on many, never pass the cap together.
  * - When the new total passes the cap, it takes the reservation back and refuses with DAILY_LIMIT. This
  *   budget then remembers the capped day and refuses later turns that day with no store call.
- * - A reservation that is never settled stays counted for the day, which errs toward pausing.
+ * - The telemetry settles each reservation after its turn (daily-totals.ts). A reservation that is
+ *   never settled stays counted for the day, which errs toward pausing.
  *
  * @param now says which UTC day is today.
  */
@@ -116,12 +155,6 @@ async function addToDayCost(store: UpstashStore, day: string, amount: number): P
   }
   return total;
 }
-
-/**
- * A new reservation. It names the UTC day its cost counts on, so a turn that ends after 00:00 UTC
- * settles on the day it reserved; the rest makes each reservation unique.
- */
-const reservationOn = (day: string) => `${day}/${crypto.randomUUID()}`;
 
 /**
  * The entry's seven fields and nothing else. An object with more fields, such as a threadId, still

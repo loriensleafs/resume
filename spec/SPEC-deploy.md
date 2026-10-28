@@ -702,6 +702,7 @@ src/deploy/policy.ts               addPolicyTags(staticDir): each HTML file's po
 src/ops/ops.ts                     createOps(), createOpsReader()
 src/ops/upstash-rest.ts            the REST calls and the transactions; the token goes only to an https or loopback address
 src/ops/upstash.ts                 the key layout, the expiry rules, and the store's question log and budget
+src/ops/daily-totals.ts            the store's telemetry and daily totals: a turn's totals, its settled cost and the month's cost
 src/ops/alerts.ts                  the alert rules, the markers and the ntfy push
 src/ops/limits.ts                  the size caps' worst-case turn, the reservation, the daily cap, the monthly limit, the 75% threshold, the prices
 src/ops/smoke.ts                   the checks shared by `bun run smoke` and the Vercel health job
