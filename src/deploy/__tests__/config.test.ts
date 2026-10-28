@@ -1,5 +1,6 @@
-// Seam 1 of SPEC-deploy at unit level: addPolicyTags() on a fixture static folder (tasks/modules/deploy.md, Notes),
-// and the settings in code that Vercel and Bun read from the checkout: vercel.json, and no .env file (task D8).
+// Seam 1 of SPEC-deploy at unit level (tasks/modules/deploy.md, Notes): addPolicyTags() on a fixture static folder,
+// writeVercelConfig() on a fixture of Nitro's Vercel output, and the settings in code that Vercel and Bun read from the
+// checkout: vercel.json, and no .env file (task D8).
 // The checks of the built output (each built page's own tag, no style attribute) live once, in the site's build test,
 // src/site/__tests__/build.test.ts.
 // Each expected hash is a literal from outside this code. 'sha256-B2yPHKaXnvFWtRChIbabYmUBFZdVfKKXHbWtWidDVF8=' is
@@ -10,9 +11,10 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { $ } from "bun";
 import { existsSync } from "node:fs";
-import { readdir } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdir, readdir, symlink } from "node:fs/promises";
+import { dirname, relative, resolve } from "node:path";
 import { addPolicyTags } from "../policy";
+import { writeVercelConfig } from "../routes";
 
 const REPO = resolve(import.meta.dir, "../../..");
 const tmp = `${Bun.env.TMPDIR ?? "/tmp"}/deploy-config-test-${crypto.randomUUID()}`;
@@ -41,6 +43,54 @@ async function envFiles(root: string, dir = root): Promise<string[]> {
     found.push(...(await envFiles(root, path)));
   }
   return found;
+}
+
+/** One route of config.json, in the shape of Vercel's Build Output API. */
+type Route = { src?: string; dest?: string; handle?: string; [field: string]: unknown };
+
+/**
+ * The config.json that Nitro's Vercel preset wrote in a local build of the site (nitro 3.0.260903-beta): its immutable
+ * rule for /assets/, the filesystem, and every other path to its server function.
+ */
+const NITRO_CONFIG = {
+  version: 3,
+  framework: { name: "nitro", version: "3.0.260903-beta" },
+  overrides: {},
+  routes: [
+    { headers: { "cache-control": "public, max-age=31536000, immutable" }, src: "/assets/(.*)" },
+    { handle: "filesystem" },
+    { src: "/(.*)", dest: "/__server" },
+  ],
+};
+
+/**
+ * Writes a fixture of Nitro's Vercel output and returns its .vercel/output path: config.json, a function folder for
+ * each of `functions` (with its .vc-config.json), a symbolic link to `__server.func` for each of `links`, as Nitro
+ * writes its per-route folders, and each of `files` under static/.
+ */
+async function nitroOutput(
+  name: string,
+  parts: { config?: object; functions?: string[]; links?: string[]; files?: string[] } = {},
+): Promise<string> {
+  const output = `${tmp}/${name}/.vercel/output`;
+  const { config = NITRO_CONFIG, functions = ["__server"], links = [], files = ["index.html", "404.html"] } = parts;
+  await Bun.write(`${output}/config.json`, JSON.stringify(config, null, 2));
+  for (const fn of functions) {
+    await Bun.write(`${output}/functions/${fn}.func/.vc-config.json`, '{ "handler": "index.mjs" }');
+  }
+  // Nitro's link is relative, "./" plus the path from the link's folder (nitro 3.0.260903-beta, dist/_presets.mjs).
+  for (const fn of links) {
+    const link = `${output}/functions/${fn}.func`;
+    await mkdir(dirname(link), { recursive: true });
+    await symlink(`./${relative(dirname(link), `${output}/functions/__server.func`)}`, link);
+  }
+  for (const file of files) await Bun.write(`${output}/static/${file}`, `<!-- ${file} -->`);
+  return output;
+}
+
+/** The routes that writeVercelConfig() wrote into the output's config.json. */
+async function routesOf(output: string): Promise<Route[]> {
+  return (await Bun.file(`${output}/config.json`).json()).routes;
 }
 
 afterAll(async () => {
@@ -213,6 +263,150 @@ describe("addPolicyTags()", () => {
     const dir = await staticFolder("no-pages", { "assets/app.js": "console.log(1);" });
 
     await expect(addPolicyTags(dir)).rejects.toThrow(`no HTML file under ${dir}`);
+  });
+});
+
+// The expected routes are SPEC-deploy's, "Routes", in the form that the deploy spike ran on Vercel (research 12,
+// "Deploy spike verdicts", checks 2, 3, 5 and 6).
+describe("writeVercelConfig()", () => {
+  test("redirects pkloss.dev, pwk.dev and www.peterkloss.dev first, each by its exact host, with 308 to peterkloss.dev", async () => {
+    const output = await nitroOutput("redirects");
+
+    await writeVercelConfig(output);
+
+    expect((await routesOf(output)).slice(0, 3)).toEqual([
+      {
+        src: "^/(.*)$",
+        has: [{ type: "host", value: { eq: "pkloss.dev" } }],
+        status: 308,
+        headers: { Location: "https://peterkloss.dev/$1" },
+      },
+      {
+        src: "^/(.*)$",
+        has: [{ type: "host", value: { eq: "pwk.dev" } }],
+        status: 308,
+        headers: { Location: "https://peterkloss.dev/$1" },
+      },
+      {
+        src: "^/(.*)$",
+        has: [{ type: "host", value: { eq: "www.peterkloss.dev" } }],
+        status: 308,
+        headers: { Location: "https://peterkloss.dev/$1" },
+      },
+    ]);
+  });
+
+  // Vercel gives the project's .vercel.app address when Peter imports the project; task D37 writes it into routes.ts.
+  test("names no .vercel.app host until task D37 writes the project's address", async () => {
+    const output = await nitroOutput("no-vercel-app");
+
+    await writeVercelConfig(output);
+
+    expect(JSON.stringify(await routesOf(output))).not.toContain("vercel.app");
+  });
+
+  test("redirects the project's .vercel.app address after the domains, except its /api/ paths", async () => {
+    const output = await nitroOutput("vercel-app");
+
+    await writeVercelConfig(output, { vercelAppHost: "resume-test.vercel.app" });
+
+    const route = (await routesOf(output))[3]!;
+    expect(route).toEqual({
+      src: "^/(?!api/)(.*)$",
+      has: [{ type: "host", value: { eq: "resume-test.vercel.app" } }],
+      status: 308,
+      headers: { Location: "https://peterkloss.dev/$1" },
+    });
+    // Vercel matches a route's src without regard to case (research 12, vercel.json reference), as the "i" flag does.
+    const src = new RegExp(route.src!, "i");
+    expect(["/", "/resume", "/sources/agent-workflows", "/api"].filter((path) => !src.test(path))).toEqual([]);
+    expect(["/api/chat", "/api/status", "/api/cron/health"].filter((path) => src.test(path))).toEqual([]);
+  });
+
+  // In the filesystem phase Vercel serves each function folder at its own path, before any later route (spike check 3:
+  // /__server answered from Nitro's function). Nitro writes a per-route folder as a link to __server.func, so the
+  // linked "sources/[id]" proves that the scan follows links. "api/status" is a link too, and its own API route names
+  // it.
+  test("before the filesystem, sends each function folder that no API route names to /404.html with status 404", async () => {
+    const output = await nitroOutput("function-folders", {
+      functions: ["__server", "api/chat"],
+      links: ["api/status", "sources/[id]"],
+    });
+
+    await writeVercelConfig(output);
+
+    const routes = await routesOf(output);
+    const beforeFilesystem = routes.slice(0, routes.findIndex((route) => route.handle === "filesystem"));
+    expect(beforeFilesystem.filter((route) => route.dest !== undefined)).toEqual([
+      { src: "^/__server(?:/.*)?$", dest: "/404.html", status: 404 },
+      { src: "^/sources/\\[id\\](?:/.*)?$", dest: "/404.html", status: 404 },
+    ]);
+  });
+
+  // Nitro writes an override with a contentType for a prerendered file whose type its name does not give
+  // (getPrerenderOverrides, nitro 3.0.260903-beta); "feed" stands for one.
+  test("gives each prerendered page an override for its clean address, beside Nitro's own overrides", async () => {
+    const output = await nitroOutput("overrides", {
+      config: { ...NITRO_CONFIG, overrides: { feed: { contentType: "application/rss+xml" } } },
+      files: ["index.html", "resume/index.html", "sources/agent-workflows/index.html", "404.html", "sitemap.xml"],
+    });
+
+    await writeVercelConfig(output);
+
+    expect((await Bun.file(`${output}/config.json`).json()).overrides).toEqual({
+      feed: { contentType: "application/rss+xml" },
+      "resume/index.html": { path: "resume" },
+      "sources/agent-workflows/index.html": { path: "sources/agent-workflows" },
+    });
+  });
+
+  // Routes match without regard to case unless caseSensitive is set, and then /API/chat would reach the chat's
+  // function (spike check 3's control run).
+  test("after the filesystem, sends the three API paths to their functions, each case-sensitive", async () => {
+    const output = await nitroOutput("api-routes", { functions: ["__server", "api/chat"] });
+
+    await writeVercelConfig(output);
+
+    const routes = await routesOf(output);
+    const afterFilesystem = routes.slice(routes.findIndex((route) => route.handle === "filesystem") + 1);
+    expect(afterFilesystem.slice(0, 3)).toEqual([
+      { src: "^/api/chat$", dest: "/api/chat", caseSensitive: true },
+      { src: "^/api/status$", dest: "/__server", caseSensitive: true },
+      { src: "^/api/cron/health$", dest: "/__server", caseSensitive: true },
+    ]);
+  });
+
+  // Nitro's last route, /(.*) to /__server, rendered every path that is not a file in a function at request time.
+  test("sends every other path to /404.html with status 404 last, and no other path to a function", async () => {
+    const output = await nitroOutput("not-found", { functions: ["__server", "api/chat"], links: ["sources/[id]"] });
+
+    await writeVercelConfig(output);
+
+    const routes = await routesOf(output);
+    expect(routes.at(-1)).toEqual({ src: "^/(.*)$", dest: "/404.html", status: 404 });
+    const toFunctions = routes.filter((route) => route.dest !== undefined && route.dest !== "/404.html");
+    expect(toFunctions.map((route) => route.src)).toEqual(["^/api/chat$", "^/api/status$", "^/api/cron/health$"]);
+  });
+
+  test("keeps Nitro's other fields, and has Vercel Cron call /api/cron/health daily at 15:17 UTC", async () => {
+    const output = await nitroOutput("other-fields");
+
+    await writeVercelConfig(output);
+
+    const { routes, overrides, ...otherFields } = await Bun.file(`${output}/config.json`).json();
+    expect(otherFields).toEqual({
+      version: 3,
+      framework: { name: "nitro", version: "3.0.260903-beta" },
+      crons: [{ path: "/api/cron/health", schedule: "17 15 * * *" }],
+    });
+  });
+
+  // A wrong folder, such as the static folder, must stop the build, not leave Nitro's routes in place.
+  test("refuses a folder with no config.json, and names the folder", async () => {
+    const dir = `${tmp}/no-config`;
+    await Bun.write(`${dir}/static/index.html`, "<!-- index.html -->");
+
+    await expect(writeVercelConfig(dir)).rejects.toThrow(`no config.json in ${dir}`);
   });
 });
 

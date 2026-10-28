@@ -15,6 +15,7 @@
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { addPolicyTags } from "../src/deploy/policy";
+import { writeVercelConfig } from "../src/deploy/routes";
 import { buildSite } from "../src/site/build";
 
 const REPO = resolve(import.meta.dir, "..");
@@ -46,5 +47,8 @@ await buildSite({ root, outDir });
 const pages = await addPolicyTags(staticDir);
 console.log(`Policy tags: ${pages.join(", ")}`);
 // 4. Site (task S28): writeServiceWorker(staticDir).
-// 5. Deploy (task D17): writeVercelConfig(outputDir).
+// 5. Deploy: the routes replace Nitro's own, so only the three API paths run as functions; the redirects, the clean
+//    addresses, the not-found page and the cron.
+const unnamedFolders = await writeVercelConfig(outputDir);
+console.log(`Routes: written; function folders sent to 404.html: ${unnamedFolders.join(", ")}`);
 console.log(`Built ${outputDir}`);
