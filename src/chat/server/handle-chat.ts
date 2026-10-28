@@ -14,7 +14,7 @@ import { finishTurn } from "./finish-turn";
 import { turnLimits } from "./limits";
 import { citationMarkers } from "./markers";
 import { systemPrompt } from "./prompt";
-import { ChatMessages, ChatProps, type ChatMessage } from "./props";
+import { ChatMessages, ChatProps } from "./props";
 import type { Budget, QuestionLog, Telemetry } from "./question-log";
 import { turnUsage } from "./telemetry";
 import { startTurn } from "./turn";
@@ -30,16 +30,6 @@ export type ChatDeps = {
   // empty means the request's own origin (outside production, tests, evals)
   now(): Date;
 };
-
-/**
- * The newest question's text as sent. The request check passes a user message of text only, and its
- * text parts join with no separator, as chat() joins them for the model.
- */
-function questionText(messages: readonly ChatMessage[]): string {
-  const newest = messages.findLast((message) => message.role === "user");
-  if (newest === undefined) return "";
-  return typeof newest.content === "string" ? newest.content : newest.content.map((part) => part.text).join("");
-}
 
 /** A stream of one event, for an answer the model does not give. */
 async function* only(event: StreamChunk): AsyncGenerator<StreamChunk> {
@@ -107,11 +97,16 @@ const utf8 = new TextDecoder("utf-8", { fatal: true });
 type ChatParams = Awaited<ReturnType<typeof chatParamsFromRequestBody>>;
 
 /**
- * What the turn takes from a request that passed every check. The body's tools, context, state and
- * resume stay in `params` and never reach chat(): it gets only the handler's own tools. The scope,
- * audience and about lines (C7, C15) read `props`.
+ * What the turn takes from a request that passed every check: the thread id, the messages, the question
+ * and the props only. The body's tools, context, state and resume stay behind, so they cannot reach
+ * chat(): it gets only the handler's own tools. The scope, audience and about lines (C7, C15) read `props`.
  */
-type CheckedRequest = { params: ChatParams; question: string; props: ChatProps };
+type CheckedRequest = {
+  threadId: ChatParams["threadId"];
+  messages: ChatParams["messages"];
+  question: string;
+  props: ChatProps;
+};
 
 /**
  * Whether the request's page may use the chat (The request, "Origin"): its Origin is one of `origins`,
@@ -138,23 +133,24 @@ async function checkRequest(request: Request, origins: readonly string[]): Promi
   // 3. TanStack AI's check of the body. Not chatParamsFromRequest(): it reads the body itself and answers a plain-text 400.
   const params = await unlessThrown(() => chatParamsFromRequestBody(body));
   if (params === undefined) return "INVALID_REQUEST";
-  // 4. The messages: the roles user, assistant and tool only, and a user message of text only. Then the
-  // newest question's length; earlier turns are bounded by the bytes and by the conversation sent.
+  // 4. The messages: the roles user, assistant and tool only, a user message of text only, and the newest
+  // message the question, with text. Then the question's length; earlier turns are bounded by the bytes
+  // and by the conversation sent.
   const messages = ChatMessages.safeParse(params.messages);
   if (!messages.success) return "INVALID_REQUEST";
-  const question = questionText(messages.data);
+  const { question } = messages.data;
   if (question.length > turnLimits.questionCharacters) return "QUESTION_TOO_LONG";
   // 5. The question's own request properties.
   const props = ChatProps.safeParse(params.forwardedProps);
   if (!props.success) return "INVALID_REQUEST";
-  return { params, question, props: props.data };
+  return { threadId: params.threadId, messages: params.messages, question, props: props.data };
 }
 
 export async function handleChat(request: Request, deps: ChatDeps): Promise<Response> {
   const startedAt = deps.now();
   const checked = await checkRequest(request, deps.origins);
   if (typeof checked === "string") return chatError(checked);
-  const { params, question } = checked;
+  const { threadId, messages, question } = checked;
 
   // At the day's cap or the month's limit, the answer is the limit stream, and the model is not called.
   // The browser reads no body of a response that is not 200, so the refusal is a 200 stream (The request, "Limits").
@@ -167,9 +163,9 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
 
   const stream = chat({
     adapter: deps.adapter,
-    threadId: params.threadId,
+    threadId,
     systemPrompts: [systemPrompt(deps.knowledge)],
-    messages: params.messages,
+    messages,
     middleware: [
       citationMarkers(deps.knowledge, turn),
       turnUsage(turn),

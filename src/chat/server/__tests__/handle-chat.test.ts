@@ -334,6 +334,13 @@ describe("request checks", () => {
       "a user document part",
       () => postChat(chatBody([questionWith({ type: "document", source: { type: "data", value: "JVBERi0=", mimeType: "application/pdf" } })])),
     ],
+    ["a request with no message", () => postChat(chatBody([]))],
+    ["a request with no user message, only an earlier answer", () => postChat(chatBody([answer("At Acme [role:acme].")]))],
+    [
+      "a request whose newest message is the assistant's, after the question",
+      () => postChat(chatBody([question("Where does Test Person work?"), answer("At Acme [role:acme].")])),
+    ],
+    ["a newest question of white space only", () => postChat(chatBody([question(" \n\t ")]))],
     ["forwardedProps with a key ChatProps does not name", () => postChat(chatBody([question("What did Test Person build?")], { model: "claude-opus-5" }))],
     ["forwardedProps with an audience ChatProps does not name", () => postChat(chatBody([question("What did Test Person build?")], { audience: "ceo" }))],
   ];
