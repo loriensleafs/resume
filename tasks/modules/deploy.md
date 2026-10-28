@@ -113,7 +113,8 @@ Acceptance:
 - `vercel.json` holds only the build settings: `bunVersion` `1.4.x`, `framework: null`, `installCommand` `bun ci` (or the 1.4.2 installer if check 1 failed), `buildCommand` `bun run build:site`, `ignoreCommand` `sh scripts/ignore-build.sh`.
 - `.gitignore` gains `.secrets/`, `.env*` and `.vercel/`; a test fails when any `.env*` file exists in the checkout.
 - Research 12 records whether `bunfig.toml` can turn Bun's automatic `.env` loading off ("Secrets and settings"); if it can, `bunfig.toml` does.
-Verify: `bun test src/deploy/__tests__/config.test.ts`; `bun test`
+- Vercel builds from `main`'s version-3 `bun.lock` with Bun 1.4, and its `bun ci` passes (SPEC-deploy, Open Questions; research 12, Open points). Research 12 records the verdict. If the build runs another Bun, the install command takes SPEC-deploy's fallback installer.
+Verify: `bun test src/deploy/__tests__/config.test.ts`; `bun test`; one push of `main`'s `package.json` and `bun.lock` to `prototype/deploy-spike`, whose check 1 line names the build's Bun (while Peter keeps the spike project; otherwise the first build of setup step 4)
 Files: `vercel.json`, `.gitignore`, `bunfig.toml` (only if supported), `src/deploy/__tests__/config.test.ts`, `docs/research/12-deploy-platform.md`
 Size: S
 Needs Peter: no
@@ -228,6 +229,7 @@ Delivers: `writeVercelConfig(outputDir)` replaces Nitro's routes, so only the th
 Blocked by: D16, D6
 Acceptance:
 - pkloss.dev, pwk.dev and www.peterkloss.dev redirect with 308 to `https://peterkloss.dev/$1` (query per spike check 5); the `.vercel.app` route leaves `/api/` alone (its address is written in D37).
+- Before `{ "handle": "filesystem" }`, a route sends each function folder that no API route names to `/404.html` with status 404, by its own path: Nitro's `/__server` and each per-route `.func` link (spike check 3). One function, `findFunctionFolders(outputDir)` in `src/deploy/routes.ts`, owns the output scan for function folders and follows symbolic links; only `writeVercelConfig()` calls it, and a test with a linked `.func` folder proves the scan finds it.
 - After `{ "handle": "filesystem" }`, every prerendered page has an override for its clean address; the three API routes are case-sensitive; the last route sends every other path to `/404.html` with status 404, and no route sends a page or `/_serverFn/` to `/__server`.
 - Nitro's other fields stay, and `crons` calls `/api/cron/health` at `17 15 * * *`.
 Verify: `bun run build:site`; `bun test src/deploy/__tests__/config.test.ts`
@@ -266,6 +268,7 @@ Blocked by: D6, D17, S1 (`vite.config.ts` with Nitro's Vercel preset), C17 (the 
 Acceptance:
 - Every function's `.vc-config.json` has the runtime value from spike check 2.
 - The chat function's `.vc-config.json` has `maxDuration: 150` and region `iad1` (Nitro's `vercel.functionRules`).
+- `/api/chat` does not set `supportsCancellation`, and no write sits behind a `waitUntil` guard (Peter, row 168): every write finishes before the response ends, as SPEC-chat's handler test proves. The config test fails when `vercel.json` or a function's `.vc-config.json` sets `supportsCancellation`.
 Verify: `bun run build:site`; `bun test src/deploy/__tests__/config.test.ts`
 Files: `vite.config.ts`, `src/deploy/__tests__/config.test.ts`
 Size: S
@@ -277,7 +280,7 @@ Delivers: `bun run smoke <origin>` checks a running copy of the site without ask
 Blocked by: D18, S16 (the pages `/`, `/resume`, a source page and `404.html`), S31 (`bun run preview --dir <folder>`, answering the API routes), C17 (the handler's request checks behind `api.chat.ts`: 400 and 403 `ChatError`)
 Acceptance:
 - Against the preview of the seam-1 build, it passes: `/`, `/resume` and a source page return 200 with HTML, a title and the canonical address; `/sources/does-not-exist` and `/API/chat` return 404 with the not-found page; each page carries every header and its own policy tag; the asset, worker and document headers match "Headers"; a malformed chat `POST` gets 400 and one with `Origin: https://example.com` gets 403 `FORBIDDEN_ORIGIN`.
-- Every request sends `x-vercel-skip-toolbar: 1`.
+- Every request but one sends `x-vercel-skip-toolbar: 1`. The one is a plain request for `/`, with no browser and without the header, whose page's scripts must all be the site's own: each inline script's hash is in the page's policy tag, and each script `src` is on the site's own address (Peter, row 170).
 - It fails, naming the cause, when one header is removed, when a page has an unhashed inline script, and when an HTML file has no policy tag.
 Verify: `bun test scripts/__tests__/smoke.test.ts`
 Files: `src/ops/smoke.ts`, `scripts/smoke.ts`, `package.json`, `scripts/__tests__/smoke.test.ts`
@@ -352,7 +355,7 @@ Needs Peter: no
 Delivers: With `--production`, the smoke check also checks the real model's setting, the host redirects and the WAF rules, and it passes Deployment Protection on a deployment URL.
 Blocked by: D21, D23, D6
 Acceptance:
-- With `--production`: `/api/status` also reports the real model as configured; the three other hosts and the `.vercel.app` address return 308 for `/resume?x=1` to `https://peterkloss.dev/resume?x=1`; a chat `POST` with `Content-Type: text/plain` gets the WAF's 403; malformed chat requests get 429 by the 41st.
+- With `--production`: `/api/status` also reports the real model as configured; the three other hosts and the `.vercel.app` address return 308 for `/resume?x=1` to `https://peterkloss.dev/resume?x=1`; a chat `POST` with `Content-Type: text/plain` gets the WAF's 403; malformed chat requests get the WAF's 429 by the 41st. On both, the check tells the WAF's answer from the function's by the status and `x-vercel-mitigated: deny` (spike check 8).
 - On a protected deployment URL, requests carry `x-vercel-protection-bypass` from `VERCEL_AUTOMATION_BYPASS_SECRET`, and the browser also sends `x-vercel-set-bypass-cookie: true`.
 Verify: `bun test scripts/__tests__/smoke.test.ts` stays green; the production part first runs in D37 (no local seam: Testing Strategy, last line).
 Files: `src/ops/smoke.ts`, `scripts/smoke.ts`
@@ -364,7 +367,7 @@ Needs Peter: no
 Delivers: On Peter's laptop, `bun run questions` prints the last 7 days' entries, counts and costs through the read-only token.
 Blocked by: D12, D6 (spike check 9)
 Acceptance:
-- An entry appended through `log.append()` comes back from `createOpsReader().list(7)`, and the reader makes no write command.
+- An entry appended through `log.append()` comes back from `createOpsReader().list(7)`, and the reader makes no write command. It sends single commands or `/pipeline`, never `/multi-exec`, which Upstash refuses to the read-only token even for reads (spike check 9).
 - `bun run questions` loads `.secrets/local.env` with `--env-file` and prints the entries newest first, a count per outcome, the most read sources, and the daily totals with the day's and the month's cost against the cap and the limit.
 Verify: `bun test src/ops`; manual after setup: Peter runs `bun run questions` (the read-only token is his; agents never read it).
 Files: `src/ops/ops.ts`, `src/ops/upstash.ts`, `scripts/questions.ts`, `package.json`, `src/ops/__tests__/ops.test.ts`

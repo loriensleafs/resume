@@ -1,6 +1,6 @@
 # Spec: chat
 
-Approved by Peter on 2026-10-27, last amended on 2026-10-27 after C1 (decision record rows 155 and 156). The amendments are in History, at the end.
+Approved by Peter on 2026-10-27, last amended on 2026-10-27 after the deploy spike (decision record row 168). The amendments are in History, at the end.
 
 ## Objective
 
@@ -59,7 +59,7 @@ A turn is one question and its answer, with the reads made for it.
 | The host's rate limit answers 429 | The same alert, with "Too many questions in a short time. Try again in a few minutes." The queue pauses until the visitor sends again | none (the function does not run) |
 | The day's cost cap or Anthropic's monthly limit is reached | The "limit reached" state: Peter's email and a link that opens the resume, with no Try again. The question goes back into the input only when the input is empty. The queue pauses, and a saved pause marker keeps the state after a reload. The wording (Peter, row 138): for the day, "The chat has reached today's limit." and "It answers again at <00:00 UTC in the visitor's time, such as 5:00 PM> your time. Until then, you can read the resume or email Peter at <email>."; for the month, "The chat has reached this month's limit." and "It answers again on <the first day of next month, such as November 1>. Until then, you can read the resume or email Peter at <email>."; the button "Open the resume" | `limit`; a refusal before the model call writes no log entry |
 
-**A Stop on Vercel** ([SPEC-deploy](SPEC-deploy.md), deploy spike check 7). Vercel does not tell the chat function that the visitor stopped. The function streams the whole answer, then writes its log entry and telemetry. So the turn is logged with its own ending (`answered`, a refusal or `error`), and it settles with its real cost. Its model calls run to their end too; this is inferred, because the spike had no model. The browser still shows what arrived, marked "Answer stopped.". After Send now, the stopped turn runs on beside the next one. The handler still logs `stopped` when the abort reaches it, as in the handler tests and on a local server.
+**A Stop on Vercel.** On Vercel the visitor's Stop does not reach the chat function, so the turn is logged with its own ending and settles at its real cost (Peter, row 168); [SPEC-deploy](SPEC-deploy.md), "A Stop on Vercel", has the platform detail.
 
 A reload during an answer cannot rejoin the stream, because the server keeps no conversation. The answer's row is written only when the answer ends, so the restored conversation shows that question with the error alert and no partial text.
 
@@ -738,3 +738,4 @@ All rows are in the [decision record](../docs/design/interview-2026-10-26.md).
 - 2026-10-27: amended after the spec reviews (rows 128 to 136).
 - 2026-10-27: Peter approved it with the updated mockups (row 139); the scope label and the texts follow rows 137 and 138.
 - 2026-10-27, after C1 ([research 07](../docs/research/07-tanstack-ai-hosting-model.md)): rows 155 and 156 added Thinking, The request's "A thrown run" and "No thinking in the request", the `SERVER_ERROR` code and the read budget's wording. The review of that amendment added the event allowlist (The request, "Events on the wire"), `turnLimits.thinkingCharacters`, `finishTurn()` and the history builder; the conductor set those for Peter's end review.
+- 2026-10-27, after the deploy spike (task D6): the `stopped` row of "How a turn ends" and "A Stop on Vercel" follow Peter's row 168. The handler logs `stopped` where the abort reaches it; on Vercel the turn logs its own ending.
