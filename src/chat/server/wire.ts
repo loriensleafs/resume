@@ -18,7 +18,7 @@ import { z } from "zod";
 import type { ReadResult } from "../../knowledge/types";
 import { turnLimits } from "./limits";
 import { logServerError } from "./server-log";
-import { OPEN_RESUME, OPEN_SOURCE, READ_SOURCES, type ToolName } from "./tool-names";
+import { isToolName, OPEN_RESUME, OPEN_SOURCE, READ_SOURCES, type ToolName } from "./tool-names";
 
 /**
  * The handler's own codes, each with its fixed message. The browser shows its own text for each code
@@ -158,7 +158,7 @@ const Ids = z.array(z.string()).catch([]);
  * The three lists of ids, and no other field: an object schema drops every key it does not name, `text`
  * among them. A content that is no read result, such as a tool error, has no ids.
  */
-const ReadIdsSchema = z.object({ read: Ids, unknown: Ids, skipped: Ids }).catch({ read: [], unknown: [], skipped: [] }) satisfies z.ZodType<ReadIds>;
+export const ReadIdsSchema = z.object({ read: Ids, unknown: Ids, skipped: Ids }).catch({ read: [], unknown: [], skipped: [] }) satisfies z.ZodType<ReadIds>;
 
 /** An open tool's result when it opened (Tools). */
 const Opened = z.object({ opened: z.literal(true) });
@@ -182,8 +182,6 @@ const RESULT_FIELDS: Record<ToolName, z.ZodType> = {
   [OPEN_SOURCE]: z.union([Opened, z.object({ error: z.string() }).transform(() => ({ error: OPEN_SOURCE_WIRE_ERROR }))]),
 };
 
-const isToolName = (name: string): name is ToolName => Object.hasOwn(RESULT_FIELDS, name);
-
 /** No field of its own: what the browser gets of a result that is not in its tool's shape, or of a tool the chat does not have. */
 const NO_FIELDS = {};
 
@@ -196,8 +194,11 @@ function jsonOf(content: ToolCallResultEvent["content"]): unknown {
   }
 }
 
-/** The fields of a result that the browser gets: those its tool's entry names, or none. */
-function resultFieldsOf(tool: string, content: ToolCallResultEvent["content"]): unknown {
+/**
+ * The fields of a result that the browser gets: those its tool's entry names, or none. The conversation
+ * sent gives the model no more than these of an earlier result, from the request's copy (conversation-sent.ts).
+ */
+export function resultFieldsOf(tool: string, content: ToolCallResultEvent["content"]): unknown {
   if (!isToolName(tool)) return NO_FIELDS;
   const fields = RESULT_FIELDS[tool].safeParse(jsonOf(content));
   return fields.success ? fields.data : NO_FIELDS;

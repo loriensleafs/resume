@@ -47,6 +47,191 @@
   gap: 8px;
 }
 
+/* The career timeline band (src/site/shell/CareerTimeline.tsx), as the first-view and career-timeline-states boards
+   draw it, with the boards' own sizes: no token holds them. The stylesheet that the build writes from resume.yaml
+   (careerTimeline() in src/site/site-data.ts) sets --career-timeline-months, the year axis's months, and the grid
+   columns of each span and year label. One column per month makes each span as long as its role, and a gap between
+   roles shows as space. --career-timeline-bar is the height of a span's bar, which the axis line's place follows. */
+.career-timeline {
+  --career-timeline-bar: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 40px 10px;
+  border-bottom: 1px solid var(--ds-gray-400);
+}
+
+.career-timeline-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.career-timeline-heading {
+  margin: 0;
+  font-weight: var(--acme-font-weight-600);
+}
+
+.career-timeline-hint {
+  margin: 0;
+  color: var(--ds-gray-900);
+}
+
+/* The spans, then the year labels under them. */
+.career-timeline-track {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.career-timeline-spans,
+.career-timeline-axis {
+  display: grid;
+  grid-template-columns: repeat(var(--career-timeline-months), minmax(0, 1fr));
+}
+
+/* The axis line runs behind the bars, through each gap: 1 px at the middle of the bar, which ends the row. */
+.career-timeline-spans {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: linear-gradient(var(--ds-gray-400), var(--ds-gray-400)) 0 calc(100% - var(--career-timeline-bar) / 2) /
+    100% 1px no-repeat;
+}
+
+/* Every span and year label sits on the one row; the last year label may share columns with the one before it. */
+.career-timeline-span,
+.career-timeline-year {
+  grid-row: 1;
+  min-width: 0;
+}
+
+/* 2 px at each end, so two roles that meet keep a 4 px gap. */
+.career-timeline-span {
+  padding-inline: 2px;
+}
+
+/* Design-system gap: acme-tooltip sizes itself to its trigger (0.3.3: an inline-block host and an inline-flex "root"
+   part), and has no setting to fill its container. The span's button must fill the span, so the span stretches it. */
+.career-timeline-span > acme-tooltip {
+  display: block;
+}
+
+.career-timeline-span > acme-tooltip::part(root) {
+  display: flex;
+}
+
+/* Design-system gap: acme-tooltip draws a dark surface with an arrow (0.3.3). The career-timeline-states board draws
+   a light surface with the design system's tooltip shadow and no arrow, in both themes. */
+.career-timeline-span > acme-tooltip::part(content) {
+  padding: 8px 12px;
+  border-radius: var(--acme-radius);
+  background: var(--ds-background-100);
+  color: var(--ds-gray-1000);
+  box-shadow: var(--ds-shadow-tooltip);
+}
+
+.career-timeline-span > acme-tooltip::part(arrow) {
+  display: none;
+}
+
+/* Design-system gap: the prerendered page holds the tooltip's content slot as light-DOM text (SPEC-site, Tech Stack),
+   which would show beside the button until the part upgrades and moves it into its surface. The part's definition
+   loads on the first interaction with the page (CareerTimeline.tsx), so until then the band shows this state. */
+.career-timeline-span > acme-tooltip:not(:defined) > [slot="content"] {
+  display: none;
+}
+
+.career-timeline-tooltip-name {
+  display: block;
+  font-weight: var(--acme-font-weight-600);
+}
+
+.career-timeline-tooltip-line {
+  display: block;
+  margin-top: 2px;
+  color: var(--ds-gray-900);
+}
+
+/* The button is the whole span: its short label, then its bar. Its width fills the span both before acme-tooltip
+   upgrades, as a block's child, and after, as the flex item of the part's "root". */
+.career-timeline-button {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+/* A label longer than its span ends in an ellipsis, on one line. */
+.career-timeline-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ds-gray-1000);
+  font-weight: var(--acme-font-weight-500);
+}
+
+.career-timeline-bar {
+  height: var(--career-timeline-bar);
+  border-radius: calc(var(--career-timeline-bar) / 2);
+  background: var(--ds-gray-700);
+}
+
+/* Hover or keyboard focus darkens the span; keyboard focus also rings its bar, as the career-timeline-states board
+   draws it, in place of the button's own ring. */
+.career-timeline-button:hover .career-timeline-bar,
+.career-timeline-button:focus-visible .career-timeline-bar {
+  background: var(--ds-gray-1000);
+}
+
+.career-timeline-button:focus-visible {
+  outline: none;
+}
+
+.career-timeline-button:focus-visible .career-timeline-bar {
+  outline: 2px solid var(--ds-focus-color);
+  outline-offset: 3px;
+}
+
+.career-timeline-year {
+  white-space: nowrap;
+  color: var(--ds-gray-900);
+  font-family: var(--acme-font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Below 1024 px, where SPEC-site's one column starts: the instruction is for wide screens (decision record row 50),
+   and the band keeps the phone board's scale, about 70 px a year, and scrolls sideways inside itself, so each span
+   stays a target of at least 24 × 24 px (WCAG 2.2, 2.5.8). Task S23 adds the rest of the phone band. */
+@media (width < 1024px) {
+  .career-timeline {
+    padding-inline: 16px;
+  }
+
+  .career-timeline-hint {
+    display: none;
+  }
+
+  .career-timeline-scroller {
+    overflow-x: auto;
+  }
+
+  .career-timeline-track {
+    min-width: calc(var(--career-timeline-months) * 70px / 12);
+  }
+}
+
 /* The not-found page, 404.html (src/site/not-found.tsx), as the not-found boards draw it: the phone board's sizes
    first, the desktop board's from 1024 px, where SPEC-site's wide layout starts. The page has no script, so it links
    this stylesheet, which every page links, and uses no design-system part. The boards' own sizes: no token holds them. */

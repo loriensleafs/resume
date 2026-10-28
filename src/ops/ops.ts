@@ -24,7 +24,7 @@ import { upstashStore } from "./upstash-rest";
 
 export type { DailyTotals } from "./daily-totals";
 
-/** What createOps() reads from the environment. `process.env` fits it as it is. */
+/** What createOps() reads from the environment. `process.env` fits it as it is (see the declaration below). */
 export type OpsEnv = {
   VERCEL_ENV?: string; // the store and alerts are used only in "production"
   KV_REST_API_URL?: string; // set by the Upstash integration, Production only
@@ -34,6 +34,14 @@ export type OpsEnv = {
   PREVIEW_LIMIT?: string; // "day" or "month", outside production only: the budget refuses every turn with
                           // DAILY_LIMIT or SPEND_LIMIT, so a preview can show the "limit reached" state
 };
+
+// process.env's type declares these variables, as Bun's docs say to type them ("Environment variables", TypeScript).
+// Without it, TypeScript refuses `createOps(process.env)`: process.env's type declares only NODE_ENV and TZ, and a type
+// of optional fields only must share one of them (the weak-type check, TS2559). With it, OpsEnv needs no index
+// signature, so a misspelled key in a `createOps({...})` call fails the type check.
+declare module "bun" {
+  interface Env extends OpsEnv {}
+}
 
 /** The parts the chat's route file passes to handleChat() as ChatDeps, and the daily totals. */
 export type Ops = {
@@ -63,14 +71,15 @@ const RESERVE_LIMIT_MS = 1_000;
  * - In production, `PREVIEW_LIMIT` is ignored, whatever its value, and `record()` prints each turn's
  *   chat_turn line through `io.print`, the function log by default. With `KV_REST_API_URL` and
  *   `KV_REST_API_TOKEN` both set, the log, the budget, the telemetry and the totals are the store's,
- *   and each store call goes through `io.fetch`, with a time limit of 2 s, 1 s in `reserve()`. When a
- *   store call fails, `reserve()` allows the turn, `append()` and `record()` resolve, and the step
- *   prints an ops_error line through `io.print`. With `NTFY_TOPIC_URL` also set, a DAILY_LIMIT
- *   refusal, a month's estimate past 75% of the limit, and a failed store call push their limit
- *   alerts, through `io.fetch` too, and a failed push prints an ops_error line. Without both store
- *   variables, the log and the budget stay in memory, the budget allows every turn, and there are no
- *   daily totals or alerts, so answers keep working. A missing store or ntfy variable prints the
- *   missing_config line on every turn (SPEC-deploy, "A setting is missing in production").
+ *   and each store call goes through `io.fetch`, with a time limit of 2 s, 1 s in `reserve()`. The
+ *   budget also holds the monthly limit's pause and its hourly probe. When a store call fails,
+ *   `reserve()` allows the turn, `append()` and `record()` resolve, and the step prints an ops_error
+ *   line through `io.print`. With `NTFY_TOPIC_URL` also set, a DAILY_LIMIT refusal, a month's
+ *   estimate past 75% of the limit, a turn that meets Anthropic's limit and a failed store call push
+ *   their limit alerts, through `io.fetch` too, and a failed push prints an ops_error line. Without
+ *   both store variables, the log and the budget stay in memory, the budget allows every turn, and
+ *   there are no daily totals or alerts, so answers keep working. A missing store or ntfy variable
+ *   prints the missing_config line on every turn (SPEC-deploy, "A setting is missing in production").
  */
 export function createOps(
   env: OpsEnv,
@@ -94,7 +103,7 @@ export function createOps(
   const parts: Ops = {
     log: upstashQuestionLog(store, now),
     budget: upstashBudget(budgetStore, now, alerts.dayCapped, alerts.storeFailed),
-    telemetry: printedTelemetry(print, upstashTelemetry(store, alerts.monthCost)),
+    telemetry: printedTelemetry(print, upstashTelemetry(store, now, alerts)),
     totals: upstashTotals(store, now),
   };
   return reportingMissing(answersGoOn(parts, now, alerts.storeFailed), missing, print);

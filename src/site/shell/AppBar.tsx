@@ -2,7 +2,7 @@
 import { AppBar as AcmeAppBar } from "@acmelabs/design-system-react/components/app-bar";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useSyncExternalStore } from "react";
-import type { SiteResume } from "../data";
+import type { SiteResume } from "../site-data";
 import { useInstallOffer } from "../install-offer";
 import { InstallAppButton } from "./InstallAppButton";
 

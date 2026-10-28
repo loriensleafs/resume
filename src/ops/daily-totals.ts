@@ -3,8 +3,9 @@
 // and the read of the totals. The keys and their expiry rules are in upstash.ts; the prices and the
 // reservation are in limits.ts.
 
-import type { Telemetry } from "../chat/server/question-log";
+import { utcDay, type Telemetry } from "../chat/server/question-log";
 import type { ChatTurnEvent } from "../chat/server/telemetry";
+import type { LimitAlerts } from "./alerts";
 import * as limits from "./limits";
 import type { TurnTokens } from "./limits";
 import {
@@ -14,10 +15,11 @@ import {
   dayLongestKey,
   dayStatsKey,
   keptDays,
+  metSpendLimit,
   monthCostKey,
   monthKeysExpireAt,
-  reservationCounted,
-  reservationDay,
+  readReservation,
+  spendLimitMarkerCommands,
 } from "./upstash";
 import { UpstashError, type Command, type UpstashStore } from "./upstash-rest";
 
@@ -54,21 +56,25 @@ export type DailyTotals = {
 /**
  * The telemetry in the store. A turn with a reservation reached the model: in one transaction,
  * `record()` adds the turn to its day's totals, replaces its reservation with its cost or keeps it,
- * and adds that cost to the month. A turn without one, a rejected request or a refusal at the cap or
- * the monthly limit, writes nothing, so a flood of bad requests costs the store nothing. Printing the
- * chat_turn line is createOps()'s part.
+ * sets or deletes the monthly limit's marker (upstash.ts, spendLimitMarkerCommands()), and adds that
+ * cost to the month. A turn without one, a rejected request or a refusal at the cap or the monthly
+ * limit, writes nothing, so a flood of bad requests costs the store nothing, and a refusal never moves
+ * the marker's time. Printing the chat_turn line is createOps()'s part.
  *
- * @param onMonthCost gets the month's estimate after each turn that adds to it, from the same
- *   transaction's reply, for the spend75 alert (alerts.ts).
+ * @param now says when a turn met Anthropic's limit, for the marker and the spendlimit alert's day.
+ * @param alerts get, after the transaction, the month's estimate from its reply (spend75), and the
+ *   UTC day of a turn that met Anthropic's limit (spendlimit). The two run at once, and each resolves.
  */
 export function upstashTelemetry(
   store: UpstashStore,
-  onMonthCost: (day: string, monthCost: number) => Promise<void> = async () => {},
+  now: () => Date,
+  alerts: Pick<LimitAlerts, "monthCost" | "spendLimited">,
 ): Telemetry {
   return {
     async record(event, reservation) {
       if (reservation === undefined) return;
-      const day = reservationDay(reservation);
+      const at = now();
+      const { day, probe, counted } = readReservation(reservation);
       const expiresAt = dayKeysExpireAt(day);
       const tokens = knownTokens(event);
       const cost = settledCost(event, tokens);
@@ -78,7 +84,7 @@ export function upstashTelemetry(
       // The settlement replaces the reservation on the day it counts on with the turn's cost. An
       // uncounted reservation, which reserve() gave while the store failed, never reached the day's
       // cost, so the turn's whole cost is added instead (upstash.ts).
-      const settlement = reservationCounted(reservation) ? cost - limits.reservation : cost;
+      const settlement = counted ? cost - limits.reservation : cost;
       const commands: Command[] = [
         ...statsIncrements(event, tokens).map(([field, amount]): Command => ["HINCRBY", stats, field, String(amount)]),
         ["EXPIREAT", stats, expiresAt],
@@ -90,6 +96,7 @@ export function upstashTelemetry(
               ["INCRBY", dayCostKey(day), String(settlement)],
               ["EXPIREAT", dayCostKey(day), expiresAt],
             ] satisfies Command[])),
+        ...spendLimitMarkerCommands(event, { probe, callFinished: tokens !== undefined }, at),
       ];
       // The index of the month's INCRBY reply below: the transaction answers in command order, so the
       // order must stay as it is, with the month's two commands pushed last.
@@ -99,7 +106,10 @@ export function upstashTelemetry(
       if (typeof monthCost !== "number" || !Number.isSafeInteger(monthCost)) {
         throw new UpstashError("Upstash /multi-exec: INCRBY did not answer a whole number", "BAD_REPLY");
       }
-      await onMonthCost(day, monthCost);
+      await Promise.all([
+        alerts.monthCost(day, monthCost),
+        metSpendLimit(event) ? alerts.spendLimited(utcDay(at.getTime())) : undefined,
+      ]);
     },
   };
 }
@@ -125,16 +135,29 @@ export function upstashTotals(store: UpstashStore, now: () => Date): (days: numb
 }
 
 /**
- * What a turn costs once it ends (SPEC-deploy, "Which usage a turn settles with"). A turn whose model
- * calls all finished, an answer or a refusal with no error code, costs the estimate of its summed
- * usage. Any other turn keeps its whole reservation, because its last call's usage is not known: a
- * stopped turn, a DEADLINE, MAX_TOKENS or SERVER_ERROR turn, a broken stream, a turn that met the
- * monthly limit, and a turn whose counts are null or cannot be true.
+ * What a turn costs once it ends (SPEC-deploy, "Which usage a turn settles with"):
+ *
+ * - A turn whose model calls all finished, an answer or a refusal with no error code, costs the
+ *   estimate of its summed usage.
+ * - A turn that met Anthropic's monthly limit (SPEND_LIMIT) costs the estimate of its finished calls'
+ *   usage, and $0 when no call finished: Anthropic refuses the call at its limit, so that call runs no
+ *   tokens (decision record row 184). Counts that cannot be true say the usage is not known, so such a
+ *   turn keeps its reservation.
+ * - Any other turn keeps its whole reservation, because its last call's usage is not known: a stopped
+ *   turn, a DEADLINE, MAX_TOKENS or SERVER_ERROR turn, a broken stream, and a turn whose counts are
+ *   null or cannot be true.
  */
 function settledCost(event: ChatTurnEvent, tokens: TurnTokens | undefined): number {
+  if (metSpendLimit(event)) {
+    if (tokens) return limits.estimatedCost(tokens);
+    return noCallFinished(event) ? 0 : limits.reservation;
+  }
   const finished = FINISHED_OUTCOMES.has(event.outcome) && event.errorCode === null;
   return finished && tokens ? limits.estimatedCost(tokens) : limits.reservation;
 }
+
+/** Whether none of the turn's model calls finished: SPEC-chat gives null token counts then. */
+const noCallFinished = (event: ChatTurnEvent) => TOKEN_COUNTS.every((count) => event[count] === null);
 
 /**
  * What one turn adds to its day's hash, field by field: its token counts only when they are known.
