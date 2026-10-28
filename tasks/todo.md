@@ -82,7 +82,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [C4](modules/chat.md#c4-request-checks-with-the-chaterror-shape-and-turnlimits) Request checks with the `ChatError` shape and `turnLimits` — blocked by C3 (done 2026-10-27; a request needs a question with text; `CheckedRequest` carries only what `chat()` may use)
 - [x] [C5](modules/chat.md#c5-the-read-tool-passages-read-on-the-server-ids-only-on-the-wire) The read tool: passages read on the server, ids only on the wire — blocked by C3, K7, K8 (done 2026-10-27; ids only on the wire; bounds from `readLimits`)
 - [x] [C6](modules/chat.md#c6-the-read-budget-and-the-last-call) The read budget and the last call — blocked by C5 (done 2026-10-27; `readBudget(turn)` in `limits.ts`; `recordRead()` in `turn.ts`)
-- [ ] [C7](modules/chat.md#c7-the-ask-about-this-read-and-request-line) The "Ask about this" read and request line — blocked by C6
+- [x] [C7](modules/chat.md#c7-the-ask-about-this-read-and-request-line) The "Ask about this" read and request line — blocked by C6 (done 2026-10-27; `about-read.ts`; the About read counts toward the budget)
 - [ ] [C8](modules/chat.md#c8-markers-refusals-follow-up-questions-and-the-citation-forms) Markers: refusals, follow-up questions and the citation forms — blocked by C5
 - [ ] [C9](modules/chat.md#c9-the-open-tools-open_resume-and-open_source) The open tools: `open_resume` and `open_source` — blocked by C8
 - [ ] [C10](modules/chat.md#c10-the-conversation-sent-20-turns-40000-characters-earlier-reads-as-ids) The conversation sent: 20 turns, 40,000 characters, earlier reads as ids — blocked by C5
@@ -98,13 +98,13 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [S6](modules/site.md#s6-page-titles-descriptions-canonical-addresses-and-share-previews) Page titles, descriptions, canonical addresses and share previews — blocked by S3 (done 2026-10-27; `pageHead()`; no public `pages.json`; the share image comes in S26, row 173)
 - [x] [S7](modules/site.md#s7-google-sans-flex-served-from-the-site-itself) Google Sans Flex served from the site itself — blocked by S4; Peter: its wording draft goes to his one review before D37 (row 153) (done 2026-10-27; one 45.2 KB WOFF; WOFF2 with Bun's Brotli is in the draft)
 - [x] [S8](modules/site.md#s8-seam-1-runs-the-build-script) Seam 1 runs the build script — blocked by S2 to S7, D16 (done 2026-10-27; one build per test run; exact policy-tag check)
-- [ ] [S37](modules/site.md#s37-google-sans-code-served-from-the-site-itself) Google Sans Code served from the site itself — blocked by S7 (row 179)
+- [x] [S37](modules/site.md#s37-google-sans-code-served-from-the-site-itself) Google Sans Code served from the site itself — blocked by S7 (row 179) (done 2026-10-27; a 24,092-byte WOFF subset; `/` first load unchanged)
 - [x] [Checkpoint site: the build output](modules/site.md#checkpoint-site-the-build-output) — after S1 to S8, D16; Peter: look at `/` and `/resume` in `bun run dev` (checks passed 2026-10-27: S1 to S8 and D16 merged, `bun test` passes; Peter's look is open and does not stop the run)
 - [x] [K14](modules/knowledge.md#k14-the-knowledge-scripts-own-test-seam) The knowledge script's own test seam — blocked by K10 (row 176; before K11, because every move runs the script) (done 2026-10-27; `--root`; seam 4 in `scripts/__tests__/knowledge.test.ts`)
 - [x] [K11](modules/knowledge.md#k11-move-three-deep-dives-to-sources-fednow-architecture-fednow-bundle-size-fednow-design-system) Move three deep dives to sources: `fednow-architecture`, `fednow-bundle-size`, `fednow-design-system` — blocked by K5 to K7 and Peter's approval; Peter: approve the three summaries and the moved files (done 2026-10-27; Peter approved the three summaries, row 181)
-- [ ] [K12](modules/knowledge.md#k12-move-three-deep-dives-to-sources-fednow-standards-mentoring-highspot-agent-workflow-highspot-ai-standards) Move three deep dives to sources: `fednow-standards-mentoring`, `highspot-agent-workflow`, `highspot-ai-standards` — blocked by K5 to K7 and Peter's approval; Peter: approve the three summaries and the moved files
-- [ ] [K13](modules/knowledge.md#k13-move-three-deep-dives-to-sources-highspot-data-table-highspot-mcp-server-highspot-streaming-markdown) Move three deep dives to sources: `highspot-data-table`, `highspot-mcp-server`, `highspot-streaming-markdown` — blocked by K5 to K7 and Peter's approval; Peter: approve the three summaries and the moved files
-- [ ] [Checkpoint knowledge: lands](modules/knowledge.md#checkpoint-knowledge-lands) — after K11 to K13; Peter: read the fresh-session result
+- [x] [K12](modules/knowledge.md#k12-move-three-deep-dives-to-sources-fednow-standards-mentoring-highspot-agent-workflow-highspot-ai-standards) Move three deep dives to sources: `fednow-standards-mentoring`, `highspot-agent-workflow`, `highspot-ai-standards` — blocked by K5 to K7 and Peter's approval; Peter: approve the three summaries and the moved files (done 2026-10-27; Peter approved the three summaries, row 182)
+- [x] [K13](modules/knowledge.md#k13-move-three-deep-dives-to-sources-highspot-data-table-highspot-mcp-server-highspot-streaming-markdown) Move three deep dives to sources: `highspot-data-table`, `highspot-mcp-server`, `highspot-streaming-markdown` — blocked by K5 to K7 and Peter's approval; Peter: approve the three summaries and the moved files (done 2026-10-27; Peter approved the three summaries, row 183)
+- [x] [Checkpoint knowledge: lands](modules/knowledge.md#checkpoint-knowledge-lands) — after K11 to K13; Peter: read the fresh-session result (passed 2026-10-27: nine catalog entries, 9,902 of 80,000 characters, `knowledge/deep-dives/` gone, rows 181 to 183; the fresh-session check passed and STATUS records it)
 
 ## Phase 2: the workspace and the chat column
 
@@ -112,14 +112,14 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [D17](modules/deploy.md#d17-the-routes-redirects-clean-addresses-three-api-routes-and-the-not-found-page) The routes: redirects, clean addresses, three API routes and the not-found page — blocked by D16, D6 (done 2026-10-27; `findFunctionFolders()`; the named-folder check moves to D20)
 - [x] [D18](modules/deploy.md#d18-security-and-cache-headers) Security and cache headers — blocked by D17 (done 2026-10-27; one policy header per path, the worker policy route last; a 404 under `/assets/` stays immutable as the spec writes it)
 - [x] [D10](modules/deploy.md#d10-the-question-log-in-upstash-deleted-by-the-store-after-90-days) The question log in Upstash, deleted by the store after 90 days — blocked by D9, D6 (done 2026-10-27; REST with `fetch`, one `/multi-exec` per write)
-- [ ] [S9](modules/site.md#s9-the-preview-and-the-real-browser-test) The preview and the real-browser test — blocked by S8, D17
+- [x] [S9](modules/site.md#s9-the-preview-and-the-real-browser-test) The preview and the real-browser test — blocked by S8, D17 (done 2026-10-27; `bun run preview`; seam 2 drives Google Chrome; axe at both sizes)
 - [ ] [S10](modules/site.md#s10-the-career-timeline-band) The career timeline band — blocked by S9, T1
 - [ ] [S11](modules/site.md#s11-the-workspace-and-its-first-view-on-wide-screens) The workspace and its first view on wide screens — blocked by S10; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [S12](modules/site.md#s12-the-head-script) The head script — blocked by S11, D16
 - [ ] [S13](modules/site.md#s13-the-theme-switch) The theme switch — blocked by S12
 - [ ] [S14](modules/site.md#s14-the-workspace-contract-and-the-scope-from-the-career-timeline) The workspace contract, and the scope from the career timeline — blocked by S11
 - [ ] [S15](modules/site.md#s15-the-first-view-names-the-selected-role) The first view names the selected role — blocked by S14; Peter: its wording draft goes to his one review before D37 (row 153)
-- [ ] [S16](modules/site.md#s16-source-pages) Source pages — blocked by S6, S8, K3, K5, K9
+- [x] [S16](modules/site.md#s16-source-pages) Source pages — blocked by S6, S8, K3, K5, K9 (done 2026-10-27; nine source pages; `buildSiteData(root)`; public text only)
 - [ ] [S17](modules/site.md#s17-passage-text-as-markdown) Passage text as Markdown — blocked by S16, S13
 - [ ] [S18](modules/site.md#s18-a-source-opens-in-the-document-panel-from-its-address) A source opens in the document panel from its address — blocked by S14, S16
 - [ ] [S19](modules/site.md#s19-close-the-source-tab) Close the source tab — blocked by S18
@@ -163,7 +163,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [S30](modules/site.md#s30-the-speed-budget) The speed budget — blocked by S29
 - [ ] [Checkpoint site: phones, offline, install](modules/site.md#checkpoint-site-phones-offline-install) — after S23 to S30; Peter: review the preview at 390 × 844
 - [x] [D11](modules/deploy.md#d11-the-daily-cap-holds-under-parallel-requests) The daily cap holds under parallel requests — blocked by D10 (done 2026-10-27; one store transaction per reservation; https only; D12 and D15 close the interim gaps)
-- [ ] [D12](modules/deploy.md#d12-daily-totals-and-the-cost-estimate) Daily totals and the cost estimate — blocked by D11
+- [x] [D12](modules/deploy.md#d12-daily-totals-and-the-cost-estimate) Daily totals and the cost estimate — blocked by D11 (done 2026-10-27; a known cost settles the reservation; `daily-totals.ts`)
 - [ ] [D13](modules/deploy.md#d13-limit-alerts-for-the-months-spend-and-the-daily-cap) Limit alerts for the month's spend and the daily cap — blocked by D12; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [D14](modules/deploy.md#d14-the-monthly-limit-pauses-the-chat-and-one-probe-an-hour) The monthly limit pauses the chat, and one probe an hour — blocked by D13; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [D15](modules/deploy.md#d15-a-failing-or-slow-store-never-breaks-an-answer) A failing or slow store never breaks an answer — blocked by D13; Peter: its wording draft goes to his one review before D37 (row 153)

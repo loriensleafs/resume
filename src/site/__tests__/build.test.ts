@@ -1,22 +1,31 @@
 // Seam 1 of SPEC-site: the build script, `bun run build:site`, writes the real build output once, with every step that
 // Vercel's build runs, and these tests read its files. The fixture root (fixture-root.ts) holds the project's files.
+// Seam 2 (browser.test.ts) serves the same build output (build-output.ts).
 
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { $, Glob } from "bun";
+import { beforeAll, describe, expect, test } from "bun:test";
+import { Glob } from "bun";
 import { Face, Blob as HarfBuzzBlob } from "harfbuzzjs";
 import { formatRange, formatTitle, loadResume, type Resume } from "../../content";
-import { buildKnowledge } from "../../knowledge/build";
+import { buildKnowledge, publicKnowledge } from "../../knowledge/build";
 import { holds } from "../../private-details";
-import { FAKE_PHONE, FIXTURE_HEADLINE, FIXTURE_LEAD, FIXTURE_NAME, writeFixtureRoot } from "./fixture-root";
+import { buildOutput, seam1 } from "./build-output";
+import {
+  FAKE_PHONE,
+  FIXTURE_DEEP_DIVE,
+  FIXTURE_DRAFT,
+  FIXTURE_HEADLINE,
+  FIXTURE_INTERVIEW,
+  FIXTURE_LEAD,
+  FIXTURE_NAME,
+} from "./fixture-root";
 
 const REPO = `${import.meta.dir}/../../..`;
-const tmp = `${Bun.env.TMPDIR ?? "/tmp"}/site-test-${crypto.randomUUID()}`;
-const root = `${tmp}/root`;
-const outDir = `${tmp}/out`;
-const staticDir = `${outDir}/.vercel/output/static`;
+const { root, outDir, staticDir } = seam1;
 
 /** The fixture root's resume, as the content module's loader reads it: what the pages must show. */
 let resume: Resume;
+/** What the build script wrote to standard output, TanStack Start's prerender log among it. */
+let buildLog = "";
 
 /** Every HTML file under the static folder, by its path in that folder. */
 async function htmlFiles(): Promise<string[]> {
@@ -141,27 +150,197 @@ async function scriptsLoadedBy(page: string): Promise<string[]> {
 }
 
 beforeAll(async () => {
-  await writeFixtureRoot(root);
+  // One build per test run, with all its steps, in its own process (SPEC-deploy, "The build script").
+  buildLog = await buildOutput();
   resume = await loadResume("public", root);
-  // One build, with all its steps, in its own process (SPEC-deploy, "The build script"). `bun run` starts the script
-  // in the repository, so both folders are absolute. The script inherits `bun test`'s NODE_ENV, "test", and makes the
-  // production build all the same. One build per checkout runs at a time: Nitro keeps the last build's output folder
-  // at a fixed path (src/site/build.ts).
-  const build = await $`${process.execPath} run build:site --root ${root} --out ${outDir}`.cwd(REPO).quiet().nothrow();
-  if (build.exitCode !== 0) {
-    throw new Error(`bun run build:site failed with exit code ${build.exitCode}:\n${build.stderr}\n${build.stdout}`);
-  }
 }, 120_000);
-
-afterAll(async () => {
-  await $`rm -rf ${tmp}`.quiet().nothrow();
-});
 
 describe("the HTML files", () => {
   // The not-found page is not a prerendered page: buildSite() writes it outside the route tree (SPEC-site, Project
-  // Structure), so it is in no sitemap.
-  test("are the prerendered pages / and /resume, and the not-found page 404.html", async () => {
-    expect(await htmlFiles()).toEqual(["404.html", "index.html", "resume/index.html"]);
+  // Structure), so it is in no sitemap. The fixture root's draft source gets no page (SPEC-site, Testing 1).
+  test("are the prerendered pages /, /resume and one per approved source, and the not-found page 404.html", async () => {
+    expect(await htmlFiles()).toEqual([
+      "404.html",
+      "index.html",
+      "resume/index.html",
+      `sources/${FIXTURE_DEEP_DIVE}/index.html`,
+      `sources/${FIXTURE_INTERVIEW}/index.html`,
+    ]);
+  });
+});
+
+// SPEC-site, Tech Stack: each source page links /?source=<id>, and the crawler drops a page's query from its output
+// path, so a crawled /?source=<id> would be written over index.html. The prerender filter rejects every path with "?".
+// The written index.html would differ from the workspace's only once / reads ?source= (task S18), so the proof is
+// TanStack Start's own list of the pages it prerendered, one "[prerender] - <path>" line each
+// (@tanstack/start-plugin-core 1.171.55, prerender.js). The sitemap tests prove the filter's other half.
+describe("the prerender", () => {
+  test("renders /, /resume and each approved source's page, and no address with a query", async () => {
+    const rendered = [...buildLog.matchAll(/^\[prerender\] - (.+)$/gm)].map(([, path]) => path!.trim()).sort();
+    expect(rendered).toEqual(["/", "/resume", `/sources/${FIXTURE_DEEP_DIVE}`, `/sources/${FIXTURE_INTERVIEW}`]);
+  });
+});
+
+// SPEC-site, Views: Source view, and Standalone pages; Testing 1. Each approved source of the fixture root has its
+// page at /sources/<id>, with every passage of publicKnowledge(knowledge) and its anchor #<source id>.<n>.
+describe.each([
+  [
+    FIXTURE_DEEP_DIVE,
+    "The fixture root’s deep dive",
+    // SPEC-site's own example of the kind line: a deep dive about FedNow, 2021 – 2024, with five passages.
+    "Deep dive, written from Peter’s answers and approved by him. FedNow, 2021 – 2024. 5 passages.",
+  ],
+  [
+    FIXTURE_INTERVIEW,
+    "The fixture root’s interview",
+    // The interview's line and the two roles' form are S16's wording draft (docs/design/wording-drafts/S16.md).
+    "Interview, in Peter’s own words and approved by him. Highspot, 2024 – 2026; FedNow, 2021 – 2024. 3 passages.",
+  ],
+])("the source page of %s", (id, title, kindLine) => {
+  const page = `sources/${id}/index.html`;
+
+  /** The source as publicKnowledge() gives it to the site: what the page must show. */
+  const publicSource = async () => {
+    const source = publicKnowledge(await buildKnowledge({ root })).sources.find((source) => source.id === id);
+    if (!source) throw new Error(`the fixture root has no approved source ${id}`);
+    return source;
+  };
+
+  test("opens with the app bar: the fixture root's name in the name box, then its headline", async () => {
+    const [first] = await elementsOn(page, "body > *");
+    expect(first?.tag).toBe("acme-app-bar");
+    const texts = (await elementsOn(page, "acme-app-bar *")).map((element) => element.text);
+    expect(texts.indexOf(FIXTURE_HEADLINE)).toBeGreaterThan(texts.indexOf(FIXTURE_NAME));
+    expect(texts.indexOf(FIXTURE_NAME)).toBeGreaterThanOrEqual(0);
+  });
+
+  test("has one h1, the source's title, and then the kind line", async () => {
+    expect(await elementsOn(page, "h1")).toEqual([{ tag: "h1", text: title }]);
+    expect(await elementsOn(page, "main article > header > *")).toEqual([
+      { tag: "h1", text: title },
+      { tag: "p", text: kindLine },
+    ]);
+  });
+
+  test("shows every passage in file order, each with its anchor <source id>.<n>, its number and its heading", async () => {
+    const { passages } = await publicSource();
+    expect(await attributeOn(page, "main article section", "id")).toEqual(passages.map((passage) => passage.id));
+    expect((await elementsOn(page, "main article section h2")).map((heading) => heading.text)).toEqual(
+      passages.map((passage, i) => `${i + 1} ${passage.heading}`),
+    );
+  });
+
+  test("shows each passage's text, every paragraph of it, in the passage's own section", async () => {
+    const { passages } = await publicSource();
+    const sections = await elementsOn(page, "main article section");
+    expect(sections).toHaveLength(passages.length);
+    passages.forEach((passage, i) => {
+      for (const paragraph of passage.text.split(/\n\s*\n/)) {
+        expect(sections[i]!.text).toContain(paragraph.replace(/\s+/g, " ").trim());
+      }
+    });
+  });
+
+  test('links "Ask the chat about this" to the workspace with the source open, /?source=<id>', async () => {
+    expect(await elementsOn(page, `main a[href="/?source=${id}"]`)).toEqual([
+      { tag: "a", text: "Ask the chat about this" },
+    ]);
+  });
+
+  // SPEC-site, Standalone pages and Testing 1: the head names the page for search engines and share previews. The
+  // description is the source's summary, which Peter approves with the source.
+  test("has one title, the source's title and then the fixture root's name", async () => {
+    expect(await elementsOn(page, "head title")).toEqual([{ tag: "title", text: `${title} — ${FIXTURE_NAME}` }]);
+  });
+
+  test("has one description, the source's summary, and one canonical address on peterkloss.dev", async () => {
+    const { summary } = await publicSource();
+    expect(await attributeOn(page, 'meta[name="description"]', "content")).toEqual([summary]);
+    expect(await attributeOn(page, 'link[rel="canonical"]', "href")).toEqual([`https://peterkloss.dev/sources/${id}`]);
+  });
+
+  test("has a share preview's Open Graph tags: type, canonical address, title, description", async () => {
+    const { summary } = await publicSource();
+    const tags: Record<string, (string | null)[]> = {};
+    new HTMLRewriter()
+      .on('meta[property^="og:"]', {
+        element(element) {
+          const content = element.getAttribute("content");
+          (tags[element.getAttribute("property")!] ??= []).push(content === null ? null : unescaped(content));
+        },
+      })
+      .transform(await Bun.file(`${staticDir}/${page}`).text());
+    expect(tags).toEqual({
+      "og:type": ["website"],
+      "og:url": [`https://peterkloss.dev/sources/${id}`],
+      "og:title": [`${title} — ${FIXTURE_NAME}`],
+      "og:description": [summary],
+    });
+  });
+});
+
+// SPEC-site, Acceptance criteria and Testing 1: the build-time module holds each approved source's id, title and roles
+// only. Each source's passages are a separate JSON file that Vite emits under /assets/ with a hashed name, which a view
+// fetches only when it shows that source, so the JavaScript that / loads does not grow with the sources.
+describe("the source JSON files", () => {
+  // Rolldown's [hash] is eight characters of base64url (https://rolldown.rs/reference/OutputOptions.assetFileNames).
+  test("are one JSON file per approved source under assets/, named <id>-<hash>.json, and none for the draft", async () => {
+    const files = (await Array.fromAsync(new Glob("assets/**/*.json").scan({ cwd: staticDir }))).sort();
+    expect(files.map((file) => file.replace(/-[\w-]{8}\.json$/, ".json"))).toEqual([
+      `assets/${FIXTURE_DEEP_DIVE}.json`,
+      `assets/${FIXTURE_INTERVIEW}.json`,
+    ]);
+  });
+
+  test("each holds its source's passages, as publicKnowledge(knowledge) gives them", async () => {
+    const { sources } = publicKnowledge(await buildKnowledge({ root }));
+    for (const source of sources) {
+      const [file, ...others] = await Array.fromAsync(new Glob(`assets/${source.id}-*.json`).scan({ cwd: staticDir }));
+      expect(others).toEqual([]);
+      const { passages } = await Bun.file(`${staticDir}/${file}`).json();
+      expect(passages).toEqual(source.passages);
+    }
+  });
+
+  // The titles are the control: the module holds them, so the search finds a text with "’" as the bundle writes it.
+  // Headings stay out of the search: a deep dive's are words such as "Result", which any bundle can hold.
+  test("the JavaScript that / loads holds each source's title, and no summary or passage text", async () => {
+    const { sources } = publicKnowledge(await buildKnowledge({ root }));
+    const scripts = await Promise.all(
+      (await scriptsLoadedBy("index.html")).map((script) => Bun.file(`${staticDir}${script}`).text()),
+    );
+    const inScripts = (text: string) => scripts.some((script) => script.includes(text));
+    const texts = sources.flatMap((source) => [source.summary, ...source.passages.map((passage) => passage.text)]);
+    expect(sources.map((source) => source.title).filter((title) => !inScripts(title))).toEqual([]);
+    expect(texts.filter(inScripts)).toEqual([]);
+  });
+});
+
+// SPEC-site, Acceptance criteria and Boundaries: a source's Not public section names kinds of material for the chat on
+// the server; publicKnowledge() leaves it out, so no file a browser can load holds it. A draft source reaches no output.
+describe("the static folder", () => {
+  /** Each file under the static folder whose text holds `text`, by its path there. */
+  async function filesHolding(text: string): Promise<string[]> {
+    const holding: string[] = [];
+    for await (const path of new Glob("**/*").scan({ cwd: staticDir, dot: true })) {
+      if ((await Bun.file(`${staticDir}/${path}`).text()).includes(text)) holding.push(path);
+    }
+    return holding;
+  }
+
+  // The summaries are the control: each source's page and file hold it, so the search finds a text with "’".
+  test("holds no approved source's Not public text", async () => {
+    const { sources } = await buildKnowledge({ root });
+    expect(sources).toHaveLength(2);
+    for (const source of sources) {
+      expect((await filesHolding(source.summary)).length).toBeGreaterThan(0);
+      expect(source.notPublic.length).toBeGreaterThan(0);
+      expect(await filesHolding(source.notPublic)).toEqual([]);
+    }
+  });
+
+  test("holds no text of the draft source: not its id, its title, its summary or its passage", async () => {
+    for (const text of [FIXTURE_DRAFT, "draft source", "fixture draft"]) expect(await filesHolding(text)).toEqual([]);
   });
 });
 
@@ -427,7 +606,10 @@ describe("the static assets", () => {
         .on('link[rel="stylesheet"]', { element: (element) => void loaded.add(element.getAttribute("href")!) })
         .transform(await Bun.file(`${staticDir}/${page}`).text());
     }
-    const assets = await Array.fromAsync(new Glob("assets/**").scan({ cwd: staticDir }));
+    // A source's JSON file is fetched by a view, not loaded by a page; the source JSON file tests check each one.
+    const assets = (await Array.fromAsync(new Glob("assets/**").scan({ cwd: staticDir }))).filter(
+      (asset) => !asset.endsWith(".json"),
+    );
     expect(assets.map((asset) => `/${asset}`).filter((asset) => !loaded.has(asset))).toEqual([]);
   });
 });
@@ -634,9 +816,15 @@ describe("the site's fonts", () => {
 });
 
 describe("the sitemap", () => {
-  // A crawled /?source= or /?role= link would otherwise be listed here (SPEC-site, Tech Stack).
-  test("lists / and /resume on peterkloss.dev, and no address with a query", async () => {
-    expect(await sitemapAddresses()).toEqual(["https://peterkloss.dev/", "https://peterkloss.dev/resume"]);
+  // A crawled /?source= or /?role= link would otherwise be listed here (SPEC-site, Tech Stack). Each source page links
+  // /?source=<id>, so the crawler finds such a link.
+  test("lists /, /resume and each approved source's page on peterkloss.dev, and no address with a query", async () => {
+    expect(await sitemapAddresses()).toEqual([
+      "https://peterkloss.dev/",
+      "https://peterkloss.dev/resume",
+      `https://peterkloss.dev/sources/${FIXTURE_DEEP_DIVE}`,
+      `https://peterkloss.dev/sources/${FIXTURE_INTERVIEW}`,
+    ]);
   });
 
   // SPEC-site, Testing 1: the sitemap lists every page. 404.html is no prerendered page: it answers every unknown path,

@@ -1,10 +1,14 @@
 ---
 id: fednow-standards-mentoring
 title: FedNow front-end standards, the testing harness, and mentoring
-role: fednow
-highlights: [4, 5]
+kind: deep-dive
+subject: project
+roles: [fednow]
+highlights: [highlight:fednow.4, highlight:fednow.5]
+summary: How Peter wrote and introduced front-end standards that 5+ teams adopted, developed a testing harness, mentored 20+ developers one-on-one and ran weekly office hours open to every development team.
+links: []
 status: approved
-approved: 2026-10-26
+approved: 2026-10-27
 source: Interview with Peter, 2026-10-26; Peter's 2024 resume for the testing harness
 ---
 

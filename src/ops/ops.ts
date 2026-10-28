@@ -1,8 +1,9 @@
 // The ops module (SPEC-deploy, "The question log, daily totals, alerts and status"). It gives the
-// chat's route file the question log, budget and telemetry that SPEC-chat defines. Outside
-// production they are the chat module's in-memory versions, whatever variables are set, so a
-// preview never reaches the store or sends an alert (decision record row 108). In production the
-// log and the budget are the store's (upstash.ts).
+// chat's route file the question log, budget and telemetry that SPEC-chat defines, and the daily
+// totals. Outside production they are the chat module's in-memory versions, whatever variables are
+// set, so a preview never reaches the store or sends an alert (decision record row 108). In
+// production the telemetry prints each turn's chat_turn line, and with the store set, the log, the
+// budget, the telemetry and the totals are the store's (upstash.ts, daily-totals.ts).
 
 import {
   inMemoryBudget,
@@ -12,8 +13,12 @@ import {
   type QuestionLog,
   type Telemetry,
 } from "../chat/server/question-log";
+import type { ChatTurnEvent } from "../chat/server/telemetry";
+import { upstashTelemetry, upstashTotals, type DailyTotals } from "./daily-totals";
 import { upstashBudget, upstashQuestionLog } from "./upstash";
 import { upstashStore } from "./upstash-rest";
+
+export type { DailyTotals } from "./daily-totals";
 
 /** What createOps() reads from the environment. `process.env` fits it as it is. */
 export type OpsEnv = {
@@ -26,11 +31,13 @@ export type OpsEnv = {
                           // DAILY_LIMIT or SPEND_LIMIT, so a preview can show the "limit reached" state
 };
 
-/** The parts the chat's route file passes to handleChat() as ChatDeps. */
+/** The parts the chat's route file passes to handleChat() as ChatDeps, and the daily totals. */
 export type Ops = {
   log: QuestionLog;
   budget: Budget;
   telemetry: Telemetry;
+  /** The daily totals of the last `days` UTC days, today included, newest first. */
+  totals(days: number): Promise<DailyTotals[]>;
 };
 
 /**
@@ -38,31 +45,83 @@ export type Ops = {
  * builds them once per function instance.
  *
  * - Outside production (any `VERCEL_ENV` but "production"): the chat module's in-memory log, budget
- *   and telemetry, whatever other variables are set. `PREVIEW_LIMIT` "day" or "month" makes the
- *   budget refuse every turn; an empty value counts as unset; any other value throws.
- * - In production, `PREVIEW_LIMIT` is ignored, whatever its value. With `KV_REST_API_URL` and
- *   `KV_REST_API_TOKEN` both set, the log and the budget are the store's, and each store call goes
- *   through `io.fetch`. Without both, the parts stay in memory and the budget allows every turn, so
- *   answers keep working (SPEC-deploy, "A setting is missing in production").
+ *   and telemetry, whatever other variables are set, and no daily totals. `PREVIEW_LIMIT` "day" or
+ *   "month" makes the budget refuse every turn; an empty value counts as unset; any other value throws.
+ * - In production, `PREVIEW_LIMIT` is ignored, whatever its value, and `record()` prints each turn's
+ *   chat_turn line through `io.print`, the function log by default. With `KV_REST_API_URL` and
+ *   `KV_REST_API_TOKEN` both set, the log, the budget, the telemetry and the totals are the store's,
+ *   and each store call goes through `io.fetch`. Without both, the log and the budget stay in memory,
+ *   the budget allows every turn, and there are no daily totals, so answers keep working (SPEC-deploy,
+ *   "A setting is missing in production").
  */
-export function createOps(env: OpsEnv, io: { fetch?: typeof fetch; now?: () => Date } = {}): Ops {
+export function createOps(
+  env: OpsEnv,
+  io: { fetch?: typeof fetch; now?: () => Date; print?: (line: string) => void } = {},
+): Ops {
   const now = io.now ?? (() => new Date());
   if (env.VERCEL_ENV !== "production") {
     return inMemoryOps(now, previewRefusal(env.PREVIEW_LIMIT));
   }
-  if (!env.KV_REST_API_URL || !env.KV_REST_API_TOKEN) return inMemoryOps(now);
+  const print = io.print ?? console.log;
+  if (!env.KV_REST_API_URL || !env.KV_REST_API_TOKEN) {
+    return { ...inMemoryOps(now), telemetry: printedTelemetry(print) };
+  }
   const store = upstashStore({ url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN, fetch: io.fetch ?? fetch });
   return {
     log: upstashQuestionLog(store, now),
     budget: upstashBudget(store, now),
-    // The interim: D12 replaces the telemetry with the store's, which settles each reservation. Until
-    // then, production keeps the in-memory telemetry, so every reservation stays counted for its day.
-    telemetry: inMemoryTelemetry(),
+    telemetry: printedTelemetry(print, upstashTelemetry(store)),
+    totals: upstashTotals(store, now),
   };
 }
 
+/**
+ * Production's telemetry: `record()` prints the turn's chat_turn line to the function log, then hands
+ * the turn to the store's telemetry, when the store is set. The line comes first, so it shows also
+ * when the store fails.
+ */
+function printedTelemetry(print: (line: string) => void, store?: Telemetry): Telemetry {
+  return {
+    async record(event, reservation) {
+      print(chatTurnLine(event));
+      await store?.record(event, reservation);
+    },
+  };
+}
+
+/**
+ * The chat_turn line: the event's thirteen fields as JSON, and nothing else. An object with more
+ * fields, such as a threadId, still fits the type at run time, and no line holds a field that
+ * SPEC-chat leaves out.
+ */
+function chatTurnLine(event: ChatTurnEvent): string {
+  const { outcome, reads, citations, removed, modelCalls, durationMs, errorCode } = event;
+  const { inputTokens, cachedInputTokens, cacheWriteTokens, cacheWrite1hTokens, outputTokens } = event;
+  return JSON.stringify({
+    event: "chat_turn",
+    outcome,
+    reads,
+    citations,
+    removed,
+    modelCalls,
+    inputTokens,
+    cachedInputTokens,
+    cacheWriteTokens,
+    cacheWrite1hTokens,
+    outputTokens,
+    durationMs,
+    errorCode,
+  } satisfies ChatTurnEvent);
+}
+
 function inMemoryOps(now: () => Date, refusal?: "DAILY_LIMIT" | "SPEND_LIMIT"): Ops {
-  return { log: inMemoryQuestionLog(now), budget: inMemoryBudget(refusal), telemetry: inMemoryTelemetry() };
+  return {
+    log: inMemoryQuestionLog(now),
+    budget: inMemoryBudget(refusal),
+    telemetry: inMemoryTelemetry(),
+    // Only the store keeps daily totals, so the in-memory parts have none.
+    totals: async () => [],
+  };
 }
 
 /** The most characters of an unknown PREVIEW_LIMIT that the error shows, in case a secret went into it by mistake. */

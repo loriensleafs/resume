@@ -11,7 +11,8 @@ import { PASSAGE_CHARACTERS, renderSource, SOURCE_CHARACTERS, SUMMARY_CHARACTERS
 import type { Entry, Knowledge, PublicKnowledge, Source } from "./types";
 
 const REPO = `${import.meta.dir}/../..`;
-const SOURCES = "knowledge/sources";
+/** The folder of the source files, under the root. The site's build-time data watches it too (src/site/data.ts). */
+export const SOURCES = "knowledge/sources";
 
 /**
  * A link as written: "https://", then no white space, control character, invisible format
