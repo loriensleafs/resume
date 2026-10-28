@@ -87,7 +87,7 @@ Acceptance:
 - `/` and `/resume` each have a title, a description from `resume.yaml` (no fact copied by hand), a canonical address on `https://peterkloss.dev` and Open Graph tags (Testing 1; Standalone pages; AC).
 - The sitemap lists every prerendered page on `https://peterkloss.dev` (Testing 1).
 Verify: `bun test src/site/__tests__/build.test.ts`; `bun test`
-Files: `src/site/routes/__root.tsx`, `src/site/routes/index.tsx`, `src/site/routes/resume.tsx`, `vite.config.ts`, `src/site/__tests__/build.test.ts`
+Files: `src/site/page-head.ts`, `src/site/routes/index.tsx`, `src/site/routes/resume.tsx`, `vite.config.ts`, `src/site/__tests__/build.test.ts`
 Size: S
 Needs Peter: no
 
@@ -339,6 +339,7 @@ Blocked by: S7, S8
 Acceptance:
 - `bun run icons` (`scripts/icons.ts`) renders "PK" in Google Sans Flex Bold, white on `--ds-blue-700`, as a rounded square at 192 and 512 px, a maskable 512 px version with the letters inside the safe zone, and the favicon, with Chrome, locally, into `public/icons/`. The files are committed with the script (Views: App icon).
 - The build copies the committed icons; the icon files in the output are those files, at those sizes (Testing 1).
+- `/` and `/resume` gain `og:image` on `https://peterkloss.dev`, pointing at the committed 512 px icon, with its width and height (Peter's row 173; S6's `pageHead()` in `src/site/page-head.ts`).
 Verify: `bun run icons && git status public/icons`; `bun test src/site/__tests__/build.test.ts`; `bun test`
 Files: `scripts/icons.ts`, `public/icons/` (four files), `package.json` (the `icons` script), `src/site/build.ts`, `src/site/__tests__/build.test.ts`
 Size: M

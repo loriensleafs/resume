@@ -93,7 +93,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [S3](modules/site.md#s3-the-resume-view-from-build-time-data-with-knowledge-ids) The resume view from build-time data, with knowledge ids — blocked by S2, K1 (done 2026-10-27; each entry carries its id in `data-knowledge-id`; `root` reaches the data)
 - [x] [S4](modules/site.md#s4-the-app-bar-and-design-system-parts-in-prerendered-pages) The app bar, and design-system parts in prerendered pages — blocked by S3 (done 2026-10-27; `@acmelabs/design-system-react` 0.3.2, row 166; the name box keeps the board's colors, row 171; `/` loads 134.3 KB gzip)
 - [x] [S5](modules/site.md#s5-the-static-not-found-page) The static not-found page — blocked by S4 (done 2026-10-27; no script; the build script tags it)
-- [ ] [S6](modules/site.md#s6-page-titles-descriptions-canonical-addresses-and-share-previews) Page titles, descriptions, canonical addresses and share previews — blocked by S3
+- [x] [S6](modules/site.md#s6-page-titles-descriptions-canonical-addresses-and-share-previews) Page titles, descriptions, canonical addresses and share previews — blocked by S3 (done 2026-10-27; `pageHead()`; no public `pages.json`; the share image comes in S26, row 173)
 - [ ] [S7](modules/site.md#s7-google-sans-flex-served-from-the-site-itself) Google Sans Flex served from the site itself — blocked by S4; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [S8](modules/site.md#s8-seam-1-runs-the-build-script) Seam 1 runs the build script — blocked by S2 to S7, D16
 - [ ] [Checkpoint site: the build output](modules/site.md#checkpoint-site-the-build-output) — after S1 to S8, D16; Peter: look at `/` and `/resume` in `bun run dev`
@@ -104,7 +104,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 
 ## Phase 2: the workspace and the chat column
 
-- [ ] [D8](modules/deploy.md#d8-build-settings-in-code-and-no-env-files) Build settings in code, and no `.env` files — blocked by D6
+- [x] [D8](modules/deploy.md#d8-build-settings-in-code-and-no-env-files) Build settings in code, and no `.env` files — blocked by D6 (done 2026-10-27; no spike push: `bun.lock` is version 2 again since A10)
 - [ ] [D17](modules/deploy.md#d17-the-routes-redirects-clean-addresses-three-api-routes-and-the-not-found-page) The routes: redirects, clean addresses, three API routes and the not-found page — blocked by D16, D6
 - [ ] [D18](modules/deploy.md#d18-security-and-cache-headers) Security and cache headers — blocked by D17
 - [ ] [D10](modules/deploy.md#d10-the-question-log-in-upstash-deleted-by-the-store-after-90-days) The question log in Upstash, deleted by the store after 90 days — blocked by D9, D6

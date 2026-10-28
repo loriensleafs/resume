@@ -222,6 +222,7 @@ src/site/data.ts             the pages' data: a Vite module made at build time f
 src/site/styles/             tokens import, fonts, layout
 src/site/build.ts            buildSite({ root, outDir }): the Vite build with prerendering, documents/ and 404.html
 src/site/not-found.tsx       renderNotFoundPage(): the text of 404.html, a React tree with no script
+src/site/page-head.ts        SITE_ADDRESS and pageHead(): each page's title, description, canonical address and Open Graph tags
 src/site/service-worker.ts   writeServiceWorker(staticDir): Workbox generateSW over the static folder
 scripts/build-site.ts        `bun run build:site`: the build-time composition root (owned by SPEC-deploy)
 scripts/icons.ts             `bun run icons`: renders the icons with Chrome into public/icons/
