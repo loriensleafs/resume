@@ -1665,6 +1665,68 @@ describe("the system prompt", () => {
   });
 });
 
+describe("the wording draft", () => {
+  /** C15's wording draft, which Peter approves (row 153). Until then, his text and the model's text must stay one text. */
+  const WORDING_DRAFT = new URL("../../../../docs/design/wording-drafts/C15.md", import.meta.url);
+
+  /** The wording draft's text under `heading`, up to its next heading of level 2 or 3. The prompt's own "# " lines stay in. */
+  function draftSection(draft: string, heading: string): string {
+    const start = draft.indexOf(`\n${heading}\n`);
+    expect(start).toBeGreaterThan(-1);
+    const rest = draft.slice(start + heading.length + 2);
+    const end = rest.search(/^#{2,3} /m);
+    return end === -1 ? rest : rest.slice(0, end);
+  }
+
+  /** The cells of the table row in `section` whose first cell is `label`. */
+  function rowCells(section: string, label: string): string[] {
+    const row = section.split("\n").find((line) => line.startsWith(`| ${label} |`));
+    expect(row).toBeDefined();
+    return (row ?? "").split("|").slice(1, -1).map((cell) => cell.trim());
+  }
+
+  /** The audience lines' rows in the wording draft's request-lines table. */
+  const AUDIENCE_ROWS = [
+    ["recruiter", "Recruiter"],
+    ["manager", "Manager"],
+    ["engineer", "Engineer"],
+    ["designer", "Designer"],
+    ["product", "Product manager"],
+  ] as const;
+
+  test("its system prompt, five audience lines and two refusal wordings are the texts the model gets, with the email from basics", async () => {
+    const draft = await Bun.file(WORDING_DRAFT).text();
+    const email = "test@example.com";
+    const { fake, requests } = recordingFake(
+      Array.from({ length: 1 + AUDIENCE_ROWS.length }, () => ({ text: "Test Person built the first thing [highlight:acme.1]." })),
+    );
+    const deps = seamDeps(fake);
+    await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), deps));
+    for (const [audience] of AUDIENCE_ROWS) await readEvents(await handleChat(askWith("What did Test Person build?", { audience }), deps));
+    const [plain, ...asked] = requests.map(systemPromptsOf);
+    const systemPrompt = plain?.[0] ?? "";
+
+    // The system prompt: the wording draft's one fenced block, with the email and the core put in as the code puts them.
+    const fence = draftSection(draft, "### The system prompt").match(/```text\n([\s\S]*?)\n```/)?.[1] ?? "";
+    const CORE = "<the core: renderCore(knowledge)>";
+    expect(fence.endsWith(`\n${CORE}`)).toBe(true);
+    expect(systemPrompt).toBe(fence.replaceAll("<email>", email).replace(CORE, () => renderCore(knowledge)));
+
+    // Each audience line: the request-lines table's quoted text, alone in the second system block.
+    const requestLines = draftSection(draft, "### The request lines");
+    AUDIENCE_ROWS.forEach(([_audience, label], i) => {
+      expect(asked[i]?.[1]).toBe(rowCells(requestLines, label)[1]?.replace(/^"(.*)"$/, "$1"));
+    });
+
+    // Each refusal wording and its marker, as the refusals table gives them, is in the system prompt.
+    const refusals = draftSection(draft, "### The two refusal wordings");
+    for (const label of ["Outside the chat's topics", "Not covered"]) {
+      const [, wording, marker] = rowCells(refusals, label);
+      expect(systemPrompt).toContain(`answer ${wording?.replaceAll("<email>", email)} and add ${marker?.replace(/^`(.*)`$/, "$1")}.`);
+    }
+  });
+});
+
 describe("request checks", () => {
   /** A fake model that answers once, and seam-1 deps whose budget counts its reservations. */
   function checkSeam() {
