@@ -158,7 +158,7 @@ const Ids = z.array(z.string()).catch([]);
  * The three lists of ids, and no other field: an object schema drops every key it does not name, `text`
  * among them. A content that is no read result, such as a tool error, has no ids.
  */
-const ReadIdsSchema = z.object({ read: Ids, unknown: Ids, skipped: Ids }).catch({ read: [], unknown: [], skipped: [] }) satisfies z.ZodType<ReadIds>;
+export const ReadIdsSchema = z.object({ read: Ids, unknown: Ids, skipped: Ids }).catch({ read: [], unknown: [], skipped: [] }) satisfies z.ZodType<ReadIds>;
 
 /** An open tool's result when it opened (Tools). */
 const Opened = z.object({ opened: z.literal(true) });
@@ -196,8 +196,11 @@ function jsonOf(content: ToolCallResultEvent["content"]): unknown {
   }
 }
 
-/** The fields of a result that the browser gets: those its tool's entry names, or none. */
-function resultFieldsOf(tool: string, content: ToolCallResultEvent["content"]): unknown {
+/**
+ * The fields of a result that the browser gets: those its tool's entry names, or none. The conversation
+ * sent gives the model no more than these of an earlier result, from the request's copy (history.ts).
+ */
+export function resultFieldsOf(tool: string, content: ToolCallResultEvent["content"]): unknown {
   if (!isToolName(tool)) return NO_FIELDS;
   const fields = RESULT_FIELDS[tool].safeParse(jsonOf(content));
   return fields.success ? fields.data : NO_FIELDS;

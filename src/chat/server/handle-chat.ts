@@ -13,6 +13,7 @@ import {
 import type { Knowledge } from "../../knowledge/types";
 import { readAbout } from "./about-read";
 import { finishRejected, finishTurn, finishTurnHooks, type EndTurn } from "./finish-turn";
+import { conversationSent } from "./history";
 import { deadline, readBudget, turnLimits } from "./limits";
 import { answerMarkers } from "./markers";
 import { systemPrompts } from "./prompt";
@@ -56,7 +57,10 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
     await finishRejected(deps, startedAt);
     return chatError(checked.errorCode);
   }
-  const { threadId, messages, question, props } = checked.request;
+  const { threadId, question, props } = checked.request;
+  // The earlier turns within the conversation's limits, each message rebuilt from the fields the model
+  // needs, earlier reads as ids only, then the question (Limits, "Conversation sent"; The request, "Trust").
+  const messages = conversationSent(checked.request);
 
   // At the day's cap or the month's limit, the answer is the limit stream, and the model is not called.
   // The browser reads no body of a response that is not 200, so the refusal is a 200 stream (The request, "Limits").
@@ -83,7 +87,8 @@ export async function handleChat(request: Request, deps: ChatDeps): Promise<Resp
     systemPrompts: systemPrompts(deps.knowledge, props),
     messages: [...messages, ...about.messages],
     // The handler's own tools only: the request's tools never reach chat() (The request). open_source
-    // reads the request's earlier answers for the passages they cite.
+    // reads the earlier answers that the model gets for the passages they cite, so it opens no passage
+    // that only a turn past the conversation's limits cites.
     tools: chatTools(deps.knowledge, turn, messages),
     // At most six model calls; readBudget() makes the sixth answer (Limits, "Model calls").
     agentLoopStrategy: maxIterations(turnLimits.modelCalls),

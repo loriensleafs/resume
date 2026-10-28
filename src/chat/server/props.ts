@@ -10,10 +10,13 @@ import { z } from "zod";
 const TextPart = z.strictObject({ type: z.literal("text"), text: z.string() });
 
 /** A user message, which holds text only: a string, or text parts. */
-const UserMessage = z.looseObject({ role: z.literal("user"), content: z.union([z.string(), z.array(TextPart)]) });
+export const UserMessage = z.looseObject({ role: z.literal("user"), content: z.union([z.string(), z.array(TextPart)]) });
 
-/** A user message's text as sent. Its text parts join with no separator, as chat() joins them for the model. */
-function questionText(message: z.infer<typeof UserMessage>): string {
+/**
+ * A user message's text as sent: the question's, and an earlier question's in the conversation sent
+ * (history.ts). Its text parts join with no separator, as chat() joins them for the model.
+ */
+export function questionText(message: z.infer<typeof UserMessage>): string {
   return typeof message.content === "string" ? message.content : message.content.map((part) => part.text).join("");
 }
 

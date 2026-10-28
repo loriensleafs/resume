@@ -11,7 +11,7 @@ import { readLimits, readPassages } from "../../knowledge/read";
 import type { Knowledge } from "../../knowledge/types";
 import { turnLimits } from "./limits";
 import { markerScanner } from "./marker-scanner";
-import { OPEN_RESUME, OPEN_SOURCE, READ_SOURCES } from "./tool-names";
+import { OPEN_RESUME, OPEN_SOURCE, READ_SOURCES, type ToolName } from "./tool-names";
 import { hasRead, recordRead, type Turn } from "./turn";
 
 /**
@@ -33,6 +33,24 @@ const ReadInput = z.strictObject({
     .meta({ description: `What the read looks for, in a few words, at most ${turnLimits.topicCharacters} characters. The visitor sees it.` }),
 });
 
+/** open_resume's input: no field, as the browser opens the whole resume, at its top. */
+const OpenResumeInput = z.strictObject({});
+
+/** open_source's input: the passage to open. */
+const OpenSourceInput = z.strictObject({
+  passageId: z.string().meta({ description: "The id of one passage, <source id>.<n>." }),
+});
+
+/**
+ * Each tool's input schema, by the tool's name. The engine checks a call's arguments with it before
+ * the tool runs, and the conversation sent checks an earlier call's arguments with it (history.ts).
+ */
+export const TOOL_INPUTS = {
+  [READ_SOURCES]: ReadInput,
+  [OPEN_RESUME]: OpenResumeInput,
+  [OPEN_SOURCE]: OpenSourceInput,
+} as const satisfies Record<ToolName, z.ZodType>;
+
 const readSources = toolDefinition({
   name: READ_SOURCES,
   description:
@@ -49,8 +67,7 @@ const opened = () => ({ opened: true }) as const;
 const openResume = toolDefinition({
   name: OPEN_RESUME,
   description: "Opens the whole resume beside the chat, for a visitor who asks to see the resume. It returns { opened: true }.",
-  // No field: the browser opens the whole resume, at its top.
-  inputSchema: z.strictObject({}),
+  inputSchema: OpenResumeInput,
 });
 
 const openSource = toolDefinition({
@@ -58,9 +75,7 @@ const openSource = toolDefinition({
   description:
     "Opens one passage of an approved source beside the chat, for a visitor who asks where a fact came from. " +
     "Only a passage that an earlier answer cited, or that this turn read, opens. It returns { opened: true }, or an error.",
-  inputSchema: z.strictObject({
-    passageId: z.string().meta({ description: "The id of one passage, <source id>.<n>." }),
-  }),
+  inputSchema: OpenSourceInput,
 });
 
 /** open_source's two errors, as fixed text the model reads. Neither holds the id or any read text. */
