@@ -20,6 +20,18 @@ import {
 } from "./upstash";
 import { UpstashError, type Command, type UpstashStore } from "./upstash-rest";
 
+/** The outcomes of a turn whose model calls all finished. */
+const FINISHED_OUTCOMES = new Set<ChatTurnEvent["outcome"]>(["answered", "refusal:out-of-scope", "refusal:not-covered"]);
+
+/** The outcomes of a turn that reached the model: the outcomes the totals count. */
+const OUTCOMES = ["answered", "refusal:out-of-scope", "refusal:not-covered", "stopped", "error", "limit"] as const;
+
+/** The counts of a turn that its day adds up, the summed duration among them. */
+const TURN_COUNTS = ["modelCalls", "reads", "citations", "removed", "durationMs"] as const;
+
+/** The five token counts (SPEC-deploy, "Cost estimate"). */
+const TOKEN_COUNTS = ["inputTokens", "cachedInputTokens", "cacheWriteTokens", "cacheWrite1hTokens", "outputTokens"] as const;
+
 /** What the store keeps for one UTC day: how its chat turns ended, the tokens they used and how long they took. */
 export type DailyTotals = {
   date: string; // the UTC day, "2026-10-27"
@@ -108,29 +120,17 @@ function settledCost(event: ChatTurnEvent, tokens: TurnTokens | undefined): numb
   return finished && tokens ? limits.estimatedCost(tokens) : limits.reservation;
 }
 
-/** The outcomes of a turn whose model calls all finished. */
-const FINISHED_OUTCOMES = new Set<ChatTurnEvent["outcome"]>(["answered", "refusal:out-of-scope", "refusal:not-covered"]);
-
-/** The outcomes of a turn that reached the model: the outcomes the totals count. */
-const OUTCOMES = ["answered", "refusal:out-of-scope", "refusal:not-covered", "stopped", "error", "limit"] as const;
-
-/** The counts of a turn that its day adds up, the summed duration among them. */
-const TURN_COUNTS = ["modelCalls", "reads", "citations", "removed", "durationMs"] as const;
-
-/** The five token counts (SPEC-deploy, "Cost estimate"). */
-const TOKEN_COUNTS = ["inputTokens", "cachedInputTokens", "cacheWriteTokens", "cacheWrite1hTokens", "outputTokens"] as const;
-
 /**
  * What one turn adds to its day's hash, field by field: its token counts only when they are known.
  * A field it adds nothing to gets no command.
  */
 function statsIncrements(event: ChatTurnEvent, tokens: TurnTokens | undefined): [field: string, amount: number][] {
-  const increments: [string, number][] = [
-    [`outcome:${event.outcome}`, 1],
-    ...(event.errorCode === null ? [] : [[`errorCode:${codeWord(event.errorCode)}`, 1] as [string, number]]),
-    ...TURN_COUNTS.map((count): [string, number] => [count, wholeCount(event[count])]),
-    ...(tokens ? TOKEN_COUNTS.map((count): [string, number] => [count, tokens[count]]) : []),
-  ];
+  const increments: [field: string, amount: number][] = [[`outcome:${event.outcome}`, 1]];
+  if (event.errorCode !== null) increments.push([`errorCode:${codeWord(event.errorCode)}`, 1]);
+  for (const count of TURN_COUNTS) increments.push([count, wholeCount(event[count])]);
+  if (tokens) {
+    for (const count of TOKEN_COUNTS) increments.push([count, tokens[count]]);
+  }
   return increments.filter(([, amount]) => amount > 0);
 }
 

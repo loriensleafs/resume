@@ -23,9 +23,11 @@ export const monthCostKey = (day: string) => `qcost:${day.slice(0, 7)}`;
 /** The key of a day's totals: a hash of counts (`qstats`). */
 export const dayStatsKey = (day: string) => `qstats:${day}`;
 
+/** The one member of a day's `qslow` sorted set; its score is the day's longest duration. */
+export const LONGEST = "longest";
+
 /** The key of a day's longest duration: a sorted set whose one member is LONGEST (`qslow`). */
 export const dayLongestKey = (day: string) => `qslow:${day}`;
-export const LONGEST = "longest";
 
 /**
  * When a day's keys expire, in Unix seconds for `EXPIREAT`: 00:00 UTC on the 90th day after the day.
@@ -55,7 +57,7 @@ export function monthKeysExpireAt(day: string): string {
  */
 export function keptDays(now: () => Date, days: number): string[] {
   const today = now().getTime();
-  return Array.from({ length: Math.max(0, Math.min(days, RETENTION_DAYS)) }, (_unused, back) => utcDay(today - back * DAY_MS));
+  return Array.from({ length: Math.max(0, Math.min(days, RETENTION_DAYS)) }, (_, back) => utcDay(today - back * DAY_MS));
 }
 
 /**
