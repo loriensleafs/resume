@@ -15,6 +15,16 @@ export const reservation = dollars(0.9);
 export const dailyCap = dollars(8);
 
 /**
+ * Anthropic's monthly limit for the workspace `resume-chat`, $20 (row 113). Anthropic enforces the
+ * limit itself, from the Console; this copy is what the spend75 alert measures the month against, so
+ * a raise in the Console comes here too.
+ */
+export const monthlyLimit = dollars(20);
+
+/** The share of the monthly limit that the month's estimate passes before the spend75 alert, 75% (rows 115 and 121). */
+export const spendAlertShare = 0.75;
+
+/**
  * Sonnet 5.5's prices in dollars per million tokens (SPEC-deploy, "Cost estimate"; research 11). A
  * dollar per million tokens is a millionth of a dollar per token, so each price is also one token's
  * cost in the unit the store counts in.

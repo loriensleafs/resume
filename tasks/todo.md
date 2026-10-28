@@ -84,12 +84,12 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [C6](modules/chat.md#c6-the-read-budget-and-the-last-call) The read budget and the last call — blocked by C5 (done 2026-10-27; `readBudget(turn)` in `limits.ts`; `recordRead()` in `turn.ts`)
 - [x] [C7](modules/chat.md#c7-the-ask-about-this-read-and-request-line) The "Ask about this" read and request line — blocked by C6 (done 2026-10-27; `about-read.ts`; the About read counts toward the budget)
 - [x] [C8](modules/chat.md#c8-markers-refusals-follow-up-questions-and-the-citation-forms) Markers: refusals, follow-up questions and the citation forms — blocked by C5 (done 2026-10-27; `answerMarkers`; split markers covered at chunk sizes 1 to 9)
-- [ ] [C9](modules/chat.md#c9-the-open-tools-open_resume-and-open_source) The open tools: `open_resume` and `open_source` — blocked by C8
+- [x] [C9](modules/chat.md#c9-the-open-tools-open_resume-and-open_source) The open tools: `open_resume` and `open_source` — blocked by C8 (done 2026-10-27; `tool-names.ts`; the browser gets one fixed `open_source` error text)
 - [ ] [C10](modules/chat.md#c10-the-conversation-sent-20-turns-40000-characters-earlier-reads-as-ids) The conversation sent: 20 turns, 40,000 characters, earlier reads as ids — blocked by C5
 - [x] [C11](modules/chat.md#c11-the-limit-stream-stream-errors-model-errors-and-stop) The limit stream, stream errors, model errors and Stop — blocked by C3 (done 2026-10-27; the response has its own controller; a Stop that reaches the handler logs `stopped`)
 - [x] [C12](modules/chat.md#c12-the-stub-anthropic-client-anthropics-limit-max_tokens-and-the-thinking-settings) The stub Anthropic client: Anthropic's limit, `max_tokens` and the thinking settings — blocked by C11 (done 2026-10-27; one wire table; unknown tool results fail closed)
-- [ ] [C13](modules/chat.md#c13-the-120-second-deadline) The 120-second deadline — blocked by C12
-- [ ] [C14](modules/chat.md#c14-turn-telemetry-summed-usage-and-one-chat_turn-event-per-turn) Turn telemetry: summed usage and one `chat_turn` event per turn — blocked by C4, C12
+- [x] [C13](modules/chat.md#c13-the-120-second-deadline) The 120-second deadline — blocked by C12 (done 2026-10-27; `run.ts` and `request-checks.ts` came out of `handle-chat.ts`)
+- [x] [C14](modules/chat.md#c14-turn-telemetry-summed-usage-and-one-chat_turn-event-per-turn) Turn telemetry: summed usage and one `chat_turn` event per turn — blocked by C4, C12 (done 2026-10-27; `finishRejected()` writes a rejected request's event and no log entry)
 - [ ] [C15](modules/chat.md#c15-the-system-prompt-the-scope-and-audience-lines-and-the-refusal-wordings) The system prompt, the scope and audience lines, and the refusal wordings — blocked by C7 to C9; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [Checkpoint chat: the handler](modules/chat.md#checkpoint-chat-the-handler) — after C3 to C15
 - [x] [S3](modules/site.md#s3-the-resume-view-from-build-time-data-with-knowledge-ids) The resume view from build-time data, with knowledge ids — blocked by S2, K1 (done 2026-10-27; each entry carries its id in `data-knowledge-id`; `root` reaches the data)
@@ -127,7 +127,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [S21](modules/site.md#s21-saved-views-in-peterkloss-views) Saved views in `peterkloss-views` — blocked by S19
 - [ ] [S22](modules/site.md#s22-document-downloads-from-the-resume-view-and-the-app-bar) Document downloads from the resume view and the app bar — blocked by S11, T2
 - [ ] [Checkpoint site: the wide workspace](modules/site.md#checkpoint-site-the-wide-workspace) — after S9 to S22, D17; Peter: review the preview at 1440 × 900, light and dark
-- [ ] [C16](modules/chat.md#c16-the-chats-vite-plugin-virtualknowledge-and-the-device-index) The chat's Vite plugin: `virtual:knowledge` and the device index — blocked by K9, S8
+- [x] [C16](modules/chat.md#c16-the-chats-vite-plugin-virtualknowledge-and-the-device-index) The chat's Vite plugin: `virtual:knowledge` and the device index — blocked by K9, S8 (done 2026-10-27; the build code in `device-index-build.ts`; C17 adds the bundle test)
 - [ ] [C17](modules/chat.md#c17-the-route-file-apichatts-with-the-fake-model-outside-production) The route file `api.chat.ts`, with the fake model outside production — blocked by C14, C16, D9, S9, K11 to K13
 - [ ] [S31](modules/site.md#s31-the-preview-answers-the-api-routes) The preview answers the API routes — blocked by S9, C17
 - [ ] [D20](modules/deploy.md#d20-the-functions-run-on-bun-14-with-the-chats-limits) The functions run on Bun 1.4 with the chat's limits — blocked by D6, D17, S1, C17
@@ -156,7 +156,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [S24](modules/site.md#s24-the-resume-sheet-on-phones) The resume sheet on phones — blocked by S23
 - [ ] [S25](modules/site.md#s25-the-source-sheet-on-phones) The source sheet on phones — blocked by S24, S18
 - [x] [S26](modules/site.md#s26-the-app-icon) The app icon — blocked by S7, S8 (done 2026-10-27; four committed icons; `og:image` on `/` and `/resume`)
-- [ ] [S27](modules/site.md#s27-the-web-manifest-and-the-install-app-button) The web manifest and the "Install app" button — blocked by S26
+- [x] [S27](modules/site.md#s27-the-web-manifest-and-the-install-app-button) The web manifest and the "Install app" button — blocked by S26 (done 2026-10-27; `/` loads 153.9 KB gzip; the browser test's cleanup has a 30 s limit)
 - [ ] [S28](modules/site.md#s28-the-service-worker-and-its-precache) The service worker and its precache — blocked by S16, S22, S27, C16
 - [ ] [D19](modules/deploy.md#d19-the-service-worker-precaches-the-tagged-pages) The service worker precaches the tagged pages — blocked by S28, D17
 - [ ] [S29](modules/site.md#s29-offline-after-one-visit-and-installable) Offline after one visit, and installable — blocked by S28, S21, S25
@@ -164,7 +164,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [Checkpoint site: phones, offline, install](modules/site.md#checkpoint-site-phones-offline-install) — after S23 to S30; Peter: review the preview at 390 × 844
 - [x] [D11](modules/deploy.md#d11-the-daily-cap-holds-under-parallel-requests) The daily cap holds under parallel requests — blocked by D10 (done 2026-10-27; one store transaction per reservation; https only; D12 and D15 close the interim gaps)
 - [x] [D12](modules/deploy.md#d12-daily-totals-and-the-cost-estimate) Daily totals and the cost estimate — blocked by D11 (done 2026-10-27; a known cost settles the reservation; `daily-totals.ts`)
-- [ ] [D13](modules/deploy.md#d13-limit-alerts-for-the-months-spend-and-the-daily-cap) Limit alerts for the month's spend and the daily cap — blocked by D12; Peter: its wording draft goes to his one review before D37 (row 153)
+- [x] [D13](modules/deploy.md#d13-limit-alerts-for-the-months-spend-and-the-daily-cap) Limit alerts for the month's spend and the daily cap — blocked by D12; Peter: its wording draft goes to his one review before D37 (row 153) (done 2026-10-27; each push stops after 3 s; the `daycap` text is a wording draft)
 - [ ] [D14](modules/deploy.md#d14-the-monthly-limit-pauses-the-chat-and-one-probe-an-hour) The monthly limit pauses the chat, and one probe an hour — blocked by D13; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [D15](modules/deploy.md#d15-a-failing-or-slow-store-never-breaks-an-answer) A failing or slow store never breaks an answer — blocked by D13; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [Checkpoint deploy: the ops write side](modules/deploy.md#checkpoint-deploy-the-ops-write-side) — after D9 to D15
