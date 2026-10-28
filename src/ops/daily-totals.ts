@@ -18,7 +18,7 @@ import {
   metSpendLimit,
   monthCostKey,
   monthKeysExpireAt,
-  reservationDay,
+  readReservation,
   spendLimitMarkerCommands,
 } from "./upstash";
 import { UpstashError, type Command, type UpstashStore } from "./upstash-rest";
@@ -74,7 +74,7 @@ export function upstashTelemetry(
     async record(event, reservation) {
       if (reservation === undefined) return;
       const at = now();
-      const day = reservationDay(reservation);
+      const { day, probe } = readReservation(reservation);
       const expiresAt = dayKeysExpireAt(day);
       const tokens = knownTokens(event);
       const cost = settledCost(event, tokens);
@@ -94,7 +94,7 @@ export function upstashTelemetry(
               ["INCRBY", dayCostKey(day), String(settlement)],
               ["EXPIREAT", dayCostKey(day), expiresAt],
             ] satisfies Command[])),
-        ...spendLimitMarkerCommands(event, reservation, at),
+        ...spendLimitMarkerCommands(event, { probe, callFinished: tokens !== undefined }, at),
       ];
       // The index of the month's INCRBY reply below: the transaction answers in command order, so the
       // order must stay as it is, with the month's two commands pushed last.
@@ -133,16 +133,29 @@ export function upstashTotals(store: UpstashStore, now: () => Date): (days: numb
 }
 
 /**
- * What a turn costs once it ends (SPEC-deploy, "Which usage a turn settles with"). A turn whose model
- * calls all finished, an answer or a refusal with no error code, costs the estimate of its summed
- * usage. Any other turn keeps its whole reservation, because its last call's usage is not known: a
- * stopped turn, a DEADLINE, MAX_TOKENS or SERVER_ERROR turn, a broken stream, a turn that met the
- * monthly limit, and a turn whose counts are null or cannot be true.
+ * What a turn costs once it ends (SPEC-deploy, "Which usage a turn settles with"):
+ *
+ * - A turn whose model calls all finished, an answer or a refusal with no error code, costs the
+ *   estimate of its summed usage.
+ * - A turn that met Anthropic's monthly limit (SPEND_LIMIT) costs the estimate of its finished calls'
+ *   usage, and $0 when no call finished: Anthropic refuses the call at its limit, so that call runs no
+ *   tokens (decision record row 184). Counts that cannot be true say the usage is not known, so such a
+ *   turn keeps its reservation.
+ * - Any other turn keeps its whole reservation, because its last call's usage is not known: a stopped
+ *   turn, a DEADLINE, MAX_TOKENS or SERVER_ERROR turn, a broken stream, and a turn whose counts are
+ *   null or cannot be true.
  */
 function settledCost(event: ChatTurnEvent, tokens: TurnTokens | undefined): number {
+  if (metSpendLimit(event)) {
+    if (tokens) return limits.estimatedCost(tokens);
+    return noCallFinished(event) ? 0 : limits.reservation;
+  }
   const finished = FINISHED_OUTCOMES.has(event.outcome) && event.errorCode === null;
   return finished && tokens ? limits.estimatedCost(tokens) : limits.reservation;
 }
+
+/** Whether none of the turn's model calls finished: SPEC-chat gives null token counts then. */
+const noCallFinished = (event: ChatTurnEvent) => TOKEN_COUNTS.every((count) => event[count] === null);
 
 /**
  * What one turn adds to its day's hash, field by field: its token counts only when they are known.

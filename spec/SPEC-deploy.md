@@ -10,6 +10,8 @@ Amended on 2026-10-27 with the deploy spike's verdicts (task D6; [research 12](.
 
 Amended on 2026-10-27 after task A10 (rows 158 and 172): `bun.lock` is version 2 again, so task D8 needs no spike push (Configuration in code; Open Questions). Task D8 also found that `bunfig.toml` turns Bun's automatic `.env` loading off (Secrets and settings).
 
+Amended on 2026-10-27 after task D14 and its review: a `SPEND_LIMIT` turn settles with the cost of its finished model calls, $0 when none finished, so failed probes never fill the day's cap (Peter, row 184; "Which usage a turn settles with"). The probe deletes the marker only when one of its model calls finished (The monthly limit), the conductor's decision for Peter's end review.
+
 ## Objective
 
 Put the site and the chat on the internet at `https://peterkloss.dev`, and keep them safe, cheap and observable without Peter watching them. The site serves recruiters, hiring managers and engineers during Peter's job search, when traffic is higher than usual (row 114), so a quiet failure or a spent limit must reach Peter at once.
@@ -316,6 +318,7 @@ The prices and both limits live in `src/ops/limits.ts`. A test checks the estima
 
 - SPEC-chat's telemetry sums `onUsage` across the turn's finished model calls (amendment 5). The token counts in the daily totals are that sum, so they stay true.
 - One rule settles the cost: a turn whose last model call did not finish keeps its whole $0.90 reservation. This covers a turn cut off by the deadline (`DEADLINE`), a turn whose answer reached `max_tokens` (`MAX_TOKENS`), a turn whose stream broke, and a stopped turn whose abort reached the handler. Its real cost is not known, because TanStack AI reports usage only for a call that finishes (SPEC-chat).
+- The exception is a turn that meets Anthropic's monthly limit (`SPEND_LIMIT`). It settles with the cost of its finished model calls: the cost of their summed usage, and $0 when no call finished. Anthropic refuses the call at the limit, so that call runs no tokens and costs $0 (Peter, row 184). So a probe that meets the limit again adds nothing to the day or the month, and the hourly probe never fills the day's cap. Token counts that cannot be true still keep the whole reservation.
 - On Vercel a visitor's Stop does not reach the function (spike check 7; "A Stop on Vercel", below). The turn's model calls then finish (inferred, not seen: the spike had no model), and the turn settles with the cost of its summed usage, which is its real cost (Peter, row 168).
 - A turn with no usage at all, for example after a crash, also keeps its whole reservation.
 - A turn whose model calls all finished settles with the cost of its summed usage.
@@ -344,7 +347,7 @@ Either gives `errorCode: "SPEND_LIMIT"` and sets the marker `limit:spend` with t
 
 - While the marker is less than an hour old, `budget.reserve()` refuses with `SPEND_LIMIT` before calling the model, so visitors get the state at once and no call is wasted.
 - After an hour, one turn goes through as a probe; the others still refuse. A probe claims `limit:probe:<hour>` with `SET NX`, so only one goes through each hour.
-- If the probe reaches the model, `record()` deletes the marker, and the chat works again. That happens when Peter raises the limit in the Console. If the probe meets the limit again, the marker's time is reset.
+- If at least one of the probe's model calls finishes, and none meets the limit, `record()` deletes the marker, and the chat works again. That happens when Peter raises the limit in the Console. If the probe meets the limit again, the marker's time is reset. A probe whose call started and did not finish (a server error, the deadline, an abort or a rate limit) says nothing about the limit: it leaves the marker, and the next hour's probe tries again (D14's review).
 
 **How the limit state reaches the browser.** TanStack AI's browser client throws on a response that is not 200 without reading its body, so a refusal must arrive as a stream:
 
@@ -632,7 +635,8 @@ Approving this spec approves these amendments:
   5. Usage:
      - `ChatTurnEvent` gains `cacheWriteTokens` and `cacheWrite1hTokens`, and `inputTokens` means uncached input only;
      - telemetry sums `onUsage` across the turn's finished model calls; the token counts are `null` when no call finished;
-     - a turn whose last model call did not finish (stopped, `DEADLINE`, `MAX_TOKENS` or a broken stream), and a turn with no usage, keep their whole reservation.
+     - a turn whose last model call did not finish (stopped, `DEADLINE`, `MAX_TOKENS` or a broken stream), and a turn with no usage, keep their whole reservation;
+     - a turn that meets Anthropic's monthly limit (`SPEND_LIMIT`) settles with the cost of its finished model calls, and $0 when no call finished (row 184).
   6. The route sets `promptCache: "short"` explicitly.
   7. The 429 text becomes "Try again in a few minutes".
   8. `bun run questions` (`scripts/questions.ts`) moves to this spec, which owns `createOpsReader()`. It also prints the daily totals and the day's and the month's cost. `QuestionLog` keeps `append(entry)` and `list(days)`, and the reader also uses `list(days)`.
@@ -766,7 +770,7 @@ expect(tickets.filter((t) => t.ok)).toHaveLength(8); // 8 × $0.90 = $7.20; a ni
    - **Totals and cost.**
      - `record()` adds a turn to the day's totals; `totals(1)` shows the outcome counts, the five token counts and the longest duration.
      - A turn with known token counts, 1-hour writes among them, adds the worked example's cost from `limits.ts`, counted by hand.
-     - A turn with `null` token counts keeps its whole reservation.
+     - A turn with `null` token counts keeps its whole reservation, apart from a `SPEND_LIMIT` turn (Monthly limit, below).
      - A turn with one finished model call and a second one that did not finish keeps its whole reservation, and the totals show the first call's tokens only. The test runs this for a stopped turn and for a `DEADLINE` turn.
      - A rejected turn and a limit refusal write nothing to the store.
    - **Daily cap.**
@@ -777,7 +781,8 @@ expect(tickets.filter((t) => t.ok)).toHaveLength(8); // 8 × $0.90 = $7.20; a ni
      - The worked worst-case turn in `limits.ts` costs less than the reservation.
    - **Monthly limit.**
      - After a `SPEND_LIMIT` turn, `reserve()` refuses with `SPEND_LIMIT` for an hour, then lets exactly one probe through.
-     - A probe that reaches the model clears the marker; one that meets the limit resets its time.
+     - A probe whose model call finished clears the marker; one that meets the limit resets its time; one whose call started and did not finish leaves it.
+     - A `SPEND_LIMIT` turn with no finished call gives its $0.90 back to the day and adds $0 to the month; one with a finished call settles at that call's cost. Nine failed probes in one UTC day leave the day under the cap, and the next hour's probe still runs (row 184).
      - One `spendlimit` push that day.
    - **Alerts.**
      - The month's estimate crosses 75%: one `spend75` push, and none again that month.

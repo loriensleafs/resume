@@ -121,12 +121,16 @@ export const metSpendLimit = (event: ChatTurnEvent) => event.errorCode === "SPEN
  *
  * - A turn that met Anthropic's limit sets the marker to `at`, until 00:00 UTC on the first day of the
  *   next month. A probe that met it again does the same, so the hour's pause starts again.
- * - The probe, when it made a model call and that call did not meet the limit, deletes the marker, so
- *   the chat works again. Only the probe does: a turn that reserved before the marker, and ends after
- *   it, says nothing about the limit now.
- * - Any other turn adds nothing.
+ * - The probe, when at least one of its model calls finished and none met the limit, deletes the
+ *   marker, so the chat works again. A call that started and did not finish, after a server error, the
+ *   deadline, an abort or a rate limit, says nothing about the limit. Only the probe deletes: a turn
+ *   that reserved before the marker, and ends after it, says nothing about the limit now.
+ * - Any other turn adds nothing, so the next hour's probe tries again.
+ *
+ * @param turn says whether the turn is the hour's probe (readReservation()), and whether at least
+ *   one of its model calls finished: its token counts are known.
  */
-export function spendLimitMarkerCommands(event: ChatTurnEvent, reservation: string, at: Date): Command[] {
+export function spendLimitMarkerCommands(event: ChatTurnEvent, turn: { probe: boolean; callFinished: boolean }, at: Date): Command[] {
   if (metSpendLimit(event)) {
     const nextMonth = alertPeriodEnd(utcDay(at.getTime()).slice(0, 7));
     return [
@@ -134,7 +138,7 @@ export function spendLimitMarkerCommands(event: ChatTurnEvent, reservation: stri
       ["EXPIREAT", SPEND_LIMIT_MARKER, String(nextMonth / 1000)],
     ];
   }
-  if (isProbe(reservation) && event.modelCalls > 0) return [["DEL", SPEND_LIMIT_MARKER]];
+  if (turn.probe && turn.callFinished) return [["DEL", SPEND_LIMIT_MARKER]];
   return [];
 }
 
@@ -158,21 +162,22 @@ export function keptDays(now: () => Date, days: number): string[] {
 }
 
 /**
- * A new reservation. It names the UTC day its cost counts on, so a turn that ends after 00:00 UTC
- * settles on the day it reserved, and whether the turn is the hour's probe of the monthly limit; the
- * rest makes each reservation unique.
+ * A new reservation: `<day>/<uuid>`, or `<day>/probe/<uuid>` for the hour's probe of the monthly
+ * limit. The day is the UTC day its cost counts on, so a turn that ends after 00:00 UTC settles on the
+ * day it reserved; the uuid makes each reservation unique. readReservation() is the one reader of
+ * this text, so the two stay side by side.
  */
 const reservationOn = (day: string, kind: "turn" | "probe" = "turn") =>
   `${day}/${kind === "probe" ? "probe/" : ""}${crypto.randomUUID()}`;
 
-/** Whether a reservation is the one of an hour's probe of the monthly limit. */
-const isProbe = (reservation: string) => /^\d{4}-\d{2}-\d{2}\/probe\//.test(reservation);
-
-/** The UTC day a reservation names. A text that is not one of this budget's reservations throws. */
-export function reservationDay(reservation: string): string {
-  const day = /^(\d{4}-\d{2}-\d{2})\//.exec(reservation)?.[1];
-  if (day === undefined) throw new RangeError("The reservation is not one that this store's budget gave.");
-  return day;
+/**
+ * The UTC day a reservation names, and whether it is the hour's probe. A text that is not one of this
+ * budget's reservations throws.
+ */
+export function readReservation(reservation: string): { day: string; probe: boolean } {
+  const match = /^(\d{4}-\d{2}-\d{2})\/(probe\/)?/.exec(reservation);
+  if (match === null) throw new RangeError("The reservation is not one that this store's budget gave.");
+  return { day: match[1]!, probe: match[2] !== undefined };
 }
 
 /**
@@ -248,12 +253,10 @@ export function upstashBudget(
       const { total, spendLimitAt } = await reserveOnDay(store, day);
       if (spendLimitAt !== undefined) {
         const pauseEnds = spendLimitAt + SPEND_LIMIT_PAUSE_MS;
-        if (at.getTime() < pauseEnds) {
-          // Set before the await: a turn that starts while takeBack() waits is refused with no store call.
-          pausedUntil = pauseEnds;
-        } else if (total <= limits.dailyCap && (await claimProbe(store, at))) {
-          return { ok: true, reservation: reservationOn(day, "probe") };
-        }
+        const step = await atSpendLimit(store, at, pauseEnds, total);
+        if (step === "probe") return { ok: true, reservation: reservationOn(day, "probe") };
+        // Set before takeBack(): a turn that starts while it waits is refused with no store call.
+        if (step === "pause") pausedUntil = pauseEnds;
         await takeBack(store, day);
         return { ok: false, errorCode: "SPEND_LIMIT" };
       }
@@ -286,6 +289,21 @@ function markerTime(reply: unknown): number | undefined {
   if (typeof reply !== "string") throw new UpstashError("Upstash /multi-exec: GET did not answer text", "BAD_REPLY");
   const at = Date.parse(reply);
   return Number.isNaN(at) ? 0 : at;
+}
+
+/**
+ * What the budget does with a turn while the monthly limit's marker stands, at `at`:
+ *
+ * - "pause" until `pauseEnds`, an hour after a turn last met the limit;
+ * - "probe" when the day's new `total` is within the cap and the turn claims the hour's probe, which
+ *   is a store write (claimProbe());
+ * - "refuse" when the day is past its cap, or another turn holds the hour's probe.
+ */
+async function atSpendLimit(store: UpstashStore, at: Date, pauseEnds: number, total: number): Promise<"pause" | "probe" | "refuse"> {
+  if (at.getTime() < pauseEnds) return "pause";
+  if (total > limits.dailyCap) return "refuse";
+  const claimed = await claimProbe(store, at);
+  return claimed ? "probe" : "refuse";
 }
 
 /**

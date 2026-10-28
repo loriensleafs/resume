@@ -1060,8 +1060,60 @@ describe("the monthly limit, in production on the in-test Upstash and ntfy serve
     expect(tickets.filter((ticket) => !ticket.ok)).toEqual(Array.from({ length: 24 }, () => ({ ok: false, errorCode: "SPEND_LIMIT" })));
     // The hour's probe claim lives 2 hours.
     expect(upstash.expiresAt("limit:probe:2026-10-27T13")).toEqual(new Date("2026-10-27T15:00:00.000Z"));
-    // Every refusal took its $0.90 back: the day holds the first turn's kept $0.90 and the probe's, in millionths of a dollar.
-    expect(upstash.get("qcost:2026-10-27")).toBe("1800000");
+    // The first turn settled at $0, because none of its model calls finished (row 184), and every refusal took its
+    // $0.90 back: the day holds the probe's open $0.90 only, in millionths of a dollar.
+    expect(upstash.get("qcost:2026-10-27")).toBe("900000");
+  });
+
+  test("a SPEND_LIMIT turn with no finished model call gives its whole $0.90 back to the day and adds $0 to the month", async () => {
+    const ops = functionInstance();
+
+    await ops.telemetry.record(spendLimitTurn, await reserveOn(ops));
+
+    // Anthropic refused the call at its limit, so the call ran no tokens and cost nothing (row 184).
+    expect(upstash.get("qcost:2026-10-27")).toBe("0");
+    expect(upstash.get("qcost:2026-10")).toBe("0");
+  });
+
+  test("a SPEND_LIMIT turn whose first model call finished settles at that call's cost, on its day and in its month", async () => {
+    const ops = functionInstance();
+    // The first call finished with the worked example's usage; Anthropic refused the second at its limit.
+    const firstCallFinished: ChatTurnEvent = { ...workedExampleTurn, outcome: "limit", modelCalls: 2, errorCode: "SPEND_LIMIT" };
+
+    await ops.telemetry.record(firstCallFinished, await reserveOn(ops));
+
+    // The worked example's cost, counted by hand in the telemetry tests above: 58,001 millionths of a dollar.
+    expect(upstash.get("qcost:2026-10-27")).toBe("58001");
+    expect(upstash.get("qcost:2026-10")).toBe("58001");
+  });
+
+  test("a SPEND_LIMIT turn whose token counts cannot be true keeps its whole $0.90, because its usage is not known", async () => {
+    const ops = functionInstance();
+    // More 1-hour cache writes than cache writes: no finished call reports that.
+    const countsNotTrue: ChatTurnEvent = { ...workedExampleTurn, outcome: "limit", modelCalls: 2, cacheWrite1hTokens: 20_000, errorCode: "SPEND_LIMIT" };
+
+    await ops.telemetry.record(countsNotTrue, await reserveOn(ops));
+
+    expect(upstash.get("qcost:2026-10-27")).toBe("900000");
+    expect(upstash.get("qcost:2026-10")).toBe("900000");
+  });
+
+  test("nine failed probes in one UTC day leave the day under the $8 cap, and the next hour's probe still runs", async () => {
+    clock = new Date("2026-10-27T00:00:00.000Z");
+    const first = functionInstance();
+    await first.telemetry.record(spendLimitTurn, await reserveOn(first));
+
+    // While the limit holds, the probe of each hour from 01:00 to 09:00 meets it again.
+    for (let hour = 1; hour <= 9; hour++) {
+      clock = new Date(`2026-10-27T0${hour}:00:00.000Z`);
+      const prober = functionInstance();
+      await prober.telemetry.record(spendLimitTurn, await reserveOn(prober));
+    }
+
+    // Ten turns met the limit, and each settled at $0. With $0.90 kept for each, the eighth probe's reservation would pass the cap.
+    expect(upstash.get("qcost:2026-10-27")).toBe("0");
+    clock = new Date("2026-10-27T10:00:00.000Z");
+    expect(await functionInstance().budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) });
   });
 
   test("a turn that meets the limit sets limit:spend to its time in record()'s one transaction, until 00:00 UTC on the next month's first day", async () => {
@@ -1117,7 +1169,7 @@ describe("the monthly limit, in production on the in-test Upstash and ntfy serve
     expect(await ops.budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) });
   });
 
-  test("a probe that reaches the model deletes limit:spend, and every function instance allows turns again", async () => {
+  test("a probe whose model call finished deletes limit:spend, and every function instance allows turns again", async () => {
     const first = functionInstance();
     await first.telemetry.record(spendLimitTurn, await reserveOn(first));
     // Another instance reads the marker at 12:30, so it remembers the hour that ends at 13:00.
@@ -1189,6 +1241,32 @@ describe("the monthly limit, in production on the in-test Upstash and ntfy serve
     const tickets = await Promise.all([functionInstance().budget.reserve(), functionInstance().budget.reserve()]);
     expect(tickets.filter((ticket) => ticket.ok)).toHaveLength(1);
   });
+
+  // Each probe's model call started, and none finished: the token counts are null.
+  test.each([
+    ["a server error", { outcome: "error", errorCode: "SERVER_ERROR" }],
+    ["the deadline", { outcome: "error", errorCode: "DEADLINE" }],
+    ["an abort", { outcome: "stopped", errorCode: null }],
+    ["a rate limit", { outcome: "error", errorCode: "429" }],
+  ] as const)(
+    "a probe whose model call started but did not finish, after %s, leaves limit:spend, and the next UTC hour lets one more probe through",
+    async (_label, ending) => {
+      const first = functionInstance();
+      await first.telemetry.record(spendLimitTurn, await reserveOn(first));
+      clock = new Date("2026-10-27T13:10:00.000Z");
+      const prober = functionInstance();
+      const probe = await reserveOn(prober);
+
+      await prober.telemetry.record({ ...spendLimitTurn, ...ending, modelCalls: 1 }, probe);
+
+      // No call finished, so the probe says nothing about the limit now.
+      expect(upstash.get("limit:spend")).toBe("2026-10-27T12:00:00.000Z");
+      clock = new Date("2026-10-27T13:30:00.000Z");
+      expect(await functionInstance().budget.reserve()).toEqual({ ok: false, errorCode: "SPEND_LIMIT" });
+      clock = new Date("2026-10-27T14:00:00.000Z");
+      expect(await functionInstance().budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) });
+    },
+  );
 
   test("turns that meet the limit on 3 function instances push one urgent spendlimit that day, with the wording draft's text; the next UTC day's first one pushes again", async () => {
     const instances = [functionInstance(), functionInstance(), functionInstance()];
