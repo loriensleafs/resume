@@ -119,7 +119,7 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [S13](modules/site.md#s13-the-theme-switch) The theme switch — blocked by S12
 - [ ] [S14](modules/site.md#s14-the-workspace-contract-and-the-scope-from-the-career-timeline) The workspace contract, and the scope from the career timeline — blocked by S11
 - [ ] [S15](modules/site.md#s15-the-first-view-names-the-selected-role) The first view names the selected role — blocked by S14; Peter: its wording draft goes to his one review before D37 (row 153)
-- [ ] [S16](modules/site.md#s16-source-pages) Source pages — blocked by S6, S8, K3, K5, K9
+- [x] [S16](modules/site.md#s16-source-pages) Source pages — blocked by S6, S8, K3, K5, K9 (done 2026-10-27; nine source pages; `buildSiteData(root)`; public text only)
 - [ ] [S17](modules/site.md#s17-passage-text-as-markdown) Passage text as Markdown — blocked by S16, S13
 - [ ] [S18](modules/site.md#s18-a-source-opens-in-the-document-panel-from-its-address) A source opens in the document panel from its address — blocked by S14, S16
 - [ ] [S19](modules/site.md#s19-close-the-source-tab) Close the source tab — blocked by S18
