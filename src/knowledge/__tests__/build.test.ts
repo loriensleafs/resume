@@ -1,10 +1,10 @@
 // Seam 1 of SPEC-knowledge: buildKnowledge() on fixtures and on the real files, with renderCore(),
-// renderSource() and publicKnowledge() on its output.
+// renderSource(), publicKnowledge() and previewDraft() on its output.
 
 import { afterAll, describe, expect, test } from "bun:test";
 import { loadResume } from "../../content";
 import { holds } from "../../private-details";
-import { buildKnowledge, publicKnowledge } from "../build";
+import { buildKnowledge, previewDraft, publicKnowledge } from "../build";
 import { parseId } from "../ids";
 import { renderCore, renderSource } from "../render";
 import type { Source } from "../types";
@@ -582,6 +582,93 @@ describe("buildKnowledge on a draft source file", () => {
     expect(await stops("draft-sections", { [file]: deepDiveFile({ id: "draft-one", status: "draft", approved: null }, body) })).toStartWith(
       `${file}: a deep dive's sections must be, in order: Problem, What Peter did, How it worked, Result, Tools, Not public. Found: Problem, What Peter did, How it worked, Tools, Not public`,
     );
+  });
+});
+
+// What `bun run knowledge --draft <source id>` prints (SPEC-knowledge, Drafts and approval).
+describe("previewDraft on a draft source file", () => {
+  /** The fixture interview as a draft, with a link, so the line after the kind line has every part it can have in an interview. */
+  const DRAFT = interviewFile({ status: "draft", approved: null, links: '["https://github.com/loriensleafs/brain"]' });
+
+  test("gives the draft's text as renderSource() gives it once the draft is approved, and no problems for a draft that breaks no rule", async () => {
+    const preview = await previewDraft({ root: await fixture("preview-text", { [SAMPLE]: DRAFT }), id: "sample" });
+    // The same file, approved: only its status and its approved date change.
+    const approved = DRAFT.replace("status: draft", "status: approved\napproved: 2026-10-27");
+    const [source] = await builds("preview-text-approved", { [SAMPLE]: approved });
+    expect(preview).toEqual({ text: renderSource(source!), problems: [] });
+  });
+
+  test("names each rule a draft breaks, one line each with the file and the field, as the build names them once the draft is approved", async () => {
+    const file = "knowledge/sources/Draft_One.md";
+    const front = {
+      id: "Draft_One",
+      status: "draft",
+      approved: null,
+      roles: "[nope]",
+      highlights: "[highlight:acme.9]",
+      summary: "a".repeat(201),
+      links: '["http://example.com/", "https://peter:hunter2@example.com/"]',
+    };
+    // Over the passage budget, and with it over the rendered source's budget: 525 characters around the long passage.
+    const body = DEEP_DIVE_BODY.replace("Text for Problem.", "a".repeat(24_001))
+      .replace("Text for Result.", "")
+      .replace("Internal code.", "See https://wiki.example.com/ or ask alice@example.com.");
+    const draft = deepDiveFile(front, body);
+    const { text, problems } = await previewDraft({ root: await fixture("preview-every-rule", { ...SOURCES, [file]: draft }), id: "Draft_One" });
+    expect(problems).toEqual(
+      [
+        'id "Draft_One" is not a source id: use a slug (lowercase letters and digits, with single hyphens between them, at most 60 characters), never "basics" or "education"',
+        'roles[0] "nope" is not a role id in resume.yaml',
+        'highlights[0] "highlight:acme.9" is not a highlight in resume.yaml',
+        "summary must be one line of 1 to 200 characters; it has 201 characters on 1 line",
+        "links[0] is not an absolute https:// URL: write it in full, with no space, line break, backslash or invisible character",
+        "links[1] holds a user name or password: give the URL without them",
+        'passage Draft_One.1 ("Problem") has 24001 characters; an approved passage holds at most 3000',
+        'passage Draft_One.4 ("Result") has no text; an approved passage holds text, and only Not public may be empty',
+        'Not public holds a URL or an IP address; it names kinds of material only, such as "internal links"',
+        'Not public holds an email address; it names kinds of material only, such as "colleague names"',
+        "the rendered source has 24526 characters; an approved source renders to at most 24000",
+      ].map((problem) => `${file}: ${problem}`),
+    );
+    // The draft is rendered all the same, so its reader sees what the rules are about.
+    expect(text).toStartWith("# [Draft_One] A sample deep dive\nDeep dive: written from Peter's answers, in the third person.\n");
+    expect(text).toHaveLength(24_526);
+    // Once approved, the same file stops the build with the same lines.
+    const approved = draft.replace("status: draft", "status: approved\napproved: 2026-10-27");
+    expect(await stops("preview-every-rule-approved", { [file]: approved })).toBe(problems.join("\n"));
+  });
+
+  test.each([
+    ["broken front matter", deepDiveFile({ id: "draft-one", status: "draft", approved: null, kind: "case-study" })],
+    ["a missing section", deepDiveFile({ id: "draft-one", status: "draft", approved: null }, DEEP_DIVE_BODY.replace("## Result\n\nText for Result.\n\n", ""))],
+    [
+      "the Not public heading in a code block",
+      deepDiveFile({ id: "draft-one", status: "draft", approved: null }, DEEP_DIVE_BODY.replace("Text for Tools.", "```\n## Not public: decline to describe these kinds of material\n```")),
+    ],
+  ])("names the shape rule a draft with %s breaks, as the build stops on it, and gives no text, since nothing can be rendered", async (name, draft) => {
+    const files = { "knowledge/sources/draft-one.md": draft };
+    const preview = await previewDraft({ root: await fixture(`preview-shape-${name.replaceAll(" ", "-")}`, files), id: "draft-one" });
+    expect(preview).toEqual({ text: "", problems: [await stops(`preview-shape-${name.replaceAll(" ", "-")}-build`, files)] });
+  });
+
+  test("reads an approved source file the same way, so a change to one can be read with the rules it breaks", async () => {
+    const { text, problems } = await previewDraft({ root: await fixture("preview-approved-file", { [SAMPLE]: interviewFile({ roles: "[nope]" }) }), id: "sample" });
+    expect(text).toStartWith("# [sample] Why platform work\nInterview: Peter's own words, in the first person.\nRoles: nope.\n\n## [sample.1] Why front-end platform work?\n");
+    expect(problems).toEqual([`${SAMPLE}: roles[0] "nope" is not a role id in resume.yaml`]);
+  });
+
+  test.each([
+    ["an id no source file has", "nope"],
+    ["a path up out of knowledge/sources/", "../secret"],
+    ["a path into a folder inside knowledge/sources/", "deeper/secret"],
+  ])("stops on %s, naming the id, and reads no file outside the files of knowledge/sources/", async (_case, id) => {
+    // Each file would parse as a draft from its own folder, so a path joined from the id would read it.
+    const root = await fixture(`preview-not-found-${_case.replace(/[^a-z]+/g, "-")}`, {
+      [SAMPLE]: DRAFT,
+      "knowledge/secret.md": interviewFile({ id: "secret", status: "draft", approved: null }),
+      "knowledge/sources/deeper/secret.md": interviewFile({ id: "secret", status: "draft", approved: null }),
+    });
+    await expect(previewDraft({ root, id })).rejects.toThrow(`knowledge/sources: no source file has the id ${JSON.stringify(id)}`);
   });
 });
 

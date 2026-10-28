@@ -204,6 +204,18 @@ describe("parseSource", () => {
     },
   );
 
+  test.each([
+    ["## Not public", "```markdown"],
+    ["## Not public: decline to describe these kinds of material", "```"],
+    ["### not public", "~~~"],
+    ["# Not Public", "````text"],
+  ])("stops on %p in a code block, a line that looks like the Not public heading, which the chat could read as that section", (line, fence) => {
+    const body = `## How is a source laid out?\n\nLike this:\n\n${fence}\n${line}\nSECRET.\n${fence.match(/^[`~]+/)![0]}\n\n## Not public\n\nColleague names.\n`;
+    const message = failure(interviewFile({}, body));
+    expect(message).toContain(`${JSON.stringify(line)}, in a code block, looks like the Not public heading, and the chat could read it as that section: write the line another way`);
+    expect(message).not.toContain("SECRET");
+  });
+
   test("keeps a ## line inside a fenced code block as text of its passage, as Markdown does", () => {
     const answer = [
       "## How is a source laid out?",
@@ -212,7 +224,7 @@ describe("parseSource", () => {
       "",
       "```markdown title=x",
       "## Problem",
-      "## not public",
+      "## Result",
       "```",
       "",
       "~~~",
@@ -230,7 +242,7 @@ describe("parseSource", () => {
     ].join("\n");
     const { source } = parseSource(interviewFile({}, answer), SOURCE_FILE);
     expect(source.passages.map((p) => p.heading)).toEqual(["How is a source laid out?"]);
-    expect(source.passages[0]!.text).toContain("```markdown title=x\n## Problem\n## not public\n```");
+    expect(source.passages[0]!.text).toContain("```markdown title=x\n## Problem\n## Result\n```");
     expect(source.passages[0]!.text).toContain("~~~\n```\n## Still code\n~~~~");
     expect(source.notPublic).toBe("Colleague names.");
 
