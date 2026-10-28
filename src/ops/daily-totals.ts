@@ -56,8 +56,14 @@ export type DailyTotals = {
  * and adds that cost to the month. A turn without one, a rejected request or a refusal at the cap or
  * the monthly limit, writes nothing, so a flood of bad requests costs the store nothing. Printing the
  * chat_turn line is createOps()'s part.
+ *
+ * @param onMonthCost gets the month's estimate after each turn that adds to it, from the same
+ *   transaction's reply, for the spend75 alert (alerts.ts).
  */
-export function upstashTelemetry(store: UpstashStore): Telemetry {
+export function upstashTelemetry(
+  store: UpstashStore,
+  onMonthCost: (day: string, monthCost: number) => Promise<void> = async () => {},
+): Telemetry {
   return {
     async record(event, reservation) {
       if (reservation === undefined) return;
@@ -70,7 +76,7 @@ export function upstashTelemetry(store: UpstashStore): Telemetry {
       const month = monthCostKey(day);
       // The settlement replaces the reservation on the day it counts on with the turn's cost.
       const settlement = cost - limits.reservation;
-      await store.transaction([
+      const commands: Command[] = [
         ...statsIncrements(event, tokens).map(([field, amount]): Command => ["HINCRBY", stats, field, String(amount)]),
         ["EXPIREAT", stats, expiresAt],
         ["ZADD", longest, "GT", String(wholeCount(event.durationMs)), LONGEST],
@@ -81,9 +87,16 @@ export function upstashTelemetry(store: UpstashStore): Telemetry {
               ["INCRBY", dayCostKey(day), String(settlement)],
               ["EXPIREAT", dayCostKey(day), expiresAt],
             ] satisfies Command[])),
-        ["INCRBY", month, String(cost)],
-        ["EXPIREAT", month, monthKeysExpireAt(day)],
-      ]);
+      ];
+      // The index of the month's INCRBY reply below: the transaction answers in command order, so the
+      // order must stay as it is, with the month's two commands pushed last.
+      const monthReply = commands.length;
+      commands.push(["INCRBY", month, String(cost)], ["EXPIREAT", month, monthKeysExpireAt(day)]);
+      const monthCost = (await store.transaction(commands))[monthReply];
+      if (typeof monthCost !== "number" || !Number.isSafeInteger(monthCost)) {
+        throw new UpstashError("Upstash /multi-exec: INCRBY did not answer a whole number", "BAD_REPLY");
+      }
+      await onMonthCost(day, monthCost);
     },
   };
 }

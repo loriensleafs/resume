@@ -3,9 +3,12 @@
 // (decision record rows 131 and 132); the other values were approved with the spec. A change to a
 // limit asks Peter first (SPEC-chat, Boundaries).
 //
-// The readBudget middleware below enforces the reads and the last call; C13 adds the deadline.
+// The readBudget middleware below enforces the reads and the last call, and the deadline middleware
+// the 120 seconds of a run.
 
 import type { ChatMiddleware } from "@tanstack/ai";
+import type { EndTurn } from "./finish-turn";
+import { READ_SOURCES } from "./tool-names";
 import type { Turn } from "./turn";
 
 export const turnLimits = {
@@ -24,12 +27,6 @@ export const turnLimits = {
                               // (a typical one is 1 to 3 KB; the conductor's value, for Peter's end review)
   fitCheckRequirements: 10,   // a prompt rule: the fit check lists at most this many requirements; the evals check it
 } as const;
-
-/**
- * The read tool's name, as tools.ts gives it. This module imports nothing from tools.ts, because
- * tools.ts reads turnLimits when it loads; the read-budget tests fail when the two names differ.
- */
-const READ_TOOL = "read_sources";
 
 /**
  * The read budget of one turn (Limits, "Reads" and "The last call"): code, not the prompt, stops the
@@ -52,7 +49,7 @@ export function readBudget(turn: Pick<Turn, "reads">): ChatMiddleware {
   return {
     name: "read-budget",
     onGuardToolCall: (_ctx, call) => {
-      if (call.toolName !== READ_TOOL) return undefined;
+      if (call.toolName !== READ_SOURCES) return undefined;
       if (reads >= turnLimits.reads) return { type: "skip", result: { error: "The read limit for this question is reached." } };
       reads++;
       return undefined;
@@ -62,5 +59,45 @@ export function readBudget(turn: Pick<Turn, "reads">): ChatMiddleware {
       const lastCall = ctx.iteration >= turnLimits.modelCalls - 1;
       return readsUsedUp || lastCall ? { toolChoice: "none" } : undefined;
     },
+  };
+}
+
+/** The reason the deadline aborts a run with. Only passedDeadline() reads it. */
+const DEADLINE_REASON = "DEADLINE";
+
+/** Whether the deadline aborted the run whose controller has `signal`. */
+export const passedDeadline = (signal: AbortSignal): boolean => signal.reason === DEADLINE_REASON;
+
+/**
+ * The deadline of one turn (Limits, "Deadline"): a timer on the run's abortController, `run`.
+ *
+ * - The timer starts when the run starts. When it fires, the deadline ends the turn with
+ *   `endTurn()` as error DEADLINE, then aborts the run. The abort reaches the model call through
+ *   chat()'s abortController, so a call that never ends ends too. The stream wrapper (run.ts) then
+ *   sends the handler's own RUN_ERROR DEADLINE before the stream closes, because the browser takes a
+ *   stream that closes with no error event as a finished answer.
+ * - The turn ends before the abort reaches the run's terminal hook, so the hook's later ending writes
+ *   nothing (finishTurn() writes a turn once): the log records error, not stopped. ctx.defer() makes
+ *   the run await the writes before its stream ends.
+ * - A Stop or a closed connection that aborted the run first decides how the turn ends.
+ * - The timer stops at the run's terminal hook, so no timer outlives the turn. TanStack AI runs exactly
+ *   one terminal hook per run, and it runs the middleware's hooks in array order: put the deadline
+ *   first, so it stops the timer before any of the chat's other terminal hooks runs or waits.
+ */
+export function deadline(run: AbortController, endTurn: EndTurn): ChatMiddleware {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stop = () => clearTimeout(timer);
+  return {
+    name: "deadline",
+    onStart: (ctx) => {
+      timer = setTimeout(() => {
+        if (run.signal.aborted) return;
+        ctx.defer(endTurn({ outcome: "error", errorCode: "DEADLINE" }));
+        run.abort(DEADLINE_REASON);
+      }, turnLimits.deadlineMs);
+    },
+    onFinish: stop,
+    onAbort: stop,
+    onError: stop,
   };
 }

@@ -14,7 +14,7 @@ import { turnLimits } from "./limits";
 import { markerScanner, type MarkerScanner, type Scan, type Verdict } from "./marker-scanner";
 import type { RefusalKind } from "./question-log";
 import { logServerError } from "./server-log";
-import type { Turn } from "./turn";
+import { hasRead, type Turn } from "./turn";
 
 /** The value of the chat.citations event. */
 export type Citations = { citations: string[]; removed: number };
@@ -67,11 +67,10 @@ export function answerMarkers(knowledge: Knowledge, turn: Turn): ChatMiddleware 
   const followUps: string[] = [];
 
   /**
-   * Whether the turn has read this passage: its id, or its whole source, is in the turn's reads. A
-   * whole-source read reads every passage the source has, and no other.
+   * Whether the turn has read this passage of an approved source: its id, or its whole source, is in
+   * the turn's reads (hasRead()). A whole-source read reads every passage the source has, and no other.
    */
-  const readThisTurn = (id: string, source: string) =>
-    passages.has(id) && (turn.readIds.includes(id) || turn.readIds.includes(source));
+  const readThisTurn = (id: string, source: string) => passages.has(id) && hasRead(turn, id, source);
 
   /**
    * A bracketed text is a citation only in an id form, and a source or passage form only for a source

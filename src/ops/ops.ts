@@ -3,7 +3,8 @@
 // totals. Outside production they are the chat module's in-memory versions, whatever variables are
 // set, so a preview never reaches the store or sends an alert (decision record row 108). In
 // production the telemetry prints each turn's chat_turn line, and with the store set, the log, the
-// budget, the telemetry and the totals are the store's (upstash.ts, daily-totals.ts).
+// budget, the telemetry and the totals are the store's (upstash.ts, daily-totals.ts), and the budget
+// and the telemetry raise the limit alerts (alerts.ts).
 
 import {
   inMemoryBudget,
@@ -14,6 +15,7 @@ import {
   type Telemetry,
 } from "../chat/server/question-log";
 import type { ChatTurnEvent } from "../chat/server/telemetry";
+import { limitAlerts } from "./alerts";
 import { upstashTelemetry, upstashTotals, type DailyTotals } from "./daily-totals";
 import { upstashBudget, upstashQuestionLog } from "./upstash";
 import { upstashStore } from "./upstash-rest";
@@ -53,9 +55,11 @@ export type Ops = {
  * - In production, `PREVIEW_LIMIT` is ignored, whatever its value, and `record()` prints each turn's
  *   chat_turn line through `io.print`, the function log by default. With `KV_REST_API_URL` and
  *   `KV_REST_API_TOKEN` both set, the log, the budget, the telemetry and the totals are the store's,
- *   and each store call goes through `io.fetch`. Without both, the log and the budget stay in memory,
- *   the budget allows every turn, and there are no daily totals, so answers keep working (SPEC-deploy,
- *   "A setting is missing in production").
+ *   and each store call goes through `io.fetch`. With `NTFY_TOPIC_URL` also set, a DAILY_LIMIT refusal
+ *   and a month's estimate past 75% of the limit push their limit alerts, through `io.fetch` too, and
+ *   a failed push prints an ops_error line through `io.print`. Without both store variables, the log
+ *   and the budget stay in memory, the budget allows every turn, and there are no daily totals or
+ *   alerts, so answers keep working (SPEC-deploy, "A setting is missing in production").
  */
 export function createOps(
   env: OpsEnv,
@@ -69,11 +73,13 @@ export function createOps(
   if (!env.KV_REST_API_URL || !env.KV_REST_API_TOKEN) {
     return { ...inMemoryOps(now), telemetry: printedTelemetry(print) };
   }
-  const store = upstashStore({ url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN, fetch: io.fetch ?? fetch });
+  const fetchFn = io.fetch ?? fetch;
+  const store = upstashStore({ url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN, fetch: fetchFn });
+  const alerts = limitAlerts({ topicUrl: env.NTFY_TOPIC_URL, store, fetch: fetchFn, now, print });
   return {
     log: upstashQuestionLog(store, now),
-    budget: upstashBudget(store, now),
-    telemetry: printedTelemetry(print, upstashTelemetry(store)),
+    budget: upstashBudget(store, now, alerts.dayCapped),
+    telemetry: printedTelemetry(print, upstashTelemetry(store, alerts.monthCost)),
     totals: upstashTotals(store, now),
   };
 }

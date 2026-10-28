@@ -161,10 +161,19 @@ function reviewerPrompt(axis, retry) {
 }
 
 // Row 147: a report whose first line does not name the skills loaded is rejected once.
+// It also names each library skill the task gives (the skill part after '#'): two correctness
+// reviewers skipped theirs as "not needed" on 2026-10-27 (C9 and S27).
+const LIBRARY_SKILLS = (t.libraries && t.libraries !== 'none')
+  ? t.libraries.split(',').map(s => s.trim().split('#').pop()).filter(Boolean)
+  : []
+
 function capabilityHolds(review) {
   if (!review || !review.capability) return false
-  return review.capability.includes('brain:code-review-and-quality')
-    && review.capability.includes('ask-user-question')
+  const line = review.capability
+  if (/not loaded|skipped|did not load/i.test(line) && LIBRARY_SKILLS.length) return false
+  return line.includes('brain:code-review-and-quality')
+    && line.includes('ask-user-question')
+    && LIBRARY_SKILLS.every(skill => line.includes(skill))
 }
 
 phase('Review')
