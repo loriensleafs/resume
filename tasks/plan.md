@@ -99,7 +99,7 @@ Each item names the task it blocks; todo.md shows them as "Peter:".
 
 | Risk | Mitigation |
 |---|---|
-| The design system renames parts during its systematization pass | Pin exact versions (0.3.2); upgrade deliberately |
+| The design system renames parts during its systematization pass | Pin exact versions (0.3.3); upgrade deliberately, the core, the React wrappers and the docs server together, with the design system's migration skill (row 172) |
 | The design system's React package does not server-render | Pages prerender each part as its tag with its light-DOM text and no declarative shadow root (S4); the parts upgrade in the browser (S9) |
 | The chat states a wrong fact | Knowledge base only; the citation check on the server; no `Not public` text on the wire; trick-question evals on Peter's approval (C40, C41) |
 | Abuse runs up the API bill | WAF rate limits per address; the $8 daily cap with a $0.90 reservation per turn; the Anthropic workspace spend limit; limit alerts to Peter's phone (D11 to D14) |

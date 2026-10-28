@@ -27,7 +27,7 @@
   color: var(--ds-gray-900);
 }
 
-/* Text for screen readers only. The design system documents no such class (0.3.2), so the site keeps its own. */
+/* Text for screen readers only. The design system documents no such class (0.3.3), so the site keeps its own. */
 .visually-hidden {
   position: absolute;
   width: 1px;
