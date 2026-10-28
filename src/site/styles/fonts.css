@@ -1,21 +1,32 @@
 /* The site's own fonts (SPEC-site, Tech Stack: no request to Google Fonts or any other third party). The design system's
-   token stylesheet names Google Sans Flex first in its text stack, --acme-font-sans, and gives it no file; this rule
-   does. The file is a Latin subset of the variable font with its weight axis from 400 to 700, cut by
-   scripts/site-fonts.ts and committed in public/fonts/, which the build copies to /fonts/.
+   token stylesheet names Google Sans Flex first in its text stack, --acme-font-sans, and Google Sans Code in its stack
+   for labels, numbers and code, --acme-font-mono, and gives neither a file; these rules do. Each file is a Latin subset
+   of the variable font with its weight axis from 400 to 700, cut by scripts/site-fonts.ts and committed in
+   public/fonts/, which the build copies to /fonts/.
    - font-weight 400 700 maps every weight in that range onto the axis; a single weight would make the browser
      synthesize bold.
-   - font-display swap is the design system's own: its Typeface page loads the family with display=swap. Text shows at
-     once in the fallback font, then in this one.
+   - font-display swap is the design system's own: its Typeface page loads both families with display=swap. Text shows
+     at once in the fallback font, then in this one.
    - No preload link, as the design system's own load has none. On a phone profile (slow 4G, 4x CPU, three cold
-     loads of / and /resume, 2026-10-27), a preload shared the link with the stylesheet that blocks the first paint:
-     the first and the largest paint came about 190 ms later (870 ms against 680 ms), for about 430 ms less in the
-     fallback font. Layout shift was 0 either way. On later visits, the service worker's precache (task S28) serves
-     the file.
-   - No unicode-range: the file is the only one for the family, and a character it lacks falls back on its own. */
+     loads of / and /resume, 2026-10-27), a preload of the Flex file shared the link with the stylesheet that blocks
+     the first paint: the first and the largest paint came about 190 ms later (870 ms against 680 ms), for about
+     430 ms less in the fallback font. Layout shift was 0 either way. A browser fetches the Code file only for a page
+     that shows text in the mono stack. On later visits, the service worker's precache (task S28) serves the files.
+   - No unicode-range: each file is the only one for its family, and a character it lacks falls back on its own.
+   - The mono stack names "GoogleSansCode Nerd Font Mono" before Google Sans Code; a device with that local build
+     keeps it, as the design system intends (its Typeface page). */
 @font-face {
   font-family: "Google Sans Flex";
   font-style: normal;
   font-weight: 400 700;
   font-display: swap;
   src: url("/fonts/google-sans-flex-latin.woff") format("woff");
+}
+
+@font-face {
+  font-family: "Google Sans Code";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/google-sans-code-latin.woff") format("woff");
 }

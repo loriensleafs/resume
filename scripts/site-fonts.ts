@@ -1,45 +1,79 @@
-// `bun run scripts/site-fonts.ts [path/to/GoogleSansFlex-VF-5.000.ttf]`: cuts the site's font into public/fonts/
-// (SPEC-site, Tech Stack: Google Sans Flex served from the site itself, a Latin subset of the variable font).
+// `bun run scripts/site-fonts.ts [variable font...]`: cuts the site's fonts into public/fonts/ (SPEC-site, Tech Stack:
+// Google Sans Flex and Google Sans Code served from the site itself, a Latin subset of each variable font).
 //
-// The cut is one WOFF file. It keeps the weight axis from 400 to 700 and pins every other axis at its default. That is
-// the font Google Fonts serves for the design system's own request, `family=Google+Sans+Flex:wght@400..700` (its
-// Typeface page, 0.3.3): Google pins each axis a request does not name. So the site draws text as the design system
-// and the mockups do, with no request to Google. The build copies public/fonts/ into the site and downloads nothing
-// (SPEC-deploy, Documents), so commit what this script writes.
+// Each cut is one WOFF file. It keeps the weight axis from 400 to 700 and pins every other axis at its default. That is
+// the font Google Fonts serves for the design system's own request,
+// `family=Google+Sans+Flex:wght@400..700&family=Google+Sans+Code:wght@400..700` (its Typeface page, 0.3.3): Google
+// pins each axis a request does not name. So the site draws text in Google Sans Flex, and labels, numbers and code in
+// Google Sans Code, as the design system and the mockups do, with no request to Google. The build copies
+// public/fonts/ into the site and downloads nothing (SPEC-deploy, Documents), so commit what this script writes.
 //
 // The cutter is HarfBuzz's subsetter, compiled to WebAssembly in the harfbuzzjs package, as in the content module's
 // scripts/make-fonts.ts, which cuts the documents' fonts; this script leaves that script and fonts/ unchanged.
 // The format is WOFF, the format of the wording draft for Peter's one review (decision record row 153). The draft,
-// docs/design/wording-drafts/S7.md, compares it with WOFF2.
+// docs/design/wording-drafts/S7.md, compares it with WOFF2; both files follow his choice.
 //
 // Usage:
-//   bun run scripts/site-fonts.ts                   downloads the variable font to GoogleSansFlex-VF-5.000.ttf if missing
-//   bun run scripts/site-fonts.ts <variable font>   cuts that file; it must be the version below
+//   bun run scripts/site-fonts.ts                     downloads each variable font to its path below if missing
+//   bun run scripts/site-fonts.ts <variable font>...  cuts each file given, which its SHA-256 matches to a font below;
+//                                                     a font with no file given comes from its path, as above
 
 const REPO = `${import.meta.dir}/..`;
 
-/**
- * The variable font: Google Sans Flex 5.000 in google/fonts at a fixed commit, with its SHA-256. The script cuts only
- * this file, so a new cut reproduces the committed one. `bun run fonts` downloads the same font from google/fonts'
- * main branch, where version 5.000 landed on 2026-10-09, and keeps it as GoogleSansFlex-VF.ttf.
- */
-const SOURCE = {
-  url: "https://raw.githubusercontent.com/google/fonts/bd8f81ddb5c74d5c8897b36ad88b440266245103/ofl/googlesansflex/GoogleSansFlex%5BROND%2Copsz%2Cslnt%2Cwdth%2Cwght%5D.ttf",
-  sha256: "a9ac770798857d5e8ac593ced42b22e40a7c08cec98319f92b0eccc2783a77ba",
-  // In the repository's root, where git ignores it. The name carries the version, so this pinned copy and the
-  // unpinned copy of `bun run fonts` never share a file, and neither script cuts the other's download.
-  path: "GoogleSansFlex-VF-5.000.ttf",
+type Font = {
+  family: string;
+  /**
+   * The variable font in google/fonts at a fixed commit, with its SHA-256. The script cuts only this file, so a new cut
+   * reproduces the committed one. The path is in the repository's root, where git ignores it.
+   */
+  source: { url: string; sha256: string; path: string };
+  /**
+   * The cut file, in the repository. The site's @font-face rules (src/site/styles/fonts.css) name it at its address,
+   * the same path under /fonts/. Its license, OFL.txt, is committed beside it and holds each font's copyright notice.
+   */
+  output: string;
+  /** Every axis but weight, pinned at its default in the font's fvar table. Google Fonts pins them there too. */
+  pinned: Record<string, number>;
 };
 
-/**
- * The cut file, in the repository. The site's @font-face rule (src/site/styles/fonts.css) names it at its address,
- * /fonts/google-sans-flex-latin.woff. Its license, OFL.txt, is committed beside it.
- */
-const OUTPUT = "public/fonts/google-sans-flex-latin.woff";
+const FONTS: Font[] = [
+  {
+    family: "Google Sans Flex",
+    // Version 5.000. `bun run fonts` downloads the same font from google/fonts' main branch, where version 5.000 landed
+    // on 2026-10-09, and keeps it as GoogleSansFlex-VF.ttf. The name of this pinned copy carries the version, so the
+    // two copies never share a file, and neither script cuts the other's download.
+    source: {
+      url: "https://raw.githubusercontent.com/google/fonts/bd8f81ddb5c74d5c8897b36ad88b440266245103/ofl/googlesansflex/GoogleSansFlex%5BROND%2Copsz%2Cslnt%2Cwdth%2Cwght%5D.ttf",
+      sha256: "a9ac770798857d5e8ac593ced42b22e40a7c08cec98319f92b0eccc2783a77ba",
+      path: "GoogleSansFlex-VF-5.000.ttf",
+    },
+    output: "public/fonts/google-sans-flex-latin.woff",
+    // Optical size 18 is also Google Fonts' registry default for this family (METADATA.pb), and its rule says
+    // font-stretch 100%. A check on 2026-10-27 shaped every character of Google's static 400 and 700 files and of this
+    // font at these values: no advance differed. At optical size 14, 503 of 540 did.
+    pinned: { opsz: 18, wdth: 100, slnt: 0, ROND: 0 },
+  },
+  {
+    family: "Google Sans Code",
+    // Version 6.001, the upright font. It landed in google/fonts on 2025-08-27 and is still the newest there on
+    // 2026-10-27. The design system's request names no italic, so the italic file stays out.
+    source: {
+      url: "https://raw.githubusercontent.com/google/fonts/5be3d1410fd1df6f03a64234dd28ea6fff96f397/ofl/googlesanscode/GoogleSansCode%5Bwght%5D.ttf",
+      sha256: "c9649573afcd966f61096b1e9c3c3115e7b54315ca2adf9839c6f8b17d5f8e1f",
+      path: "GoogleSansCode-VF-6.001.ttf",
+    },
+    output: "public/fonts/google-sans-code-latin.woff",
+    // Its one axis is weight, from 300 to 800, so no axis is pinned. A check on 2026-10-27 drew every character of this
+    // font and of the cut at weights 400 to 700, in steps of 50: no advance differed, and no point moved by more than
+    // 0.5 units of 2000 (at weight 400, none moved).
+    pinned: {},
+  },
+];
 
 /**
- * Google Fonts' "latin" subset: the unicode-range of the latin rule that Google serves for the design system's request.
- * Every character the pages print is in it (seam 1 checks the built pages against the cut font).
+ * Google Fonts' "latin" subset: the unicode-range of the latin rule that Google serves for the design system's request,
+ * the same for both families. Every character the pages print is in it (seam 1 checks the built pages against each
+ * cut font).
  */
 const LATIN: [first: number, last: number][] = [
   [0x0000, 0x00ff],
@@ -63,15 +97,8 @@ const LATIN: [first: number, last: number][] = [
   [0xfffd, 0xfffd],
 ];
 
-/** The weight axis keeps the design system's weights, 400 to 700 (its Typeface page). */
+/** The weight axis keeps the design system's weights, 400 to 700 (its Typeface page and its weight tokens). */
 const WEIGHT = { min: 400, max: 700, default: 400 };
-/**
- * Every other axis, pinned at its default in the font's fvar table. Google Fonts pins them there too: optical size 18
- * is also its registry default for this family (METADATA.pb), and its rule says font-stretch 100%. A check on
- * 2026-10-27 shaped every character of Google's static 400 and 700 files and of this font at these values: no advance
- * differed. At optical size 14, 503 of 540 did.
- */
-const PINNED = { opsz: 18, wdth: 100, slnt: 0, ROND: 0 };
 
 // The HarfBuzz functions this script calls. harfbuzz-subset.wasm exports them as raw C functions, which take and
 // return numbers (pointers, sizes, flags, floats); harfbuzzjs's typed API has no subsetting.
@@ -118,8 +145,8 @@ async function loadHarfBuzz(): Promise<Hb> {
   return instance.exports;
 }
 
-/** The Latin subset of the variable font, weight 400 to 700, every other axis pinned, as a TrueType (sfnt) file. */
-function cutLatin(hb: Hb, source: Uint8Array): Uint8Array<ArrayBuffer> {
+/** The Latin subset of a variable font, weight 400 to 700, every other axis pinned, as a TrueType (sfnt) file. */
+function cutLatin(hb: Hb, font: Font, source: Uint8Array): Uint8Array<ArrayBuffer> {
   const ptr = hb.malloc(source.byteLength);
   new Uint8Array(hb.memory.buffer, ptr, source.byteLength).set(source);
   const blob = hb.hb_blob_create(ptr, source.byteLength, 2 /* HB_MEMORY_MODE_WRITABLE */, 0, 0);
@@ -137,22 +164,23 @@ function cutLatin(hb: Hb, source: Uint8Array): Uint8Array<ArrayBuffer> {
     hb.hb_set_clear(set);
     hb.hb_set_invert(set);
   }
-  // No IUP optimization (HB_SUBSET_FLAGS_OPTIMIZE_IUP_DELTAS): it saves 1.4 KB, but moves points of 108 of the 226
-  // glyphs at weight 700 by 1 unit away from Google's own instance; without it, 1 glyph differs (2026-10-27).
+  // No IUP optimization (HB_SUBSET_FLAGS_OPTIMIZE_IUP_DELTAS): for Google Sans Flex it saves 1.4 KB, but moves points
+  // of 108 of the 226 glyphs at weight 700 by 1 unit away from Google's own instance; without it, 1 glyph differs
+  // (2026-10-27).
   hb.hb_subset_input_set_flags(input, hb.hb_subset_input_get_flags(input) | FLAG_NOTDEF_OUTLINE);
 
-  for (const [axis, value] of Object.entries(PINNED)) {
+  for (const [axis, value] of Object.entries(font.pinned)) {
     if (!hb.hb_subset_input_pin_axis_location(input, face, tag(axis), value)) {
-      throw new Error(`site-fonts: could not pin the axis ${axis} at ${value}`);
+      throw new Error(`site-fonts: could not pin the axis ${axis} of ${font.family} at ${value}`);
     }
   }
   if (!hb.hb_subset_input_set_axis_range(input, face, tag("wght"), WEIGHT.min, WEIGHT.max, WEIGHT.default)) {
-    throw new Error(`site-fonts: could not keep the axis wght from ${WEIGHT.min} to ${WEIGHT.max}`);
+    throw new Error(`site-fonts: could not keep the axis wght of ${font.family} from ${WEIGHT.min} to ${WEIGHT.max}`);
   }
 
   const subset = hb.hb_subset_or_fail(face, input);
   hb.hb_subset_input_destroy(input);
-  if (!subset) throw new Error("site-fonts: HarfBuzz could not cut the subset");
+  if (!subset) throw new Error(`site-fonts: HarfBuzz could not cut the subset of ${font.family}`);
 
   const outBlob = hb.hb_face_reference_blob(subset);
   const length = hb.hb_blob_get_length(outBlob);
@@ -240,30 +268,55 @@ async function toWoff(sfnt: Uint8Array<ArrayBuffer>): Promise<Uint8Array> {
   return woff;
 }
 
-/** The variable font at the path given, or the repository's copy, downloaded when it is missing; checked by SHA-256. */
-async function readSource(given: string | undefined): Promise<Uint8Array> {
-  const path = given ?? `${REPO}/${SOURCE.path}`;
-  if (!(await Bun.file(path).exists())) {
-    if (given !== undefined) throw new Error(`site-fonts: no file at ${path}`);
-    console.log(`Downloading the Google Sans Flex variable font to ${SOURCE.path}`);
-    const response = await fetch(SOURCE.url);
-    if (!response.ok) throw new Error(`site-fonts: the download failed with status ${response.status}`);
-    await Bun.write(path, response);
+const sha256Of = (bytes: Uint8Array) => new Bun.CryptoHasher("sha256").update(bytes).digest("hex");
+
+/**
+ * Each font's variable font: a file given on the command line, which its SHA-256 matches to the font, or else the
+ * repository's copy at the font's path, downloaded when it is missing and checked by SHA-256.
+ */
+async function readSources(given: string[]): Promise<Map<Font, Uint8Array>> {
+  const sources = new Map<Font, Uint8Array>();
+  for (const path of given) {
+    if (!(await Bun.file(path).exists())) throw new Error(`site-fonts: no file at ${path}`);
+    const bytes = await Bun.file(path).bytes();
+    const sha256 = sha256Of(bytes);
+    const font = FONTS.find(({ source }) => source.sha256 === sha256);
+    if (!font) {
+      const expected = FONTS.map(({ source }) => `${source.path} (${source.url})`).join(", ");
+      throw new Error(`site-fonts: ${path} is none of the variable fonts this script cuts: ${expected}`);
+    }
+    sources.set(font, bytes);
   }
-  // A new BunFile: one made before the download reads the file as empty after it (Bun 1.4.4, seen 2026-10-27).
-  const bytes = await Bun.file(path).bytes();
-  const sha256 = new Bun.CryptoHasher("sha256").update(bytes).digest("hex");
-  if (sha256 !== SOURCE.sha256) {
-    throw new Error(
-      `site-fonts: ${path} is not Google Sans Flex 5.000 (its SHA-256 is ${sha256}). ` +
-        `Delete it so that the script downloads ${SOURCE.url}, or pass that file.`,
-    );
+  for (const font of FONTS) {
+    if (sources.has(font)) continue;
+    const path = `${REPO}/${font.source.path}`;
+    if (!(await Bun.file(path).exists())) {
+      console.log(`Downloading the ${font.family} variable font to ${font.source.path}`);
+      const response = await fetch(font.source.url);
+      if (!response.ok) {
+        throw new Error(`site-fonts: the download of ${font.family} failed with status ${response.status}`);
+      }
+      await Bun.write(path, response);
+    }
+    // A new BunFile: one made before the download reads the file as empty after it (Bun 1.4.4, seen 2026-10-27).
+    const bytes = await Bun.file(path).bytes();
+    const sha256 = sha256Of(bytes);
+    if (sha256 !== font.source.sha256) {
+      throw new Error(
+        `site-fonts: ${path} is not the ${font.family} variable font this script cuts (its SHA-256 is ${sha256}). ` +
+          `Delete it so that the script downloads ${font.source.url}, or pass that file.`,
+      );
+    }
+    sources.set(font, bytes);
   }
-  return bytes;
+  return sources;
 }
 
-const source = await readSource(Bun.argv[2]);
-const sfnt = cutLatin(await loadHarfBuzz(), source);
-const woff = await toWoff(sfnt);
-await Bun.write(`${REPO}/${OUTPUT}`, woff);
-console.log(`${OUTPUT}: ${woff.byteLength} bytes (${sfnt.byteLength} bytes as TrueType)`);
+const sources = await readSources(Bun.argv.slice(2));
+const hb = await loadHarfBuzz();
+for (const font of FONTS) {
+  const sfnt = cutLatin(hb, font, sources.get(font)!);
+  const woff = await toWoff(sfnt);
+  await Bun.write(`${REPO}/${font.output}`, woff);
+  console.log(`${font.output}: ${woff.byteLength} bytes (${sfnt.byteLength} bytes as TrueType)`);
+}

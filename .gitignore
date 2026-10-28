@@ -12,6 +12,7 @@ private.yaml
 .env*
 # Downloaded by `bun run fonts`.
 GoogleSansFlex-VF.ttf
-# Downloaded by scripts/site-fonts.ts: the pinned version, under its own name.
+# Downloaded by scripts/site-fonts.ts: the pinned versions, under their own names.
 GoogleSansFlex-VF-5.000.ttf
+GoogleSansCode-VF-6.001.ttf
 .DS_Store
