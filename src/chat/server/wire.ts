@@ -1,9 +1,11 @@
 // What reaches the browser (SPEC-chat, The request, "Stream errors"): one table of fixed messages, one
 // per code, and wireError(code), which builds every RUN_ERROR event the handler sends. The event holds
-// its code and fixed message only. C5 adds the wire middleware here; C11 makes every RUN_ERROR on the
-// wire one of these.
+// its code and fixed message only. The wire middleware, a new instance per request, replaces every
+// RUN_ERROR of the run with wireError(code). C5 adds its event allowlist and the read results as ids,
+// and C12 the thinking summary as chat.thinking events.
 
-import { EventType, type RunErrorEvent } from "@tanstack/ai";
+import { EventType, type ChatMiddleware, type RunErrorEvent, type StreamChunk } from "@tanstack/ai";
+import { logServerError } from "./server-log";
 
 /**
  * The handler's own codes, each with its fixed message. The browser shows its own text for each code
@@ -16,6 +18,9 @@ const MESSAGES = {
   MAX_TOKENS: "The answer didn't arrive.",
   SERVER_ERROR: "The answer didn't arrive.",
 } as const;
+
+/** The fixed message of every model API code: SERVER_ERROR's, as the browser shows the same alert as for an error. */
+const MODEL_API_MESSAGE = MESSAGES.SERVER_ERROR;
 
 export type HandlerErrorCode = keyof typeof MESSAGES;
 
@@ -37,8 +42,53 @@ export function runErrorCode(code: string): RunErrorCode {
   return isHandlerErrorCode(code) || MODEL_API_ERROR_CODE.test(code) ? (code as RunErrorCode) : "SERVER_ERROR";
 }
 
-/** A new RUN_ERROR event with the code and its fixed message, and nothing else. A code that is not the handler's own (the same runtime guard) becomes SERVER_ERROR. */
-export function wireError(code: HandlerErrorCode): RunErrorEvent {
-  const known = isHandlerErrorCode(code) ? code : "SERVER_ERROR";
-  return { type: EventType.RUN_ERROR, code: known, message: MESSAGES[known], timestamp: Date.now() };
+/**
+ * A new RUN_ERROR event with the code and its fixed message, and nothing else. A code that is neither
+ * the handler's own nor the model API's (the same runtime guard) becomes SERVER_ERROR.
+ */
+export function wireError(code: RunErrorCode): RunErrorEvent {
+  const known = runErrorCode(code);
+  const message = isHandlerErrorCode(known) ? MESSAGES[known] : MODEL_API_MESSAGE;
+  return { type: EventType.RUN_ERROR, code: known, message, timestamp: Date.now() };
+}
+
+/**
+ * The wire code of a RUN_ERROR that the model adapter or the engine sent. The adapter's `max_tokens`
+ * is the handler's MAX_TOKENS (research 07, finding 4). A model API code passes. Any other code, or
+ * none, is SERVER_ERROR. C12 adds Anthropic's spend limit, which it finds from the status and the body.
+ */
+function wireCodeOf(event: Extract<StreamChunk, { type: "RUN_ERROR" }>): RunErrorCode {
+  if (event.code === "max_tokens") return "MAX_TOKENS";
+  return runErrorCode(event.code ?? "");
+}
+
+/**
+ * The wire middleware for one turn. Every RUN_ERROR of the run leaves as wireError(code), so no
+ * rawEvent, metadata, usage, nested error or other provider detail reaches the browser, and the turn
+ * keeps the code it sent for finishTurn().
+ */
+export function wireEvents(turn: { errorCode: RunErrorCode | null }): ChatMiddleware {
+  function rewrite(chunk: StreamChunk): StreamChunk | undefined {
+    if (chunk.type !== EventType.RUN_ERROR) return undefined;
+    const code = wireCodeOf(chunk);
+    turn.errorCode = code;
+    return wireError(code);
+  }
+
+  return {
+    name: "wire",
+    // TanStack AI does not guard onChunk, and a throw out of chat() would put its message on the wire.
+    // So the middleware catches its own error and decides: a chunk it could not check is dropped, and a
+    // RUN_ERROR it could not read still ends the stream, as SERVER_ERROR.
+    onChunk: (_ctx, chunk) => {
+      try {
+        return rewrite(chunk);
+      } catch (error) {
+        logServerError("chat wire: a chunk could not be checked and was dropped", error);
+        if (chunk.type !== EventType.RUN_ERROR) return null;
+        turn.errorCode = "SERVER_ERROR";
+        return wireError("SERVER_ERROR");
+      }
+    },
+  };
 }

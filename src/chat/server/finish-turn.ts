@@ -1,8 +1,10 @@
 // finishTurn() (SPEC-chat, Question log; Turn telemetry): the one function that writes a turn's
-// question-log entry and its chat_turn event, from the turn's state. The terminal middleware hook
-// calls it with ctx.defer(), so the run awaits the writes before the response ends. Each turn writes
-// each record exactly once, and a failed write never breaks the answer.
+// question-log entry and its chat_turn event, from the turn's state. The terminal middleware hooks
+// below call it with ctx.defer(), so the run awaits the writes before the response ends, and the
+// stream wrapper in handle-chat.ts calls it after a throw. Each turn writes each record exactly once,
+// and a failed write never breaks the answer.
 
+import type { ChatMiddleware } from "@tanstack/ai";
 import { utcDay, type QuestionLog, type QuestionLogEntry, type Telemetry } from "./question-log";
 import { logServerError } from "./server-log";
 import type { ChatTurnEvent } from "./telemetry";
@@ -11,6 +13,25 @@ import { runErrorCode, type RunErrorCode } from "./wire";
 
 /** How the turn ended. */
 export type TurnEnding = { outcome: QuestionLogEntry["outcome"]; errorCode: RunErrorCode | null };
+
+/** What finishTurn() writes to: the question log, the telemetry and the clock of ChatDeps. */
+type FinishDeps = { log: QuestionLog; telemetry: Telemetry; now(): Date };
+
+/**
+ * The terminal hooks of one turn (How a turn ends). TanStack AI runs exactly one of them per run, and
+ * each ends the turn through finishTurn() with ctx.defer().
+ */
+export function finishTurnHooks(deps: FinishDeps, turn: Turn): ChatMiddleware {
+  return {
+    name: "finish-turn",
+    onFinish: (ctx) => ctx.defer(finishTurn(deps, turn, { outcome: "answered", errorCode: null })),
+    // A model error ends with the code the wire sent for it. A throw has none: it is SERVER_ERROR,
+    // which the stream wrapper also sends.
+    onError: (ctx) => ctx.defer(finishTurn(deps, turn, { outcome: "error", errorCode: turn.errorCode ?? "SERVER_ERROR" })),
+    // The visitor's Stop, where its abort reaches the handler (row 168).
+    onAbort: (ctx) => ctx.defer(finishTurn(deps, turn, { outcome: "stopped", errorCode: null })),
+  };
+}
 
 /** The turns already written: a second call for one turn writes nothing. */
 const finished = new WeakSet<Turn>();
@@ -24,11 +45,7 @@ const NO_TOKENS: { [K in keyof TokenCounts]: null } = {
   outputTokens: null,
 };
 
-export async function finishTurn(
-  deps: { log: QuestionLog; telemetry: Telemetry; now(): Date },
-  turn: Turn,
-  ending: TurnEnding,
-): Promise<void> {
+export async function finishTurn(deps: FinishDeps, turn: Turn, ending: TurnEnding): Promise<void> {
   if (finished.has(turn)) return;
   finished.add(turn);
   const event: ChatTurnEvent = {

@@ -549,6 +549,9 @@ export type ChatDeps = {
   origins: string[];           // the allowed Origin values; the route computes them from VERCEL_ENV and VERCEL_URL;
                                // empty means the request's own origin (outside production, tests, evals)
   now(): Date;
+  testMiddleware?: ChatMiddleware[]; // tests only: runs after the marker and usage middleware and before the wire
+                               // middleware, so a seam-1 test can throw inside the run or add an event the wire must
+                               // handle; the route, the evals and the preview never set it
 };
 
 export function handleChat(request: Request, deps: ChatDeps): Promise<Response>;

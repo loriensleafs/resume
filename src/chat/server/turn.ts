@@ -1,6 +1,8 @@
 // One turn's state (SPEC-chat, One turn): handleChat() makes one for each request, each middleware
 // writes the facts it learns into it, and finishTurn() reads it once, at the end of the turn.
 
+import type { RunErrorCode } from "./wire";
+
 /** The summed token counts of a turn's model calls that finished, as SPEC-deploy maps them. */
 export type TokenCounts = {
   inputTokens: number; // uncached input only
@@ -28,9 +30,11 @@ export type Turn = {
   modelCalls: number;
   /** The counts of the model calls that finished; null until one finishes. */
   tokens: TokenCounts | null;
+  /** The code of the RUN_ERROR the wire sent for the model's or the engine's error; null until one is sent. */
+  errorCode: RunErrorCode | null;
 };
 
 /** A turn that has read, cited and called nothing yet. */
 export function startTurn(turn: Pick<Turn, "question" | "startedAt" | "reservation">): Turn {
-  return { ...turn, readIds: [], reads: 0, citations: [], removed: 0, modelCalls: 0, tokens: null };
+  return { ...turn, readIds: [], reads: 0, citations: [], removed: 0, modelCalls: 0, tokens: null, errorCode: null };
 }
