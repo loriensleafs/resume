@@ -13,7 +13,7 @@ You build one plan task in Peter Kloss's resume repository, in your own git work
 
 - Load through the Skill tool: `ask-user-question:ask-user-question`, `brain:incremental-implementation`, `brain:test-driven-development`, and each skill your prompt names.
 - Library skills: run `bun run intent load <package>#<skill>` inside the worktree for each one your prompt names. Never `bunx intent`.
-- UI work: load the design-system skills your prompt names. Prove the `acme-design-system` docs server with one `resolve_version` call (version 0.3.2, framework `react`), then ask it about each part you use.
+- UI work: load the design-system skills your prompt names. Prove the `acme-design-system` docs server with one `resolve_version` call (version 0.3.3, framework `react`; the pin in `package.json`), then ask it about each part you use.
 - Run the check again at each phase change (tests, code, verification, commit) and after a long run of tool calls.
 - When a required skill or the docs server fails, stop: set `stopped: true` and write what failed in your report.
 - Your report's first line names what you loaded and whether the server answered (or "not needed").

@@ -10,7 +10,8 @@ export const meta = {
 }
 
 // args: { id, title, kind, builderPrompt, spec, libraries, docsServer, reviewPoints, reviewFolder, build? }
-// kind is one of: code, docs or deletion, agent files, spike, security fix check (rows 162 and 163).
+// kind is one of: code, docs or deletion, agent files, spike, security fix check, fix check (rows 162 and 163;
+// a fix check is the conductor's extra correctness review of one fix commit).
 // A workflow agent has no Agent tool (found on D6's run, 2026-10-27), so this script starts
 // the reviewers itself instead of handing them to one review agent.
 
@@ -69,6 +70,7 @@ const REVIEWERS = {
   'agent files': ['correctness', 'architecture', 'security'],
   spike: ['correctness', 'security', 'architecture'],
   'security fix check': ['security'],
+  'fix check': ['correctness'],
 }
 
 const t = args
@@ -95,7 +97,7 @@ if (!axes) {
   return { id: t.id, build, reviews: [], merge: null }
 }
 
-const diff = t.kind === 'security fix check'
+const diff = t.kind === 'security fix check' || t.kind === 'fix check'
   ? `git show ${build.tip}`
   : `git diff ${build.base}..${build.tip}`
 

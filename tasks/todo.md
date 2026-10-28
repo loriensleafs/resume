@@ -61,8 +61,8 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [Checkpoint knowledge: old contract gone](modules/knowledge.md#checkpoint-knowledge-old-contract-gone) — after K1 to K4; Peter: review before the rules and reads (checks passed 2026-10-27: build and tests pass, the search finds only `ids.test.ts`'s rejection case, `bun run knowledge` prints the core in three parts with an empty catalog; Peter's review is open and does not stop the run)
 - [x] [K5](modules/knowledge.md#k5-the-rules-on-approved-sources-stop-the-build) The rules on approved sources stop the build — blocked by K3 (done 2026-10-27; one `checkSource()` returns every problem, for K10 to reuse)
 - [x] [K6](modules/knowledge.md#k6-rendered-sources-and-the-passage-id-snapshot) Rendered sources and the passage-id snapshot — blocked by K3 (runs after K5: same files) (done 2026-10-27; the 24,000-character budget sits in `checkSource()`; the real-files snapshot is empty until K11)
-- [ ] [K7](modules/knowledge.md#k7-readpassages-reads-approved-sources-by-id) `readPassages()` reads approved sources by id — blocked by K6
-- [ ] [K8](modules/knowledge.md#k8-readlimits-bound-every-read) `readLimits` bound every read — blocked by K7
+- [x] [K7](modules/knowledge.md#k7-readpassages-reads-approved-sources-by-id) `readPassages()` reads approved sources by id — blocked by K6 (done 2026-10-27; ids looked up in a `Map`; `skipped` waits for K8)
+- [x] [K8](modules/knowledge.md#k8-readlimits-bound-every-read) `readLimits` bound every read — blocked by K7 (done 2026-10-27; 20 ids, 64 characters an id, 24,000 characters)
 - [x] [K9](modules/knowledge.md#k9-publicknowledge-leaves-out-every-not-public-section) `publicKnowledge()` leaves out every `Not public` section — blocked by K3 (runs after K5: same files) (done 2026-10-27; `PublicKnowledge` in `types.ts`)
 - [ ] [K10](modules/knowledge.md#k10-bun-run-knowledge---draft-shows-a-draft-as-the-chat-will-read-it) `bun run knowledge --draft` shows a draft as the chat will read it — blocked by K5, K6
 - [ ] [Checkpoint knowledge: contract complete](modules/knowledge.md#checkpoint-knowledge-contract-complete) — after K5 to K10; Peter: review before the moves
@@ -73,7 +73,9 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [x] [D9](modules/deploy.md#d9-createops-gives-in-memory-parts-outside-production) `createOps()` gives in-memory parts outside production — blocked by C2 (done 2026-10-27)
 - [ ] [Checkpoint deploy: createOps ready](modules/deploy.md#checkpoint-deploy-createops-ready) — after D9
 - [x] [A9](modules/agents.md#a9-the-type-check) The type check — blocked by C1 (done 2026-10-27; 44 files, the release skill's scripts included; CI run 40581851481 on `8e312cf`: `test`, `audit` and `audit-all` pass)
-- [ ] Peter: release a `@acmelabs/design-system-mcp` with `zod` 4.6.6 or later (acmelabs-15/design-system#9); then a follow-up task removes the `zod` override (row 158) — after A9; blocks nothing
+- [x] Peter: release a `@acmelabs/design-system-mcp` with `zod` 4.6.6 or later (acmelabs-15/design-system#9); then a follow-up task removes the `zod` override (row 158) — after A9; blocks nothing (done 2026-10-27: 0.3.3, issue 9 closed)
+- [x] [A10](modules/agents.md#a10-the-design-system-packages-at-033-with-no-zod-override) The design system packages at 0.3.3, with no `zod` override — blocked by Peter's 0.3.3 release (done) (done 2026-10-27; `bun.lock` is version 2 again; the docs server answers 0.3.3 after Peter reconnected it)
+- [ ] [A11](modules/agents.md#a11-the-mockup-boards-and-the-update-mockups-skill-at-033) The mockup boards and the `update-mockups` skill at 0.3.3 — blocked by A10
 - [x] [C3](modules/chat.md#c3-one-turn-through-handlechat-a-resume-citation-kept-and-one-log-entry) One turn through `handleChat()`: a resume citation kept and one log entry — blocked by A9, C1, C2, K3 (done 2026-10-27; `finishTurn()`, the `Turn` state, a pure marker scanner and one error-code guard came with it)
 - [x] [C4](modules/chat.md#c4-request-checks-with-the-chaterror-shape-and-turnlimits) Request checks with the `ChatError` shape and `turnLimits` — blocked by C3 (done 2026-10-27; a request needs a question with text; `CheckedRequest` carries only what `chat()` may use)
 - [ ] [C5](modules/chat.md#c5-the-read-tool-passages-read-on-the-server-ids-only-on-the-wire) The read tool: passages read on the server, ids only on the wire — blocked by C3, K7, K8
@@ -82,15 +84,15 @@ A task line reads: ID and title — what blocks it; what Peter does for it. Work
 - [ ] [C8](modules/chat.md#c8-markers-refusals-follow-up-questions-and-the-citation-forms) Markers: refusals, follow-up questions and the citation forms — blocked by C5
 - [ ] [C9](modules/chat.md#c9-the-open-tools-open_resume-and-open_source) The open tools: `open_resume` and `open_source` — blocked by C8
 - [ ] [C10](modules/chat.md#c10-the-conversation-sent-20-turns-40000-characters-earlier-reads-as-ids) The conversation sent: 20 turns, 40,000 characters, earlier reads as ids — blocked by C5
-- [ ] [C11](modules/chat.md#c11-the-limit-stream-stream-errors-model-errors-and-stop) The limit stream, stream errors, model errors and Stop — blocked by C3
+- [x] [C11](modules/chat.md#c11-the-limit-stream-stream-errors-model-errors-and-stop) The limit stream, stream errors, model errors and Stop — blocked by C3 (done 2026-10-27; the response has its own controller; a Stop that reaches the handler logs `stopped`)
 - [ ] [C12](modules/chat.md#c12-the-stub-anthropic-client-anthropics-limit-max_tokens-and-the-thinking-settings) The stub Anthropic client: Anthropic's limit, `max_tokens` and the thinking settings — blocked by C11
 - [ ] [C13](modules/chat.md#c13-the-120-second-deadline) The 120-second deadline — blocked by C12
 - [ ] [C14](modules/chat.md#c14-turn-telemetry-summed-usage-and-one-chat_turn-event-per-turn) Turn telemetry: summed usage and one `chat_turn` event per turn — blocked by C4, C12
 - [ ] [C15](modules/chat.md#c15-the-system-prompt-the-scope-and-audience-lines-and-the-refusal-wordings) The system prompt, the scope and audience lines, and the refusal wordings — blocked by C7 to C9; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [Checkpoint chat: the handler](modules/chat.md#checkpoint-chat-the-handler) — after C3 to C15
 - [x] [S3](modules/site.md#s3-the-resume-view-from-build-time-data-with-knowledge-ids) The resume view from build-time data, with knowledge ids — blocked by S2, K1 (done 2026-10-27; each entry carries its id in `data-knowledge-id`; `root` reaches the data)
-- [ ] [S4](modules/site.md#s4-the-app-bar-and-design-system-parts-in-prerendered-pages) The app bar, and design-system parts in prerendered pages — blocked by S3
-- [ ] [S5](modules/site.md#s5-the-static-not-found-page) The static not-found page — blocked by S4
+- [x] [S4](modules/site.md#s4-the-app-bar-and-design-system-parts-in-prerendered-pages) The app bar, and design-system parts in prerendered pages — blocked by S3 (done 2026-10-27; `@acmelabs/design-system-react` 0.3.2, row 166; the name box keeps the board's colors, row 171; `/` loads 134.3 KB gzip)
+- [x] [S5](modules/site.md#s5-the-static-not-found-page) The static not-found page — blocked by S4 (done 2026-10-27; no script; the build script tags it)
 - [ ] [S6](modules/site.md#s6-page-titles-descriptions-canonical-addresses-and-share-previews) Page titles, descriptions, canonical addresses and share previews — blocked by S3
 - [ ] [S7](modules/site.md#s7-google-sans-flex-served-from-the-site-itself) Google Sans Flex served from the site itself — blocked by S4; Peter: its wording draft goes to his one review before D37 (row 153)
 - [ ] [S8](modules/site.md#s8-seam-1-runs-the-build-script) Seam 1 runs the build script — blocked by S2 to S7, D16

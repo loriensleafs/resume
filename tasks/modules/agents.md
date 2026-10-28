@@ -139,6 +139,37 @@ Files: `tsconfig.json`, `package.json`, `bun.lock`, `scripts/make-fonts.ts`, `sr
 Size: M
 Needs Peter: no (approved, row 157). Research 13 already holds the facts and his choice.
 
+### A10: The design system packages at 0.3.3, with no `zod` override
+
+Delivers: `@acmelabs/design-system`, `@acmelabs/design-system-react` and `@acmelabs/design-system-mcp` all at exactly 0.3.3, and A9's scoped `zod` override gone (row 158; acmelabs-15/design-system#9, closed 2026-10-27; Peter's row 172).
+Blocked by: Peter's 0.3.3 release (done 2026-10-27)
+Notes: the three move together: `design-system-react` 0.3.3 requires `design-system` at exactly 0.3.3, and the 0.3.2 docs server has no 0.3.3 docs. D8 runs beside this task and records the lockfile verdict in research 12, so A10 leaves research 12 to the conductor and reports the lockfile version it sees. Until the session restarts its docs server, the session's server still answers for 0.3.2 only; A10 proves the 0.3.3 server from its own worktree.
+Acceptance:
+- `package.json` pins the three packages at exactly 0.3.3 and holds no `overrides` entry; `bun.lock` holds `zod` 4.6.7 or later and no `zod` 4.6.5.
+- The `migration-between-releases` skill of the design system (0.3.3) is applied: each part the site uses (today the app bar and its parts, and the token stylesheet) is checked against 0.3.3 with the 0.3.3 docs server, and every renamed or changed name, prop, slot or token is updated in the code, the specs and the task files.
+- The 0.3.3 docs server answers `resolve_version` for packageVersion 0.3.3, framework `react`: one real call over its stdio interface.
+- Every place that names 0.3.2 as the pinned version says 0.3.3: SPEC-site's Tech Stack, SPEC-chat where it names the release, the plan's Risks row, the site and chat task conventions (the chat's list of parts checked on 2026-10-27 is checked again at 0.3.3, and the `acme-markdown` stylesheet gap is checked again). Decision records keep their dates and versions.
+- `bun audit --audit-level=high` passes for the whole tree; the built pages still prerender each part as its tag with its light-DOM text; `/` stays under its 200 KB gzip budget (report the size).
+- The report names `bun.lock`'s `lockfileVersion` after the change (research 12 expects 2 without a scoped override).
+Verify: `bun run typecheck`; `bun run build`; `bun run build:site`; `bun test`; `bun audit --audit-level=high`; one `resolve_version` call to the 0.3.3 server; CI's `test`, `audit` and `audit-all` on the pushed commit.
+Files: `package.json`, `bun.lock`, `spec/SPEC-site.md`, `spec/SPEC-chat.md`, `tasks/plan.md` (Risks), `tasks/modules/site.md` and `tasks/modules/chat.md` (conventions), and any `src/site/` file the migration changes
+Size: M
+Needs Peter: no (row 158 approved the override's removal; Peter asked for the 0.3.3 upgrade, row 172; exact-to-exact bumps of approved packages pass the approval check)
+
+### A11: The mockup boards and the `update-mockups` skill at 0.3.3
+
+Delivers: the mockup boards use `@acmelabs/design-system-browser` 0.3.3, and the `update-mockups` skill asks the docs server at the version the boards use, so the next mockup task passes its capability check (Peter's row 172; A10's review).
+Blocked by: A10 (done); the session's docs server at 0.3.3 (Peter reconnected it on 2026-10-27; `resolve_version` 0.3.3 answers for `react` and `html`)
+Acceptance:
+- Follow the `update-mockups` skill to its last line: the board sources on `prototype/site-mockups` import `@acmelabs/design-system-browser` 0.3.3, the canvas "Resume site mockups" gets the same change, and the images in `docs/design/mockups/` are rendered again from the boards.
+- The skill's capability check asks the docs server at the boards' version (0.3.3, framework `html`) and names where that version is written, so the next upgrade changes one place; `docs/design/mockups/README.md` says 0.3.3.
+- No board looks different: the rendered images match the approved ones, or the task stops and shows Peter each difference before it changes the canvas.
+- The three copies of every board stay in step (the skill's rule).
+Verify: the skill's own checks; `bun test` (the agent-files test covers the skill); one `resolve_version` call (0.3.3, `html`).
+Files: `.agents/skills/update-mockups/SKILL.md`, `docs/design/mockups/README.md`, the images in `docs/design/mockups/` if they change, and the board sources on `prototype/site-mockups`
+Size: S
+Needs Peter: no, unless a board looks different after the move (then his look, before the canvas changes)
+
 ## Checkpoints
 
 ### Checkpoint agents: before the first release

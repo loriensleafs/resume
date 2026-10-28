@@ -93,7 +93,7 @@ Each item names the task it blocks; todo.md shows them as "Peter:".
 27. Reading each fresh-session check's result, at each module's landing.
 28. His one review before D37: the wording drafts that [wording-drafts.md](../docs/design/wording-drafts.md) lists (row 153), and any checkpoint review still open (Running the plan): D37.
 29. Going over [build-decisions.md](../docs/design/build-decisions.md) with the conductor, at the end of the run (row 154).
-30. Releasing a `@acmelabs/design-system-mcp` with `zod` 4.6.6 or later, tracked in acmelabs-15/design-system#9; then a follow-up task removes A9's `zod` override (row 158). It blocks nothing.
+30. Done 2026-10-27: Peter released 0.3.3 (acmelabs-15/design-system#9 closed), and A10 moved the three design-system packages to 0.3.3 and removed A9's `zod` override (rows 158 and 172).
 
 ## Risks
 
