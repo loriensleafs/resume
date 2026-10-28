@@ -54,6 +54,8 @@ const ARITY: Record<string, { min: number; max: number }> = {
   ZRANGE: { min: 4, max: 5 },
   SET: { min: 3, max: Infinity },
   PTTL: { min: 2, max: 2 },
+  GET: { min: 2, max: 2 },
+  DEL: { min: 2, max: Infinity },
 };
 
 /**
@@ -196,6 +198,17 @@ export function startFakeUpstash({ now = () => new Date() }: { now?: () => Date 
         // The milliseconds left before the key expires: -2 for a missing key, -1 for a key with no expiry.
         if (!entry) return { result: -2 };
         return { result: entry.expiresAtMs === undefined ? -1 : entry.expiresAtMs - now().getTime() };
+      }
+      case "GET": {
+        // A string key's value; null for a missing key.
+        if (!entry) return { result: null };
+        if (entry.value.type !== "string") return { error: WRONGTYPE };
+        return { result: entry.value.value };
+      }
+      case "DEL": {
+        // DEL key [key …]: deletes each live key of any type, and answers how many it deleted.
+        const deleted = [key, ...args].filter((name) => live(name) !== undefined && keys.delete(name)).length;
+        return { result: deleted };
       }
       default:
         return { error: `ERR unknown command '${name}'` };

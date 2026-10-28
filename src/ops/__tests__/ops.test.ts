@@ -355,20 +355,23 @@ describe("the daily cap, in production on the in-test Upstash server", () => {
     expect(upstash.get("qcost:2026-10-27")).toBe("7200000");
   });
 
-  test("each write of the daily cap is one /multi-exec transaction, and qcost:<day> expires at 00:00 UTC on the 90th day after its day", async () => {
+  test("each write of the daily cap is one /multi-exec transaction, a reservation's reads limit:spend too, and qcost:<day> expires at 00:00 UTC on the 90th day after its day", async () => {
     const budget = functionInstance().budget;
 
-    // 8 reservations, then a refusal and its take-back: 10 writes.
+    // 9 reservations, the ninth refused, then its take-back: 10 writes.
     for (let turn = 0; turn < 9; turn++) await budget.reserve();
 
     expect(upstash.requests.map((request) => request.path)).toEqual(Array.from({ length: 10 }, () => "/multi-exec"));
-    for (const request of upstash.requests) {
-      const commands = JSON.parse(request.body) as string[][];
-      expect(commands.map(([name, key]) => [name, key])).toEqual([
-        ["INCRBY", "qcost:2026-10-27"],
-        ["EXPIREAT", "qcost:2026-10-27"],
-      ]);
-    }
+    const reservation = [
+      ["INCRBY", "qcost:2026-10-27"],
+      ["EXPIREAT", "qcost:2026-10-27"],
+      ["GET", "limit:spend"],
+    ];
+    const takeBack = reservation.slice(0, 2);
+    expect(upstash.requests.map((request) => (JSON.parse(request.body) as string[][]).map(([name, key]) => [name, key]))).toEqual([
+      ...Array.from({ length: 9 }, () => reservation),
+      takeBack,
+    ]);
     // Counted by hand: 4 days to the end of October, 30 in November, 31 in December, 25 in January.
     expect(upstash.expiresAt("qcost:2026-10-27")).toEqual(new Date("2027-01-25T00:00:00.000Z"));
   });
@@ -990,5 +993,226 @@ describe("the limit alerts, in production on the in-test Upstash and ntfy server
     expect(JSON.parse(printed[0]!)).toEqual({ event: "ops_error", step: "alert_push", alert: "daycap", code: expect.stringMatching(/^[A-Za-z0-9_]{1,32}$/) });
     expect(printed[0]).not.toContain(topic);
     expect(printed[0]).not.toContain(new URL(ntfy.url).port);
+  });
+});
+
+describe("the monthly limit, in production on the in-test Upstash and ntfy servers", () => {
+  // The function instances and the store share one clock, which a test moves on.
+  let clock: Date;
+  let upstash: FakeUpstash;
+  let ntfy: FakeNtfy;
+  beforeEach(() => {
+    clock = new Date("2026-10-27T12:00:00.000Z");
+    upstash = startFakeUpstash({ now: () => clock });
+    ntfy = startFakeNtfy();
+  });
+  afterEach(async () => {
+    await upstash.stop();
+    await ntfy.stop();
+  });
+
+  /** A new production function instance with the store and the alerts set. */
+  const functionInstance = () =>
+    createOps(
+      { VERCEL_ENV: "production", KV_REST_API_URL: upstash.url, KV_REST_API_TOKEN: upstash.token, NTFY_TOPIC_URL: `${ntfy.url}/resume-alerts-in-test` },
+      { now: () => clock, print: () => {} },
+    );
+
+  /** Reserves a turn on the instance, as the handler does before its first model call. */
+  const reserveOn = async (ops: ReturnType<typeof createOps>) => {
+    const ticket = await ops.budget.reserve();
+    if (!ticket.ok) throw new Error(`the budget refused the turn with ${ticket.errorCode}`);
+    return ticket.reservation;
+  };
+
+  /** The chat_turn event of a turn whose first model call met Anthropic's monthly limit: the handler ends it with SPEND_LIMIT. */
+  const spendLimitTurn: ChatTurnEvent = {
+    event: "chat_turn",
+    outcome: "limit",
+    reads: 0,
+    citations: 0,
+    removed: 0,
+    modelCalls: 1,
+    inputTokens: null,
+    cachedInputTokens: null,
+    cacheWriteTokens: null,
+    cacheWrite1hTokens: null,
+    outputTokens: null,
+    durationMs: 600,
+    errorCode: "SPEND_LIMIT",
+  };
+
+  test("after a turn meets Anthropic's limit, reserve() refuses with SPEND_LIMIT for an hour on every function instance, then lets exactly one probe through", async () => {
+    const first = functionInstance();
+    await first.telemetry.record(spendLimitTurn, await reserveOn(first));
+
+    for (const at of ["2026-10-27T12:00:01.000Z", "2026-10-27T12:59:59.999Z"]) {
+      clock = new Date(at);
+      for (const ops of [first, functionInstance()]) expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "SPEND_LIMIT" });
+    }
+
+    // An hour after the turn met the limit, 25 turns arrive at once on 25 function instances.
+    clock = new Date("2026-10-27T13:00:00.000Z");
+    const budgets = Array.from({ length: 25 }, () => functionInstance().budget);
+    const tickets = await Promise.all(budgets.map((budget) => budget.reserve()));
+
+    expect(tickets.filter((ticket) => ticket.ok)).toEqual([{ ok: true, reservation: expect.any(String) }]);
+    expect(tickets.filter((ticket) => !ticket.ok)).toEqual(Array.from({ length: 24 }, () => ({ ok: false, errorCode: "SPEND_LIMIT" })));
+    // The hour's probe claim lives 2 hours.
+    expect(upstash.expiresAt("limit:probe:2026-10-27T13")).toEqual(new Date("2026-10-27T15:00:00.000Z"));
+    // Every refusal took its $0.90 back: the day holds the first turn's kept $0.90 and the probe's, in millionths of a dollar.
+    expect(upstash.get("qcost:2026-10-27")).toBe("1800000");
+  });
+
+  test("a turn that meets the limit sets limit:spend to its time in record()'s one transaction, until 00:00 UTC on the next month's first day", async () => {
+    const ops = functionInstance();
+    const reservation = await reserveOn(ops);
+    clock = new Date("2026-10-27T12:00:05.000Z");
+    const before = upstash.requests.length;
+
+    await ops.telemetry.record(spendLimitTurn, reservation);
+
+    const records = upstash.requests.slice(before).filter((request) => request.body.includes("qstats:"));
+    expect(records.map((request) => request.path)).toEqual(["/multi-exec"]);
+    expect(JSON.parse(records[0]!.body)).toEqual(
+      expect.arrayContaining([
+        ["SET", "limit:spend", "2026-10-27T12:00:05.000Z"],
+        ["EXPIREAT", "limit:spend", String(Date.parse("2026-11-01T00:00:00.000Z") / 1000)],
+      ]),
+    );
+    expect(upstash.get("limit:spend")).toBe("2026-10-27T12:00:05.000Z");
+    expect(upstash.expiresAt("limit:spend")).toEqual(new Date("2026-11-01T00:00:00.000Z"));
+  });
+
+  test("while the marker is less than an hour old, a function instance that has read it refuses with no store call", async () => {
+    const ops = functionInstance();
+    await ops.telemetry.record(spendLimitTurn, await reserveOn(ops));
+    clock = new Date("2026-10-27T12:10:00.000Z");
+    // The first refusal reads the marker: the reservation's transaction and its take-back.
+    expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "SPEND_LIMIT" });
+    const storeCalls = upstash.requests.length;
+
+    for (const at of ["2026-10-27T12:30:00.000Z", "2026-10-27T12:59:59.999Z"]) {
+      clock = new Date(at);
+      expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "SPEND_LIMIT" });
+    }
+
+    expect(upstash.requests).toHaveLength(storeCalls);
+  });
+
+  test("a refusal before the model call writes nothing in record(), so the marker keeps its time and the hour ends when it should", async () => {
+    const ops = functionInstance();
+    await ops.telemetry.record(spendLimitTurn, await reserveOn(ops));
+    // The handler records a SPEND_LIMIT refusal with no reservation and no model call.
+    const refused: ChatTurnEvent = { ...spendLimitTurn, modelCalls: 0, durationMs: 3 };
+    clock = new Date("2026-10-27T12:40:00.000Z");
+    expect(await ops.budget.reserve()).toEqual({ ok: false, errorCode: "SPEND_LIMIT" });
+    const storeCalls = upstash.requests.length;
+
+    await ops.telemetry.record(refused, undefined);
+
+    expect(upstash.requests).toHaveLength(storeCalls);
+    expect(upstash.get("limit:spend")).toBe("2026-10-27T12:00:00.000Z");
+    clock = new Date("2026-10-27T13:00:00.000Z");
+    expect(await ops.budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) });
+  });
+
+  test("a probe that reaches the model deletes limit:spend, and every function instance allows turns again", async () => {
+    const first = functionInstance();
+    await first.telemetry.record(spendLimitTurn, await reserveOn(first));
+    // Another instance reads the marker at 12:30, so it remembers the hour that ends at 13:00.
+    clock = new Date("2026-10-27T12:30:00.000Z");
+    const other = functionInstance();
+    expect(await other.budget.reserve()).toEqual({ ok: false, errorCode: "SPEND_LIMIT" });
+
+    // Peter has raised the limit in the Console: the probe at 13:05 gets its answer.
+    clock = new Date("2026-10-27T13:05:00.000Z");
+    const prober = functionInstance();
+    const probe = await reserveOn(prober);
+    clock = new Date("2026-10-27T13:05:08.000Z");
+    await prober.telemetry.record(answeredTurn, probe);
+
+    expect(upstash.get("limit:spend")).toBeNull();
+    for (const ops of [first, other, prober, functionInstance()]) {
+      expect(await ops.budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) });
+    }
+  });
+
+  test("a probe that meets the limit again resets the marker's time: the next probe goes through an hour after it", async () => {
+    const first = functionInstance();
+    await first.telemetry.record(spendLimitTurn, await reserveOn(first));
+    clock = new Date("2026-10-27T13:05:00.000Z");
+    const prober = functionInstance();
+    const probe = await reserveOn(prober);
+
+    clock = new Date("2026-10-27T13:05:01.000Z");
+    await prober.telemetry.record(spendLimitTurn, probe);
+
+    expect(upstash.get("limit:spend")).toBe("2026-10-27T13:05:01.000Z");
+    clock = new Date("2026-10-27T14:05:00.999Z");
+    expect(await functionInstance().budget.reserve()).toEqual({ ok: false, errorCode: "SPEND_LIMIT" });
+    clock = new Date("2026-10-27T14:05:01.000Z");
+    expect(await functionInstance().budget.reserve()).toEqual({ ok: true, reservation: expect.any(String) });
+  });
+
+  test("a turn that reserved before the marker, and ends after it with an answer, leaves the marker: only the probe deletes it", async () => {
+    clock = new Date("2026-10-27T11:59:00.000Z");
+    const ops = functionInstance();
+    const longTurn = await reserveOn(ops);
+    const limitedTurn = await reserveOn(ops);
+    clock = new Date("2026-10-27T12:00:00.000Z");
+    await ops.telemetry.record(spendLimitTurn, limitedTurn);
+
+    clock = new Date("2026-10-27T12:01:00.000Z");
+    await ops.telemetry.record(answeredTurn, longTurn);
+
+    expect(upstash.get("limit:spend")).toBe("2026-10-27T12:00:00.000Z");
+    expect(await functionInstance().budget.reserve()).toEqual({ ok: false, errorCode: "SPEND_LIMIT" });
+  });
+
+  test("a probe that ends before its first model call leaves the marker, and the next UTC hour lets one more probe through", async () => {
+    const first = functionInstance();
+    await first.telemetry.record(spendLimitTurn, await reserveOn(first));
+    clock = new Date("2026-10-27T13:10:00.000Z");
+    const prober = functionInstance();
+    const probe = await reserveOn(prober);
+    // The visitor stopped the turn before the run started: no model call, no tokens.
+    const stoppedFirst: ChatTurnEvent = { ...spendLimitTurn, outcome: "stopped", modelCalls: 0, errorCode: null };
+
+    await prober.telemetry.record(stoppedFirst, probe);
+
+    expect(upstash.get("limit:spend")).toBe("2026-10-27T12:00:00.000Z");
+    // The hour's probe is taken.
+    clock = new Date("2026-10-27T13:59:59.999Z");
+    expect(await functionInstance().budget.reserve()).toEqual({ ok: false, errorCode: "SPEND_LIMIT" });
+    clock = new Date("2026-10-27T14:00:00.000Z");
+    const tickets = await Promise.all([functionInstance().budget.reserve(), functionInstance().budget.reserve()]);
+    expect(tickets.filter((ticket) => ticket.ok)).toHaveLength(1);
+  });
+
+  test("turns that meet the limit on 3 function instances push one urgent spendlimit that day, with the wording draft's text; the next UTC day's first one pushes again", async () => {
+    const instances = [functionInstance(), functionInstance(), functionInstance()];
+    const reservations = await Promise.all(instances.map(reserveOn));
+
+    await Promise.all(instances.map((ops, index) => ops.telemetry.record(spendLimitTurn, reservations[index])));
+
+    expect(ntfy.pushes).toEqual([
+      {
+        topic: "resume-alerts-in-test",
+        priority: 5,
+        title: "Chat paused at Anthropic's monthly limit for October",
+        message: "Raise the limit in the Anthropic Console, then in src/ops/limits.ts. The chat tries again within an hour.",
+        headers: expect.any(Object),
+      },
+    ]);
+    expect(upstash.expiresAt("alert:spendlimit:2026-10-27")).toEqual(new Date("2026-10-28T00:00:00.000Z"));
+
+    // The next day's first probe meets the limit again.
+    clock = new Date("2026-10-28T09:00:00.000Z");
+    const prober = functionInstance();
+    await prober.telemetry.record(spendLimitTurn, await reserveOn(prober));
+
+    expect(ntfy.pushes).toHaveLength(2);
+    expect(upstash.expiresAt("alert:spendlimit:2026-10-28")).toEqual(new Date("2026-10-29T00:00:00.000Z"));
   });
 });

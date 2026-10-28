@@ -3,8 +3,9 @@
 // and the read of the totals. The keys and their expiry rules are in upstash.ts; the prices and the
 // reservation are in limits.ts.
 
-import type { Telemetry } from "../chat/server/question-log";
+import { utcDay, type Telemetry } from "../chat/server/question-log";
 import type { ChatTurnEvent } from "../chat/server/telemetry";
+import type { LimitAlerts } from "./alerts";
 import * as limits from "./limits";
 import type { TurnTokens } from "./limits";
 import {
@@ -14,9 +15,11 @@ import {
   dayLongestKey,
   dayStatsKey,
   keptDays,
+  metSpendLimit,
   monthCostKey,
   monthKeysExpireAt,
   reservationDay,
+  spendLimitMarkerCommands,
 } from "./upstash";
 import { UpstashError, type Command, type UpstashStore } from "./upstash-rest";
 
@@ -53,20 +56,24 @@ export type DailyTotals = {
 /**
  * The telemetry in the store. A turn with a reservation reached the model: in one transaction,
  * `record()` adds the turn to its day's totals, replaces its reservation with its cost or keeps it,
- * and adds that cost to the month. A turn without one, a rejected request or a refusal at the cap or
- * the monthly limit, writes nothing, so a flood of bad requests costs the store nothing. Printing the
- * chat_turn line is createOps()'s part.
+ * sets or deletes the monthly limit's marker (upstash.ts, spendLimitMarkerCommands()), and adds that
+ * cost to the month. A turn without one, a rejected request or a refusal at the cap or the monthly
+ * limit, writes nothing, so a flood of bad requests costs the store nothing, and a refusal never moves
+ * the marker's time. Printing the chat_turn line is createOps()'s part.
  *
- * @param onMonthCost gets the month's estimate after each turn that adds to it, from the same
- *   transaction's reply, for the spend75 alert (alerts.ts).
+ * @param now says when a turn met Anthropic's limit, for the marker and the spendlimit alert's day.
+ * @param alerts get, after the transaction, the month's estimate from its reply (spend75), and the
+ *   UTC day of a turn that met Anthropic's limit (spendlimit). The two run at once, and each resolves.
  */
 export function upstashTelemetry(
   store: UpstashStore,
-  onMonthCost: (day: string, monthCost: number) => Promise<void> = async () => {},
+  now: () => Date,
+  alerts: Pick<LimitAlerts, "monthCost" | "spendLimited">,
 ): Telemetry {
   return {
     async record(event, reservation) {
       if (reservation === undefined) return;
+      const at = now();
       const day = reservationDay(reservation);
       const expiresAt = dayKeysExpireAt(day);
       const tokens = knownTokens(event);
@@ -87,6 +94,7 @@ export function upstashTelemetry(
               ["INCRBY", dayCostKey(day), String(settlement)],
               ["EXPIREAT", dayCostKey(day), expiresAt],
             ] satisfies Command[])),
+        ...spendLimitMarkerCommands(event, reservation, at),
       ];
       // The index of the month's INCRBY reply below: the transaction answers in command order, so the
       // order must stay as it is, with the month's two commands pushed last.
@@ -96,7 +104,10 @@ export function upstashTelemetry(
       if (typeof monthCost !== "number" || !Number.isSafeInteger(monthCost)) {
         throw new UpstashError("Upstash /multi-exec: INCRBY did not answer a whole number", "BAD_REPLY");
       }
-      await onMonthCost(day, monthCost);
+      await Promise.all([
+        alerts.monthCost(day, monthCost),
+        metSpendLimit(event) ? alerts.spendLimited(utcDay(at.getTime())) : undefined,
+      ]);
     },
   };
 }
