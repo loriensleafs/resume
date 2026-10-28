@@ -46,3 +46,109 @@
   align-items: center;
   gap: 8px;
 }
+
+/* The not-found page, 404.html (src/site/not-found.tsx), as the not-found boards draw it: the phone board's sizes
+   first, the desktop board's from 1024 px, where SPEC-site's wide layout starts. The page has no script, so it links
+   this stylesheet, which every page links, and uses no design-system part. The boards' own sizes: no token holds them. */
+
+/* A plain header with the app bar's name box and headline (their rules are above). */
+.not-found-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--ds-gray-400);
+}
+
+.not-found {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 64px 16px 24px;
+}
+
+.not-found > nav {
+  margin-top: 20px;
+}
+
+.not-found-dim {
+  color: var(--ds-gray-900);
+}
+
+.not-found-measure {
+  max-width: 560px;
+}
+
+.not-found-links {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ds-gray-400);
+}
+
+/* Each link is a row: its text, then the arrow at the far end. */
+.not-found-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--ds-gray-400);
+  color: var(--ds-gray-1000);
+}
+
+.not-found-link:hover {
+  background: var(--ds-gray-100);
+  color: var(--ds-gray-1000);
+}
+
+.not-found-link:focus-visible {
+  outline: 2px solid var(--ds-focus-color);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.not-found-link svg {
+  flex: none;
+  color: var(--ds-gray-900);
+}
+
+/* The phone board shows the name box alone. */
+@media (width < 1024px) {
+  .not-found-bar .app-bar-headline {
+    display: none;
+  }
+}
+
+@media (width >= 1024px) {
+  .not-found-bar {
+    height: 64px;
+    padding: 0 40px;
+  }
+
+  .not-found {
+    gap: 16px;
+    padding: 120px 40px 40px;
+  }
+
+  .not-found > nav {
+    margin-top: 16px;
+  }
+
+  /* The type style text-heading-40, which the desktop board uses. A class cannot change with the width, so its
+     values are here; below 1024 px the heading keeps text-heading-32, as the phone board does. */
+  .not-found-heading {
+    letter-spacing: -2.4px;
+    font-size: 40px;
+    line-height: 48px;
+  }
+
+  .not-found-link {
+    min-height: 56px;
+    padding: 0 8px;
+  }
+}
