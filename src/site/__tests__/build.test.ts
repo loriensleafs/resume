@@ -95,6 +95,12 @@ async function stylesheetsOf(page: string): Promise<string[]> {
   return hrefs;
 }
 
+/** The text of the stylesheets a page links, in page order. */
+async function cssOf(page: string): Promise<string> {
+  const sheets = (await stylesheetsOf(page)).map((href) => Bun.file(`${staticDir}${href}`).text());
+  return (await Promise.all(sheets)).join("\n");
+}
+
 /**
  * The JavaScript files a page loads before any interaction, by address: its scripts and module preloads, and every
  * file they import statically. A dynamic import waits for a navigation, so it stays out.
@@ -303,8 +309,7 @@ describe("the not-found page 404.html", () => {
     new HTMLRewriter()
       .on("[class]", { element: (element) => element.getAttribute("class")!.split(/\s+/).forEach((c) => classes.add(c)) })
       .transform(await Bun.file(`${staticDir}/404.html`).text());
-    const css = (await Promise.all((await stylesheetsOf("404.html")).map((href) => Bun.file(`${staticDir}${href}`).text())))
-      .join("\n");
+    const css = await cssOf("404.html");
     // A class name is followed by a character that cannot continue it: ".not-found" is not ".not-found-bar".
     const unstyled = [...classes].filter((name) => !new RegExp(`\\.${name}(?![-\\w])`).test(css));
     expect(classes.size).toBeGreaterThan(0);
@@ -314,9 +319,7 @@ describe("the not-found page 404.html", () => {
   // SPEC-site, Workspace addresses: with no script to read the stored theme, the page follows the system's setting.
   // The token stylesheet does that with its own media query, before any part or script runs.
   test("follows the system's light or dark setting through the stylesheets it links", async () => {
-    const css = (await Promise.all((await stylesheetsOf("404.html")).map((href) => Bun.file(`${staticDir}${href}`).text())))
-      .join("\n");
-    expect(css).toMatch(/@media\s*\(prefers-color-scheme:\s*dark\)/);
+    expect(await cssOf("404.html")).toMatch(/@media\s*\(prefers-color-scheme:\s*dark\)/);
   });
 });
 

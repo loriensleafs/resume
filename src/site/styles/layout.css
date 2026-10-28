@@ -68,7 +68,7 @@
   padding: 64px 16px 24px;
 }
 
-.not-found > nav {
+.not-found-nav {
   margin-top: 20px;
 }
 
@@ -103,7 +103,6 @@
 
 .not-found-link:hover {
   background: var(--ds-gray-100);
-  color: var(--ds-gray-1000);
 }
 
 .not-found-link:focus-visible {
@@ -135,7 +134,7 @@
     padding: 120px 40px 40px;
   }
 
-  .not-found > nav {
+  .not-found-nav {
     margin-top: 16px;
   }
 

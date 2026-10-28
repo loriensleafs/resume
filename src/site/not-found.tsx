@@ -58,7 +58,7 @@ function NotFoundPage({ basics, stylesheets }: NotFoundPageProps) {
           <p className="text-copy-16 not-found-dim not-found-measure">
             There is no page at this address. The link may be mistyped, or the page may have moved.
           </p>
-          <nav aria-label="Where to go next" className="not-found-measure">
+          <nav aria-label="Where to go next" className="not-found-nav not-found-measure">
             <ul className="not-found-links">
               <li>
                 <a href="/" className="text-label-16 not-found-link">
