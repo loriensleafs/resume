@@ -2,6 +2,7 @@
 // writes the facts it learns into it, and finishTurn() reads it once, at the end of the turn.
 
 import type { ReadResult } from "../../knowledge/types";
+import type { RefusalKind } from "./question-log";
 import type { RunErrorCode } from "./wire";
 
 /** The summed token counts of a turn's model calls that finished, as SPEC-deploy maps them. */
@@ -27,6 +28,9 @@ export type Turn = {
   readonly citations: string[];
   /** The markers the check removed. */
   removed: number;
+  /** The kind of the answer's first refusal marker; null when the answer is no refusal. */
+  refusal: RefusalKind | null;
+  // The follow-up questions stay in the marker middleware's closure (markers.ts): only its chat.follow-ups event needs them.
   /** The model calls that started. */
   modelCalls: number;
   /** The counts of the model calls that finished; null until one finishes. */
@@ -37,7 +41,7 @@ export type Turn = {
 
 /** A turn that has read, cited and called nothing yet. */
 export function startTurn(turn: Pick<Turn, "question" | "startedAt" | "reservation">): Turn {
-  return { ...turn, readIds: [], reads: 0, citations: [], removed: 0, modelCalls: 0, tokens: null, errorCode: null };
+  return { ...turn, readIds: [], reads: 0, citations: [], removed: 0, refusal: null, modelCalls: 0, tokens: null, errorCode: null };
 }
 
 /**

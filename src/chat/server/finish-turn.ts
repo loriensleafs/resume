@@ -21,6 +21,9 @@ export type TurnEnding = { outcome: QuestionLogEntry["outcome"]; errorCode: RunE
  */
 const errorEnding = (errorCode: RunErrorCode): TurnEnding => ({ outcome: errorCode === "SPEND_LIMIT" ? "limit" : "error", errorCode });
 
+/** How a turn that answered ended: answered, or the refusal kind its refusal marker named (How a turn ends). */
+const answerEnding = (turn: Turn): TurnEnding => ({ outcome: turn.refusal === null ? "answered" : `refusal:${turn.refusal}`, errorCode: null });
+
 /** What finishTurn() writes to: the question log, the telemetry and the clock of ChatDeps. */
 type FinishDeps = { log: QuestionLog; telemetry: Telemetry; now(): Date };
 
@@ -31,7 +34,7 @@ type FinishDeps = { log: QuestionLog; telemetry: Telemetry; now(): Date };
 export function finishTurnHooks(deps: FinishDeps, turn: Turn): ChatMiddleware {
   return {
     name: "finish-turn",
-    onFinish: (ctx) => ctx.defer(finishTurn(deps, turn, { outcome: "answered", errorCode: null })),
+    onFinish: (ctx) => ctx.defer(finishTurn(deps, turn, answerEnding(turn))),
     // A model error ends with the code the wire sent for it. A throw has none: it is SERVER_ERROR,
     // which the stream wrapper also sends.
     onError: (ctx) => ctx.defer(finishTurn(deps, turn, errorEnding(turn.errorCode ?? "SERVER_ERROR"))),

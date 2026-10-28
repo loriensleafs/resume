@@ -184,7 +184,7 @@ describe("citations", () => {
 
     const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), deps));
 
-    expect(streamedText(events)).toBe("Test Person planned the first thing [sample.2] and tested it .");
+    expect(streamedText(events)).toBe("Test Person planned the first thing [sample.2] and tested it.");
     expect(citationEvents(events)).toEqual([{ citations: ["sample.2"], removed: 1 }]);
     expect((await deps.log.list(1)).map(({ read, citations, removed }) => ({ read, citations, removed }))).toEqual([
       { read: ["sample.2"], citations: ["sample.2"], removed: 1 },
@@ -201,7 +201,7 @@ describe("citations", () => {
 
     const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), seamDeps(fake)));
 
-    expect(streamedText(events)).toBe("Test Person found the problem [sample.1] and measured the result [sample.4] in step nine .");
+    expect(streamedText(events)).toBe("Test Person found the problem [sample.1] and measured the result [sample.4] in step nine.");
     expect(citationEvents(events)).toEqual([{ citations: ["sample.1", "sample.4"], removed: 1 }]);
   });
 
@@ -222,7 +222,7 @@ describe("citations", () => {
 
     const events = await readEvents(await handleChat(chatRequest([question("What did Test Person lead at Acme?")]), seamDeps(fake)));
 
-    expect(streamedText(events)).toBe("Test Person works at Acme [role:acme] and led its migration .");
+    expect(streamedText(events)).toBe("Test Person works at Acme [role:acme] and led its migration.");
     expect(citationEvents(events)).toEqual([{ citations: ["role:acme"], removed: 1 }]);
   });
 });
@@ -347,7 +347,7 @@ describe("the read budget", () => {
     expect(fourth).not.toContain("Text for Result.");
     expect(readResults(events).map((e) => JSON.parse(String(e.content)).read)).toEqual([["sample.1"], ["sample.2"], ["sample.3"], []]);
     // The turn never read sample.4, so its citation is removed.
-    expect(streamedText(events)).toBe("Test Person planned it [sample.2] and measured it .");
+    expect(streamedText(events)).toBe("Test Person planned it [sample.2] and measured it.");
     expect(events.at(-1)?.type).toBe("RUN_FINISHED");
     expect((await deps.log.list(1)).map(({ read, outcome }) => ({ read, outcome }))).toEqual([
       { read: ["sample.1", "sample.2", "sample.3"], outcome: "answered" },
@@ -440,7 +440,7 @@ describe("the read budget", () => {
 
     expect(toolChoices(requests)).toEqual([undefined, undefined, undefined, undefined, "none"]);
     expect(toolMessages(requests[4]).join("\n")).not.toContain(READ_LIMIT_ERROR);
-    expect(streamedText(events)).toBe("Test Person measured the result [sample.4] but not the problem .");
+    expect(streamedText(events)).toBe("Test Person measured the result [sample.4] but not the problem.");
     expect((await deps.log.list(1)).map(({ read }) => read)).toEqual([["sample.2", "sample.3", "sample.4"]]);
     expect(telemetry.events.map(({ reads }) => reads)).toEqual([3]);
   });
@@ -529,7 +529,7 @@ describe("about", () => {
     expect(read?.toolCallId).toBe(call?.toolCalls?.[0]?.id);
     for (const text of ["Text for What Peter did.", "Internal code."]) expect(JSON.stringify(read?.content)).toContain(text);
     // The passage the turn read is kept; one it did not read is removed.
-    expect(streamedText(events)).toBe("Test Person planned the first thing [sample.2] and tested it .");
+    expect(streamedText(events)).toBe("Test Person planned the first thing [sample.2] and tested it.");
     expect(citationEvents(events)).toEqual([{ citations: ["sample.2"], removed: 1 }]);
     expect((await deps.log.list(1)).map(({ read, outcome }) => ({ read, outcome }))).toEqual([{ read: ["sample.2"], outcome: "answered" }]);
     expect(telemetry.events.map(({ reads }) => reads)).toEqual([1]);
@@ -555,7 +555,7 @@ describe("about", () => {
     expect(third).toContain(READ_LIMIT_ERROR);
     expect(third).not.toContain("Text for Result.");
     expect(readResults(events).map((e) => JSON.parse(String(e.content)).read)).toEqual([["sample.2"], ["sample.1"], ["sample.3"], []]);
-    expect(streamedText(events)).toBe("Test Person planned it [sample.2], built it [sample.3] and measured it .");
+    expect(streamedText(events)).toBe("Test Person planned it [sample.2], built it [sample.3] and measured it.");
     expect((await deps.log.list(1)).map(({ read }) => read)).toEqual([["sample.2", "sample.1", "sample.3"]]);
     expect(telemetry.events.map(({ reads, modelCalls }) => ({ reads, modelCalls }))).toEqual([{ reads: 3, modelCalls: 4 }]);
   });
@@ -901,8 +901,8 @@ describe("markers: holding", () => {
 
     const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build?")]), seamDeps(fake)));
 
-    expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1] and planned the next .");
-    expect(deltas(events)).toContain("[highlight:acme.1]");
+    expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1] and planned the next.");
+    expect(deltas(events).some((delta) => delta.includes("[highlight:acme.1]"))).toBe(true);
     expect(deltas(events).some((delta) => delta.includes("nobody"))).toBe(false);
     expect(citationEvents(events)).toEqual([{ citations: ["highlight:acme.1"], removed: 1 }]);
   });
@@ -929,6 +929,242 @@ describe("markers: holding", () => {
 
     expect(streamedText(events)).toBe(text);
     expect(citationEvents(events)).toEqual([{ citations: [], removed: 0 }]);
+  });
+});
+
+describe("markers: what a removed marker leaves", () => {
+  test("a removed marker takes the white space before it, also from the text event before it, so no stray space is left before the punctuation or the next word", async () => {
+    const fake = fakeText();
+    // "Test Person led a migration " is 28 characters, so its space ends a 4-character text event.
+    fake.setResponses([
+      { text: "Test Person led a migration [highlight:acme.9]. Test Person built the first thing [highlight:acme.1] and tested it [role:nobody] [sample.9] twice." },
+    ]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person lead?")]), seamDeps(fake)));
+
+    expect(streamedText(events)).toBe("Test Person led a migration. Test Person built the first thing [highlight:acme.1] and tested it twice.");
+    expect(citationEvents(events)).toEqual([{ citations: ["highlight:acme.1"], removed: 3 }]);
+  });
+
+  test.each([
+    ["a <<…>> that is neither a refusal nor a follow-up question", "<<note: Test Person said so>>"],
+    ["a refusal marker of no known kind", "<<refusal: salary>>"],
+  ])("%s is removed and counted, and the turn is no refusal", async (_name, marker) => {
+    const fake = fakeText();
+    fake.setResponses([{ text: `Test Person built the first thing ${marker} at Acme [highlight:acme.1].` }]);
+    const deps = seamDeps(fake);
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build at Acme?")]), deps));
+
+    expect(streamedText(events)).toBe("Test Person built the first thing at Acme [highlight:acme.1].");
+    expect(citationEvents(events)).toEqual([{ citations: ["highlight:acme.1"], removed: 1 }]);
+    expect(chatEvents(events, "chat.refusal")).toEqual([]);
+    expect((await deps.log.list(1)).map(({ removed, outcome }) => ({ removed, outcome }))).toEqual([{ removed: 1, outcome: "answered" }]);
+  });
+
+  test("a whole-source marker is removed and counted, also after the turn read the whole source, as a citation names a passage", async () => {
+    const fake = fakeText();
+    fake.setResponses([readCall({ ids: ["sample"], topic: "the first thing" }), { text: "Test Person found the problem [sample.1] in the deep dive [sample]." }]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person build the first thing?")]), seamDeps(fake)));
+
+    expect(streamedText(events)).toBe("Test Person found the problem [sample.1] in the deep dive.");
+    expect(citationEvents(events)).toEqual([{ citations: ["sample.1"], removed: 1 }]);
+  });
+
+  test("a << that never closes is flushed as text at the end of the message, and the citation markers after it, the last one included, are still checked", async () => {
+    const fake = fakeText();
+    fake.setResponses([{ text: "Test Person rated it 2 << 3 at Acme [highlight:acme.1] and [role:nobody]" }]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("How did Test Person rate it?")]), seamDeps(fake)));
+
+    expect(streamedText(events)).toBe("Test Person rated it 2 << 3 at Acme [highlight:acme.1] and");
+    expect(citationEvents(events)).toEqual([{ citations: ["highlight:acme.1"], removed: 1 }]);
+  });
+});
+
+describe("markers: citation forms", () => {
+  test.each(["[1]", "[x]", "items[0]"])("%s is ordinary text: it passes unchanged and is not counted", async (form) => {
+    const fake = fakeText();
+    const text = `Test Person listed the steps ${form} at Acme [highlight:acme.1].`;
+    fake.setResponses([{ text }]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person list?")]), seamDeps(fake)));
+
+    expect(streamedText(events)).toBe(text);
+    expect(citationEvents(events)).toEqual([{ citations: ["highlight:acme.1"], removed: 0 }]);
+  });
+
+  // Each text holds [basics], which the check would keep, [sample.9], which it would remove, or a
+  // refusal marker; inside code or link text, none of them is a marker.
+  test.each([
+    ["inline code", "Test Person wrote `[sample.9]` and `<<refusal: out-of-scope>>` in the docs [highlight:acme.1]."],
+    ["inline code of two backticks that holds one", "Test Person wrote ``a ` [basics] <<refusal: not-covered>>`` in the docs [highlight:acme.1]."],
+    ["fenced code", "Test Person wrote this:\n\n```md\n[sample.9] [basics]\n<<refusal: out-of-scope>>\n```\n\nIt shipped at Acme [highlight:acme.1]."],
+    ["fenced code with tildes", "Test Person wrote this:\n\n~~~\n[basics] `\n~~~\n\nIt shipped at Acme [highlight:acme.1]."],
+    ["link text", "Test Person's [basics](https://peterkloss.dev/) and [sample.9](https://peterkloss.dev/sources/sample) are online [highlight:acme.1]."],
+    ["an image's alt text", "Test Person drew ![basics](https://peterkloss.dev/x.png) at Acme [highlight:acme.1]."],
+  ])("a citation form inside %s passes unchanged, is neither kept nor counted, and no <<…>> in it is a marker", async (_name, text) => {
+    const fake = fakeText();
+    fake.setResponses([{ text }]);
+    const deps = seamDeps(fake);
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person write?")]), deps));
+
+    expect(streamedText(events)).toBe(text);
+    expect(citationEvents(events)).toEqual([{ citations: ["highlight:acme.1"], removed: 0 }]);
+    expect(chatEvents(events, "chat.refusal")).toEqual([]);
+    expect((await deps.log.list(1)).map(({ outcome }) => outcome)).toEqual(["answered"]);
+  });
+
+  test("the check resumes after inline code and after fenced code close", async () => {
+    const fake = fakeText();
+    fake.setResponses([{ text: "Test Person wrote `[sample.9]` once [role:nobody].\n\n```\n[sample.9]\n```\n\nThen Test Person shipped it [highlight:acme.9]." }]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person write?")]), seamDeps(fake)));
+
+    expect(streamedText(events)).toBe("Test Person wrote `[sample.9]` once.\n\n```\n[sample.9]\n```\n\nThen Test Person shipped it.");
+    expect(citationEvents(events)).toEqual([{ citations: [], removed: 2 }]);
+  });
+
+  test("a backtick that no backtick closes in its paragraph is text, as Markdown reads it, so the markers after it are still checked", async () => {
+    const fake = fakeText();
+    fake.setResponses([
+      { text: "Test Person wrote ` once [sample.9] <<follow-up: What did Test Person write next?>>.\n\nThen ` Test Person shipped it [highlight:acme.9]." },
+    ]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person write?")]), seamDeps(fake)));
+
+    expect(streamedText(events)).toBe("Test Person wrote ` once.\n\nThen ` Test Person shipped it.");
+    expect(citationEvents(events)).toEqual([{ citations: [], removed: 2 }]);
+    expect(chatEvents(events, "chat.follow-ups")).toEqual([{ followUps: ["What did Test Person write next?"] }]);
+  });
+});
+
+/** The values of a response's CUSTOM events with this name, in order. */
+const chatEvents = (events: WireEvent[], name: string) => events.filter((e) => e.type === "CUSTOM" && e.name === name).map((e) => e.value);
+
+describe("markers: refusals and follow-up questions", () => {
+  test.each([
+    ["out-of-scope", "What salary does Test Person ask for?", "That's outside what this chat answers. You can ask Test Person directly at test@example.com."],
+    ["not-covered", "Did Test Person ever work in Rust?", "Test Person's knowledge base doesn't cover that yet. You can ask at test@example.com."],
+  ] as const)(
+    "a %s refusal marker leaves the text and arrives as a chat.refusal event, and the log and the telemetry have the refusal outcome",
+    async (kind, asked, answerText) => {
+      const fake = fakeText();
+      fake.setResponses([{ text: `${answerText} <<refusal: ${kind}>>` }]);
+      const telemetry = inMemoryTelemetry();
+      const deps = seamDeps(fake, { telemetry });
+
+      const events = await readEvents(await handleChat(chatRequest([question(asked)]), deps));
+
+      expect(streamedText(events)).toBe(answerText);
+      expect(chatEvents(events, "chat.refusal")).toEqual([{ refusal: kind }]);
+      expect(citationEvents(events)).toEqual([{ citations: [], removed: 0 }]);
+      expect((await deps.log.list(1)).map(({ question, outcome }) => ({ question, outcome }))).toEqual([{ question: asked, outcome: `refusal:${kind}` }]);
+      expect(telemetry.events.map(({ outcome, removed }) => ({ outcome, removed }))).toEqual([{ outcome: `refusal:${kind}`, removed: 0 }]);
+    },
+  );
+
+  test("follow-up markers leave the text and arrive as one chat.follow-ups event with the first two questions; a third follow-up question is dropped and not counted as removed", async () => {
+    const fake = fakeText();
+    fake.setResponses([
+      {
+        text:
+          "Test Person built the first thing [highlight:acme.1]. <<follow-up: What else did Test Person build at Acme?>> " +
+          "<<follow-up: Where does Test Person work now?>> <<follow-up: What did Test Person plan after that?>>",
+      },
+    ]);
+    const deps = seamDeps(fake);
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build at Acme?")]), deps));
+
+    expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1].");
+    expect(chatEvents(events, "chat.follow-ups")).toEqual([{ followUps: ["What else did Test Person build at Acme?", "Where does Test Person work now?"] }]);
+    expect(citationEvents(events)).toEqual([{ citations: ["highlight:acme.1"], removed: 0 }]);
+    expect((await deps.log.list(1)).map(({ outcome }) => outcome)).toEqual(["answered"]);
+  });
+
+  test("a follow-up question of 120 characters never reaches the text, in any text event, and is dropped; one of 80 characters is kept", async () => {
+    /** A follow-up question of exactly `length` characters. */
+    const followUpOf = (length: number) => `Which tools did Test Person use${" again".repeat(30)}`.slice(0, length - 1) + "?";
+    const [long, longest] = [followUpOf(120), followUpOf(80)];
+    expect([long.length, longest.length]).toEqual([120, 80]);
+    const fake = fakeText();
+    fake.setResponses([{ text: `Test Person built the first thing [highlight:acme.1].\n\n<<follow-up: ${long}>>\n<<follow-up: ${longest}>>` }]);
+
+    const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build at Acme?")]), seamDeps(fake)));
+
+    // A removed marker takes the spaces and tabs before it, never a line break. SPEC-chat's Markers
+    // section names no rule for the line breaks around a removed marker, so these three stay.
+    expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1].\n\n\n");
+    for (const event of events.filter((e) => e.type === "TEXT_MESSAGE_CONTENT")) {
+      expect(String(event.delta)).not.toContain("follow-up");
+      expect(String(event.delta)).not.toContain("again");
+    }
+    expect(chatEvents(events, "chat.follow-ups")).toEqual([{ followUps: [longest] }]);
+    expect(citationEvents(events)).toEqual([{ citations: ["highlight:acme.1"], removed: 0 }]);
+  });
+});
+
+/**
+ * `fake`, with the text of each text message streamed in TEXT_MESSAGE_CONTENT events of `size`
+ * characters, not fakeText()'s 4: the fake's own text events of a message are joined, then split again.
+ */
+function inTextEventsOf(size: number, fake: ReturnType<typeof fakeText>): ReturnType<typeof fakeText> {
+  const chatStream = fake.chatStream.bind(fake);
+  fake.chatStream = async function* (options) {
+    let text = "";
+    for await (const chunk of chatStream(options)) {
+      if (chunk.type === EventType.TEXT_MESSAGE_CONTENT) {
+        text += chunk.delta;
+        continue;
+      }
+      if (chunk.type === EventType.TEXT_MESSAGE_END) {
+        for (let at = 0; at < text.length; at += size) {
+          yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: chunk.messageId, delta: text.slice(at, at + size), timestamp: Date.now() };
+        }
+        text = "";
+      }
+      yield chunk;
+    }
+  };
+  return fake;
+}
+
+describe("markers: split over text events", () => {
+  test("one answer with a kept and a removed citation, a refusal and a follow-up question gives the same visitor text and the same markers in text events of 1 to 9 characters", async () => {
+    const text =
+      "Test Person built the first thing [highlight:acme.1] and tested it [role:nobody]. Test Person's salary is outside what this chat answers. " +
+      "<<refusal: out-of-scope>> <<follow-up: What else did Test Person build at Acme?>>";
+    const sizes = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    const results = [];
+
+    for (const size of sizes) {
+      const fake = fakeText();
+      fake.setResponses([{ text }]);
+      const deps = seamDeps(inTextEventsOf(size, fake));
+      const events = await readEvents(await handleChat(chatRequest([question("What did Test Person build at Acme?")]), deps));
+      results.push({
+        size,
+        text: streamedText(events),
+        citations: citationEvents(events),
+        refusal: chatEvents(events, "chat.refusal"),
+        followUps: chatEvents(events, "chat.follow-ups"),
+        outcome: (await deps.log.list(1)).map(({ outcome }) => outcome),
+      });
+    }
+
+    expect(results).toEqual(
+      sizes.map((size) => ({
+        size,
+        text: "Test Person built the first thing [highlight:acme.1] and tested it. Test Person's salary is outside what this chat answers.",
+        citations: [{ citations: ["highlight:acme.1"], removed: 1 }],
+        refusal: [{ refusal: "out-of-scope" }],
+        followUps: [{ followUps: ["What else did Test Person build at Acme?"] }],
+        outcome: ["refusal:out-of-scope"],
+      })),
+    );
   });
 });
 
