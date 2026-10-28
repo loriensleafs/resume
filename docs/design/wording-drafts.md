@@ -9,7 +9,7 @@ Status words, in each file: `not written`, `wording draft`, `approved, row <n>`,
 | Task | Wording | File |
 |---|---|---|
 | [T1](../../tasks/modules/content.md#t1-each-role-has-its-short-label-x-short) | The nine `x-short` labels, and the apostrophe in "Brigham and Women’s" | [T1](wording-drafts/T1.md) |
-| [C15](../../tasks/modules/chat.md#c15-the-system-prompt-the-scope-and-audience-lines-and-the-refusal-wordings) | The system prompt, the five audience lines and the two refusal wordings | [C15](wording-drafts/C15.md) |
+| [C15](../../tasks/modules/chat.md#c15-the-system-prompt-the-scope-and-audience-lines-and-the-refusal-wordings) | The system prompt, the scope line's form, the five audience lines and the two refusal wordings | [C15](wording-drafts/C15.md) |
 | [C16](../../tasks/modules/chat.md#c16-the-chats-vite-plugin-virtualknowledge-and-the-device-index) | The device index's labels: basics, an earlier role, a skills group and education | [C16](wording-drafts/C16.md) |
 | [S7](../../tasks/modules/site.md#s7-google-sans-flex-served-from-the-site-itself) | The font file format | [S7](wording-drafts/S7.md) |
 | [S11](../../tasks/modules/site.md#s11-the-workspace-and-its-first-view-on-wide-screens) | The overall suggested questions | [S11](wording-drafts/S11.md) |
