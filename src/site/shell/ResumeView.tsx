@@ -1,5 +1,5 @@
 import { BASICS_ID, EDUCATION_ID, highlightId, roleId, skillsId } from "../../knowledge/ids";
-import type { SiteData } from "../data";
+import type { SiteData } from "../site-data";
 
 /**
  * The whole resume as plain semantic HTML that reads without JavaScript (SPEC-site, Views: Resume view): the lead, each

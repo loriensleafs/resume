@@ -6,13 +6,13 @@
 // - device-index.json, the device index, goes into the static folder during the same Vite build. It comes from
 //   publicKnowledge(knowledge), so it holds no Not public text (device-index-build.ts).
 // Both read the project's files under the root that buildSite() names: the site's build data reads the same root
-// (src/site/data.ts), so the seam-1 build reads its fixture root here too.
+// (src/site/site-data.ts), so the seam-1 build reads its fixture root here too.
 // Vite's convention for a module made at build time: https://vite.dev/guide/api-plugin#importing-a-virtual-file
 
 import { dirname, join, resolve } from "node:path";
 import type { Plugin } from "vite";
 import { buildKnowledge, publicKnowledge, SOURCES } from "../knowledge/build";
-import { buildSiteData } from "../site/data";
+import { buildSiteData } from "../site/site-data";
 import { DEVICE_INDEX_FILE, type DeviceIndex } from "./device-index";
 import { buildDeviceIndex } from "./device-index-build";
 

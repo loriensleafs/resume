@@ -13,7 +13,7 @@ const VITE_CONFIG = join(import.meta.dir, "../../vite.config.ts");
 
 export type BuildSiteOptions = {
   /** The folder that holds the project's files: resume.yaml, private.yaml, knowledge/ and documents/. The pages' data
-   *  comes from its resume.yaml (src/site/data.ts). A relative path starts at the working folder. */
+   *  comes from its resume.yaml (src/site/site-data.ts). A relative path starts at the working folder. */
   root: string;
   /** The build writes Nitro's Vercel output to <outDir>/.vercel/output/, and the pages to its static/ folder.
    *  A relative path starts at the working folder. */

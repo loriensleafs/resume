@@ -8,7 +8,7 @@ import { Face, Blob as HarfBuzzBlob } from "harfbuzzjs";
 import { formatRange, formatTitle, loadResume, type Resume } from "../../content";
 import { buildKnowledge, publicKnowledge } from "../../knowledge/build";
 import { holds } from "../../private-details";
-import { buildOutput, seam1 } from "./build-output";
+import { buildOutput, buildRefused, seam1 } from "./build-output";
 import {
   FAKE_PHONE,
   FIXTURE_DEEP_DIVE,
@@ -21,6 +21,8 @@ import {
   FIXTURE_LINK,
   FIXTURE_LOGISTICS_ANSWER,
   FIXTURE_NAME,
+  FIXTURE_ONE_YEAR_ROLE,
+  FIXTURE_OPEN_ROLE,
 } from "./fixture-root";
 import { iconSizes, pngSize } from "./image-sizes";
 
@@ -132,9 +134,10 @@ async function cssOf(page: string): Promise<string> {
 
 /**
  * The JavaScript files a page loads before any interaction, by address: its scripts and module preloads, and every
- * file they import statically. A dynamic import waits for a navigation, so it stays out.
+ * file they import statically. A dynamic import waits for a navigation or an interaction, so it stays out, unless
+ * `dynamic` asks for every file that the page can load, the dynamic imports and their own imports included.
  */
-async function scriptsLoadedBy(page: string): Promise<string[]> {
+async function scriptsLoadedBy(page: string, { dynamic = false } = {}): Promise<string[]> {
   const entries: string[] = [];
   // Each selector matches only elements that have the attribute, so getAttribute() returns a string.
   new HTMLRewriter()
@@ -147,7 +150,9 @@ async function scriptsLoadedBy(page: string): Promise<string[]> {
     if (loaded.has(address)) return;
     loaded.add(address);
     for (const { path, kind } of scanner.scanImports(await Bun.file(`${staticDir}${address}`).text())) {
-      if (kind === "import-statement") await visit(new URL(path, `https://peterkloss.dev${address}`).pathname);
+      if (kind === "import-statement" || (dynamic && kind === "dynamic-import")) {
+        await visit(new URL(path, `https://peterkloss.dev${address}`).pathname);
+      }
     }
   };
   for (const entry of entries) await visit(entry);
@@ -524,6 +529,207 @@ describe.each(["index.html", "resume/index.html"])("the app bar in %s", (page) =
   });
 });
 
+/**
+ * The years of each role of the fixture root, by role id, earliest first, as SPEC-site writes them: the start year, an
+ * en dash and the end year ("2021 – 2024"); one year alone for a role that starts and ends in it; "Present" for a role
+ * with no end date.
+ */
+const YEARS: Record<string, string> = {
+  brigham: "2009 – 2012",
+  "six-red-marbles": "2013 – 2015",
+  hbs: "2015 – 2016",
+  "jack-morton": "2016 – 2017",
+  sheridan: "2017 – 2019",
+  linksquares: "2019 – 2020",
+  pippin: "2020 – 2021",
+  fednow: "2021 – 2024",
+  highspot: "2024 – 2026",
+  [FIXTURE_ONE_YEAR_ROLE.id]: "2027",
+  [FIXTURE_OPEN_ROLE.id]: "2028 – Present",
+};
+
+/** The fixture root's roles and earlier roles, earliest first: the career timeline's order from left to right. */
+const rolesByStart = () => resume.work.toSorted((a, b) => a.startDate.localeCompare(b.startDate));
+
+/**
+ * The value of a property in the rule for one selector, in a stylesheet's text, or undefined. A minifier may join two
+ * rules with the same declarations into one selector list, so the selector is one item of the rule's list.
+ */
+function declarationOf(css: string, selector: string, property: string): string | undefined {
+  for (const [, selectors, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!selectors!.split(",").some((item) => item.trim() === selector)) continue;
+    const value = body!.match(new RegExp(`(?:^|;)\\s*${property}\\s*:([^;]*)`))?.[1];
+    if (value !== undefined) return value.trim();
+  }
+  return undefined;
+}
+
+/** The grid lines of a timeline span or year label from its class's rule, `grid-column: <start> / <end>`. */
+function gridColumnOf(css: string, className: string): [number, number] | undefined {
+  const value = declarationOf(css, `.${className}`, "grid-column");
+  const lines = value?.match(/^(\d+)\s*\/\s*(\d+)$/);
+  return lines ? [Number(lines[1]), Number(lines[2])] : undefined;
+}
+
+// SPEC-site, Views: Career timeline band; Testing 1. The workspace shows every role and earlier role as a span at its
+// true length on a year axis, as the first-view and career-timeline-states boards draw it.
+describe("the career timeline in index.html", () => {
+  const page = "index.html";
+
+  test('comes first in main, under the app bar, as a group named by its heading "Career timeline"', async () => {
+    const [first] = await attributeOn(page, "main > *", "role");
+    const [labelledBy] = await attributeOn(page, "main > *", "aria-labelledby");
+    expect(first).toBe("group");
+    expect(await elementsOn(page, `#${labelledBy}`)).toEqual([{ tag: "h2", text: "Career timeline" }]);
+  });
+
+  // Decision record row 50: the instruction follows the heading. The stylesheet shows it on wide screens only (seam 2).
+  test('has the line "Select a role to read it and scope the chat" after its heading', async () => {
+    expect(await elementsOn(page, ".career-timeline-header > *")).toEqual([
+      { tag: "h2", text: "Career timeline" },
+      { tag: "p", text: "Select a role to read it and scope the chat" },
+    ]);
+  });
+
+  test("has one span for each role and earlier role, earliest first, labelled with the role's x-short value", async () => {
+    const labels = (await elementsOn(page, ".career-timeline-label")).map((label) => label.text);
+    expect(labels).toEqual(rolesByStart().map((role) => role["x-short"]));
+  });
+
+  // Testing 1: each span's button name holds the full employer name and the years. It also holds the span's visible
+  // label, as WCAG 2.2's 2.5.3 Label in Name asks, so a visitor who speaks "HBS" reaches Harvard Business School. Text
+  // in parentheses does not count for that (axe-core 4.14, after ACT rule 2ee8b8), so "(FedNow)" in the employer name
+  // does not hold the label "FedNow".
+  test("each span is a real button whose name holds the full employer name, the years and its label", async () => {
+    const buttons = await elementsOn(page, ".career-timeline-span button");
+    const types = await attributeOn(page, ".career-timeline-span button", "type");
+    const names = await attributeOn(page, ".career-timeline-span button", "aria-label");
+    expect(buttons.map((button) => button.tag)).toEqual(rolesByStart().map(() => "button"));
+    expect(types).toEqual(rolesByStart().map(() => "button"));
+    expect(rolesByStart().map((role) => role.id)).toEqual(Object.keys(YEARS));
+    rolesByStart().forEach((role, i) => {
+      for (const part of [role.name, YEARS[role.id]!]) expect(names[i]).toContain(part);
+      expect(names[i]!.replace(/\([^()]*\)/g, "")).toContain(role["x-short"]);
+    });
+    // SPEC-site's own example, and a label that the employer name does not hold.
+    expect(names).toContain("Jack Morton Worldwide, 2016 – 2017");
+    expect(names).toContain("HBS, Harvard Business School, 2015 – 2016");
+  });
+
+  // The fixture root's own roles: one that starts and ends in one year, and one with no end date (fixture-root.ts).
+  test('names a role of one year by that year, and a role with no end date "<start year> – Present"', async () => {
+    const labels = (await elementsOn(page, ".career-timeline-label")).map((label) => label.text);
+    const names = await attributeOn(page, ".career-timeline-span button", "aria-label");
+    const classes = await attributeOn(page, ".career-timeline-span", "class");
+    expect(labels.slice(-2)).toEqual(["One-Year Employer", "Open Employer"]);
+    expect(names.slice(-2)).toEqual([
+      "The Fixture Root’s One-Year Employer, 2027",
+      "The Fixture Root’s Open Employer, 2028 – Present",
+    ]);
+    expect(classes.slice(-2)).toEqual([
+      "career-timeline-span career-timeline-span-fixture-one-year",
+      "career-timeline-span career-timeline-span-fixture-open",
+    ]);
+  });
+
+  // The tooltip's text is its description of the button (acme-tooltip 0.3.3: the content slot's text).
+  test("each span's acme-tooltip holds the full employer name, then the title and the years", async () => {
+    const texts = (await elementsOn(page, '.career-timeline-span acme-tooltip > [slot="content"]')).map(({ text }) => text);
+    expect(texts).toEqual(rolesByStart().flatMap((role) => [role.name, `${role.position}, ${YEARS[role.id]}`]));
+    // SPEC-site's own example.
+    expect(texts).toContain("Senior Front-End Engineer, 2016 – 2017");
+  });
+
+  test("labels its year axis with every second year from the first, and the last year at its end", async () => {
+    const years = (await elementsOn(page, ".career-timeline-axis > *")).map((label) => label.text);
+    // The first-view board's rule on the fixture root's axis, 2009 to June 2028, the build's month. 2027 begins less
+    // than two years before the axis's end, so it gets no label.
+    expect(years).toEqual(["2009", "2011", "2013", "2015", "2017", "2019", "2021", "2023", "2025", "2028"]);
+  });
+
+  // SPEC-deploy, Headers: no style attribute, so each span's place on the axis is a class in a stylesheet the build
+  // writes. The axis has one grid column per month; a span covers the months of its role. A role's dates name a year
+  // or a month: it starts at the first month its start date names, and ends after the month that its end date names,
+  // or, for a year alone, as that year begins, so "2019 – 2020" and "2020 – 2021" meet and do not overlap.
+  test("the stylesheets / links give each span its true length on a year axis of one column per month", async () => {
+    const css = await cssOf(page);
+    const columns = Object.fromEntries(
+      rolesByStart().map((role) => [role.id, gridColumnOf(css, `career-timeline-span-${role.id}`)]),
+    );
+    const months = (id: string) => columns[id]![1] - columns[id]![0];
+    // Jan 2009 to the end of June 2028, the build's month: 19 years and 6 months.
+    expect(declarationOf(css, ".career-timeline", "--career-timeline-months")).toBe("234");
+    expect(columns.brigham).toEqual([1, 37]); // 2009 – 2012: from the axis's first column, 36 months
+    expect(months("jack-morton")).toBe(12); // 2016 – 2017
+    expect(columns.highspot).toEqual([192, 213]); // Dec 2024 – Aug 2026, August included: 21 months
+    expect(columns[FIXTURE_ONE_YEAR_ROLE.id]).toEqual([217, 229]); // 2027 alone: January to December
+    // 2028 – Present: January to June 2028, the build's month, which ends the axis.
+    expect(columns[FIXTURE_OPEN_ROLE.id]).toEqual([229, 235]);
+    // The career-timeline-states board: "the gap from 2012 to 2013 shows as space".
+    expect(columns["six-red-marbles"]![0] - columns.brigham![1]).toBe(12);
+    // Left to right, earliest first, and no two spans overlap.
+    const ordered = rolesByStart().map((role) => columns[role.id]!);
+    ordered.slice(1).forEach(([start], i) => expect(start).toBeGreaterThanOrEqual(ordered[i]![1]));
+  });
+
+  test("the stylesheets / links place each year label at its January, and the last at the axis's end", async () => {
+    const css = await cssOf(page);
+    const years = ["2009", "2011", "2013", "2015", "2017", "2019", "2021", "2023", "2025"];
+    expect(years.map((year) => gridColumnOf(css, `career-timeline-year-${year}`)?.[0])).toEqual(
+      years.map((year) => (Number(year) - 2009) * 12 + 1),
+    );
+    expect(gridColumnOf(css, "career-timeline-year-2028")?.[1]).toBe(235);
+  });
+
+  // A class with no rule in a linked stylesheet would leave the band unstyled until a script ran, or for ever.
+  test("has a rule for each class it uses in the stylesheets / links", async () => {
+    const classes = new Set<string>();
+    new HTMLRewriter()
+      .on(".career-timeline, .career-timeline [class]", {
+        element: (element) => element.getAttribute("class")!.split(/\s+/).forEach((name) => classes.add(name)),
+      })
+      .transform(await Bun.file(`${staticDir}/${page}`).text());
+    const css = await cssOf(page);
+    const unstyled = [...classes].filter((name) => !new RegExp(`\\.${name}(?![-\\w])`).test(css));
+    expect(classes.size).toBeGreaterThan(0);
+    expect(unstyled).toEqual([]);
+  });
+});
+
+// The career timeline cannot place a role whose dates run backwards, or two roles that share a month: one button would
+// hide the other. The build stops at its data step and names the role, so a resume.yaml edit never ships such a band.
+// Each run stops before Vite writes a file, so it is short.
+describe("the build script refuses", () => {
+  test("a role whose end date is before its start date, and names it", async () => {
+    const backwards = {
+      id: "fixture-backwards",
+      name: "The Fixture Root’s Backwards Employer",
+      "x-short": "Backwards",
+      position: "Fixture Engineer",
+      startDate: "2012-09",
+      endDate: "2012-03",
+    };
+    const { exitCode, stderr } = await buildRefused("backwards", (roles) => [...roles, backwards]);
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain("resume.yaml: work fixture-backwards: endDate 2012-03 is before startDate 2012-09");
+  });
+
+  test("two roles that overlap on the career timeline, and names both", async () => {
+    // FedNow runs from 2021 to the start of 2024.
+    const overlapping = {
+      id: "fixture-overlap",
+      name: "The Fixture Root’s Overlapping Employer",
+      "x-short": "Overlap",
+      position: "Fixture Engineer",
+      startDate: "2022",
+      endDate: "2023",
+    };
+    const { exitCode, stderr } = await buildRefused("overlap", (roles) => [...roles, overlapping]);
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain("resume.yaml: work fednow and work fixture-overlap overlap");
+  });
+});
+
 // The page's one h1 names what the page is about. On /resume that is Peter, as the documents open with his name; the
 // app bar above it is the site's banner, not the page's heading. The workspace's h1 is its first view's heading (S11).
 describe("the headings of resume/index.html", () => {
@@ -678,6 +884,8 @@ describe("the not-found page 404.html", () => {
  */
 const PARTS: Record<string, (resume: Resume) => string[]> = {
   "acme-app-bar": (resume) => [resume.basics.name, resume.basics.label],
+  // Each career timeline span's tooltip holds its own role's text; the career timeline tests check each one.
+  "acme-tooltip": () => [],
 };
 
 // SPEC-site, Tech Stack and Testing 1. The wrappers render in the browser only (decision 0007), so the prerender writes
@@ -717,10 +925,12 @@ describe.each(["index.html", "resume/index.html"])("the design-system parts in %
 // import of the package root makes the build emit files that no page loads, such as the flow diagram's web worker and
 // the book's image (seen with @acmelabs/design-system-react 0.3.2), even when the bundler drops the unused wrappers.
 describe("the static assets", () => {
+  // A script that a page loads later counts: the career timeline loads acme-tooltip's definition on the first
+  // interaction (src/site/shell/CareerTimeline.tsx).
   test("each file under assets/ is a script or a stylesheet that a page loads", async () => {
     const loaded = new Set<string>();
     for (const page of await htmlFiles()) {
-      for (const script of await scriptsLoadedBy(page)) loaded.add(script);
+      for (const script of await scriptsLoadedBy(page, { dynamic: true })) loaded.add(script);
       new HTMLRewriter()
         .on('link[rel="stylesheet"]', { element: (element) => void loaded.add(element.getAttribute("href")!) })
         .transform(await Bun.file(`${staticDir}/${page}`).text());

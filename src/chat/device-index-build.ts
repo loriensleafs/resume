@@ -5,14 +5,14 @@
 
 import { parseId, skillsId } from "../knowledge/ids";
 import type { PublicKnowledge } from "../knowledge/types";
-import type { SiteResume } from "../site/data";
+import type { SiteResume } from "../site/site-data";
 import type { DeviceEntry, DeviceIndex } from "./device-index";
 
 /**
  * The label of each resume entry, by its id: "Resume: FedNow" for a role and "Resume: FedNow, highlight 2" for a
  * highlight (SPEC-chat, Citations card). A role is named by its short label, its `x-short` in resume.yaml, as the
- * career timeline names it; the site's build data holds it (src/site/data.ts). The labels of basics, a skills group and
- * education are a wording draft (docs/design/wording-drafts/C16.md).
+ * career timeline names it; the site's build data holds it (src/site/site-data.ts). The labels of basics, a skills group
+ * and education are a wording draft (docs/design/wording-drafts/C16.md).
  */
 function resumeLabeler(resume: SiteResume): (id: string) => string {
   // Maps, never an object's properties, so an id such as "constructor" names nothing (SPEC-knowledge, Ids).

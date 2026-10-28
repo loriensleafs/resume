@@ -1,5 +1,5 @@
 import { parseId } from "../../knowledge/ids";
-import type { SiteRole, SiteSource, SourceJsonFile } from "../data";
+import type { SiteRole, SiteSource, SourceJsonFile } from "../site-data";
 
 export type SourceViewProps = {
   /** The source: the build-time module's id and title, and its JSON file's kind and passages. */
