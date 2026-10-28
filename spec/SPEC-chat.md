@@ -1,6 +1,6 @@
 # Spec: chat
 
-Approved by Peter on 2026-10-27, last amended on 2026-10-27 after C1 (decision record rows 155 and 156). The amendments are in History, at the end.
+Approved by Peter on 2026-10-27, last amended on 2026-10-27 after the deploy spike (decision record row 168). The amendments are in History, at the end.
 
 ## Objective
 
@@ -50,7 +50,7 @@ A turn is one question and its answer, with the reads made for it.
 | The model answers, with or without reads | The answer, its steps, citations and follow-up questions | `answered`, or the refusal kind |
 | The third read returns | The next model call has `toolChoice: "none"`. The model answers from what it read, says what it could not check, and points to Peter's email | `answered` |
 | Five model calls have run without an answer | The sixth call has `toolChoice: "none"`, so it answers from what the turn read, as in the row above | `answered`, or the refusal kind |
-| The visitor selects Stop | What arrived stays, marked "Answer stopped." | `stopped` |
+| The visitor selects Stop | What arrived stays, marked "Answer stopped." | `stopped` when the request's abort reaches the handler. On Vercel it does not, and the log records the turn's own ending (see below) |
 | The deadline passes (120 s) | The handler ends the stream with its own `RUN_ERROR` event, code `DEADLINE`, before it closes. "The answer didn't arrive." with Try again and Edit question; partial text is not kept | `error` (`errorCode` `DEADLINE`) |
 | A model call reaches `max_tokens` | The same alert as an error; partial text is not kept | `error` (`errorCode` `MAX_TOKENS`) |
 | The model fails, or the stream breaks after it started | The same alert | `error` |
@@ -58,6 +58,8 @@ A turn is one question and its answer, with the reads made for it.
 | The request fails before any response (a network error) | The question goes back to the front of the queue as a queued question, and the input shows the offline state. The chat tries again every 30 s and on the `online` event | none (the function does not run) |
 | The host's rate limit answers 429 | The same alert, with "Too many questions in a short time. Try again in a few minutes." The queue pauses until the visitor sends again | none (the function does not run) |
 | The day's cost cap or Anthropic's monthly limit is reached | The "limit reached" state: Peter's email and a link that opens the resume, with no Try again. The question goes back into the input only when the input is empty. The queue pauses, and a saved pause marker keeps the state after a reload. The wording (Peter, row 138): for the day, "The chat has reached today's limit." and "It answers again at <00:00 UTC in the visitor's time, such as 5:00 PM> your time. Until then, you can read the resume or email Peter at <email>."; for the month, "The chat has reached this month's limit." and "It answers again on <the first day of next month, such as November 1>. Until then, you can read the resume or email Peter at <email>."; the button "Open the resume" | `limit`; a refusal before the model call writes no log entry |
+
+**A Stop on Vercel.** On Vercel the visitor's Stop does not reach the chat function, so the turn is logged with its own ending and settles at its real cost (Peter, row 168); [SPEC-deploy](SPEC-deploy.md), "A Stop on Vercel", has the platform detail.
 
 A reload during an answer cannot rejoin the stream, because the server keeps no conversation. The answer's row is written only when the answer ends, so the restored conversation shows that question with the error alert and no partial text.
 
@@ -736,3 +738,4 @@ All rows are in the [decision record](../docs/design/interview-2026-10-26.md).
 - 2026-10-27: amended after the spec reviews (rows 128 to 136).
 - 2026-10-27: Peter approved it with the updated mockups (row 139); the scope label and the texts follow rows 137 and 138.
 - 2026-10-27, after C1 ([research 07](../docs/research/07-tanstack-ai-hosting-model.md)): rows 155 and 156 added Thinking, The request's "A thrown run" and "No thinking in the request", the `SERVER_ERROR` code and the read budget's wording. The review of that amendment added the event allowlist (The request, "Events on the wire"), `turnLimits.thinkingCharacters`, `finishTurn()` and the history builder; the conductor set those for Peter's end review.
+- 2026-10-27, after the deploy spike (task D6): the `stopped` row of "How a turn ends" and "A Stop on Vercel" follow Peter's row 168. The handler logs `stopped` where the abort reaches it; on Vercel the turn logs its own ending.
