@@ -734,6 +734,9 @@ const toolCall = (name: string, input: unknown): FakeResponse => ({ toolCalls: [
 const toolOutputs = (request: TextOptions | undefined) =>
   (request?.messages ?? []).filter((message) => message.role === "tool").map((message) => JSON.parse(String(message.content)));
 
+/** open_source's error as the browser gets it (wire.ts): one fixed text, whatever the error said. */
+const OPEN_SOURCE_WIRE_ERROR = "That passage cannot be opened.";
+
 /** The results on the wire of the calls of one tool: each result's content, parsed, and its metadata. */
 function wireResultsOf(events: WireEvent[], tool: string) {
   const calls = new Set(events.filter((e) => e.type === "TOOL_CALL_START" && e.toolCallName === tool).map((e) => e.toolCallId));
@@ -835,7 +838,7 @@ describe("the open tools", () => {
     const events = await readEvents(await handleChat(request(), deps));
 
     expect(toolOutputs(requests[1]).at(-1)).toEqual({ error: NOT_CITED });
-    expect(wireResultsOf(events, "open_source")).toEqual([{ content: { error: NOT_CITED }, metadata: FAILED }]);
+    expect(wireResultsOf(events, "open_source")).toEqual([{ content: { error: OPEN_SOURCE_WIRE_ERROR }, metadata: FAILED }]);
     expect(streamedText(events)).toBe("That passage is not one this conversation cites.");
     expect(events.filter((e) => e.type === "RUN_ERROR")).toEqual([]);
     expect((await deps.log.list(1)).map(({ outcome }) => outcome)).toEqual(["answered"]);
@@ -856,13 +859,13 @@ describe("the open tools", () => {
     const events = await readEvents(await handleChat(whereFrom(`Test Person said so [${passageId}].`), seamDeps(fake)));
 
     expect(toolOutputs(requests[2]).at(-1)).toEqual({ error: NOT_A_PASSAGE });
-    expect(wireResultsOf(events, "open_source")).toEqual([{ content: { error: NOT_A_PASSAGE }, metadata: FAILED }]);
+    expect(wireResultsOf(events, "open_source")).toEqual([{ content: { error: OPEN_SOURCE_WIRE_ERROR }, metadata: FAILED }]);
     expect(streamedText(events)).toBe("Only a passage can open beside the chat.");
   });
 
   test.each<[string, string, unknown, unknown]>([
-    ["open_source with no passageId", "open_source", {}, { error: expect.stringContaining("Input validation failed for tool open_source") }],
-    ["open_source with a key of its own", "open_source", { passageId: "sample.2", note: "x" }, { error: expect.stringContaining("Input validation failed for tool open_source") }],
+    ["open_source with no passageId", "open_source", {}, { error: OPEN_SOURCE_WIRE_ERROR }],
+    ["open_source with a key of its own", "open_source", { passageId: "sample.2", note: "x" }, { error: OPEN_SOURCE_WIRE_ERROR }],
     ["open_resume with a key of its own", "open_resume", { passageId: "sample.2" }, {}],
   ])("%s gets a tool error from its input schema, opens nothing, and the run goes on to the answer", async (_name, tool, input, onTheWire) => {
     const { fake, requests } = recordingFake([toolCall(tool, input), { text: "Test Person built the first thing [highlight:acme.1]." }]);
@@ -872,6 +875,23 @@ describe("the open tools", () => {
     expect(toolOutputs(requests[1]).at(-1)).toEqual({ error: expect.stringContaining(`Input validation failed for tool ${tool}`) });
     expect(wireResultsOf(events, tool)).toEqual([{ content: onTheWire, metadata: FAILED }]);
     expect(streamedText(events)).toBe("Test Person built the first thing [highlight:acme.1].");
+  });
+
+  test("a failing open_source call reaches the browser as one fixed error text only: the model reads the whole error, with the arguments it sent, and no result on the wire holds any of it", async () => {
+    // The model chooses a key of its own, so the engine's input-check error names it and repeats the arguments.
+    const { fake, requests } = recordingFake([
+      toolCall("open_source", { passageId: "sample.2", "Internal code.": "x" }),
+      { text: "Test Person built the first thing [highlight:acme.1]." },
+    ]);
+
+    const events = await readEvents(await handleChat(whereFrom("Test Person planned the first thing [sample.2]."), seamDeps(fake)));
+
+    const { error } = toolOutputs(requests[1]).at(-1);
+    expect(error).toContain("Received arguments");
+    expect(error).toContain("Internal code.");
+    expect(wireResultsOf(events, "open_source")).toEqual([{ content: { error: OPEN_SOURCE_WIRE_ERROR }, metadata: FAILED }]);
+    const results = JSON.stringify(events.filter((e) => e.type === "TOOL_CALL_RESULT"));
+    for (const text of ["Input validation failed", "Received arguments", "Internal code."]) expect(results).not.toContain(text);
   });
 
   test("on the real Anthropic adapter, an open_source error reaches the model as a tool_result marked is_error, with the tool's fixed text", async () => {
@@ -1034,7 +1054,7 @@ describe("events on the wire", () => {
   test.each<[string, string, unknown, unknown]>([
     ["an open_resume result with a field of its own", "open_resume", { opened: true, text: "Internal code." }, { opened: true }],
     ["an open_source result with a field of its own", "open_source", { opened: true, text: "Internal code." }, { opened: true }],
-    ["an open_source error with a field of its own", "open_source", { error: "No such passage.", text: "Internal code." }, { error: "No such passage." }],
+    ["an open_source error with a field of its own", "open_source", { error: "No such passage.", text: "Internal code." }, { error: OPEN_SOURCE_WIRE_ERROR }],
     ["an open_resume result that is not { opened: true }", "open_resume", { opened: "Internal code." }, {}],
     ["an open_source result that is no JSON", "open_source", "Internal code.", {}],
     ["a result of a tool the chat does not have", "fetch_url", { opened: true, text: "Internal code." }, {}],

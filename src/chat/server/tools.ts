@@ -87,7 +87,13 @@ function passageSources(knowledge: Knowledge): PassageSources {
 /** A message of the request, as chatParamsFromRequestBody() gives it. */
 type RequestMessage = UIMessage | ModelMessage;
 
-/** The text of each earlier answer: each assistant message's text. A message that only calls tools has none. */
+/**
+ * The text of each earlier answer: each assistant message's text. A message that only calls tools has none.
+ * A string `content` is the only form of an answer's text here. The browser's uiMessagesToWire() joins the
+ * text parts of each assistant row into one string `content`. chatParamsFromRequestBody() then accepts only
+ * a string `content` on an assistant message (requireString), so any other `content` gets 400
+ * INVALID_REQUEST, and it deletes every message's `parts` field (dropInboundParts).
+ */
 const answerTexts = (conversation: readonly RequestMessage[]): string[] =>
   conversation.flatMap((message) =>
     message.role === "assistant" && "content" in message && typeof message.content === "string" ? [message.content] : [],
@@ -105,6 +111,7 @@ function citedPassages(answers: readonly string[], passages: PassageSources): Re
   const cited = new Set<string>();
   for (const text of answers) {
     const scanner = markerScanner((id) => (passages.has(id) ? "kept" : "not-a-citation"));
+    // end() decides the text that scan() still holds, such as a marker at the answer's very end.
     for (const { markers } of [scanner.scan(text), scanner.end()]) {
       for (const marker of markers) if (marker.kind === "citation") cited.add(marker.id);
     }

@@ -2,8 +2,7 @@
 // results on the wire; Thinking): one table of fixed messages, one per code, and wireError(code), which
 // builds every RUN_ERROR event the handler sends. The event holds its code and fixed message only. The
 // wire middleware, a new instance per request, sends each allowlisted event with its named fields only,
-// each tool's result with the fields that the spec gives it (a read as its ids only, an open tool as
-// { opened: true }), the thinking summary as chat.thinking events of at most
+// each tool's result as RESULT_FIELDS says, the thinking summary as chat.thinking events of at most
 // turnLimits.thinkingCharacters characters a turn, and every RUN_ERROR of the run as wireError(code),
 // Anthropic's spend limit as SPEND_LIMIT.
 
@@ -164,18 +163,23 @@ const ReadIdsSchema = z.object({ read: Ids, unknown: Ids, skipped: Ids }).catch(
 /** An open tool's result when it opened (Tools). */
 const Opened = z.object({ opened: z.literal(true) });
 
+/** open_source's error as the browser gets it: one fixed text, whatever the error said. */
+const OPEN_SOURCE_WIRE_ERROR = "That passage cannot be opened.";
+
 /**
- * What the browser gets of each tool's result (Tools): the fields that the spec gives it, and no other,
- * as an object schema drops every key it does not name. A read leaves as its ids. An open tool leaves
- * as `{ opened: true }`, and open_source's error as `{ error }`: the tool's own fixed text, or the
- * engine's text when the call fails the tool's input check. Neither holds read text: open_source reads
- * nothing, and the input check names the schema's rule. The table has one entry per tool name, so the
- * type check finds a tool missing here.
+ * What the browser gets of each tool's result (Tools), the one place that states it: the fields that
+ * the spec gives it, and no other, as an object schema drops every key it does not name. A read
+ * leaves as its ids. An open tool leaves as `{ opened: true }`. open_source's error leaves as
+ * `{ error }` with one fixed text: the error that the model reads is the tool's own text, or the
+ * engine's input-check text, which also holds the model's arguments ("Received arguments",
+ * validateToolInput()). The browser needs only to know that the call failed. The model's own tool
+ * message keeps the whole error. The table has one entry per tool name, so the type check finds a
+ * tool missing here.
  */
 const RESULT_FIELDS: Record<ToolName, z.ZodType> = {
   [READ_SOURCES]: ReadIdsSchema,
   [OPEN_RESUME]: Opened,
-  [OPEN_SOURCE]: z.union([Opened, z.object({ error: z.string() })]),
+  [OPEN_SOURCE]: z.union([Opened, z.object({ error: z.string() }).transform(() => ({ error: OPEN_SOURCE_WIRE_ERROR }))]),
 };
 
 const isToolName = (name: string): name is ToolName => Object.hasOwn(RESULT_FIELDS, name);
@@ -223,9 +227,8 @@ const finishReasonOf = (event: RunFinishedEvent) => event.finishReason ?? event.
 
 /**
  * The wire middleware for one turn. Only the allowlisted events pass, each as a new event built from
- * its named fields. Each read_sources result leaves as its ids only, so no read text and no Not public
- * section reaches the browser, and each other tool's result with the fields that RESULT_FIELDS names
- * for it. The thinking summary leaves as chat.thinking events. Every RUN_ERROR of the run leaves as
+ * its named fields. Each tool's result leaves as RESULT_FIELDS says. The thinking summary leaves as
+ * chat.thinking events. Every RUN_ERROR of the run leaves as
  * wireError(code), so no rawEvent, metadata, usage, nested error or other provider detail reaches the
  * browser, and the turn keeps the code it sent for finishTurn().
  */

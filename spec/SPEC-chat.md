@@ -148,7 +148,7 @@ All three tools run on the server; no tool writes anything. The two open tools r
 |---|---|---|---|
 | `read_sources` | `{ ids: string[]; topic: string }`, `topic` at most 60 characters | To the model: the `readPassages()` result, `{ text, read, unknown, skipped }`. To the browser: `{ read, unknown, skipped }` only | None. Reads approved sources only. Its call shows "Found 1 source about <topic>" and "Reading <title>" |
 | `open_resume` | `{}` | `{ opened: true }` | The browser calls `workspace.openResume()`. The answer shows the resume card |
-| `open_source` | `{ passageId: string }` | `{ opened: true }` or `{ error }` | Only for a passage of an approved source that the conversation cites (a kept marker in an earlier answer's text) or that this turn read. The browser calls `workspace.openCitation(id, n)` |
+| `open_source` | `{ passageId: string }` | `{ opened: true }` or `{ error }`. To the browser, the error is one fixed text (after C9's review) | Only for a passage of an approved source that the conversation cites (a kept marker in an earlier answer's text) or that this turn read. The browser calls `workspace.openCitation(id, n)` |
 
 The `read_sources` input schema checks SPEC-knowledge's `readLimits` before the tool calls `readPassages()`: at most 20 ids, each at most 64 characters. Too many ids or a too-long id is a tool error, not a throw out of the handler. An unknown or skipped id comes back named in the result, so the model can say what it could not read. A tool error is a result the model sees, not a failed run.
 
@@ -498,6 +498,7 @@ src/chat/server/about-read.ts      readAbout(): the About read of a passage or a
 src/chat/server/props.ts           ChatProps and the messages schema
 src/chat/server/prompt.ts          the system prompt, with the core from SPEC-knowledge's renderCore(knowledge), and the scope, audience and about lines
 src/chat/server/tools.ts           read_sources (its input checks readLimits), open_resume, open_source
+src/chat/server/tool-names.ts      the three tool names, in a leaf module that imports nothing
 src/chat/server/limits.ts          turnLimits; the readBudget and deadline middleware
 src/chat/server/markers.ts         the marker middleware and the chat.citations event
 src/chat/server/wire.ts            the chunk middleware, a new instance per request: the event allowlist, read results as ids,
@@ -751,3 +752,4 @@ All rows are in the [decision record](../docs/design/interview-2026-10-26.md).
 - 2026-10-27, after C4's review: The request's step 4 also refuses a request whose newest message is not a user message with text (400 `INVALID_REQUEST`), and the Origin check runs before the body is read. Both are the conductor's decisions, for Peter's end review ([build decisions](../docs/design/build-decisions.md)).
 - 2026-10-27, task A10: the design system moved from 0.3.2 to 0.3.3 (row 172). Rendering answers names 0.3.3: `acme-markdown` has the same record at 0.3.3, and the parts in the chat's task conventions are the same.
 - 2026-10-27, after C12's review: the two spend-limit tests run the adapter's own SDK behind a stub `fetch` with Anthropic's documented bodies, and every other stubbed turn goes through `createAnthropicChatWithClient()`. The conductor's decision, for Peter's end review ([build decisions](../docs/design/build-decisions.md)).
+- 2026-10-27, after C9's review: Project Structure lists `src/chat/server/tool-names.ts`, which C9 added. The browser gets one fixed `open_source` error text, whatever the error said (Tools). The fixed text is the conductor's decision, for Peter's end review.
